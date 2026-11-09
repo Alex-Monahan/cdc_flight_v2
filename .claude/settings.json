@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": "python3 \"$HOME/.claude/cdc_v2_guard/guard.py\"", "timeout": 10 }
+        ]
+      }
+    ]
+  }
+}
