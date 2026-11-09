@@ -1,0 +1,14 @@
+# secrets never enter the repo
+.env
+.env.*
+*.env
+secrets/
+# local tooling
+.claude/worktrees/
+.claude/settings.local.json
+__pycache__/
+*.pyc
+.venv/
+target/
+*.log
+.DS_Store
