@@ -99,3 +99,33 @@ def test_stream_positions(cluster):
     assert r["e_order_violations_primary"] == 0 and r["e_order_violations_replica"] == 0
     assert r["stream_order_equals_commit_order"]
     assert r["standby_slot_delivers_the_same_xid_S_E"]
+
+
+def test_standby_that_has_just_started_is_refused_until_it_settles(cluster):
+    """A commit waits for a synchronous standby across a checkpoint; the standby we read restarts from that
+    checkpoint.  Its snapshot then hides the transaction although the commit record ends before R0.  The
+    library's settle floor refuses every such cut and accepts a cut again after the next replayed commit."""
+    r = CP.standby_start(cluster)
+    assert "error" not in r, r
+    assert r["ok"] and r["slot_dropped"], r
+    assert not r["guard_accepts_a_wrong_cut"], r
+    assert not r["guard_refuses_a_right_cut_at_the_end"], r
+    assert r["before_the_restart"]["snapshot_reads"] == 1
+    if r["server_version_num"] <= 180006:
+        # negative control: without the floor, the position rule alone is caught on the releases examined
+        assert r["rule_violated"], r
+        assert r["after_the_restart"]["library_refuses_a_cut_taken_now"]
+
+
+def test_primary_rules_under_a_held_back_synchronous_standby(cluster):
+    """Cuts on the primary while commits wait for a standby whose replay is paused now and then: the stream
+    delivers transactions that snapshots do not see yet.  The exact rule and the gap tracker hold; a later
+    snapshot alone, and a later snapshot checked with pg_xact_status, are caught."""
+    r = CP.primary_stress(cluster, "live-test-primary", 20, sync="remote_apply", pause_period=2)
+    assert r["ok"], r["violations"]
+    assert r["violations"] == {}
+    assert r["cuts_checked"] >= 2000
+    wrong = r["wrong_rules"]
+    assert wrong["later_snapshot"] > 0
+    assert wrong["status_check"] > 0
+    assert wrong["passed_flush"] > 0

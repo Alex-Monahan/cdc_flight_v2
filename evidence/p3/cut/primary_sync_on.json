@@ -1,0 +1,107 @@
+{
+ "label": "primary_sync_on",
+ "server_version": "18.6 (Homebrew)",
+ "config": {
+  "seconds": 40.0,
+  "writers": [
+   "plain",
+   "async",
+   "subxact",
+   "long"
+  ],
+  "takers": 2,
+  "sync": "on",
+  "pause_period": 0.0,
+  "marker_period": 0.02,
+  "seed": 1
+ },
+ "started_utc": "2026-11-10T07:21:49Z",
+ "load_seconds": 41.2,
+ "violations": {},
+ "wrong_rules": {
+  "later_snapshot": 0,
+  "status_check": 0,
+  "xmax_ge_x": 1,
+  "passed_flush": 6917
+ },
+ "examples": {
+  "passed_flush": {
+   "snapshot": "27677497:27677701:27677497,27677510,27677696",
+   "key": 200,
+   "e": "0/CAE10C38",
+   "flush": "0/CAE10AA0"
+  },
+  "xmax_ge_x": {
+   "snapshot": "27677510:27679818:27677510,27679697,27679815",
+   "marker": 27679818
+  }
+ },
+ "checker": {
+  "cuts": 37499,
+  "in_progress_ids_listed": 57955,
+  "verdicts_checked": 17780355,
+  "cuts_the_exact_rule_accepts": 37499,
+  "cuts_with_xmin_at_or_after_a_marker": 37497,
+  "complete_cuts_discarded_by_the_status_check": 836,
+  "cuts_judged_with_a_gap_mark": 64312,
+  "blind_marks": 161,
+  "cuts_a_blind_mark_admits": 3594,
+  "blind_marks_still_blind": 86,
+  "cuts_a_blind_mark_refuses": 2846,
+  "gap_mark_empty": 1609,
+  "gap_mark_not_empty": 0,
+  "gap_mark_largest": 0
+ },
+ "wait_after_a_marker": {
+  "xmin_ge_x": {
+   "count": 1609,
+   "p50_s": 0.1348,
+   "p90_s": 0.2687,
+   "p99_s": 0.2976,
+   "max_s": 0.3039,
+   "markers_without_an_accepted_cut": 0
+  },
+  "xmin_gt_m": {
+   "count": 1609,
+   "p50_s": 0.0523,
+   "p90_s": 0.1949,
+   "p99_s": 0.2531,
+   "max_s": 0.2789,
+   "markers_without_an_accepted_cut": 0
+  },
+  "exact": {
+   "count": 1609,
+   "p50_s": 0.0002,
+   "p90_s": 0.0017,
+   "p99_s": 0.0023,
+   "max_s": 0.0052,
+   "markers_without_an_accepted_cut": 0
+  },
+  "gap_tracker": {
+   "count": 1609,
+   "p50_s": 0.0014,
+   "p90_s": 0.0024,
+   "p99_s": 0.0034,
+   "max_s": 0.0071,
+   "markers_without_an_accepted_cut": 0
+  }
+ },
+ "slot_dropped": true,
+ "cuts_checked": 37499,
+ "markers": 1609,
+ "transactions_delivered": 117841,
+ "e_order_violations": 0,
+ "stream": {
+  "calls": 864,
+  "rows": 354328,
+  "page_header_before_commit": 223
+ },
+ "activity": {
+  "bursts_async": 327,
+  "bursts_long": 40,
+  "bursts_plain": 253,
+  "bursts_subxact": 86
+ },
+ "problems": [],
+ "ok": true
+}

@@ -840,14 +840,22 @@ def _standby_view(conn, txn: P.Transaction, key: int) -> dict:
     finally:
         C.end_transaction(conn)
     full = C.widen_xid(txn.xid, cut.bounds.xmax)
-    floor = _control_xid(next_xid)
+    floor = C.parse_epoch_xid(next_xid)
+    try:                                    # the library as an engine uses it: floor first, then the cut
+        C.take_standby_cut_own(conn, settle_floor=C.settle_floor(conn))
+        C.end_transaction(conn)
+        refused = False
+    except C.StandbyNotSettled:
+        refused = True
     return {"snapshot": str(cut.bounds), "stream_xid": full, "snapshot_reads": seen,
             "commit_record_end_at_or_before_r0": txn.e <= cut.r0,
             "rule_by_position": cut.classify_by_position(txn.e).name,
             "xid_at_or_above_xmax": full >= cut.bounds.xmax,
-            "restart_point_redo_after_the_commit_record": C.parse_lsn(redo) > txn.e,
+            "control_file_redo": redo,
+            "restart_point_redo_at_or_after_the_end_of_the_commit_record": C.parse_lsn(redo) >= txn.e,
             "control_file_next_xid": floor,
-            "snapshot_xmax_at_or_above_control_file_next_xid": cut.bounds.xmax >= floor}
+            "snapshot_xmax_at_or_above_control_file_next_xid": cut.is_settled(floor),
+            "library_refuses_a_cut_taken_now": refused}
 
 
 def standby_start(cl: S.Cluster) -> dict:
@@ -888,7 +896,9 @@ def standby_start(cl: S.Cluster) -> dict:
                 out["before_the_restart"] = _standby_view(r, txn, key)
             cl.boot_sql("primary", "CHECKPOINT")
             redo, next_xid = o.execute(CONTROL).fetchone()
-            out["primary_checkpoint"] = {"redo_after_the_commit_record": C.parse_lsn(redo) > txn.e,
+            out["primary_checkpoint"] = {"redo": redo,
+                                         "redo_at_or_after_the_end_of_the_commit_record":
+                                             C.parse_lsn(redo) >= txn.e,
                                          "next_xid": _control_xid(next_xid),
                                          "commit_returned": done.is_set()}
             _flush_and_replay(cl, o)
@@ -909,9 +919,11 @@ def standby_start(cl: S.Cluster) -> dict:
         views = [out[k] for k in ("before_the_restart", "after_the_restart", "after_the_commit_returned",
                                   "after_a_later_commit")]
         out["rule_violated"] = any(v["rule_by_position"] == "INSIDE" and v["snapshot_reads"] != 1 for v in views)
-        out["guard_accepts_a_wrong_cut"] = any(v["snapshot_xmax_at_or_above_control_file_next_xid"]
+        out["guard_accepts_a_wrong_cut"] = any((v["snapshot_xmax_at_or_above_control_file_next_xid"]
+                                                or not v["library_refuses_a_cut_taken_now"])
                                                and v["rule_by_position"] == "INSIDE" and v["snapshot_reads"] != 1
                                                for v in views)
+        out["guard_refuses_a_right_cut_at_the_end"] = views[-1]["library_refuses_a_cut_taken_now"]
         out["ok"] = not errors and views[-1]["snapshot_reads"] == 1
     finally:
         cl.localpg("unset", "primary", "synchronous_standby_names", check=False)

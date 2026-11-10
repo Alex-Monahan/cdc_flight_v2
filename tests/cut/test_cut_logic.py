@@ -456,3 +456,69 @@ def test_gap_tracker_is_exact(events, blind):
             elif mark.unknown_below is None:
                 assert not sees_all, (mark, cut)                 # exact: refuses only when one is missed
             assert set(mark.blocking(cut)) or mark.admits(cut)   # a refusal names what it waits for
+
+
+# -- the settle floor of a standby that has just started -------------------------------------------------------
+
+def test_parse_epoch_xid():
+    assert C.parse_epoch_xid("0:26838533") == 26838533
+    assert C.parse_epoch_xid("2:17") == (2 << 32) | 17
+    for bad in ("17", "0:1:2", "a:b", "-1:5", "0:4294967296", ""):
+        with pytest.raises(ValueError):
+            C.parse_epoch_xid(bad)
+
+
+def test_settle_floor_reads_the_control_file_and_refuses_a_primary():
+    conn = FakeConn({C.SQL_SETTLE_FLOOR: ("1:9", True)})
+    assert C.settle_floor(conn) == (1 << 32) | 9
+    with pytest.raises(C.CutError):
+        C.settle_floor(FakeConn({C.SQL_SETTLE_FLOOR: ("1:9", False)}))
+
+
+def test_cut_below_the_settle_floor_is_dropped():
+    """The measured case (evidence/p3/cut/standby_start.json): after the restart the snapshot is
+    26838532:26838532: and the control file says next id 26838533; the hidden transaction is 26838532."""
+    def conn_with(snapshot):
+        replay = iter(["0/1000", "0/1100"])
+        return FakeConn({C.SQL_REPLAY_LSN: lambda: (next(replay),),
+                         C.SQL_OWN_FIRST: lambda: (next(replay), True, snapshot)})
+    floor = 26838533
+    conn = conn_with("26838532:26838532:")
+    with pytest.raises(C.StandbyNotSettled) as info:
+        C.take_standby_cut_own(conn, settle_floor=floor)
+    assert conn.log[-1] == "ROLLBACK" and (info.value.floor, info.value.xmax) == (floor, 26838532)
+    cut = C.take_standby_cut_own(conn_with("26838534:26838534:"), settle_floor=floor)
+    assert cut.is_settled(floor)
+    cut = C.take_standby_cut_own(conn_with("26838532:26838532:"))        # no floor given: the caller tests
+    assert not cut.is_settled(floor) and cut.is_settled(26838532)
+    assert not C.StandbyCut(r0=1, r1=2).is_settled(3)                     # no bounds: never settled
+    # the exported way tests the floor before it tests for a quiet snapshot
+    replay = iter(["0/1000", "0/1100", "0/1200"])
+    conn = FakeConn({C.SQL_REPLAY_LSN: lambda: (next(replay),), C.SQL_R1: lambda: (next(replay), True),
+                     C.SQL_EXPORT: lambda: ("00000003-0000001B-1", next(replay), True, "700:705:")})
+    with pytest.raises(C.StandbyNotSettled):
+        C.take_standby_cut_exported(conn, quiet_only=True, settle_floor=706)
+    assert conn.log[-1] == "ROLLBACK"
+
+
+def test_take_standby_cut_after_waits_for_replay_and_for_the_floor():
+    now = [0.0]
+    snaps = iter(["700:700:", "700:700:", "702:702:"])
+
+    def conn_for(snapshots, replay="0/2000"):
+        return FakeConn({C.SQL_REPLAY_LSN: (replay,), C.SQL_OWN_FIRST: lambda: (replay, True, next(snapshots))})
+
+    def sleep(seconds):
+        now[0] += seconds
+    conn = conn_for(snaps)
+    cut = C.take_standby_cut_after(conn, 0x1800, deadline_s=5, settle_floor=701, clock=lambda: now[0], sleep=sleep)
+    assert cut.bounds.xmax == 702 and cut.usable_after(0x1800) and cut.is_settled(701)
+    assert conn.log.count("ROLLBACK") == 2                                 # two snapshots were dropped
+    now[0] = 0.0
+    conn = conn_for(iter(["700:700:"] * 1000))
+    with pytest.raises(C.CutDeadlineExceeded) as info:
+        C.take_standby_cut_after(conn, 0x1800, deadline_s=1, settle_floor=701, clock=lambda: now[0], sleep=sleep)
+    assert info.value.detail == {"settle_floor": 701, "xmax": 700}
+    assert conn.log[-1] == "ROLLBACK"                                      # nothing is left open
+    with pytest.raises(TypeError):
+        C.take_standby_cut_after(conn_for(iter(["702:702:"])), 0x1800, deadline_s=1)   # the floor has no default

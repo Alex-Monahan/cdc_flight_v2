@@ -1,60 +1,70 @@
 {
  "server_version_num": 180006,
- "commit_record_end": "0/C4FD9F30",
+ "commit_record_end": "0/C509A360",
  "commit_returned_when_delivered": false,
  "before_the_restart": {
-  "snapshot": "26838533:26838533:",
-  "stream_xid": 26838532,
+  "snapshot": "26838568:26838568:",
+  "stream_xid": 26838567,
   "snapshot_reads": 1,
   "commit_record_end_at_or_before_r0": true,
   "rule_by_position": "INSIDE",
   "xid_at_or_above_xmax": false,
-  "restart_point_redo_after_the_commit_record": false,
-  "control_file_next_xid": 24049283,
-  "snapshot_xmax_at_or_above_control_file_next_xid": true
+  "control_file_redo": "0/C5045AE8",
+  "restart_point_redo_at_or_after_the_end_of_the_commit_record": false,
+  "control_file_next_xid": 26838551,
+  "snapshot_xmax_at_or_above_control_file_next_xid": true,
+  "library_refuses_a_cut_taken_now": false
  },
  "primary_checkpoint": {
-  "redo_after_the_commit_record": true,
-  "next_xid": 26838533,
+  "redo": "0/C509A360",
+  "redo_at_or_after_the_end_of_the_commit_record": true,
+  "next_xid": 26838568,
   "commit_returned": false
  },
  "after_the_restart": {
-  "snapshot": "26838532:26838532:",
-  "stream_xid": 26838532,
+  "snapshot": "26838567:26838567:",
+  "stream_xid": 26838567,
   "snapshot_reads": 0,
   "commit_record_end_at_or_before_r0": true,
   "rule_by_position": "INSIDE",
   "xid_at_or_above_xmax": true,
-  "restart_point_redo_after_the_commit_record": true,
-  "control_file_next_xid": 26838533,
-  "snapshot_xmax_at_or_above_control_file_next_xid": false
+  "control_file_redo": "0/C509A360",
+  "restart_point_redo_at_or_after_the_end_of_the_commit_record": true,
+  "control_file_next_xid": 26838568,
+  "snapshot_xmax_at_or_above_control_file_next_xid": false,
+  "library_refuses_a_cut_taken_now": true
  },
  "commit_returned_while_the_standby_restarted": false,
  "commit_returned_after_release": true,
  "after_the_commit_returned": {
-  "snapshot": "26838532:26838532:",
-  "stream_xid": 26838532,
+  "snapshot": "26838567:26838567:",
+  "stream_xid": 26838567,
   "snapshot_reads": 0,
   "commit_record_end_at_or_before_r0": true,
   "rule_by_position": "INSIDE",
   "xid_at_or_above_xmax": true,
-  "restart_point_redo_after_the_commit_record": true,
-  "control_file_next_xid": 26838533,
-  "snapshot_xmax_at_or_above_control_file_next_xid": false
+  "control_file_redo": "0/C509A360",
+  "restart_point_redo_at_or_after_the_end_of_the_commit_record": true,
+  "control_file_next_xid": 26838568,
+  "snapshot_xmax_at_or_above_control_file_next_xid": false,
+  "library_refuses_a_cut_taken_now": true
  },
  "after_a_later_commit": {
-  "snapshot": "26838534:26838534:",
-  "stream_xid": 26838532,
+  "snapshot": "26838569:26838569:",
+  "stream_xid": 26838567,
   "snapshot_reads": 1,
   "commit_record_end_at_or_before_r0": true,
   "rule_by_position": "INSIDE",
   "xid_at_or_above_xmax": false,
-  "restart_point_redo_after_the_commit_record": true,
-  "control_file_next_xid": 26838533,
-  "snapshot_xmax_at_or_above_control_file_next_xid": true
+  "control_file_redo": "0/C509A360",
+  "restart_point_redo_at_or_after_the_end_of_the_commit_record": true,
+  "control_file_next_xid": 26838568,
+  "snapshot_xmax_at_or_above_control_file_next_xid": true,
+  "library_refuses_a_cut_taken_now": false
  },
  "rule_violated": true,
  "guard_accepts_a_wrong_cut": false,
+ "guard_refuses_a_right_cut_at_the_end": false,
  "ok": true,
  "slot_dropped": true
 }
