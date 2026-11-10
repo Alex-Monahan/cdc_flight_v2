@@ -987,8 +987,8 @@ replacement is the gap tracker of section 10.4.
 **The negative control the review asked for.** "The rule without the `pg_xact_status` check must be caught by
 the stress test." It is: wrong rule `later_snapshot`, 2,317 catches in `primary_remote_apply` and 3,103 in
 `primary_twophase`. The rule with the check is caught 2,313 and 3,092 times in the same runs. The scenario with
-a stopped synchronous standby is
-`primary-gap`; the campaign uses a standby whose replay is paused, because writers must make progress.
+a stopped synchronous standby is `primary-gap`; the campaign uses a standby whose replay is paused, because
+writers must make progress.
 
 **The three things the proposal left open.**
 
@@ -1004,8 +1004,8 @@ a stopped synchronous standby is
 
 A check that would see the gap needs something written at moment 1 of section 10.1 and readable by SQL. The
 commit timestamp is such a thing (`pg_xact_commit_timestamp`, set right after the commit record is written,
-REL_18 `xact.c` line 1472),
-but it needs `track_commit_timestamp = on`, which is off by default and needs a restart. It was not tested.
+REL_18 `xact.c` line 1472), but it needs `track_commit_timestamp = on`, which is off by default and needs a
+restart. It was not tested.
 The gap tracker needs no server setting, because the engine already knows what the stream delivered.
 
 **The three statements of the design on `main`** (the last chunk of a table is open-ended; a repair snapshot
