@@ -1,27 +1,36 @@
 # The cut: where a snapshot lies in the stream
 
-Status: result of the P3 cut work. This document states the rule, argues it from the Postgres source, reports
-what was measured, and proposes text for `docs/design/core.md` 7.2 and its open points 1 and 12.
+Status: result of the P3 cut work, revised after the coordinator's review. This document states the rule,
+argues it from the Postgres source, reports what was measured, and proposes text for `docs/design/core.md` 7.2
+and its open points 1 and 12.
 
 Code: `src/cdc_v2/pg/cut.py` (the library the engine uses), `src/cdc_v2/testing/pgoutput.py` (decoder for
-tests), `src/cdc_v2/testing/cutstress.py`, `cutprimary.py`, `cutmodel.py` and `tools/cutstress` (the tests).
+tests), `src/cdc_v2/testing/cutnarrow.py` (a narrowing that only the tests can use, section 2),
+`src/cdc_v2/testing/cutstress.py`, `cutprimary.py`, `cutmodel.py` and `tools/cutstress` (the tests).
 Evidence: `evidence/p3/cut/` (index in its `README.md`). Every number below names its evidence file.
 
 ## Result in brief
 
 - **The standby rule of core 7.2 holds**, with two conditions and one correction that 7.2 does not have yet.
-  Tested by a model check over every interleaving of small histories, by a main campaign of 1,854,463 cuts over
-  7,305,063 transactions, and by twelve further runs with 2,244,033 cuts. No violation of a rule. Six wrong
-  rules were caught, each many times (sections 3 to 5).
+  Tested by a model check over every interleaving of small histories and by stress runs against Postgres 18.6.
+  Seven runs had the complete checker: 1,192,278 cuts over 5,025,620 transactions. Seven earlier runs, the
+  main campaign among them (2,982,523 cuts over 9,353,889 transactions), ran before the checker's last step
+  existed; section 5.1 says exactly which. No violation of a rule in any of them. Six wrong rules were caught,
+  each many times (sections 3 to 5).
 - **Condition 1: the standby is settled.** A standby that has just started can hide a committed transaction
   whose commit record it has replayed. The `inside` rule then fails. A cheap check repairs it (section 8).
 - **Condition 2: an exported snapshot is quiet, or the server carries a fix that is not released yet.** On
   every released version a session that imports a snapshot on a standby can see transactions the exporter does
-  not see. This touches the design for tables without a key (section 7).
+  not see, and can spoil rows for every other reader of that standby. The rule for tables without a key is
+  decided: a quiet exported snapshot within a bounded, declared wait, otherwise one reader with its own
+  snapshot (section 7).
 - **Correction: `R0 ≥ P0` is checked for every snapshot**, also on the standby that holds the slot. After a
   restart its replay position can lie before what the slot delivered (sections 3 and 5.6).
-- **The unknown set is small.** With the snapshot's bounds and the start of the commit record, about three of
-  four cuts under load, and every cut on an idle source, have no `unknown` transaction at all (section 5.2).
+- **The unknown set is small.** With the snapshot's bounds, about two of three cuts under load (66.93% in the
+  main campaign) and every cut on an idle source have no `unknown` transaction at all. The start of the commit
+  record would narrow it further, but the pipeline's stream does not deliver it (sections 2 and 5.2).
+- **A cut belongs to the timeline it was taken on.** After a promotion or a slot finding, open cuts are
+  abandoned and their backfills start again (section 9.2).
 - **On a primary** the gap between "commit record written" and "visible to snapshots" is real and can last as
   long as a synchronous standby is away. The answer by 64-bit transaction id is exact (197,212 cuts, 110 million
   answers, none wrong). `R0 ≥ P0` is replaced by a rule that needs no wait in the normal case. The
@@ -51,6 +60,10 @@ Evidence: `evidence/p3/cut/` (index in its `README.md`). Every number below name
 - **`P0`**: the stream position at which a table enters `backfilling` (core design 7.1).
 - **Gap**: on a primary, the time between the moment a commit record is in the WAL and the moment the
   transaction becomes visible to new snapshots.
+- **Timeline**: the number of one WAL history. A promotion starts a new timeline. A position is meaningful
+  only together with its timeline.
+- **Settle floor**: the transaction id a standby snapshot's `xmax` must have reached before a cut is used
+  (section 8).
 
 ## 2. The rule on a standby
 
@@ -77,25 +90,39 @@ Two ways to take the cut (`take_standby_cut_own`, `take_standby_cut_exported`):
   This way has a Postgres defect on every released minor version, see section 7. It is safe only for quiet
   snapshots, or on a server that carries the fix.
 
-Three additions make `unknown` smaller. They are optional and each is proven below.
+Two additions make `unknown` smaller. They are optional and each is proven below. The library has both
+(`StandbyCut.classify(e, xid)`).
 
 1. **By transaction id.** With the snapshot's `xmin` and `xmax`: id at or above `xmax` ⇒ `outside`; id below
    `xmin` ⇒ `inside`. On a standby the in-progress list is always empty, so ids between the bounds stay
    `unknown`.
 2. **Quiet snapshot.** If `xmin = xmax`, addition 1 answers every transaction. The cut has no `unknown`.
+
+A third addition is sound and **is not available to the pipeline**:
+
 3. **By the start of the commit record** (the sharper outside rule). A transaction whose commit record starts
    after the first record that follows `R1` is `outside`. In positions: `S > R1`, except when `R1` lies on a WAL
    page boundary and `S − R1 ≤ 40`, because then the record at `S` is the first record after `R1` (a page
    header of 24 or 40 bytes lies between). The plain form `S > R1 ⇒ outside` is wrong at page boundaries
    (model check, section 4).
 
-Three rules of use:
+   Raw pgoutput gives `S` (section 6). Stock Debezium does not: no field of its records equals `S`
+   (`docs/spike/local_streaming.md` section 4: 0 of 1,222 transactions; `docs/design/core.md` section 2: "the
+   commit record's start LSN is not available from Debezium"). The engine therefore never has `S`. The library
+   has no argument for it. The addition lives in `src/cdc_v2/testing/cutnarrow.py` (`starts_after_r1`,
+   `classify_with_start`), a module of the test tools, which the test decoder feeds. Sections 4 and 5 report it
+   as a result and as a measurement. Nothing in the proposed design text (section 13) uses it.
+
+Four rules of use:
 
 - A snapshot is used only if `R0 ≥ P0`. Then everything the stream applied before the switch is `inside`.
 - The stream **has passed** a snapshot when its applied position is greater than `R1`. The transaction at `E1`
   is then applied, and so is every `unknown` transaction.
 - A cut is taken only on a server that is in recovery (`pg_is_in_recovery()`), and only when the standby is
-  **settled** (section 8). The library checks both.
+  **settled** (section 8). The library checks both. The settle floor is not optional: every taker needs it.
+- A cut is valid only on the **timeline** it was taken on (section 9.2). After a promotion or a slot finding
+  (core design, section 8), open cuts are abandoned and their backfills start again
+  (`StandbyCut.valid_on(timeline)`).
 
 ## 3. Why the rule holds
 
@@ -143,7 +170,7 @@ value is used as `R0`.
 **Outside.** `R1` is read after the snapshot exists. By fact 1, when `R1` was read, no record after the first
 record that follows `R1` had begun to be applied. A commit record that starts after that first record had not
 begun; its flip had not happened; the snapshot, which is older than the reading of `R1`, does not see the
-transaction. That is the sharper rule (addition 3). The rule in `E` follows: the first record after `R1` ends
+transaction. That is the sharper rule (addition 3, test only). The rule in `E` follows: the first record after `R1` ends
 after `R1`. If it is the commit record of a stream transaction, that transaction has the smallest `E` above
 `R1`, which is `E1`. Every transaction with `E > E1` has a commit record that starts at or after the end of
 that first record, so it is `outside`.
@@ -203,12 +230,22 @@ against every world and compares every answer of every rule with what the snapsh
 | 2 transactions, up to 3 records | 11,280 | 1,178,688 | no sound rule violated |
 | 2 transactions, up to 4 records | 65,280 | 9,638,328 | no sound rule violated |
 
-Evidence: `evidence/p3/cut/model.txt` (command `tools/cutstress model --sizes 1:3,2:3,2:4`). The default
-test run (`tests/cut/test_cut_model.py`) explores two smaller sizes in about a second: 1 transaction with up to
-4 records, 2 transactions with up to 2 records.
+Evidence: `evidence/p3/cut/model.txt` (command `tools/cutstress model --sizes 1:3,2:3,2:4`).
 
-Rules that hold in every world: `inside`, `outside`, by id below `xmin`, by id at or above `xmax`, the sharper
-outside rule with the page-boundary exception, the library's combined answer, "has passed", and `R0 ≥ P0`.
+The check runs at three levels, so that the default test run stays fast:
+
+| Where | Sizes (transactions : records) | Worlds | Reader interleavings | Time |
+|---|---|---|---|---|
+| default test run (`tests/cut/test_cut_model.py`) | 1:2 and 2:2; 60 random larger worlds | 1,416 | 91,860 | under 1 s |
+| the same file with the marker `localpg` | 1:4 and 2:3; 600 random larger worlds | 13,704 | 1,390,340 | about 10 s |
+| `tools/cutstress model` (default sizes 1:4 and 2:3; any size with `--sizes`) | as asked | | | seconds; about half a minute for the sizes of the evidence file |
+
+The marker `localpg` only keeps the larger sizes out of the default run; they need no Postgres. The small sizes
+still refute every wrong rule of the table below (`test_every_wrong_rule_is_refuted`).
+
+Rules that hold in every world: `inside`, `outside`, by id below `xmin`, by id at or above `xmax`, the library's
+combined answer, "has passed", and `R0 ≥ P0`; and, for the tests only, the sharper outside rule with the
+page-boundary exception and the library's answer narrowed by it.
 
 Rules that the model refutes, each with a printed counterexample:
 
@@ -221,13 +258,15 @@ Rules that the model refutes, each with a printed counterexample:
 | id at or above `xmin` ⇒ `outside` | the transaction committed before the snapshot while an older one was still running |
 
 The model also runs a deliberately wrong server that moves the position before the flip. There `inside`,
-`R0 ≥ P0` and the library's answer are violated. So the check does notice when the server's order is not the one
-the rule assumes. That order is the one fact the rule rests on, and section 3 shows where it is in the source.
+`R0 ≥ P0`, the library's answer and the narrowed answer of the tests are violated. So the check does notice when
+the server's order is not the one the rule assumes. That order is the one fact the rule rests on, and section 3 shows where it is in the source.
 
 The primary has its own model (class `Primary`): a transaction gets an id, writes its commit record (the slot can
 deliver it from then on), and later leaves the set of running transactions (snapshots see it from then on).
 Histories of up to 3 transactions (7, 145 and 6,265 histories, and 535 with two markers) confirm the rules of
-section 10, including the library's gap tracker, and refute three wrong ones.
+section 10, including the library's gap tracker, and refute three wrong ones. The default test run explores the
+histories of 1 and 2 transactions (687); the 6,265 histories of 3 transactions run with the marker `localpg`
+and in `tools/cutstress model`.
 
 ## 5. Measurement on a standby
 
@@ -284,54 +323,79 @@ gives the load averages of each run.
 A first attempt of the main campaign was interrupted from outside after about 1,320 s. Its partial output is
 kept as `main_interrupted.txt` and is not used. The campaign was run again in full.
 
-**The late check.** Step 3 of the checker was added after the main campaign and the variants of section 5.6 had
-run. Before it, a cut whose snapshot returned no row for a key was not judged for that key by step 2. Step 1
-still judged it. To close this, two runs were repeated with the full checker:
+**Which runs had the complete checker.** Step 3 of the checker was added after the main campaign and the first
+runs of the variants had finished. Before it, a cut whose snapshot returned no row for a key was not judged for
+that key by step 2; step 1 still judged it. A lost row is one of the ways the defect of section 7 shows. The
+claims of this document therefore rest on runs with all three steps:
 
-| Run | Command | Cuts | Transactions | Violations | Missing rows |
+| Run | What it is | Cuts | Transactions | Violations | Missing rows |
 |---|---|---|---|---|---|
-| `main_recheck` | as the main campaign, 600 s | 628,741 | 2,451,105 | 0 | 0 |
-| `v5b_restart_crash` | as variant 5 of section 5.6 (7 restarts, 7 kills) | 89,718 | 722,901 | 0 | 0 |
+| `main_recheck` | the main campaign again, 600 s | 628,741 | 2,451,105 | 0 | 0 |
+| `v5b_restart_crash` | variant 5: 7 restarts and 7 kills of the standby | 89,718 | 722,901 | 0 | 0 |
+| `v7b_exported_no_subxact` | variant 7: exported way, one-statement transactions | 120,737 | 485,205 | 0 | 0 |
+| `v9_exported_open_no_subxact` | exported way, transactions held open, no subtransactions | 93,600 | 464,260 | 0 | 0 |
+| `qb_quiet_exported` | exported way, quiet snapshots only, subtransactions in the load | 82,928 | 268,363 | 0 | 0 |
+| `v1b_big_drop` | variant 1 | 95,014 | 155,847 | 0 | 0 |
+| `v3b_ddl_walswitch_pause` | variant 3 | 81,540 | 477,939 | 0 | 0 |
+| sum | | 1,192,278 | 5,025,620 | 0 | 0 |
 
-The other runs were not repeated. In them a missing row would have gone unseen unless step 1 caught it. The run
-with the exported way and subtransactions (section 5.5) was repeated with the full checker and did find one
-cut with a missing row, on the exported way.
+The three runs that are expected to fail (`x_exported_subxact`, `xb_exported_subxact`, `xc_exported_subxact`,
+section 5.5) had the complete checker too.
+
+How to tell from the files. The result files written after the review (`v7b`, `v9`, `qb`, `v1b`, `v3b`, `xb`,
+`xc`) name the steps of their checker (`checker_steps`). The files of `main_recheck`, `v5b_restart_crash` and
+`x_exported_subxact` are older than that field. That they ran with step 3 follows from two facts:
+`x_exported_subxact`, the first of the three, reports a missing row, which only step 3 counts; and step 3 and
+the three outputs were committed together (`58c2c64`).
+
+**Runs with steps 1 and 2 only:** `main`, `v2_twophase_subxact`, `v4_apply_delay`, `v5_restart_crash`,
+`v6_slot_on_primary`, `v8_idle` and `nc_mid_redo`: 2,982,523 cuts over 9,353,889 transactions, no violation.
+The main campaign was repeated in a shorter form and variant 5 in full; the other five were not repeated. In
+these seven runs a lost row would have gone unseen unless step 1 caught it. All their cuts were taken the own
+way. They are used below for what steps 1 and 2 decide: the answers for single transactions, the wrong rules,
+and the measurements of sections 5.2 to 5.4.
+
+**Outputs that are not used:** `v1_big_drop`, `v3_ddl_walswitch_pause`, `v7_exported_no_subxact` and
+`q_quiet_exported` are the first runs of four variants that were repeated after the review. Their files are
+kept. No number in this document comes from them.
 
 ### 5.2 The size of the unknown set
 
 The unknown set of a cut is the set of stream transactions for which the cut answers `unknown`. Its size was
-counted for every cut, for the plain rule in positions (`base`), with the id (addition 1 of section 2), with the
-record start (addition 3), and with both.
+counted for every cut, for the plain rule in positions (`base`), with the id (addition 1 of section 2, **what
+the pipeline has**), with the record start (addition 3, which only the test decoder has), and with both.
 
 Main campaign, 1,854,463 cuts (`main.txt`):
 
-| Rule | Cuts with no `unknown` | Mean size | Largest |
-|---|---|---|---|
-| positions only | 0.00% | 1.878 | 265 |
-| + transaction id | 66.93% | 0.709 | 263 |
-| + record start | 68.99% | 0.891 | 264 |
-| + both | 74.44% | 0.631 | 263 |
+| Rule | Who can use it | Cuts with no `unknown` | Mean size | Largest |
+|---|---|---|---|---|
+| positions only | the pipeline | 0.00% | 1.878 | 265 |
+| + transaction id | the pipeline | **66.93%** | 0.709 | 263 |
+| + record start | tests only | 68.99% | 0.891 | 264 |
+| + both | tests only | 74.44% | 0.631 | 263 |
 
 Distribution of the size:
 
-| Size | positions only | with both additions |
-|---|---|---|
-| 0 | 0 | 1,380,492 |
-| 1 | 1,295,248 | 252,874 |
-| 2 | 290,826 | 116,277 |
-| 3–5 | 220,693 | 77,175 |
-| 6–10 | 31,483 | 17,949 |
-| 11–100 | 14,581 | 9,198 |
-| 101 and more | 1,632 | 498 |
+| Size | positions only | with the id (the pipeline) | with the id and the record start (tests only) |
+|---|---|---|---|
+| 0 | 0 | 1,241,252 | 1,380,492 |
+| 1 | 1,295,248 | 389,339 | 252,874 |
+| 2 | 290,826 | 117,728 | 116,277 |
+| 3–5 | 220,693 | 78,424 | 77,175 |
+| 6–10 | 31,483 | 17,995 | 17,949 |
+| 11–100 | 14,581 | 9,227 | 9,198 |
+| 101 and more | 1,632 | 498 | 498 |
 
 What the numbers say:
 
 - With positions only the set is never empty. The transaction at `E1` is always `unknown`. In 1,289,783 cuts
   (69.6%) the two readings were equal, and the set is that one transaction.
-- The sharper outside rule answers exactly that transaction in most cuts: the share of cuts with an empty set
-  goes from 0% to 68.99%, and the mean from 1.878 to 0.891. That is how much sharper it is in practice. It needs
-  `S`, which the stream gives (section 6).
-- The id does about the same alone (66.93%) and the two together reach 74.44%.
+- **The id empties the set in two of three cuts** (66.93%) and brings the mean from 1.878 to 0.709. This is the
+  number the design can count on.
+- The sharper outside rule answers the transaction at `E1` in most cuts: alone it empties the set in 68.99% of
+  the cuts, together with the id in 74.44%. That is how much the start of the commit record would add: 7.5
+  points. The pipeline cannot have it, because stock Debezium does not deliver `S` (section 2). The two rows are
+  kept as a measurement of what is given up.
 - The tail is long. The size is the number of commits replayed between the two readings, plus one. The campaign
   replayed about 4,060 stream transactions per second, so the largest set (265) corresponds to about 65 ms
   between the two readings of one cut.
@@ -341,15 +405,15 @@ What the numbers say:
 On an idle source (variant 8 of section 5.6: one transaction every half second, 7,734 cuts): the plain set has
 1 transaction in 7,716 cuts and 2 in 18. With the id it is empty in every cut, because every snapshot is quiet.
 
-Across the variants of section 5.6 the share of cuts with no `unknown` at all, with both additions, lies
-between 59.6% (prepared transactions held open) and 100% (idle). The table in 5.6 has every value.
+Across the variants of section 5.6 the share of cuts with no `unknown` at all, with the id, lies between 56.9%
+(prepared transactions held open) and 100% (idle). The table in 5.6 has every value.
 
 **What this means for keyless tables** (core design 7.4). That section reads the whole table under one snapshot
 whose cut has no `unknown` transaction that touches the table, and takes another snapshot otherwise. The share
 measured here counts cuts with no `unknown` transaction at all, so it is a lower bound for the share 7.4 can
-use. About three of four cuts qualify under load, and every cut on an idle source. The expected number of
-snapshots per table is below 2 in every load tested (1 / 0.596 = 1.7 in the worst variant). This holds for the
-own way. The exported way is limited by section 7.
+use. With the id, about two of three cuts qualify under load, and every cut on an idle source. The expected
+number of snapshots per table is below 2 in every load tested (1 / 0.569 = 1.8 in the worst variant). This
+holds for the own way. The exported way is limited by section 7.
 
 ### 5.3 How often a snapshot is quiet
 
@@ -358,26 +422,29 @@ A quiet snapshot (`xmin = xmax`) is exact and is the only safe exported snapshot
 
 | Run | Load | Quiet |
 |---|---|---|
-| variant 8 | idle | 100% |
-| variant 7 | plain, async, abort: one statement per transaction | 99.8% |
-| main | plain, async, abort and a writer with 100 subtransactions per transaction | 54.3% |
-| variant 3 | as main, with DDL, WAL switches, replay pauses | 54.2% |
-| variant 4 | as main without aborts, apply delay 300 ms | 54.0% |
-| variant 6 | as main, slot on the primary | 53.6% |
-| variant 5 | as main, standby restarts and crashes | 48.7% |
-| variant 1 | transactions held 0.3 s, big transactions, drops | 10.4% |
+| `v8_idle` | idle | 100% |
+| `v7b_exported_no_subxact` | plain, async, abort: one statement per transaction | 99.9% |
+| `main` | plain, async, abort and a writer with 100 subtransactions per transaction | 54.3% |
+| `v4_apply_delay` | as main without aborts, apply delay 300 ms | 54.0% |
+| `v6_slot_on_primary` | as main, slot on the primary | 53.6% |
+| `v3b_ddl_walswitch_pause` | as main, with DDL, WAL switches, replay pauses | 53.0% |
+| `v5b_restart_crash` (`v5_restart_crash`) | as main, standby restarts and crashes | 51.6% (48.7%) |
+| `qb_quiet_exported` | plain, abort and a writer with 100 subtransactions per transaction | 51.0% |
+| `v9_exported_open_no_subxact` | plain, async, abort and one writer that holds each transaction 0.3 s | 17.8% |
+| `v1b_big_drop` | transactions held 0.3 s, big transactions, drops | 9.4% |
 | `nc_mid_redo` | drops, 3,000 subtransactions, 4 takers | 6.6% |
-| variant 2 | prepared transactions held open, 3,000 subtransactions | 4.4% |
+| `v2_twophase_subxact` | prepared transactions held open, 3,000 subtransactions | 4.4% |
 
 A snapshot is quiet when no transaction is in flight on the standby at that moment. With one-statement
 transactions nearly every snapshot is quiet. With one writer whose transactions span 100 subtransactions about
 half are. A transaction that stays open keeps every snapshot from being quiet for as long as it stays open: the
-share falls with the time transactions are held (variants 1 and 2). A transaction open for an hour means no
-quiet snapshot for an hour.
+share falls with the time transactions are held (`v9`, `v1b`, `v2`). A transaction open for an hour means no
+quiet snapshot for an hour. This is why the rule for keyless tables has a bounded wait and a second way
+(section 7.1).
 
-Run `q_quiet_exported` takes exported cuts and keeps only quiet ones, retrying at once otherwise. Two such
-takers kept 36,447 snapshots and dropped 104,616 in 120 s (25.8% kept). The share per attempt is lower than the
-share per cut of the own-way taker in the same run (51.4%). The likely reason is that a dropped snapshot is
+Run `qb_quiet_exported` takes exported cuts and keeps only quiet ones, retrying at once otherwise. Two such
+takers kept 36,413 snapshots and dropped 106,106 in 120 s (25.5% kept). The share per attempt is lower than the
+share per cut of the own-way taker in the same run (51.0%). The likely reason is that a dropped snapshot is
 retried at once, inside the same busy moment; this was not examined further. The rate is what matters: each
 taker got a quiet snapshot about 150 times per second under 3 writers.
 
@@ -388,14 +455,16 @@ counts the cuts in which the evidence contradicts them. Each wrong rule is one t
 
 | Wrong rule | Meaning | Caught, main | Caught, variants (range) |
 |---|---|---|---|
-| `stmt_as_r0` | `R0` read by the statement that takes the snapshot | 15,291 | 366 to 23,616; 0 when idle |
-| `r1_inside` | `E ≤ R1 ⇒ inside` | 15,291 | 366 to 26,065; 0 when idle |
+| `stmt_as_r0` | `R0` read by the statement that takes the snapshot | 15,291 | 366 to 23,160; 0 when idle |
+| `r1_inside` | `E ≤ R1 ⇒ inside` | 15,291 | 366 to 25,591; 0 when idle |
 | `r1_outside` | `E > R1 ⇒ outside`, no allowance for `E1` | 31 | 0 to 34,497 |
 | `naive_sharp` | `S > R1 ⇒ outside`, no page-boundary exception | 0 | 0 to 34 |
-| `xmax_inside` | id below `xmax` ⇒ `inside` | 716,780 | 227 to 97,986; 0 when idle |
-| `xmin_outside` | id at or above `xmin` ⇒ `outside` | 847,284 | 243 to 656,624; 0 when idle |
+| `xmax_inside` | id below `xmax` ⇒ `inside` | 716,780 | 83 to 97,986; 0 when idle |
+| `xmin_outside` | id at or above `xmin` ⇒ `outside` | 847,284 | 100 to 656,624; 0 when idle |
 
-These are the wrong rules the model check refutes in section 4. All of them were caught live.
+These are the wrong rules the model check refutes in section 4. All of them were caught live. The range is
+over the runs of the table in section 5.6. `naive_sharp` is a wrong form of the narrowing by `S`, which only
+the tests use (section 2); it stays in the list because the test narrowing is itself checked on every cut.
 
 **The in-statement position** (claim 5 of the task). On the own way the statement that takes the snapshot also
 reads the position, and the library calls that value `R1`. Used as `R0` it gives wrong `inside` answers: 15,291
@@ -407,84 +476,118 @@ first; the function ran after the commit was replayed. So the in-statement posit
 `R1` = `S` = 0/57803F38 and `E` = `E1` = 0/57803F68. The commit record is the first record after `R1`. Its flip
 had happened and the position had not yet moved when the snapshot was taken. This is the transaction at `E1`,
 and it is why the rule says `E > E1` and not `E > R1`. The case is rare with short redo (31 of 1.85 million
-cuts) and common when the redo of a commit record is long: 8,210 cuts in variant 1 and 34,497 in the run made
-for it (`nc_mid_redo`: writers that drop 20 tables per transaction, 4 takers without a pause, 715,694 cuts).
+cuts) and common when the redo of a commit record is long: 7,638 cuts in `v1b_big_drop` and 34,497 in the run
+made for it (`nc_mid_redo`: writers that drop 20 tables per transaction, 4 takers without a pause, 715,694
+cuts).
 
-**Page boundary** (`naive_sharp`). 11 cuts in variant 1 and 34 in `nc_mid_redo`. Example (`nc_mid_redo.json`):
-`R1` = 1/9DC3C000, a page boundary. `S` = 1/9DC3C018, which is `R1` + 24, right after the page header. The
-snapshot sees the transaction (`n` = 803, snapshot reads 803). `S > R1` holds and the transaction is inside. The
-exception in addition 3 of section 2 covers exactly this, and the library was not wrong in any of these cuts.
+**Page boundary** (`naive_sharp`). 2 cuts in `v1b_big_drop` and 34 in `nc_mid_redo`. Example
+(`nc_mid_redo.json`): `R1` = 1/9DC3C000, a page boundary. `S` = 1/9DC3C018, which is `R1` + 24, right after the
+page header. The snapshot sees the transaction (`n` = 803, snapshot reads 803). `S > R1` holds and the
+transaction is inside. The page-boundary exception of the test narrowing (section 2, `cutnarrow.py`) covers
+exactly this, and the narrowing was not wrong in any of these cuts.
 
 **By id.** `xmax_inside` and `xmin_outside` fail in a large share of cuts under load, as expected: ids between
 the bounds are undecided on a standby, because the in-progress list is not printed there.
 
 ### 5.5 The exported way in bulk
 
-Three runs compare the two ways under the same load. Section 7 explains the defect behind the result.
+Six runs compare the two ways under the same load, all with the complete checker. Section 7 explains the
+defect behind the result.
 
-| Run | Writers | Exported cuts | With a violation | Own-way cuts in the same run | With a violation |
-|---|---|---|---|---|---|
-| variant 7 (`v7_exported_no_subxact`) | plain, async, abort | 75,623 | 0 | 49,822 | 0 |
-| `q_quiet_exported` (quiet snapshots only) | plain, subxact, abort | 36,447 | 0 | 47,481 | 0 |
-| `x_exported_subxact` (every snapshot) | plain, subxact, abort | 53,951 | 771 | 37,110 | 0 |
+| Run | Writers | Exported cuts | Of them not quiet | With a violation | Own-way cuts in the same run | With a violation | Missing rows |
+|---|---|---|---|---|---|---|---|
+| `v7b_exported_no_subxact` | plain, async, abort | 72,533 | 58 | 0 | 48,204 | 0 | 0 |
+| `v9_exported_open_no_subxact` | long, plain, async, abort | 55,598 | 45,600 | 0 | 38,002 | 0 | 0 |
+| `qb_quiet_exported` (quiet snapshots only) | plain, subxact, abort | 36,413 | 0 | 0 | 46,515 | 0 | 0 |
+| `x_exported_subxact` (every snapshot) | plain, subxact, abort | 53,951 | 25,393 | 771 | 37,110 | 0 | 1 |
+| `xb_exported_subxact` (the same again) | plain, subxact, abort | 57,066 | 25,513 | 724 | 38,107 | **37** | 1 |
+| `xc_exported_subxact` (the same again) | plain, subxact, abort | 61,599 | 26,797 | 684 | 40,251 | 0 | 2 |
 
-- Without subtransactions in the load the exported way is as good as the own way.
-- With subtransactions and every exported snapshot used, 771 of 53,951 exported cuts (1.4%) break a sound rule:
-  the importing session sees transactions that the exporting snapshot does not see. This run is expected to
-  fail and is kept as evidence of the defect, not as a result of the rule.
-- With subtransactions and only quiet snapshots used, no cut breaks a rule.
-- One exported cut of the failing run returned no row at all for one key (`rows_missing_from_a_cut` = 1). That
-  is the worst form of the defect: the reader misses a row that exists.
-- No own-way cut was affected in the same run (0 of 37,110). Section 7 describes how a session with a broken
-  imported snapshot can leave wrong hint bits behind for other sessions. That effect did not show in bulk.
-  The single-case scenario (`export_defect.json`) shows it.
+- **A quiet exported snapshot is safe** (`qb`). 36,413 quiet exported cuts, no violation and no missing row,
+  under the load that breaks the exported way in the three runs below it. The rule for keyless tables rests on
+  this (section 7.1). `xc` agrees: none of its 684 exported cuts with a violation was quiet, and its 34,802
+  quiet exported cuts were all right. (`x` and `xb` do not record this.)
+- **Without subtransactions the exported way is right, also when the snapshot is not quiet** (`v9`). 45,600
+  exported cuts that were not quiet, none wrong. `v7b` alone hardly shows this: its transactions are one
+  statement long, and all but 58 of its exported snapshots were quiet. The result agrees with the cause (section
+  7): the defect needs a subtransaction. **The design does not use this result.** The pipeline cannot know that
+  a source never opens a subtransaction, so on a server with the defect the library refuses every exported
+  snapshot that is not quiet.
+- **With subtransactions and every exported snapshot used, the defect shows in bulk.** 771, 724 and 684
+  exported cuts (1.4%, 1.3%, 1.1%) break a sound rule: the importing session sees transactions that the
+  exporting snapshot does not see. These three runs are expected to fail. They are kept as evidence of the
+  defect, not as a result of the rule.
+- **Rows are lost.** In each of the three runs one or two exported cuts returned no row at all for a key that
+  exists. That is the worst form of the defect, and it is what step 3 of the checker was added for.
+- **Readers that import nothing are hit too, sometimes.** In `xb`, 37 of 38,107 cuts taken the own way broke a
+  rule. In `x` and `xc`, none did (37,110 and 40,251 cuts). This is the damage section 7 describes: an importer
+  with a broken snapshot marks a row version as aborted, and from then on every session of that standby reads
+  the old row, until the key is written again. Which rule the own-way cuts of `xb` broke is an inference, not
+  a record: the per-way record was added to the checker after `xb`, for `xc`, and `xc` had no such cut. The
+  counts fit the damage: rule `inside` (a transaction with `E ≤ R0` that the snapshot does not see) is violated
+  90 times in `xb` and in no other run of this document, and 37 `inside` plus 37 `library` violations make the
+  74 of the own way. How many spoiled rows are behind them is not known. The single case of
+  `export_defect.json` shows the same damage directly (section 7, last column of the table).
+- In `qb` the takers import quiet snapshots only, so no importer has a broken snapshot. The 46,515 own-way
+  cuts of that run were all right.
 
 ### 5.6 Variants
 
 Each variant changes one thing. All ran on Postgres 18.6 with the stream out of `E` order 0 times, no cut left
 unchecked and the slot dropped at the end. "No `unknown`" is the share of cuts with an empty unknown set with
-both additions.
+the snapshot's bounds (additions 1 and 2 of section 2), which is what the pipeline has. "Checker" says whether
+the run had all three steps (section 5.1).
 
-| # | Label | What it adds | Seconds | Cuts | Transactions | Violations | No `unknown` |
-|---|---|---|---|---|---|---|---|
-| 1 | `v1_big_drop` | big transactions, table drops, transactions held 0.3 s | 120 | 104,047 | 157,457 | 0 | 76.64% |
-| 2 | `v2_twophase_subxact` | two-phase commit finished out of order by another session; 3,000 subtransactions | 120 | 141,029 | 315,222 | 0 | 59.62% |
-| 3 | `v3_ddl_walswitch_pause` | DDL on the counter table, WAL segment switches, replay pause and resume (13, 12, 12 times) | 120 | 84,094 | 483,333 | 0 | 77.85% |
-| 4 | `v4_apply_delay` | `recovery_min_apply_delay` = 300 ms | 120 | 100,763 | 363,741 | 0 | 76.02% |
-| 5 | `v5_restart_crash` | standby restarted 7 times and killed 7 times | 180 | 76,431 | 703,213 | 0 | 71.20% |
-| 6 | `v6_slot_on_primary` | slot on the primary, snapshots on the standby | 120 | 86,409 | 477,973 | 0 | 73.34% |
-| 7 | `v7_exported_no_subxact` | exported way, no subtransactions | 120 | 125,445 | 485,337 | 0 | 99.88% |
-| 8 | `v8_idle` | idle source | 120 | 7,734 | 236 | 0 | 100% |
-| | `nc_mid_redo` | long redo, 4 takers without a pause | 150 | 715,694 | 188,441 | 0 | 76.74% |
-| | `q_quiet_exported` | exported way, quiet snapshots only | 120 | 83,928 | 266,391 | 0 | 83.00% |
+| # | Label | What it adds | Seconds | Cuts | Transactions | Violations | No `unknown` | Checker |
+|---|---|---|---|---|---|---|---|---|
+| 1 | `v1b_big_drop` | big transactions, table drops, transactions held 0.3 s | 120 | 95,014 | 155,847 | 0 | 69.16% | complete |
+| 2 | `v2_twophase_subxact` | two-phase commit finished out of order by another session; 3,000 subtransactions | 120 | 141,029 | 315,222 | 0 | 56.88% | steps 1, 2 |
+| 3 | `v3b_ddl_walswitch_pause` | DDL on the counter table, WAL segment switches, replay pause and resume (13, 12, 12 times) | 120 | 81,540 | 477,939 | 0 | 64.22% | complete |
+| 4 | `v4_apply_delay` | `recovery_min_apply_delay` = 300 ms | 120 | 100,763 | 363,741 | 0 | 76.02% | steps 1, 2 |
+| 5 | `v5_restart_crash` | standby restarted 7 times and killed 7 times | 180 | 76,431 | 703,213 | 0 | 63.86% | steps 1, 2 |
+| 5 | `v5b_restart_crash` | the same again | 180 | 89,718 | 722,901 | 0 | 67.95% | complete |
+| 6 | `v6_slot_on_primary` | slot on the primary, snapshots on the standby | 120 | 86,409 | 477,973 | 0 | 65.37% | steps 1, 2 |
+| 7 | `v7b_exported_no_subxact` | exported way, no subtransactions, one-statement transactions | 120 | 120,737 | 485,205 | 0 | 99.92% | complete |
+| 8 | `v8_idle` | idle source | 120 | 7,734 | 236 | 0 | 100% | steps 1, 2 |
+| 9 | `v9_exported_open_no_subxact` | exported way, no subtransactions, one writer holds each transaction 0.3 s | 120 | 93,600 | 464,260 | 0 | 67.81% | complete |
+| | `nc_mid_redo` | long redo, 4 takers without a pause | 150 | 715,694 | 188,441 | 0 | 73.89% | steps 1, 2 |
+| | `qb_quiet_exported` | exported way, quiet snapshots only | 120 | 82,928 | 268,363 | 0 | 76.82% | complete |
 
-Together with the main campaign: 3,380,037 cuts and 10,746,407 transactions without a violation of a sound
-rule. The two repeated runs of section 5.1 add 718,459 cuts and 3,174,006 transactions, also without one.
+Sums, with the main campaign and its repeat (section 5.1):
+
+- complete checker, seven runs: 1,192,278 cuts and 5,025,620 transactions, no violation of a sound rule, no
+  missing row;
+- steps 1 and 2 only, seven runs: 2,982,523 cuts and 9,353,889 transactions, no violation of a sound rule.
+
+Variants 1, 3 and 7 and the quiet-only run were run twice. The table has the second run; the first is not
+used (section 5.1). Variant 5 was run twice too, and both runs are in the table.
+Variant 9 was added after the review, because variant 7 has almost no exported snapshot that is not quiet.
 
 What each variant covers, from the list of the task:
 
-- `synchronous_commit = off`: writer `async` in the main campaign and in variants 3 to 7.
+- `synchronous_commit = off`: writer `async` in the main campaign and in variants 3 to 7 and 9.
 - Big transactions: variant 1 (20,000 rows per transaction).
 - More than 64 subtransactions: writer `subxact` in the main campaign (100) and in variant 2 (3,000).
 - Two-phase commit, also finished by another session in another order: variant 2 (157,681 prepared
   transactions committed, 38,851 rolled back).
-- Aborts: writer `abort` in the main campaign and in variants 3, 5, 6 and 7.
+- Aborts: writer `abort` in the main campaign and in variants 3, 5, 6, 7 and 9.
 - DDL, WAL segment switches, replay pause and resume: variant 3. The DDL adds and drops a column, changes the
   replica identity and rewrites the table with `VACUUM FULL`.
 - `recovery_min_apply_delay`: variant 4.
-- Standby restart between cuts: variant 5. The takers reconnected 255 times.
+- Standby restart between cuts: variant 5. The takers reconnected 255 times in the first run and 194 times
+  in the second.
 
 **Variants 5 and 6 and the rule `R0 ≥ P0`.** The checker also counts cuts whose `R0` lies below the last `E`
 the stream had delivered when the cut was taken. Such a cut would fail `R0 ≥ P0` if `P0` were that `E`.
 
 | Run | Cuts with `R0` below the stream | Of them, cuts that miss a delivered transaction |
 |---|---|---|
-| variant 5 (slot on the standby, restarts) | 6 | 6 (20 keys) |
-| variant 6 (slot on the primary) | 4 | 4 (6 keys) |
+| `v5_restart_crash` (slot on the standby, restarts) | 6 | 6 (20 keys) |
+| `v6_slot_on_primary` | 4 | 4 (6 keys) |
 | every other run | 0 | 0 |
 
 The repeat of variant 5 (`v5b_restart_crash`) had no such cut. So the case is rare: 6 cuts in one of two runs
-with 14 standby restarts each.
+with 14 standby restarts each. This count does not depend on step 3 of the checker.
 
 No sound rule is violated in these cuts: the rule `R0 ≥ P0` refuses them, and the answers for single
 transactions stay right. But they show that the condition is not implied by the place of the slot. In variant 5
@@ -506,8 +609,20 @@ and lost them. Section 3 gives the source. The check `R0 ≥ P0` must be made fo
 `decode.c` `DecodeCommit` (658 / 672 / 667) passes the start and the end of the commit record to
 `reorderbuffer.c` `ReorderBufferCommit` (2747 / 2780 / 2887), which stores them as `final_lsn` and `end_lsn`.
 When the slot is read with `pg_logical_slot_get_binary_changes`, the `lsn` column of the COMMIT row is `E` too.
-Ids of subtransactions do not appear in the stream. The engine widens the 32-bit id to 64 bits with a snapshot
-taken around the same time (`widen_xid` in the library).
+Ids of subtransactions do not appear in the stream.
+
+**What the pipeline has.** The pipeline does not read pgoutput itself; stock Debezium does. Of the three values
+Debezium passes on two (`docs/spike/local_streaming.md` section 4): `E` is the `lsn_commit` of the END record,
+and the 32-bit id is the `txId` of a change record and the first part of the `id` of BEGIN and END. It does not
+pass on `S`: no Debezium field equals it (0 of 1,222 transactions; `docs/design/core.md` section 2). So the
+library takes `E` and the id and nothing else. The tests read pgoutput with their own decoder, which is how
+they have `S` and can measure the narrowing by it (section 2, addition 3).
+
+**The id has 32 bits and wraps; the bounds of a snapshot have 64.** `widen_xid(xid, near)` gives the 64-bit id
+that lies closest to a 64-bit reference. It is exact when the transaction and the reference are less than 2^31
+ids apart. On a standby the reference is the `xmax` of the cut's own snapshot (`StandbyCut.classify`). On a
+primary it is the `xmax` of the latest probe (`GapTracker.widen`, section 10.4). It is never an id kept from an
+earlier run or read from the destination.
 
 **Order.** Decoding reads the WAL in order. A transaction is delivered when its commit record is decoded, as a
 whole, before the next record is read. So transactions arrive in the order of their commit records, and `E`
@@ -578,7 +693,9 @@ after the commit reads 1.
 | first write inside a subtransaction | **1 (wrong)** | **0 (wrong)** |
 | 65 subtransactions after a top-level write | **1 (wrong)** | **0 (wrong)** |
 
-The stress run with exporting takers and subtransaction writers shows the same thing in bulk (section 5.5).
+Three stress runs with exporting takers and subtransaction writers show the same thing in bulk, both columns
+of it (section 5.5): 684 to 771 wrong exported cuts per run, lost rows in every run, and in one of the three
+runs 37 wrong cuts of a reader that imported nothing.
 
 **Versions.** Present in 16.15, 17.11 and 18.6 and everything before them. Fixed on the stable branches by
 commit `74c9832ca610`, "Export subxip[] for snapshots taken during recovery." (REL_18_STABLE, 2026-08-26,
@@ -589,26 +706,79 @@ and I may not build one.
 **A quiet snapshot is safe.** If `xmin = xmax` there is no id between the bounds. The list that is lost is empty.
 This holds on every version.
 
-**What the library does.** `take_standby_cut_exported` refuses on a server with the defect. With
-`quiet_only=True` it keeps a snapshot only if it is quiet and raises `SnapshotNotQuiet` otherwise; the caller
-tries again. `accept_export_defect=True` exists for tests only.
+**What the library does.**
 
-**Consequence for the design.** Core 7.1 reads a keyless table "under one snapshot" through an exporter and
-importers, and 7.4 depends on it. On a released server this is unsafe. Three ways out, in my order of
-preference:
+- `export_defect(server_version_num)` is the one place that knows which versions have the defect. Nothing else
+  in the library, the tools or the tests names a version.
+- `take_standby_cut_exported` refuses on a server with the defect. With `quiet_only=True` it keeps a snapshot
+  only if it is quiet and raises `SnapshotNotQuiet` otherwise. `accept_export_defect=True` exists for tests
+  only.
+- `take_standby_cut_after(conn, p0, deadline, settle_floor, exported=True, quiet_only=True)` takes snapshots
+  until one is quiet or the `Deadline` has passed. It ends with a cut, or with the result `NoQuietSnapshot`
+  (the number of attempts and the oldest id still running at the last one). That result is not an error and is
+  not raised: it is false in a condition, so the caller can tell it from a cut and from a failure. A deadline
+  that passes while replay has not reached `P0`, or while the standby has not settled, is still an error
+  (`DeadlineExceeded`).
+- `take_keyless_standby_cut(conn, p0, deadline, settle_floor, quiet_wait_s=60)` is the rule below in one call.
 
-1. Use the exported way with quiet snapshots only. A quiet cut also has no `unknown` transaction, which is
-   exactly what 7.4 wants for a keyless table. The price: while some write transaction is always open on the
-   primary, no quiet snapshot comes. The wait needs a deadline and a report. Section 5.3 gives the measured
-   share of quiet snapshots.
-2. Read a keyless table with one reader and its own snapshot. Always possible, slower for a large table.
-3. Use the exported way as designed on servers that carry the fix, and way 1 or 2 elsewhere.
+### 7.1 Tables without a key: the rule (decided)
 
-**One risk stays outside our control.** Any other program that imports a snapshot on the same standby (parallel
-`pg_dump` does) can leave wrong hint bits in the tables we read. A reader with its own snapshot then reads those
-rows wrongly too. The design can only state it as a requirement on the standby: no snapshot importers on a
-standby without the fix. The table above shows the effect in a single case (last column). In bulk it did not
-show: section 5.5 has 37,110 own-way cuts taken next to importers, none wrong.
+Core 7.1 reads a keyless table "under one snapshot" through an exporter and importers, and 7.4 depends on it.
+On a released server that is unsafe. The coordinator has decided the rule; it goes to the owner as a decision
+made, not as a question.
+
+On a standby, for a table without a key:
+
+1. **The server has the defect** (`export_defect(version)` is true): wait for a **quiet exported snapshot**,
+   within a bounded, declared wait (core 4.3; default 60 s, `QUIET_WAIT_DEFAULT_S`). A quiet cut also has no
+   `unknown` transaction, which is exactly what 7.4 wants.
+2. **If none comes within the wait: one reader with its own snapshot.** No snapshot is exported or imported.
+3. **The server carries the fix:** a plain exported snapshot, quiet or not.
+
+Why not "quiet only". A snapshot is quiet only when no write transaction is open on the primary at that moment
+(section 5.3). One transaction that stays open, a session idle in a transaction or a forgotten prepared
+transaction, keeps every snapshot from being quiet for as long as it lasts. A backfill that waits for a quiet
+snapshot without a bound would never complete, for a reason the source is free to have.
+
+Why not "one reader" always. One reader holds its snapshot, and its lock on the table, for the whole read of the
+table. On a standby a replayed `ACCESS EXCLUSIVE` lock on that table (DDL, `VACUUM FULL`, a truncating vacuum)
+conflicts with it. Replay then waits for up to `max_standby_streaming_delay` and after that cancels the
+reader. While replay waits, the standby replays nothing, so the slot on it delivers nothing either: the whole
+stream stalls, not only this table. Importers read in chunks and hold nothing between them. So the one reader
+is the fallback, not the default.
+
+The **declared wait** is part of the rule: the backfill reports that it waits for a quiet snapshot, and for
+which transaction (the oldest running id of `NoQuietSnapshot`), and after the wait it reports that it reads the
+table with one reader.
+
+Measured (`evidence/p3/cut/keyless.json`, command `tools/cutstress keyless --quiet-wait 1`, Postgres 18.6, which
+has the defect). A transaction that wrote inside a subtransaction is held open on the primary:
+
+| Step | Result |
+|---|---|
+| quiet-only wait of 1 s while the transaction is open | `NoQuietSnapshot` after 1.01 s and 18 attempts; false in a condition; its oldest running id is the open transaction |
+| `take_keyless_standby_cut` while it is open | a cut of the own way, `R0 ≥ P0`, snapshot `44654627:44654629:`; the one reader does not see the open transaction and sees the committed one; the `NoQuietSnapshot` is kept in the cut for the log |
+| `take_keyless_standby_cut` after the commit | a cut of the exported way, quiet (`44654629:44654629:`); a reader that imports it sees both transactions |
+
+Tests: `tests/cut/test_cut_logic.py` (hermetic: the result object, the deadline, the order of the three
+cases), `tests/cut/test_cut_live.py` `test_keyless_table_gets_a_quiet_exported_snapshot_or_one_reader`. The
+stress run `qb_quiet_exported` (section 5.5) is the bulk evidence that a quiet exported snapshot is safe.
+
+### 7.2 A runbook rule
+
+**No other program imports snapshots on the standby we read.** Any other program that imports a snapshot on
+the same standby (parallel `pg_dump` does) can leave wrong hint bits in the tables we read. A reader with its
+own snapshot then reads those rows wrongly too, and so does a reader that imports a quiet snapshot. The
+pipeline cannot detect this. It is a requirement on the standby for as long as its server has the defect.
+
+Evidence. The table of measurements above shows the effect in a single case (last column). In bulk it showed
+in one of three runs: in `xb_exported_subxact`, 37 of 38,107 cuts of a reader with its own snapshot were wrong
+while two other sessions imported defective snapshots on the same standby; in `x_exported_subxact` and
+`xc_exported_subxact`, none of 77,361 (section 5.5). When the other sessions imported quiet snapshots only
+(`qb_quiet_exported`), none of 46,515 was wrong. So the damage is intermittent, and a short test that does not
+show it proves nothing.
+
+The pipeline itself keeps the rule: on a server with the defect its own importers import quiet snapshots only.
 
 ## 8. A standby that has just started: the `inside` rule can fail
 
@@ -653,16 +823,18 @@ replay beyond it, looks like a Postgres defect worth reporting.
 
 `evidence/p3/cut/standby_start.json` (command `tools/cutstress standby-start`, Postgres 18.6). The primary's
 `synchronous_standby_names` names a standby that does not exist, so one commit waits. The scenario was run
-three times with the same outcome; the file holds the last run:
+several times with the same outcome, and the live test repeats it. The file holds the last run, made with the
+library as it is now:
 
-| Moment | Snapshot on the standby | Sees `T` (id 26838567) | `E ≤ R0` | Control file next id | Library |
+| Moment | Snapshot on the standby | Sees `T` (id 44654445) | `E ≤ R0` | Settle floor of the connection | Library |
 |---|---|---|---|---|---|
-| before the restart | `26838568:26838568:` | yes | yes | 26838551 | accepts |
-| after the restart, `T` still waiting | `26838567:26838567:` | **no** | yes | 26838568 | refuses |
-| after `T` returned on the primary | `26838567:26838567:` | **no** | yes | 26838568 | refuses |
-| after one later commit | `26838569:26838569:` | yes | yes | 26838568 | accepts |
+| before the restart | `44654446:44654446:` | yes | yes | 44654429 | accepts |
+| after the restart, `T` still waiting | `44654445:44654445:` | **no** | yes | 44654446 | refuses |
+| after `T` returned on the primary | `44654445:44654445:` | **no** | yes | 44654446 | refuses |
+| after one later commit | `44654447:44654447:` | yes | yes | 44654446 | accepts |
 
-The redo pointer of the checkpoint (`0/C509A360`) equals the end of `T`'s commit record.
+The redo pointer of the checkpoint (`2/21048E50`) equals the end of `T`'s commit record. The restart ends the
+connection, so the rows after it use a new connection and the floor read on that one.
 
 ### 8.4 The condition: a settled standby
 
@@ -684,9 +856,24 @@ first snapshot is settled unless a transaction with one of the newest ids was op
 The runtime role of the test cluster may call `pg_control_checkpoint()` on the standby (checked by calling
 it). Whether a managed service restricts the function is not checked; the pre-flight check should call it.
 
-Library: `settle_floor(conn)`, `StandbyCut.is_settled(floor)`, the takers' `settle_floor=` argument (raises
-`StandbyNotSettled`), and `take_standby_cut_after`, where the argument has no default. Tests:
-`tests/cut/test_cut_logic.py` (hermetic), `tests/cut/test_cut_live.py`
+Library. The floor is not optional, and it is bound to its connection.
+
+- `settle_floor(conn)` reads the floor and returns a `SettleFloor`: the value together with the connection it
+  was read on. On a node that is not in recovery it refuses.
+- Every function that takes a standby cut has the floor as a required argument: `take_standby_cut_own`,
+  `take_standby_cut_exported`, `take_standby_cut_after`, `take_keyless_standby_cut`. None has a default and
+  none accepts `None` or a bare number.
+- The taker asks the object for the value for its own connection (`SettleFloor.for_connection(conn)`). For any
+  other connection that raises `CutError`. So a floor read on one standby is never used on another, and a floor
+  read before a restart is never used after it, because the restart ended that connection.
+- A snapshot below the floor is dropped and `StandbyNotSettled` is raised. `take_standby_cut_after` waits and
+  takes another, within its `Deadline`.
+- Tests that need to look at an unsettled cut pass a separately named switch, `accept_unsettled=True`, as
+  `accept_export_defect` does for the other defect. Production code has no reason to name either.
+
+Tests: `tests/cut/test_cut_logic.py` (hermetic; among them
+`test_no_function_takes_a_standby_cut_without_a_settle_floor` and
+`test_a_settle_floor_read_on_one_standby_is_refused_on_another`), `tests/cut/test_cut_live.py`
 `test_standby_that_has_just_started_is_refused_until_it_settles`.
 
 The campaign with standby restarts and crashes (section 5.6, variant 5) has no violation without the floor,
@@ -723,19 +910,50 @@ cut is taken on it and held open, the standby is promoted, and a row is written 
 
 | Observation | Value |
 |---|---|
-| The open cut, `R0` = `R1` | 1/E3001758; its snapshot reads 1 |
+| The open cut, `R0` = `R1` | 2/21000578; taken on timeline 1; its snapshot reads 1 |
+| The open cut's `valid_on` for the timeline of the source (1), and for no timeline | true; false |
 | `pg_is_in_recovery()` after promotion | false |
-| `pg_last_wal_replay_lsn()` after promotion, before and after a local commit | 1/E3001758 both times |
+| Timeline of the promoted node (from its WAL insert position) | 2 |
+| Timeline in its control file right after the promotion | still 1 |
+| The open cut's `valid_on(2)` | false |
+| `pg_last_wal_replay_lsn()` after promotion, before and after a local commit | 2/21000578 both times |
 | The local commit record | ends after that position |
 | A new snapshot after the local commit | reads 2 |
 | The open cut's snapshot after the local commit | still reads 1 |
 | The library on a new cut, own way and exported way | refuses: "not a standby: pg_is_in_recovery() is false; use take_primary_cut" |
+| The library on a new settle floor | refuses: "not a standby: pg_is_in_recovery() is false" |
+| A primary cut on the promoted node | timeline 2; `valid_on(2)` true; `valid_on(1)` false |
 
-What follows:
+**The rule: a cut belongs to the timeline it was taken on.** After a promotion or a slot finding (core design,
+section 8), open cuts are abandoned and their backfills start again.
+
+- `StandbyCut.valid_on(timeline)` and `PrimaryCut.valid_on(timeline)` are true only for the timeline the cut
+  recorded. The caller passes the timeline the stream is on now. The slot check knows it exactly: it stores the
+  timeline next to the applied position and reads the timeline history over the replication connection (core
+  design, section 8). A cut without a timeline, and a call without one, give false.
+- Abandoned means: the answers the cut gave, and everything read under its snapshot, are dropped; the table is
+  requested again with a new `P0`, as section 8 of the core design does for every table after a finding.
+- Why not keep the cut. A position means something only together with its timeline (section 1). WAL that the
+  old primary wrote after the point of promotion is not part of the new history; an `E` of the old timeline
+  and an `R0` of the new one can be the same number and name different records. And after a finding the applied
+  position is set anew, so `R0 ≥ P0` no longer says what it said when the cut was taken.
+
+What a standby can tell about its timeline. No SQL function gives the timeline that replay is on. The cut
+records the timeline of the checkpoint named in the control file (`pg_control_checkpoint()`), read by the
+statement that reads `R0`. That is the replay timeline or, between a timeline switch and the standby's next
+restart point, the one before it: the table shows the lag (the control file still says 1 on a node that is on
+timeline 2). The value never runs ahead. So the lag has one effect only. A cut taken on a standby that has
+followed a timeline switch and has not yet made a restart point records the old timeline and is refused, although
+it is good; the backfill tries again and succeeds after the next restart point. It cannot make `valid_on`
+accept a cut across a switch, as long as the caller passes the exact timeline of the stream. On a primary the
+recorded value is exact (`timeline(conn)`; the first eight digits of the WAL file name of the insert position).
+
+What else the measurement shows:
 
 - **The session and its snapshot survive a promotion.** The open cut keeps reading the same rows. Its answers
   stay right for transactions of the WAL the node has replayed. Local transactions after the promotion commit
-  after the snapshot and have `E` beyond the frozen replay position.
+  after the snapshot and have `E` beyond the frozen replay position. The rule abandons the cut all the same:
+  it is simple, and a promotion is rare.
 - **The standby rule must not be used on a promoted node.** The replay position no longer moves, while commits
   go on becoming visible. A cut made from it would call every later commit `outside` once one of them is `E1`,
   and later snapshots see them all. The library therefore reads `pg_is_in_recovery()` in the statement that
@@ -743,11 +961,13 @@ What follows:
   (`xlog.c` `XLogInsertAllowed`, 6003 / 6361 / 6423). So a cut that passes this check was taken entirely on a
   standby.
 - **After a promotion the node needs the rules of a primary** (section 10), including the rule that replaces
-  `R0 ≥ P0`. The engine's stream lane starts blind there, as after an engine restart.
-- **Positions of the old primary are not covered here.** A promotion starts a new timeline. WAL the old primary
-  wrote after the point of promotion is not part of the new node's history, and a position in it cannot be
-  compared with a cut taken on the new node. What the engine does with a stream that changes timeline is a
-  question of the failover design, not of the cut.
+  `R0 ≥ P0`. The engine's stream lane starts blind there, as after an engine start.
+
+Tests: `tests/cut/test_cut_logic.py` `test_a_cut_is_valid_only_on_the_timeline_it_was_taken_on` and
+`test_timeline_of_a_primary_is_exact_and_of_a_standby_is_the_control_file` (hermetic);
+`tests/cut/test_cut_live.py` `test_a_cut_is_valid_only_on_the_timeline_it_was_taken_on` (the promotion
+scenario). Not run: a standby that follows a new primary onto a new timeline (a cascade); the lag of the
+control file is argued for that case from the measurement on the promoted node.
 
 ## 10. The cut on a primary
 
@@ -838,9 +1058,11 @@ either before or after the whole transaction left the running set, and the print
   `PREPARE` until `COMMIT PREPARED` has finished. That can be hours. The answer is still exact.
 - **`synchronous_commit = off`.** The transaction leaves the running set without waiting for the flush. The
   answer is the same.
-- **xid epoch.** The stream's 32-bit id is widened to the 64-bit id nearest to the snapshot's `xmax`
-  (`widen_xid`). That is correct while the stream lags the snapshot by less than 2^31 transactions. A wrap of
-  the 32-bit id cannot be produced on a test cluster in reasonable time; the widening is covered by unit tests
+- **xid epoch.** The stream's 32-bit id is widened to the 64-bit id nearest to a 64-bit reference
+  (`widen_xid`). For one answer the reference is the `xmax` of the snapshot that is asked
+  (`PrimaryCut.classify`). For the tracker of section 10.4 it is the `xmax` of the latest probe. Both are
+  correct while the transaction and the reference are less than 2^31 ids apart. A wrap of the 32-bit id cannot
+  be produced on a test cluster in reasonable time; the widening is covered by unit tests
   (`tests/cut/test_cut_logic.py`) only.
 
 **Measured.** Four campaigns (`tools/cutstress primary-stress`) compare the answer with what the snapshot
@@ -878,19 +1100,31 @@ waits for every open transaction older than the newest delivered one.
 **Rule C: the gap tracker (exact).** The engine keeps the set `G` of ids of delivered transactions that no
 snapshot of its own has seen yet (`GapTracker` in the library).
 
-- For each delivered transaction: add its id to `G`.
-- From time to time, for example once per applied group: take a snapshot and remove from `G` every id it sees
-  (a **probe**). One `SELECT pg_current_snapshot()` is enough.
+- For each delivered transaction: add its 64-bit id to `G` (`GapTracker.delivered`).
+- Once per applied group: take a snapshot and remove from `G` every id it sees (a **probe**). It is one
+  statement, `SELECT pg_current_snapshot()`, in autocommit on a primary connection of the stream lane
+  (`probe_snapshot(conn)`). It opens no transaction and holds nothing.
 - At the switch of a table: copy `G` (a **mark**). It is almost always empty.
-- A snapshot taken after the mark is usable for the table exactly if it sees every id of the mark.
+- A snapshot taken after the mark is usable for the table exactly if it sees every id of the mark
+  (`GapMark.admits`).
+
+**The ids the tracker gets.** The stream has the 32-bit id of a transaction's `BEGIN`; `G` holds 64-bit ids.
+The stream widens the id with the `xmax` of the latest probe (`GapTracker.widen`; `delivered_xid32` widens and
+adds in one call). A probe is at most one group old, so the transaction and the reference are far less than
+2^31 ids apart and the result is exact. The stream never widens with a stale reference: an id kept from an
+earlier run, or read from the destination, can be 2^31 ids old on a busy source and gives an id of the wrong
+epoch. The tracker would then wait for a transaction that does not exist, or miss the one that does. Before the
+first probe the reference is the id the tracker was started with (below). `delivered` refuses an id that lies
+2^31 or more from the reference, which is what a 32-bit id passed by mistake looks like once the source has
+used 2^32 ids.
 
 Why it is exact. A transaction delivered at or before `P0` is either in the mark, or a probe saw it before the
 mark was made, and then the later snapshot sees it too. So the snapshot sees every delivered transaction if
 and only if it sees every id of the mark. The rule waits for the transactions in the gap and for nothing else.
 
-After an engine restart the tracker does not know what was delivered before. It starts **blind** with
-`X = pg_current_xact_id()`: marks also demand `xmin ≥ X` (rule A) until one probe has `xmin ≥ X`. From then on
-the tracker is exact again.
+After an engine start the tracker does not know what was delivered before. It starts **blind** with
+`unknown_below = X`, where `X = pg_current_xact_id()` is read after the start (`next_xid_marker(conn)`): marks
+also demand `xmin ≥ X` (rule A) until one probe has `xmin ≥ X`. From then on the tracker is exact again.
 
 **Measured** in the same four campaigns. A marker is a simulated switch (about 40 per second); the checker
 knows for every snapshot which delivered transactions it reads.
