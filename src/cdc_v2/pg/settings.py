@@ -19,7 +19,7 @@ from typing import Callable, Mapping
 FIXED_SESSION_SETTINGS: dict[str, tuple[str, str]] = {
     "TimeZone": ("UTC", "UTC"),
     "DateStyle": ("ISO, YMD", "ISO, YMD"),
-    "IntervalStyle": ("iso_8601", "iso_8601"),
+    "IntervalStyle": ("postgres", "postgres"),
     "extra_float_digits": ("3", "3"),
     "bytea_output": ("hex", "hex"),
     "client_encoding": ("UTF8", "UTF8"),
