@@ -136,8 +136,11 @@ def float4_text(v: float) -> str:
         return "Infinity" if v > 0 else "-Infinity"
     for p in range(1, 10):
         s = "%.*g" % (p, v)
-        if struct.pack("<f", float(s)) == struct.pack("<f", v):
-            return s
+        try:
+            if struct.pack("<f", float(s)) == struct.pack("<f", v):
+                return s
+        except OverflowError:               # a short text rounded above the largest float32
+            continue
     return repr(v)
 
 
