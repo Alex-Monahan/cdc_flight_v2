@@ -70,6 +70,12 @@ inside the process before a value is buffered on disk or sent anywhere); the lon
 - Logs go through `logging` with structured fields; no value of a source row is ever logged (SPEC 8.3).
 - Every persisted change row is ordered by (commit position, `seq`); `seq` alone orders rows only inside one
   transaction (it starts at 0 again with every engine instance).
+- **Destination names.** The source table `s.t` is the table `s.t` of the destination database: the same schema
+  name and the same table name, always as quoted identifiers (Postgres `public` is the destination schema
+  `public`; nothing is put into `main`). Everything of ours lives in schemas whose names start with `_cdc`.
+  DuckDB compares identifiers without regard to case: a source schema whose name starts with `_cdc` in any
+  case, and schemas or tables whose names differ only by case, are not replicated in P3 and are reported by the
+  code that meets them; the discovery wave of P4 decides their rule.
 
 ### C1 Crash points and fault sites (package H)
 
@@ -106,18 +112,34 @@ fuzzer).
 | `BEGIN` / `END` | transaction id, commit time, all position fields of the record's offset and its `ack_position` (below); `END` also the event count in total and per table |
 | `TRUNCATE` | one table and its `seq`; a truncate of several tables arrives as consecutive frames |
 | `MESSAGE` | a logical decoding message: prefix, transactional or not, content bytes, `seq`, position fields (SPEC 7.4 consumes it in P4; the frame exists from the start) |
-| `HEARTBEAT` | position fields of a heartbeat record and its `ack_position` (the position moved without data) |
+| `HEARTBEAT` | position fields of a heartbeat record, for information only: the frame shows that the engine is alive; it has no `ack_position` and is never acknowledged |
 | `BATCH_END` | end of one engine batch |
 | `FATAL` | the engine stops: class, message and cause chain of the error |
 
 Every record gets a sequence number `seq` in arrival order: commit order, then order inside the transaction. Rows of
 several tables travel in separate `ROWS` frames; `seq` restores their order.
 
-`ack_position` of an `END` or `HEARTBEAT` frame is exactly the position that the source will be told is confirmed
-if that record is the newest one acknowledged (`docs/research/debezium.md` 3.1: the commit position of the offset
-if it has one, else the processed position). For an `END` it is the transaction's commit end position, which is
-the applied position of the core design, section 2. Over the life of one engine it never decreases; the engine
-checks that and stops with `FATAL` if it would.
+`ack_position` of an `END` frame is exactly the position that the source will be told is confirmed if that record is
+the newest one acknowledged: the transaction's commit end position, which is the applied position of the core
+design, section 2. Over the life of one engine it never decreases; the engine checks that and stops with `FATAL` if
+it would.
+
+**Only `END` records are acknowledged.** A heartbeat record is not: Debezium dispatches a heartbeat that already
+carries a transaction's commit position before it creates that transaction's END record, and one that carries the
+position of a non-transactional message before that message. A pipeline that adopted such a position lost
+transactions (second review of package E: 80 of 20,000 in one run). The engine therefore never holds or marks a
+heartbeat record, a `HEARTBEAT` frame may arrive anywhere (also between `BEGIN` and `END`) and never moves the
+applied position, and the pipeline sends `DURABLE` only for the commit end of an `END` it has applied. On an idle
+source the position moves with the transaction of the source-side heartbeat write (package P, every 10 s, in a
+published table). A non-transactional `MESSAGE` is not acknowledged either; SPEC 7.4 (P4) decides its rule: the
+server sends such a message again after every restart, from the last confirmed `END` on, so P4 needs a position of
+its own (the position of the last applied message) to discard repeats. An `END` whose offset has no `lsn_commit`
+stops the engine with `FATAL`; the engine never falls back to another field for an `END`.
+
+The engine holds a bounded number of unacknowledged `END` records. When it must drop some, a `DURABLE` confirms a
+position at or below the durable one, never above it, and the distance stays within a bound that
+`docs/design/engine.md` states and a test shows (the first version could stop following altogether while the
+pipeline was more than about 24,000 transactions behind).
 
 `ROWS` columns are column-oriented buffers in little-endian Arrow layout, written by our own Java code (no Arrow
 library in the JVM), so that Python wraps them with `pyarrow.Array.from_buffers` without touching single values:
@@ -142,16 +164,22 @@ Column sets of a `ROWS` frame, each column named by its position `i` in the sche
 `bytea` and arrays a mark that does not travel inside the value). The engine turns it into `u<i>`; after the
 engine, no code compares a value with a placeholder. The H-003 tests are part of package E.
 
-**Attach rule.** The pipeline decides slot continuity only while its own engine holds the slot (design section
-8), so it must know when that is the case and which backend it is. The engine therefore sends `HELLO` only after
-`START_REPLICATION` has succeeded, and its replication connection carries an application name that is unique to
-this engine instance and is repeated in `HELLO`. If Debezium offers no documented point at which "replication
-has started" can be observed, package E says so, `HELLO` is sent when the engine starts, and the pipeline relies
-on the application name and the slot's `active_pid` alone. The engine never attaches a second time by itself:
-Debezium's retries are off (including its own retry when the slot is still active), and any loss of the
-replication connection ends in `FATAL`.
+**Attach rule.** The pipeline decides slot continuity only while its own engine holds the slot (design section 8),
+so it must know when that is the case and which backend it is. Stock Debezium names every replication connection
+`Debezium Streaming`, so the engine cannot carry a unique application name (found by package E). The engine sends
+`HELLO` at its first `handleBatch` call — records exist only after `START_REPLICATION` has succeeded, and on an idle
+source Debezium's heartbeat record makes that call within `heartbeat.interval.ms` — and `HELLO` names the slot's
+holder as one SQL query reads it at that moment: `active_pid` and that backend's `backend_start` (µs, UTC). A holder
+is identified by this pair, never by the process id alone. If the probe fails or the slot has no holder, the engine
+sends `FATAL`. The engine never attaches a second time by itself: `errors.max.retries=0`, `slot.max.retries=0`, and
+any loss of the replication connection ends in `FATAL`.
 
-`END` and `HEARTBEAT` carry the exact position the engine flushes when that record is marked processed. The
+The engine checks its effective configuration at start and refuses (`FATAL`) a value that would weaken a guarantee:
+among others `skipped.operations`, the offset storage and flush interval, `lsn.flush.mode`, the retry settings, the
+transaction metadata, the snapshot mode, the publication mode, the converter, tombstones and a heartbeat interval
+outside 0 < interval ≤ 10 s. Nothing that reaches the engine as "extra" properties can override them.
+
+`END` carries the exact position the engine flushes when that record is marked processed. The
 package document states which records Debezium's event counts include, proven by test for a key change, a
 TRUNCATE and a transactional message.
 
@@ -160,7 +188,7 @@ Commands to the engine, one per line on standard input:
 - `CONFIG <json>` — the first line, once: the Debezium properties, with the source password. Secrets reach the JVM
   only this way: never in arguments, in the environment, in a file or in a log line.
 - `DURABLE <position>` — the destination commit at this position is durable. The engine marks as processed the
-  newest `END` or `HEARTBEAT` record whose `ack_position` is at or below it, and then finishes the batch
+  newest `END` record that it holds whose `ack_position` is at or below it, and then finishes the batch
   bookkeeping. It acknowledges nothing else, ever. The pipeline sends `DURABLE p` only for p ≤ an applied
   position it has seen committed.
 - `STOP` — stop reading the slot, close the engine, exit 0.
@@ -360,16 +388,20 @@ fuzzer drives it. Its behaviour follows `docs/spike/run_semantics.md`; each imit
 ### C7 Source (package P)
 
 ```python
-pg.connect(target, deadline)                       # target: 'primary' | 'replica' | a configured name; TLS verify-full;
+pg.connect(target, deadline, replication=False)    # target: 'primary' | 'replica' | a configured name; TLS verify-full;
                                                    # fixed session settings (time zone, date, interval, float, bytea output)
 catalog.tables(conn) -> [SourceTable]              # columns, types, key, replica identity, publication membership
 catalog.observe(node) -> CatalogObservation        # the catalog facts of H-008 with the replay bracket (b, a)
+catalog.diff(old, new)                             # appeared, dropped, recreated (new OID), renamed, columns, rewritten
 publication.ensure(primary, tables)                # only ever adds tables
+publication.state(conn)                            # what exists, to compare with the configuration
+replica_identity.set_full(primary, table, deadline)
 slot.create(node, name, deadline) ; slot.drop(...)
 slot.facts(node, name) -> SlotFacts                # everything section 8 compares, read in one statement, with the
                                                    # holder: active_pid, that backend's start time and application
                                                    # name, and pg_is_in_recovery()
 slot.timeline_history(node) -> [...]               # over a replication connection
+timeline.contains(history, position, timeline)     # is a position on the history of the current timeline
 slot.terminate_holder(node, name)                  # our slot name only
 heartbeat.beat(primary)                            # the source-side heartbeat write of SPEC 4.4
 ```
@@ -380,9 +412,39 @@ section 8 says. Nothing on the source is fenced by the leader epoch, so every so
 when a deposed run repeats it: `publication.ensure` only adds, the heartbeat write is idempotent, and a slot is
 dropped only by an explicit operator action or by the enactment of a slot finding.
 
-### C8 Oracle and T1 harness (package O), C9 Cut (package X)
+### C8 Oracle and T1 harness (package O)
 
-As delivered by those packages; their reports define the interfaces, and this section is completed when they merge.
+Details in `docs/oracle.md`. What binds every package that writes a gate test:
+
+- Every gate test decides equality only with `cdc_v2.oracle.compare(source, destination, config, position=Q)`.
+  `Q` comes from `Workload.quiesce()` or `Workload.pause()`. `compare` refuses a source snapshot or a destination
+  state that is not at or past `Q`, and it refuses an empty comparison. A comparison without a position must be
+  asked for by name and is never a gate result.
+- A gate test passes only if `result.equal` holds and every table's `fallback_columns` is empty or declared by
+  the test.
+- The compared tables are listed explicitly (`OracleConfig.tables`, `table_map`). Heartbeat, canary and `_cdc*`
+  objects are never compared. The oracle does not enforce the list: without one it compares every table of the
+  source, the heartbeat table too, which changes every 10 s and gives a false difference.
+- A comparison that reads the source from a standby can lose its connection to a recovery conflict. The oracle
+  starts again only on SQLSTATE 40001; a connection that the standby ends while it is idle in its transaction
+  can surface as a bare connection loss, which is not retried. Such a test retries the comparison itself.
+- The applied-position lookup that `wait_for_applied` and `compare` use is provided by package S (by slot name);
+  until then the `_cdc.stream_state` reader of the oracle is a stand-in.
+- Waiting takes a `cdc_v2.deadline.Deadline`; evidence is written only through
+  `cdc_v2.testing.harness_evidence.write_evidence` (C0).
+- T1 sources and destinations come only from the fixtures in `tests/conftest.py` (section 4 says which cluster
+  and which database prefix they use). Destructive drills use the fixture `private_cluster`.
+- Workloads come from `cdc_v2.testing.workload`, with a seed and a replay log. Its transfers observer detects
+  splits of transfer transactions only; other invariants across tables are package F's.
+- The oracle shares no code with Y or A, and the pipeline never imports `cdc_v2.oracle` or `cdc_v2.testing`.
+- Canonical comparison (design open point 3, settled here): floats compare by bits with all NaNs equal, so `-0`
+  and `0` differ; intervals compare by months, days and microseconds, so `1 mon` and `30 days` differ; a UNION
+  column compares by member and by the rule of the member's source family; a source NULL is a real NULL in the
+  destination, never a UNION member that holds NULL.
+
+### C9 Cut (package X)
+
+As delivered by package X; its report defines the interface, and this section is completed when it merges.
 
 ### C10 Stream and backfill (packages S, B, V, T)
 
@@ -398,7 +460,38 @@ As delivered by those packages; their reports define the interfaces, and this se
   table; the stream lane moves `swap_ready → done`, or back to `catching_up` when the rest of the log has an
   unresolved key.
 - A slot finding (V) sets the applied position to the slot's `confirmed_flush_lsn` (or the new slot's consistent
-  point) and enacts a backfill of every CDC table, in one stream-lane transaction (design section 8).
+  point) and enacts a backfill of every CDC table, in one stream-lane transaction (design section 8). The
+  function that does it belongs to S, because S owns `_cdc.stream_state`:
+  `stream.reposition(tx, position, tables, cause)` — the position set (in any direction), a backfill request
+  enacted for each table with `P0` = that position (after a gap), the alert, all in `tx`. V calls it for a
+  finding; S calls it for a message that fails again and again at one position (SPEC 4.3, last line); P4 calls it
+  for the lag rule of SPEC 3.6. Every `stream.reposition` is followed by a new engine: an engine keeps the highest
+  `DURABLE` of its life, so one that outlived a move backwards would still confirm the old, higher position.
+- The stream component starts its engine only through the attach step (design section 8):
+  `attach(ctx, deadline) -> Attached(engine, facts, finding)`. V builds it. Until V is merged, S ships a
+  minimal one behind the same signature: fence row read, slot facts read, a holder of our slot terminated,
+  engine started at the applied position, and any finding other than "continuous" stops the stream with an alert
+  instead of being enacted.
+- A table whose `SCHEMA` frame no longer agrees with its destination table (a schema change at the source) is
+  sent through a backfill in P3: from the first transaction that carries the new version, its changes are not
+  applied to the visible table, and a backfill request (after a gap) is enacted in that group. The schema wave of
+  P4 replaces this by a change in place (design 6.5).
+- **Catalog gate.** Debezium's records name a table by schema and name only, and a drop and recreate, or a dropped
+  and added column of the same name and type, can leave the `SCHEMA` frame unchanged (H-007, H-008). So before a
+  group is applied, S calls `tables.confirm(group_end, tables, deadline) -> {table: same | changed}`. Package T
+  builds it on `catalog.observe` (C7): an observation whose lower bracket `b` is ≥ `group_end` must show, for each
+  table of the group, the identity that the destination table was built for (OID; per column `attnum`, name, type;
+  the key columns). A table that is not `same` leaves the visible path in that group: its rows are not applied. What
+  follows is enacted by T in `tables.on_group(tx, group_end)`, which S calls in every group and every idle position
+  step, immediately before `backfill.on_group`: in the first group after the stream has passed the observation (its
+  end is greater than the upper bracket `a`, design 7.2). The cost is one catalog round trip per group. Until T is
+  merged, S's stand-ins answer `same` and do nothing.
+- **The destination follows the source's names** (P3 rule). For each replicated name: absent at the source → the
+  destination table is dropped, or renamed under `on_source_drop: retain`; present with another OID → the old
+  destination table is dropped (or renamed) and a backfill of the new table is requested, in the same group; the
+  same OID with other columns → the schema rule above. A backfill that follows such a finding is entered only past
+  `a`, so that its pending log never holds a row of the earlier table. A rename is therefore a drop of the old name
+  and, if the new name is replicated, a fresh table; the rename in place of SPEC 2.2 is P4.
 - S runs a group again after `Conflict`, a bounded number of times, building its statements again when the
   conflict came from a DDL (a swap changes the catalog).
 - A table that fails to apply `apply.max_table_attempts` times (default 3) leaves the stream: state `quarantined`,
@@ -411,6 +504,24 @@ As delivered by those packages; their reports define the interfaces, and this se
   deadline, and not after it. Slot creation, the attach step after a take-over, a commit in flight and the wait
   for a replica to reach `P0` are declared this way.
 - Until package S delivers the supervisor, package L builds against this interface with a stand-in of its own.
+
+### C12 Pipeline process (packages S, L)
+
+- The bootstrap starts the pipeline as `python -m cdc_v2.pipeline <configuration file>` in its own session
+  (design section 5). The environment carries `CDC_V2_EPOCH`, `CDC_V2_RUN_ID`, `CDC_V2_FLIGHT_ID`,
+  `CDC_V2_RUN_NUMBER`, `CDC_V2_TICK_FD` (an inherited descriptor) and the secrets of the run. No secret is an
+  argument.
+- Tick: after every successful heartbeat the pipeline writes one byte to the tick descriptor without blocking; a
+  full pipe is not an error. The bootstrap needs nothing else from the pipeline while it runs.
+- Exit status of the pipeline, passed on by the bootstrap: `0` only after a committed release (planned
+  hand-over); `10` when the run was superseded (`FenceLost`, or a heartbeat that changed no row); any other
+  value is a failure.
+- Inside the pipeline, `cdc_v2.leader` (L) owns the heartbeat thread, the tick, the one reaction to `FenceLost`
+  and the hand-over clock; `cdc_v2.supervisor` (S) owns progress and the restart of components; the stream
+  component (S) offers `finish_current_group(deadline)` for the hand-over. `cdc_v2.pipeline` (S) is the process
+  that wires them, runs the migrations as leader and starts the components.
+- Whichever of S and L is merged second joins the two in a short follow-up round, with a test in which the real
+  bootstrap starts the real pipeline under `LocalPlatform`.
 
 ## 3. Test tiers used in P3
 
@@ -441,6 +552,27 @@ never touched; every command names its port.
 
 TCP fault proxies listen on 55440–55459 (package H); a worker that needs proxies of its own takes ports from the
 upper half of its own range.
+
+**The shared T1 fixtures** (`tests/conftest.py`, package O) follow the same rule through the environment:
+
+| Variable | Meaning | A package worker sets it to |
+|---|---|---|
+| `CDC_V2_PG_HOME`, `CDC_V2_PG_PORT_BASE` | the cluster on which the fixtures create one private database (`cdc_v2_t_<random>`) per test, for tests that do not disturb the cluster | its own home and port base from the table |
+| `CDC_V2_MD_PREFIX` | prefix of the MotherDuck databases the fixtures create (must start with `cdc_v2_t_`) | its own prefix, for example `cdc_v2_t_s_` |
+| `CDC_V2_T1_SHARED=1` | allows the default home (ports 55432–55439) | never: the default home is for the orchestrator's gate runs |
+
+Without a named home and without `CDC_V2_T1_SHARED=1` the fixtures fail with a message that says what to set.
+Tests that kill, promote, reconfigure or fill a cluster take the fixture `private_cluster`: a primary and a
+standby of their own on a block of 8 ports leased under a file lock from 55840–56095 (32 blocks), removed when
+the test ends. Every worker may use these leased blocks; nothing else listens there.
+
+Why no cluster is shared between workers even for harmless tests: a replayed `ACCESS EXCLUSIVE` lock stalls the
+replay of a standby for every stream that decodes there, one worker's WAL load slows every other slot, and the
+limits on slots and senders are per cluster.
+
+Fixed ranges, for reference (a default-run test of package O asserts that the leased range misses all of them):
+55432–55439 default home, 55440–55459 TCP proxies, 55460–55467 `localpg` self-tests, 55500–55509 throughput
+spike, 55600–55607 cut stress, 55620–55823 the homes of the table above.
 
 ## 5. Reviews
 
@@ -489,9 +621,9 @@ path of SPEC 4.3. The quarantine exit of C10. The spill area: DuckDB's temporary
 transform connection under `max_temp_directory_size`, with a fault site for "no space left"; the stream waits
 and alerts, it never crashes on it (SPEC 5.4, 1.7). The batch commit/ack machine as one row per slot (design
 section 9). Staging is fenced, with a progress row, in one schema, truncated at every start of the stream
-component. After `CommitUnknown`: read the position in a new transaction and continue from it. A heartbeat's
-`ack_position` becomes the applied position only in a committed group that contains every transaction framed
-before it.
+component. After `CommitUnknown`: read the position in a new transaction and continue from it. Only an `END`'s
+`ack_position` becomes the applied position, in a committed group that contains every transaction framed before
+it; a `HEARTBEAT` frame never moves it.
 
 **L (leadership).** Two states. Take-over deadline (default 45 s), then exit non-zero. A take-over whose commit
 outcome is unknown: read again after more than 2 s and decide by `run_id`. A planned hand-over abandons an

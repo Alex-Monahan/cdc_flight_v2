@@ -20,11 +20,13 @@ Two limits apply to every number below:
 
 What the owner should know, most important first:
 
-1. **The stream is the bottleneck, and it is far below the 100K rows/s target of SPEC 5.1.** Stock Debezium on a
+1. **The stream is the bottleneck, and it is below the 100K rows/s target of SPEC 5.1.** Stock Debezium on a
    Flight streamed 23–30K rows/s at `lineitem` width (one streaming thread, 30–40 µs of CPU per row; the fixture
-   Postgres shared the 2 CPUs). No setting tried so far raised it by more than 10 %. SPEC D3 expects this case; 5.1 is
-   reported as measured, and the tuning is P9. Everything after the stream has a margin: apply reaches 342–355K
-   rows/s at 1M-row groups on one connection.
+   Postgres shared the 2 CPUs). On the development machine, with the source on other cores, the same thread needs
+   11 µs per row and the rate is 77–84K rows/s: still one thread, still the limit, still under 100K. No setting
+   tried raised either number by more than 10 %. SPEC D3 expects this case; 5.1 is reported as measured, and the
+   tuning is P9. What an F16 reaches with the source outside the Flight is the first measurement of stage 2.
+   Everything after the stream has a margin: apply reaches 342–355K rows/s at 1M-row groups on one connection.
 2. **The backfill target of SPEC 3.1 (100K rows/s) has a wide margin.** Local read rate from the replica: 1.3M
    rows/s with two connections; load into MotherDuck on a Flight: 1.58M rows/s. The real number is a stage 2
    measurement.
@@ -112,17 +114,50 @@ One connection is bound by its Postgres backend at about 1.0–1.1M rows/s, what
 laptop into MotherDuck: 474–586K rows/s, limited by the upload. Estimate for an F16 Flight, not measured: 0.65–0.95M
 rows/s for our reader.
 
-Stock Debezium streaming rate on the local replica's slot: **pending** — part 2 of the spike is running; this
-section is completed when it reports.
+Stock Debezium 3.7.1 streaming from a slot on the local replica (medians of 3 runs; the machine was shared with
+three other workers, so the spread is 15–30 %):
+
+| Measurement | Result |
+|---|---|
+| One 1M-row / 10M-row transaction | **78K / 84K rows/s**; with Debezium's defaults 77K / 84K |
+| Other row shapes (1M rows) | keyed UPDATE 83K, keyed DELETE 106K; with `REPLICA IDENTITY FULL`: UPDATE 57K, DELETE 77K |
+| A backlog of 1M one-row transactions | 48–58K transactions per second |
+| Live load of 500 to 8,000 one-row transactions per second | every rate kept up; delay from commit to consumer p50 0.27–0.49 s, p99 0.52–0.95 s, max 1.02 s; the replica's replay adds at most 13 ms (p99) |
+| CPU per row | Debezium's streaming thread 10.8–11.7 µs (30–40 µs on the Flight), busy 90 % of the time; the walsender 7–8 µs |
+| Slot on the replica against slot on the primary | no difference beyond the spread (78K against 72K rows/s; 48K against 55K transactions per second) |
+| A 10M-row transaction on the server that holds the slot | 2.6 GB spilled to disk (39 files); first row 0.9–1.0 s after the commit |
+| Restart in the middle of a 10M-row transaction (SIGTERM and SIGKILL) | the slot had not moved; the server decoded and spilled the transaction again: first row after **36 s**, then exactly 10,000,000 rows |
+| Creating the slot on the replica | 0.95–8.1 s unaided; 0.7–0.9 s when the primary is asked for a running-transactions record, which the admin role may not do |
+
+What Debezium reports was compared with the server's own stream for 1,222 transactions and 38,427 changes, without
+one mismatch:
+
+- The END record carries the transaction's commit end LSN, and its `event_count` is exact. This is the applied
+  position of the design.
+- A change record carries the **previous** transaction's commit position, never its own. Debezium's transaction
+  `id` differs from record to record. Records are therefore grouped by their order in the stream.
+- Empty transactions, rolled-back transactions and transactions that wrote only unpublished tables produce
+  nothing.
+
+Two findings for the design:
+
+- With the configuration of the Flight spike (offset flush every second, no heartbeat) **Debezium never confirms
+  the last transaction before an idle period or a stop**; every restart receives it again. With
+  `offset.flush.interval.ms=0` and a heartbeat interval it is confirmed within 2 s. The design already prescribed
+  this configuration; it is now a requirement with a test (package E).
+- **A restart after a large transaction costs the server a second decode** (36 s for 10M rows here) before anything
+  new arrives. This time counts against the 120 s recovery of SPEC 5.2.
+
+Not done: a run on JDK 21 (the machine's `openjdk@21` is OpenJDK 23; the Flight uses Temurin 21).
 
 ## 3. What the numbers mean for the SPEC targets
 
 | SPEC item | Target | Indication | Limiting stage | Measured for real in |
 |---|---|---|---|---|
 | 3.1 Backfill | ≥ 100K rows/s on F16 | read 0.65–0.95M rows/s (estimate), load 1.58M rows/s (Flight) | the read, on 2 CPUs | P9 |
-| 5.1 One 10M-row transaction | 100K rows/s, scored as measured | stream 23–30K rows/s (Flight, shared CPUs); apply 342–355K rows/s (Flight) | Debezium's streaming thread | P9, with the tuning log |
-| 5.2 Latency | p99 ≤ 30 s, max ≤ 60 s | a group commit costs 0.066 s; groups close after 1 s | stalls, not steady state: replay stalls on the replica (finding 4 above), very large transactions ahead in the stream | P9 (24 h) |
-| 5.3 Small transactions | ≥ 2,000 per second | stream 10K one-row transactions per second (Flight, backlog); apply needs about 70 transactions per commit | none found | P9 |
+| 5.1 One 10M-row transaction | 100K rows/s, scored as measured | stream 23–30K rows/s (Flight, shared CPUs), 77–84K rows/s (local, source on other cores); apply 342–355K rows/s (Flight) | Debezium's streaming thread | P9, with the tuning log |
+| 5.2 Latency | p99 ≤ 30 s, max ≤ 60 s; recovery ≤ 120 s | stream delay p99 under 1 s up to 8,000 transactions per second (local); a group commit costs 0.066 s; groups close after 1 s | stalls, not steady state: replay stalls on the replica (finding 4 above), very large transactions ahead in the stream, a second decode after a restart behind a large transaction (36 s for 10M rows, local) | P9 (24 h) |
+| 5.3 Small transactions | ≥ 2,000 per second | stream 10K one-row transactions per second (Flight, backlog), 48–58K (local, backlog), 8,000 live kept up (local); apply needs about 70 transactions per commit | none found | P9 |
 | 4.2 Replacement of a dead leader | within 90 s plus start-up | about 98 s worst case to the newcomer's decision, plus 14.6 s to the first event | the one-minute schedule | P6 locally, P10 |
 | 5.4 Memory | bounded | JVM 0.3–0.8 GB; an unbounded Arrow reader grew to 2 GB; a whole 55 MB chunk buffered cost 1.4–2 GB per worker | hand-offs must be bounded | P4–P6 |
 
@@ -152,11 +187,16 @@ All in `docs/adr/0001-architecture.md`:
   primary mode is being worked out and proven by the cut stress test (7.2, open point 12).
 - **A table without a key and SPEC 3.7.** Such a table needs one snapshot for the whole read; if it is lost, the
   table is read again. The row bound of 3.7 is met for tables with a key only.
+- **Grouping and confirmation** (section 2.5). Records are grouped by stream order, not by Debezium's transaction
+  `id`; `offset.flush.interval.ms=0` with a heartbeat interval is required; the time of a second decode after a
+  restart is part of the recovery time (`docs/design/core.md` sections 2 and 3).
 
 ## 6. What stage 2 must measure first
 
 Collected in `STATUS.md` ("To verify in stage 2") and `docs/research/replica_decoding.md` §10. From the spikes:
-the streaming rate with the source outside the Flight; the read rate from a PlanetScale replica; the value of
+the streaming rate with the source outside the Flight, and the CPU per row of Debezium's streaming thread there
+(30–40 µs with the fixture on the same CPUs, 11 µs on the development machine); whether the provider's admin role
+may ask for a running-transactions record; the read rate from a PlanetScale replica; the value of
 `max_standby_streaming_delay` there and who else uses the replica; the service account's view of databases; the
 billing of short runs.
 

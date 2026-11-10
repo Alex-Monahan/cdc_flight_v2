@@ -18,6 +18,11 @@ Before you start: `git fetch origin && git merge --ff-only origin/main`.
 - No Docker, no containers, no virtual machines. Postgres runs natively and only through `tools/localpg`, in the
   private home and on the ports that `docs/design/p3_plan.md` section 4 gives your package. Never the default
   home, never a port outside your range.
+- The shared T1 fixtures (`tests/conftest.py`: `source_db`, `dest_db`, `private_cluster`, …) take their cluster
+  and their MotherDuck prefix from the environment. Before you run a T1 test, export `CDC_V2_PG_HOME` and
+  `CDC_V2_PG_PORT_BASE` (your own home and port base) and `CDC_V2_MD_PREFIX` (your own prefix); never set
+  `CDC_V2_T1_SHARED`. The fixture `private_cluster` leases a block of ports from 55840–56095 for a cluster that
+  a test may break; that range is open to every worker, through the fixture only.
 - Port 5432 belongs to the owner. Never connect to it, never signal its processes, never touch its data.
 - Signals only to processes that you started yourself or through `tools/localpg`. Never `pkill`, never `killall`.
 - MotherDuck, when your task uses it: only through `tools/with-env` (it supplies the token; never print it, never
