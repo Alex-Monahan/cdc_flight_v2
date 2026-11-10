@@ -10,14 +10,19 @@ Marker `md`: real MotherDuck, databases named `cdc_v2_t_d_*` only, created and d
 `pyproject.toml` does not register the marker and does not deselect it (this package may not edit that file), so
 this conftest registers it and deselects `md` tests unless the command line asks for them.
 """
+import datetime
+import json
 import os
+import platform
 import re
 
+import duckdb
 import pytest
 
 from cdc_v2 import crashpoints, faultsites
 from cdc_v2.testing import destination as td
 from cdc_v2.testing.faults import FaultControl
+from cdc_v2.testing.harness_evidence import write_evidence
 
 MD_PREFIX = "cdc_v2_t_d_"
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -98,3 +103,35 @@ def md_dest(no_leftovers):
     """A MotherDuck database `cdc_v2_t_d_<random>` with the leader tables; dropped after the test."""
     with td.motherduck_destination(MD_PREFIX) as d:
         yield d
+
+
+MD_COMMAND = "tools/with-env uv run -q pytest -q -m md tests/destination"
+
+
+def add_evidence(name, key, value, what=None):
+    """Put one result into `evidence/p3/destination/<name>` (a JSON file: a header and ``results``, one entry per
+    test). The entries of tests that did not run this time stay as they are. `write_evidence` scrubs and checks."""
+    path = os.path.join(EVIDENCE, name)
+    try:
+        with open(path, encoding="utf-8") as f:
+            doc = json.load(f)
+    except (FileNotFoundError, ValueError):
+        doc = {}
+    doc.setdefault("results", {})
+    if what:
+        doc["what"] = what
+    doc["command"] = MD_COMMAND
+    doc["versions"] = {"duckdb_client": duckdb.__version__, "python": platform.python_version(),
+                       "platform": "%s %s" % (platform.system(), platform.machine())}
+    doc["machine_note"] = ("10 cores, 16 GB, shared with up to three other workers of the same build (their "
+                           "tests, Postgres clusters and JVMs may have been running); times are indications only")
+    value = dict(value)
+    value["date_utc"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M")
+    doc["results"][key] = value
+    write_evidence(path, doc)
+
+
+@pytest.fixture
+def evidence():
+    """``evidence(file_name, key, value, what=None)``: record what an `md` test measured."""
+    return add_evidence

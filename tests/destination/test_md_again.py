@@ -1,0 +1,65 @@
+"""Marker `md`: the tier T0 tests of this package once more, against real MotherDuck.
+
+The test functions are the ones of `test_lane.py`, `test_schema.py`, `test_state.py` and `test_alerts.py`, unchanged.
+Only the fixture `dest` differs: here it is a MotherDuck database `cdc_v2_t_d_<random>`, created for the test and
+dropped after it. Left out are the tests whose times are set for a local database (deadlines of a fraction of a
+second) or that use a local mechanism; `test_md.py` has those again in a form made for MotherDuck.
+
+    tools/with-env uv run -q pytest -q -m md tests/destination/test_md_again.py
+"""
+import pytest
+
+from test_alerts import (al,  # noqa: F401 - a fixture
+                         test_an_alert_before_the_migrations_ran_fails_and_writes_nothing,
+                         test_an_alert_is_gone_when_its_transaction_rolls_back,
+                         test_emit_now_passes_on_what_it_cannot_decide,
+                         test_emit_now_tries_again_after_a_lost_connection_and_records_once,
+                         test_emit_now_uses_a_transaction_of_its_own,
+                         test_emit_writes_one_row_inside_the_callers_transaction,
+                         test_nothing_is_written_when_an_alert_is_refused, test_resolve,
+                         test_the_table_carries_what_delivery_needs, test_two_alerts_in_one_transaction_and_defaults)
+from test_lane import (test_a_failed_transaction_cannot_end_quietly,
+                       test_a_lost_connection_is_reported_by_where_it_happened,
+                       test_abort_from_another_thread_ends_the_call_at_once,
+                       test_an_exception_rolls_back_and_is_passed_on,
+                       test_an_unclassified_error_after_commit_was_sent_is_commit_unknown,
+                       test_arrow_data_and_row_counts,
+                       test_commit_runs_the_fence_statement_and_registers_the_connection,
+                       test_conflicts_are_per_column_which_is_why_the_fence_statement_writes_the_epoch,
+                       test_empty_transaction_still_runs_the_fence, test_every_lane_has_its_three_crash_points,
+                       test_execute_one_needs_exactly_one_row, test_interrupt_earlier_and_cleanup,
+                       test_leader_rows_cannot_be_deleted_or_inserted, test_misuse_is_refused,
+                       test_new_connection_of_a_stale_epoch_is_refused_at_registration,
+                       test_same_lane_same_epoch_twice_never_commits_both,
+                       test_stale_epoch_gets_fence_lost_and_changes_nothing,
+                       test_take_over_between_begin_and_the_fence_statement)
+from test_schema import (lists,  # noqa: F401 - a fixture
+                         test_a_database_that_does_not_fit_the_code_is_refused,
+                         test_a_failing_step_leaves_nothing_half_done,
+                         test_a_fresh_database_gets_the_tables_of_this_package,
+                         test_a_missing_row_is_reported_not_repaired,
+                         test_a_run_that_no_longer_leads_migrates_nothing,
+                         test_a_step_whose_commit_has_no_answer_is_applied_once,
+                         test_initialisation_creates_every_row_with_the_frozen_shape,
+                         test_initialising_again_changes_nothing,
+                         test_leaders_at_once_apply_every_step_exactly_once, test_only_the_control_lane_migrates,
+                         test_running_again_does_nothing_and_writes_nothing,
+                         test_steps_run_in_order_each_in_its_own_transaction)
+from test_state import (ex,  # noqa: F401 - a fixture
+                        test_a_transition_is_part_of_the_callers_transaction,
+                        test_create_fails_when_the_key_exists_or_the_state_is_not_initial,
+                        test_create_transition_and_read, test_every_pair_of_the_alert_machine,
+                        test_every_pair_of_the_example_machines, test_keys,
+                        test_the_wrong_stored_state_is_refused_and_the_transaction_stays_usable,
+                        test_two_rows_for_one_key_fail_the_transaction,
+                        test_two_transactions_cannot_both_make_one_transition)
+
+pytestmark = pytest.mark.md
+
+__all__ = [name for name in dir() if name.startswith("test_")]
+
+
+@pytest.fixture
+def dest(md_dest):
+    """The destination of the imported tests: a MotherDuck database of this test alone (see `conftest.md_dest`)."""
+    return md_dest

@@ -1,0 +1,74 @@
+{
+  "command": "tools/with-env uv run -q pytest -q -m md tests/destination",
+  "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
+  "results": {
+    "blocked_at_md.commit_reply_skip_0": {
+      "caller_got_its_error_after_s": 4.0,
+      "committed": true,
+      "date_utc": "2026-11-10 08:15",
+      "next_transaction_on_a_new_connection_ms": 487.9,
+      "raised": "CommitUnknown",
+      "what": "fault site md.commit_reply blocks (after 0 passes) inside a lane transaction with deadline 2.0 s, grace 2.0 s"
+    },
+    "blocked_at_md.commit_skip_0": {
+      "caller_got_its_error_after_s": 4.02,
+      "committed": false,
+      "date_utc": "2026-11-10 08:15",
+      "next_transaction_on_a_new_connection_ms": 475.1,
+      "raised": "CommitUnknown",
+      "what": "fault site md.commit blocks (after 0 passes) inside a lane transaction with deadline 2.0 s, grace 2.0 s"
+    },
+    "blocked_at_md.execute_skip_0": {
+      "caller_got_its_error_after_s": 4.01,
+      "committed": false,
+      "date_utc": "2026-11-10 08:14",
+      "next_transaction_on_a_new_connection_ms": 504.6,
+      "raised": "DeadlineExceeded",
+      "what": "fault site md.execute blocks (after 0 passes) inside a lane transaction with deadline 2.0 s, grace 2.0 s"
+    },
+    "blocked_at_md.execute_skip_1": {
+      "caller_got_its_error_after_s": 4.02,
+      "committed": false,
+      "date_utc": "2026-11-10 08:14",
+      "next_transaction_on_a_new_connection_ms": 509.1,
+      "raised": "DeadlineExceeded",
+      "what": "fault site md.execute blocks (after 1 passes) inside a lane transaction with deadline 2.0 s, grace 2.0 s"
+    },
+    "blocked_at_md.fence_skip_0": {
+      "caller_got_its_error_after_s": 4.0,
+      "committed": false,
+      "date_utc": "2026-11-10 08:15",
+      "next_transaction_on_a_new_connection_ms": 485.9,
+      "raised": "DeadlineExceeded",
+      "what": "fault site md.fence blocks (after 0 passes) inside a lane transaction with deadline 2.0 s, grace 2.0 s"
+    },
+    "long_statement_on_the_server": {
+      "another_lane_updated_the_same_row_right_after_ms": 334.1,
+      "caller_got_its_error_after_s": {
+        "in_a_lane_transaction": 1.12,
+        "read_outside_a_transaction": 1.21,
+        "write_outside_a_transaction": 1.21
+      },
+      "committed": false,
+      "date_utc": "2026-11-10 08:14",
+      "errors": {
+        "in_a_lane_transaction": "DeadlineExceeded",
+        "read_outside_a_transaction": "DeadlineExceeded",
+        "write_outside_a_transaction": "CommitUnknown"
+      },
+      "what": "an UPDATE that sleeps 30 s on the server, deadline 1.0 s, grace 2.0 s"
+    },
+    "roll_back_blocked": {
+      "caller_got_its_error_after_s": 3.17,
+      "date_utc": "2026-11-10 08:15",
+      "raised": "the caller's own exception",
+      "what": "ROLLBACK blocks at a fault site after an exception in the block; roll-back deadline 1.0 s, grace 2.0 s"
+    }
+  },
+  "versions": {
+    "duckdb_client": "1.5.6",
+    "platform": "Darwin arm64",
+    "python": "3.13.1"
+  },
+  "what": "Deadlines of the destination layer against MotherDuck"
+}

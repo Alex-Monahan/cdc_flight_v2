@@ -1,0 +1,92 @@
+{
+  "command": "tools/with-env uv run -q pytest -q -m md tests/destination",
+  "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
+  "results": {
+    "where_evaluated": {
+      "bare_select": {
+        "max_ms": 2.1,
+        "median_ms": 0.8,
+        "min_ms": 0.3,
+        "n": 30,
+        "p90_ms": 0.9
+      },
+      "bare_select_value_inside_the_clients_own_send_receive_window": "30 of 30",
+      "clock_sql": "uuid_extract_timestamp(uuidv7())",
+      "clock_us_sql": {
+        "max_ms": 79.5,
+        "median_ms": 74.3,
+        "min_ms": 71.9,
+        "n": 30,
+        "p90_ms": 77.9
+      },
+      "date_utc": "2026-11-10 08:25",
+      "plans": {
+        "bare select": {
+          "operators": [
+            "PROJECTION (L)",
+            "DUMMY_SCAN (L)"
+          ],
+          "run_by_motherduck": false
+        },
+        "insert select from a table": {
+          "operators": [
+            "DOWNLOAD_SOURCE (L)",
+            "DOWNLOAD_SINK (R)",
+            "BATCH_INSERT (R)",
+            "PROJECTION (R)",
+            "SEQ_SCAN (R)"
+          ],
+          "run_by_motherduck": true
+        },
+        "insert select without a table": {
+          "operators": [
+            "DOWNLOAD_SOURCE (L)",
+            "DOWNLOAD_SINK (R)",
+            "INSERT (R)",
+            "PROJECTION (R)",
+            "DUMMY_SCAN (R)"
+          ],
+          "run_by_motherduck": true
+        },
+        "insert values": {
+          "operators": [
+            "DOWNLOAD_SOURCE (L)",
+            "DOWNLOAD_SINK (R)",
+            "INSERT (R)",
+            "EXPRESSION_SCAN (R)",
+            "DUMMY_SCAN (R)"
+          ],
+          "run_by_motherduck": true
+        },
+        "md.CLOCK_US_SQL": {
+          "operators": [
+            "DOWNLOAD_SOURCE (L)",
+            "BATCH_DOWNLOAD_SINK (R)",
+            "PROJECTION (R)",
+            "SEQ_SCAN (R)"
+          ],
+          "run_by_motherduck": true
+        },
+        "update set": {
+          "operators": [
+            "DOWNLOAD_SOURCE (L)",
+            "DOWNLOAD_SINK (R)",
+            "UPDATE (R)",
+            "PROJECTION (R)",
+            "SEQ_SCAN (R)"
+          ],
+          "run_by_motherduck": true
+        }
+      },
+      "reading": "a bare SELECT of the clock expression is answered by the client without a round trip and is the client machine's clock; read through a MotherDuck table it is MotherDuck's",
+      "values_that_are_whole_milliseconds": "30 of 30",
+      "what": "EXPLAIN of each statement form: (L) marks an operator the client runs, (R) one that MotherDuck runs (a statement that MotherDuck runs ends in one client operator, DOWNLOAD_SOURCE, that receives the result); 30 repetitions of the bare select and of md.CLOCK_US_SQL on one connection"
+    }
+  },
+  "versions": {
+    "duckdb_client": "1.5.6",
+    "platform": "Darwin arm64",
+    "python": "3.13.1"
+  },
+  "what": "Where the clock expression of design 4.1 is evaluated"
+}

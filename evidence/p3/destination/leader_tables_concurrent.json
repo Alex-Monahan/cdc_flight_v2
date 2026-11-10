@@ -1,0 +1,270 @@
+{
+  "command": "tools/with-env uv run -q pytest -q -m md tests/destination",
+  "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
+  "results": {
+    "starters_at_once": {
+      "date_utc": "2026-11-10 08:17",
+      "processes": {
+        "per_round": [
+          {
+            "exit_codes": [
+              0,
+              0,
+              0
+            ],
+            "retries": [
+              1,
+              0,
+              0
+            ],
+            "rows": [
+              1,
+              18,
+              18,
+              1
+            ]
+          },
+          {
+            "exit_codes": [
+              0,
+              0,
+              0
+            ],
+            "retries": [
+              0,
+              1,
+              1
+            ],
+            "rows": [
+              1,
+              18,
+              18,
+              1
+            ]
+          },
+          {
+            "exit_codes": [
+              0,
+              0,
+              0
+            ],
+            "retries": [
+              1,
+              0,
+              1
+            ],
+            "rows": [
+              1,
+              18,
+              18,
+              1
+            ]
+          },
+          {
+            "exit_codes": [
+              0,
+              0,
+              0
+            ],
+            "retries": [
+              0,
+              0,
+              0
+            ],
+            "rows": [
+              1,
+              18,
+              18,
+              1
+            ]
+          }
+        ],
+        "rounds": 4,
+        "starters": 3
+      },
+      "threads": {
+        "per_round": [
+          {
+            "retries_or_error": [
+              0,
+              1,
+              1,
+              1
+            ],
+            "rows": [
+              1,
+              18,
+              18,
+              1
+            ]
+          },
+          {
+            "retries_or_error": [
+              0,
+              1,
+              1,
+              1
+            ],
+            "rows": [
+              1,
+              18,
+              18,
+              1
+            ]
+          },
+          {
+            "retries_or_error": [
+              0,
+              1,
+              1,
+              1
+            ],
+            "rows": [
+              1,
+              18,
+              18,
+              1
+            ]
+          },
+          {
+            "retries_or_error": [
+              0,
+              1,
+              1,
+              1
+            ],
+            "rows": [
+              1,
+              18,
+              18,
+              1
+            ]
+          },
+          {
+            "retries_or_error": [
+              1,
+              1,
+              0,
+              1
+            ],
+            "rows": [
+              1,
+              18,
+              18,
+              1
+            ]
+          },
+          {
+            "retries_or_error": [
+              1,
+              1,
+              1,
+              0
+            ],
+            "rows": [
+              1,
+              18,
+              18,
+              1
+            ]
+          },
+          {
+            "retries_or_error": [
+              1,
+              1,
+              0,
+              1
+            ],
+            "rows": [
+              1,
+              18,
+              18,
+              1
+            ]
+          },
+          {
+            "retries_or_error": [
+              0,
+              1,
+              1,
+              1
+            ],
+            "rows": [
+              1,
+              18,
+              18,
+              1
+            ]
+          },
+          {
+            "retries_or_error": [
+              0,
+              1,
+              1,
+              1
+            ],
+            "rows": [
+              1,
+              18,
+              18,
+              1
+            ]
+          },
+          {
+            "retries_or_error": [
+              0,
+              1,
+              1,
+              1
+            ],
+            "rows": [
+              1,
+              18,
+              18,
+              1
+            ]
+          },
+          {
+            "retries_or_error": [
+              1,
+              1,
+              1,
+              0
+            ],
+            "rows": [
+              1,
+              18,
+              18,
+              1
+            ]
+          },
+          {
+            "retries_or_error": [
+              1,
+              1,
+              0,
+              1
+            ],
+            "rows": [
+              1,
+              18,
+              18,
+              1
+            ]
+          }
+        ],
+        "rounds": 12,
+        "rounds_all_succeeded": 12,
+        "rounds_in_which_a_starter_had_to_retry": 12,
+        "starters": 4
+      },
+      "what": "ensure_leader_tables() by several starters at the same moment on a database without the schema _cdc; rows = (leader rows, fence rows, distinct lanes, heartbeat rows) after each round"
+    }
+  },
+  "versions": {
+    "duckdb_client": "1.5.6",
+    "platform": "Darwin arm64",
+    "python": "3.13.1"
+  },
+  "what": "Simultaneous initialisation of the leader tables on MotherDuck"
+}

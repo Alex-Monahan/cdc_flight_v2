@@ -1,0 +1,146 @@
+{
+  "command": "tools/with-env uv run -q pytest -q -m md tests/destination",
+  "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
+  "results": {
+    "old_run_stands_before_commit": {
+      "date_utc": "2026-11-10 08:16",
+      "old_run_gets": "CommitUnknown",
+      "old_transaction_committed": false,
+      "take_over_with_the_interrupt": {
+        "attempts": 2,
+        "conflicts": 1,
+        "interrupted": 1,
+        "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
+        "listed": 2,
+        "result": "won",
+        "seconds": 1.156,
+        "unknown": 0
+      },
+      "take_over_without_the_interrupt": {
+        "attempts": 9,
+        "conflicts": 9,
+        "interrupted": 0,
+        "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
+        "listed": 0,
+        "result": "TakeoverFailed after 5 s",
+        "seconds": 5.444,
+        "unknown": 0
+      },
+      "what": "the old run's stream-lane transaction has run its fence statement and stands before COMMIT"
+    },
+    "open_transaction_holds_a_leader_row": {
+      "date_utc": "2026-11-10 08:16",
+      "old_run_at_its_next_statement": "ConnectionLost",
+      "old_run_at_its_next_transaction": "FenceLost",
+      "take_over_with_the_interrupt": {
+        "attempts": 2,
+        "conflicts": 1,
+        "interrupted": 1,
+        "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
+        "listed": 2,
+        "result": "won",
+        "seconds": 1.16,
+        "unknown": 0
+      },
+      "take_over_without_the_interrupt": {
+        "attempts": 10,
+        "conflicts": 10,
+        "interrupted": 0,
+        "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
+        "listed": 0,
+        "result": "TakeoverFailed after 6 s",
+        "seconds": 6.484,
+        "unknown": 0
+      },
+      "what": "the old run's control-lane transaction has updated the heartbeat row and stays open"
+    },
+    "open_transaction_holds_only_data_rows": {
+      "date_utc": "2026-11-10 08:16",
+      "interrupt_earlier": {
+        "interrupted": 1,
+        "listed": 2
+      },
+      "new_run_updating_the_same_row": "Conflict until md.interrupt_earlier(conn, new_epoch) ran",
+      "old_run_at_its_next_statement": "ConnectionLost",
+      "take_over": {
+        "attempts": 1,
+        "conflicts": 0,
+        "interrupted": 0,
+        "last_error": null,
+        "listed": 0,
+        "result": "won without a conflict",
+        "seconds": 0.393,
+        "unknown": 0
+      },
+      "what": "the old run's stream-lane transaction has updated a data row and stays open"
+    },
+    "replaced_connection_interrupted_by_id": {
+      "date_utc": "2026-11-10 08:15",
+      "interrupt_statement_ms": 80.1,
+      "next_transaction_with_connect_interrupt_and_registration_ms": 472.8,
+      "server_still_knew_the_old_connection": false,
+      "what": "a lane transaction loses its connection before COMMIT (fault site md.fence); the next transaction of the lane connects again, interrupts the old server connection by id and updates the same row"
+    },
+    "what_the_server_answers": {
+      "begin_alone_took_ms": 0.2,
+      "date_utc": "2026-11-10 08:23",
+      "reading": "BEGIN is not sent to the server. The server lists a connection only while it has a statement in flight or a transaction with at least one statement, and an interrupt answers true in exactly those states. So the count `interrupted` of md.interrupt_earlier is the number of connections that held something, not the number of connections that are still alive, and a registered id of an idle connection cannot be told from one that is gone",
+      "states": {
+        "a statement that interrupts its own connection": {
+          "class": "transport",
+          "error": "ConnectionException: Connection Error: interrupted by user"
+        },
+        "after BEGIN alone": {
+          "interrupt_answers": false,
+          "listed": 0
+        },
+        "after the client heard of the interrupt": {
+          "interrupt_answers": false,
+          "listed": 0
+        },
+        "an id the server never saw": {
+          "interrupt_answers": false
+        },
+        "closed": {
+          "interrupt_answers": false,
+          "listed": 0
+        },
+        "idle after a read and a write in autocommit": {
+          "interrupt_answers": false,
+          "listed": 0
+        },
+        "never ran a statement": {
+          "interrupt_answers": false,
+          "listed": 0
+        },
+        "open transaction with one statement, idle": {
+          "interrupt_answers": true,
+          "listed": 1,
+          "user_agent_carries_the_marker": true
+        },
+        "statement in flight": {
+          "interrupt_answers": true,
+          "listed": 1,
+          "statement_ended_after_s": 0.32,
+          "user_agent_carries_the_marker": true
+        },
+        "the client's next statement": {
+          "class": "transport",
+          "error": "TransactionException: TransactionContext Error: transaction already rolled back: Connection Error: interrupted by user"
+        },
+        "the same transaction after the interrupt, before the client sent anything": {
+          "interrupt_answers": true,
+          "listed": 1,
+          "user_agent_carries_the_marker": true
+        }
+      },
+      "what": "one connection asks about one other connection of this test by its id: is it listed by md_active_server_connections(), and what does md_interrupt_server_connection(id) answer"
+    }
+  },
+  "versions": {
+    "duckdb_client": "1.5.6",
+    "platform": "Darwin arm64",
+    "python": "3.13.1"
+  },
+  "what": "The connection registry and the take-over against MotherDuck"
+}
