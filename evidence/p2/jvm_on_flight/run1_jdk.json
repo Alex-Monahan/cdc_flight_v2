@@ -1,0 +1,366 @@
+{
+ "boot": {
+  "child_exit": "69.231",
+  "clone": "0.344",
+  "commit": "93bd5c5fc51cef8402451f1779902274b25400db",
+  "exit": "1",
+  "first_line": "1794278241.923"
+ },
+ "derived": {
+  "container_and_requirements_s": 2.075,
+  "cost_usd_at_0.60_per_h": 0.0119,
+  "run_wall_s": 71.407
+ },
+ "marks": [
+  "T 0.901 driver_start",
+  "T 0.901 phase_jdk",
+  "T 46.761 phase_e2e",
+  "T 46.762 jdk_begin",
+  "T 50.902 jdk_done",
+  "T 50.989 jars_done",
+  "T 52.957 compile_done",
+  "T 52.957 pg_install_begin",
+  "T 65.969 pg_installed",
+  "T 69.155 driver_end"
+ ],
+ "raw_log": [
+  "Using CPython 3.12.15",
+  "Creating virtual environment at: .venv",
+  "Resolved 3 packages in 702ms",
+  "Downloading psycopg-binary (5.0MiB)",
+  " Downloaded psycopg-binary",
+  "Prepared 3 packages in 324ms",
+  "Installed 3 packages in 31ms",
+  " + psycopg==3.3.8",
+  " + psycopg-binary==3.3.8",
+  " + typing-extensions==4.16.0",
+  "BOOT first_line 1794278241.923",
+  "BOOT clone 0.344",
+  "BOOT commit 93bd5c5fc51cef8402451f1779902274b25400db",
+  "T 0.901 driver_start",
+  "RESULT {\"cpu_max\": \"200000 100000\", \"jdk\": \"temurin-21\", \"mem_max\": \"17179869184\", \"modes\": [\"jdk\", \"e2e\"], \"os_cpu_count\": 8, \"phase\": \"driver\", \"t_run\": 0.901}",
+  "T 0.901 phase_jdk",
+  "RESULT {\"phase\": \"apt_update\", \"seconds\": 2.979, \"t_run\": 4.537}",
+  "RESULT {\"download_s\": 0.7, \"java_version\": [\"openjdk version \\\"21.0.13\\\" 2026-10-20 LTS\", \"OpenJDK Runtime Environment Temurin-21.0.13+9 (build 21.0.13+9-LTS)\", \"OpenJDK 64-Bit Server VM Temurin-21.0.13+9 (build 21.0.13+9-LTS, mixed mode, sharing)\"], \"java_version_s\": 0.047, \"jdk\": \"temurin-21\", \"phase\": \"jdk_tarball\", \"t_run\": 8.573, \"tarball_bytes\": 207858352, \"unpack_s\": 3.278, \"unpacked_bytes\": 361763353}",
+  "RESULT {\"download_s\": 0.914, \"java_version\": [\"openjdk version \\\"21.0.13\\\" 2026-10-20 LTS\", \"OpenJDK Runtime Environment Corretto-21.0.13.0.11 (build 21.0.13+11-LTS)\", \"OpenJDK 64-Bit Server VM Corretto-21.0.13.0.11 (build 21.0.13+11-LTS, mixed mode, sharing)\"], \"java_version_s\": 0.045, \"jdk\": \"corretto-21\", \"phase\": \"jdk_tarball\", \"t_run\": 12.79, \"tarball_bytes\": 209244001, \"unpack_s\": 3.249, \"unpacked_bytes\": 364679387}",
+  "RESULT {\"download_s\": 0.854, \"java_version\": [\"openjdk version \\\"25.0.5\\\" 2026-10-20 LTS\", \"OpenJDK Runtime Environment Temurin-25.0.5+8 (build 25.0.5+8-LTS)\", \"OpenJDK 64-Bit Server VM Temurin-25.0.5+8 (build 25.0.5+8-LTS, mixed mode, sharing)\"], \"java_version_s\": 0.04, \"jdk\": \"temurin-25\", \"phase\": \"jdk_tarball\", \"t_run\": 16.532, \"tarball_bytes\": 141341188, \"unpack_s\": 2.839, \"unpacked_bytes\": 316642445}",
+  "RESULT {\"apt_install_s\": 15.432, \"apt_update_s\": 2.979, \"java_version\": [\"openjdk version \\\"17.0.21\\\" 2026-10-20\", \"OpenJDK Runtime Environment (build 17.0.21+9-1-deb12u1-Debian)\", \"OpenJDK 64-Bit Server VM (build 17.0.21+9-1-deb12u1-Debian, mixed mode, sharing)\"], \"java_version_s\": 0.04376792907714844, \"jdk\": \"debian-apt-openjdk-17\", \"phase\": \"jdk_apt\", \"rc\": 0, \"t_run\": 32.017, \"unpacked_bytes\": 271324047}",
+  "RESULT {\"flags\": {\"ActiveProcessorCount\": \"-1\", \"CICompilerCount\": \"2\", \"ConcGCThreads\": \"1\", \"InitialHeapSize\": \"268435456\", \"MaxHeapSize\": \"4294967296\", \"MaxRAM\": \"137438953472\", \"MaxRAMPercentage\": \"25.000000\", \"ParallelGCThreads\": \"2\", \"UseContainerSupport\": \"true\", \"UseG1GC\": \"true\", \"UseParallelGC\": \"false\", \"UseSerialGC\": \"false\"}, \"jdk\": \"temurin-21\", \"phase\": \"jvm_detects\", \"system\": [\"Operating System Metrics:\", \"Provider: cgroupv2\", \"Effective CPU Count: 2\", \"CPU Period: 100000us\", \"CPU Quota: 200000us\", \"CPU Shares: 521us\", \"List of Processors: N/A\", \"List of Effective Processors, 8 total:\", \"0 1 2 3 4 5 6 7\", \"List of Memory Nodes: N/A\", \"List of Available Memory Nodes, 1 total:\", \"0\", \"Memory Limit: 16.00G\", \"Memory Soft Limit: 0.00K\", \"Memory & Swap Limit: 16.00G\", \"Maximum Processes Limit: 76271\", \"openjdk version \\\"21.0.13\\\" 2026-10-20 LTS\", \"OpenJDK Runtime Environment Temurin-21.0.13+9 (build 21.0.13+9-LTS)\", \"OpenJDK 64-Bit Server VM Temurin-21.0.13+9 (build 21.0.13+9-LTS, mixed mode, sharing)\"], \"t_run\": 32.176}",
+  "RESULT {\"flags\": {\"ActiveProcessorCount\": \"-1\", \"CICompilerCount\": \"2\", \"ConcGCThreads\": \"1\", \"InitialHeapSize\": \"268435456\", \"MaxHeapSize\": \"4294967296\", \"MaxRAM\": \"137438953472\", \"MaxRAMPercentage\": \"25.000000\", \"ParallelGCThreads\": \"2\", \"UseContainerSupport\": \"true\", \"UseG1GC\": \"true\", \"UseParallelGC\": \"false\", \"UseSerialGC\": \"false\"}, \"jdk\": \"temurin-25\", \"phase\": \"jvm_detects\", \"system\": [\"Operating System Metrics:\", \"Provider: cgroupv2\", \"Effective CPU Count: 2\", \"CPU Period: 100000us\", \"CPU Quota: 200000us\", \"CPU Shares: 521us\", \"List of Processors: N/A\", \"List of Effective Processors, 8 total:\", \"0 1 2 3 4 5 6 7\", \"List of Memory Nodes: N/A\", \"List of Available Memory Nodes, 1 total:\", \"0\", \"Memory Limit: 16.00G\", \"Memory Soft Limit: 0.00K\", \"Memory & Swap Limit: 16.00G\", \"Maximum Processes Limit: 76271\", \"openjdk version \\\"25.0.5\\\" 2026-10-20 LTS\", \"OpenJDK Runtime Environment Temurin-25.0.5+8 (build 25.0.5+8-LTS)\", \"OpenJDK 64-Bit Server VM Temurin-25.0.5+8 (build 25.0.5+8-LTS, mixed mode, sharing)\"], \"t_run\": 32.355}",
+  "RESULT {\"bytes\": 40204549, \"count\": 73, \"phase\": \"jars_fetch\", \"seconds\": 0.548, \"slowest\": [{\"attempts\": 1, \"bytes\": 1247201, \"name\": \"jersey-common-3.1.10.jar\", \"reused\": false, \"seconds\": 0.20605417201295495}, {\"attempts\": 1, \"bytes\": 10204032, \"name\": \"kafka-clients-4.3.1.jar\", \"reused\": false, \"seconds\": 0.20109865500126034}, {\"attempts\": 1, \"bytes\": 698022, \"name\": \"jetty-util-12.0.34.jar\", \"reused\": false, \"seconds\": 0.1693256739526987}], \"t_run\": 32.955}",
+  "RESULT {\"jars_s\": 0.636, \"jdk_download_s\": 1.308, \"jdk_unpack_s\": 3.247, \"phase\": \"jdk_and_jars_parallel\", \"t_run\": 37.521, \"wall_s\": 4.566}",
+  "RESULT {\"javac_s\": 1.93, \"jdk\": \"temurin-21\", \"phase\": \"compile_and_start\", \"selftest_compiled\": {\"rc\": 0, \"seconds\": 0.321, \"version_line\": \"CDCV2 VERSION 1794278281676 debezium=3.7.1.Final engine_api=io.debezium.engine.DebeziumEngine connector=io.debezium.connector.postgresql.PostgresConnector\"}, \"selftest_compiled_again\": {\"rc\": 0, \"seconds\": 0.297, \"version_line\": \"CDCV2 VERSION 1794278281972 debezium=3.7.1.Final engine_api=io.debezium.engine.DebeziumEngine connector=io.debezium.connector.postgresql.PostgresConnector\"}, \"selftest_source_launcher\": {\"rc\": 0, \"seconds\": 1.888, \"version_line\": \"CDCV2 VERSION 1794278283835 debezium=3.7.1.Final engine_api=io.debezium.engine.DebeziumEngine connector=io.debezium.connector.postgresql.PostgresConnector\"}, \"t_run\": 41.957}",
+  "RESULT {\"javac_s\": 1.981, \"jdk\": \"temurin-25\", \"phase\": \"compile_and_start\", \"selftest_compiled\": {\"rc\": 0, \"seconds\": 0.293, \"version_line\": \"CDCV2 VERSION 1794278286144 debezium=3.7.1.Final engine_api=io.debezium.engine.DebeziumEngine connector=io.debezium.connector.postgresql.PostgresConnector\"}, \"selftest_compiled_again\": {\"rc\": 0, \"seconds\": 0.268, \"version_line\": \"CDCV2 VERSION 1794278286413 debezium=3.7.1.Final engine_api=io.debezium.engine.DebeziumEngine connector=io.debezium.connector.postgresql.PostgresConnector\"}, \"selftest_source_launcher\": {\"rc\": 0, \"seconds\": 2.125, \"version_line\": \"CDCV2 VERSION 1794278288519 debezium=3.7.1.Final engine_api=io.debezium.engine.DebeziumEngine connector=io.debezium.connector.postgresql.PostgresConnector\"}, \"t_run\": 46.625}",
+  "T 46.761 phase_e2e",
+  "T 46.762 jdk_begin",
+  "T 50.902 jdk_done",
+  "T 50.989 jars_done",
+  "T 52.957 compile_done",
+  "RESULT {\"jars_bytes\": 40204549, \"jars_count\": 73, \"jars_s\": 0.036, \"javac_s\": 1.968, \"jdk\": \"temurin-21\", \"jdk_download_s\": 0.85, \"jdk_unpack_s\": 3.28, \"phase\": \"prepare\", \"t_run\": 52.957}",
+  "T 52.957 pg_install_begin",
+  "T 65.969 pg_installed",
+  "RESULT {\"error\": \"SyntaxError: syntax error at or near \\\"$1\\\"\\nLINE 1: CREATE ROLE cdc_v2_spike_repl LOGIN REPLICATION PASSWORD $1\\n                                                                 ^\", \"mode\": \"e2e\", \"phase\": \"phase_error\", \"t_run\": 69.155, \"trace\": \"Traceback (most recent call last):\\n  File \\\"/tmp/cdc_v2_src/spikes/jvm_on_flight/driver.py\\\", line 845, in main\\n    phases[m]()\\n  File \\\"/tmp/cdc_v2_src/spikes/jvm_on_flight/driver.py\\\", line 482, in phase_e2e\\n    pg = pg_up()\\n         ^^^^^^^\\n  File \\\"/tmp/cdc_v2_src/spikes/jvm_on_flight/driver.py\\\", line 236, in pg_up\\n    pw, setup_s = pgf.setup(inst[\\\"bindir\\\"])\\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \\\"/tmp/cdc_v2_src/spikes/jvm_on_flight/pgfixture.py\\\", line 157, in setup\\n    c.execute(\\\"CREATE ROLE %s LOGIN REPLICATION PASSWORD %%s\\\" % ROLE, (password,))\\n  File \\\"/app/.venv/lib/python3.12/site-packages/psycopg/connection.py\\\", line 304, in execute\\n    raise ex.with_traceback(None)\\npsycopg.errors.SyntaxError: syntax error at or near \\\"$1\\\"\\nLINE 1: CREATE ROLE cdc_v2_spike_repl LOGIN REPLICATION PASSWORD $1\\n                                                                 ^\\n\"}",
+  "T 69.155 driver_end",
+  "BOOT child_exit 69.231",
+  "BOOT exit 1"
+ ],
+ "results": [
+  {
+   "cpu_max": "200000 100000",
+   "jdk": "temurin-21",
+   "mem_max": "17179869184",
+   "modes": [
+    "jdk",
+    "e2e"
+   ],
+   "os_cpu_count": 8,
+   "phase": "driver",
+   "t_run": 0.901
+  },
+  {
+   "phase": "apt_update",
+   "seconds": 2.979,
+   "t_run": 4.537
+  },
+  {
+   "download_s": 0.7,
+   "java_version": [
+    "openjdk version \"21.0.13\" 2026-10-20 LTS",
+    "OpenJDK Runtime Environment Temurin-21.0.13+9 (build 21.0.13+9-LTS)",
+    "OpenJDK 64-Bit Server VM Temurin-21.0.13+9 (build 21.0.13+9-LTS, mixed mode, sharing)"
+   ],
+   "java_version_s": 0.047,
+   "jdk": "temurin-21",
+   "phase": "jdk_tarball",
+   "t_run": 8.573,
+   "tarball_bytes": 207858352,
+   "unpack_s": 3.278,
+   "unpacked_bytes": 361763353
+  },
+  {
+   "download_s": 0.914,
+   "java_version": [
+    "openjdk version \"21.0.13\" 2026-10-20 LTS",
+    "OpenJDK Runtime Environment Corretto-21.0.13.0.11 (build 21.0.13+11-LTS)",
+    "OpenJDK 64-Bit Server VM Corretto-21.0.13.0.11 (build 21.0.13+11-LTS, mixed mode, sharing)"
+   ],
+   "java_version_s": 0.045,
+   "jdk": "corretto-21",
+   "phase": "jdk_tarball",
+   "t_run": 12.79,
+   "tarball_bytes": 209244001,
+   "unpack_s": 3.249,
+   "unpacked_bytes": 364679387
+  },
+  {
+   "download_s": 0.854,
+   "java_version": [
+    "openjdk version \"25.0.5\" 2026-10-20 LTS",
+    "OpenJDK Runtime Environment Temurin-25.0.5+8 (build 25.0.5+8-LTS)",
+    "OpenJDK 64-Bit Server VM Temurin-25.0.5+8 (build 25.0.5+8-LTS, mixed mode, sharing)"
+   ],
+   "java_version_s": 0.04,
+   "jdk": "temurin-25",
+   "phase": "jdk_tarball",
+   "t_run": 16.532,
+   "tarball_bytes": 141341188,
+   "unpack_s": 2.839,
+   "unpacked_bytes": 316642445
+  },
+  {
+   "apt_install_s": 15.432,
+   "apt_update_s": 2.979,
+   "java_version": [
+    "openjdk version \"17.0.21\" 2026-10-20",
+    "OpenJDK Runtime Environment (build 17.0.21+9-1-deb12u1-Debian)",
+    "OpenJDK 64-Bit Server VM (build 17.0.21+9-1-deb12u1-Debian, mixed mode, sharing)"
+   ],
+   "java_version_s": 0.04376792907714844,
+   "jdk": "debian-apt-openjdk-17",
+   "phase": "jdk_apt",
+   "rc": 0,
+   "t_run": 32.017,
+   "unpacked_bytes": 271324047
+  },
+  {
+   "flags": {
+    "ActiveProcessorCount": "-1",
+    "CICompilerCount": "2",
+    "ConcGCThreads": "1",
+    "InitialHeapSize": "268435456",
+    "MaxHeapSize": "4294967296",
+    "MaxRAM": "137438953472",
+    "MaxRAMPercentage": "25.000000",
+    "ParallelGCThreads": "2",
+    "UseContainerSupport": "true",
+    "UseG1GC": "true",
+    "UseParallelGC": "false",
+    "UseSerialGC": "false"
+   },
+   "jdk": "temurin-21",
+   "phase": "jvm_detects",
+   "system": [
+    "Operating System Metrics:",
+    "Provider: cgroupv2",
+    "Effective CPU Count: 2",
+    "CPU Period: 100000us",
+    "CPU Quota: 200000us",
+    "CPU Shares: 521us",
+    "List of Processors: N/A",
+    "List of Effective Processors, 8 total:",
+    "0 1 2 3 4 5 6 7",
+    "List of Memory Nodes: N/A",
+    "List of Available Memory Nodes, 1 total:",
+    "0",
+    "Memory Limit: 16.00G",
+    "Memory Soft Limit: 0.00K",
+    "Memory & Swap Limit: 16.00G",
+    "Maximum Processes Limit: 76271",
+    "openjdk version \"21.0.13\" 2026-10-20 LTS",
+    "OpenJDK Runtime Environment Temurin-21.0.13+9 (build 21.0.13+9-LTS)",
+    "OpenJDK 64-Bit Server VM Temurin-21.0.13+9 (build 21.0.13+9-LTS, mixed mode, sharing)"
+   ],
+   "t_run": 32.176
+  },
+  {
+   "flags": {
+    "ActiveProcessorCount": "-1",
+    "CICompilerCount": "2",
+    "ConcGCThreads": "1",
+    "InitialHeapSize": "268435456",
+    "MaxHeapSize": "4294967296",
+    "MaxRAM": "137438953472",
+    "MaxRAMPercentage": "25.000000",
+    "ParallelGCThreads": "2",
+    "UseContainerSupport": "true",
+    "UseG1GC": "true",
+    "UseParallelGC": "false",
+    "UseSerialGC": "false"
+   },
+   "jdk": "temurin-25",
+   "phase": "jvm_detects",
+   "system": [
+    "Operating System Metrics:",
+    "Provider: cgroupv2",
+    "Effective CPU Count: 2",
+    "CPU Period: 100000us",
+    "CPU Quota: 200000us",
+    "CPU Shares: 521us",
+    "List of Processors: N/A",
+    "List of Effective Processors, 8 total:",
+    "0 1 2 3 4 5 6 7",
+    "List of Memory Nodes: N/A",
+    "List of Available Memory Nodes, 1 total:",
+    "0",
+    "Memory Limit: 16.00G",
+    "Memory Soft Limit: 0.00K",
+    "Memory & Swap Limit: 16.00G",
+    "Maximum Processes Limit: 76271",
+    "openjdk version \"25.0.5\" 2026-10-20 LTS",
+    "OpenJDK Runtime Environment Temurin-25.0.5+8 (build 25.0.5+8-LTS)",
+    "OpenJDK 64-Bit Server VM Temurin-25.0.5+8 (build 25.0.5+8-LTS, mixed mode, sharing)"
+   ],
+   "t_run": 32.355
+  },
+  {
+   "bytes": 40204549,
+   "count": 73,
+   "phase": "jars_fetch",
+   "seconds": 0.548,
+   "slowest": [
+    {
+     "attempts": 1,
+     "bytes": 1247201,
+     "name": "jersey-common-3.1.10.jar",
+     "reused": false,
+     "seconds": 0.20605417201295495
+    },
+    {
+     "attempts": 1,
+     "bytes": 10204032,
+     "name": "kafka-clients-4.3.1.jar",
+     "reused": false,
+     "seconds": 0.20109865500126034
+    },
+    {
+     "attempts": 1,
+     "bytes": 698022,
+     "name": "jetty-util-12.0.34.jar",
+     "reused": false,
+     "seconds": 0.1693256739526987
+    }
+   ],
+   "t_run": 32.955
+  },
+  {
+   "jars_s": 0.636,
+   "jdk_download_s": 1.308,
+   "jdk_unpack_s": 3.247,
+   "phase": "jdk_and_jars_parallel",
+   "t_run": 37.521,
+   "wall_s": 4.566
+  },
+  {
+   "javac_s": 1.93,
+   "jdk": "temurin-21",
+   "phase": "compile_and_start",
+   "selftest_compiled": {
+    "rc": 0,
+    "seconds": 0.321,
+    "version_line": "CDCV2 VERSION 1794278281676 debezium=3.7.1.Final engine_api=io.debezium.engine.DebeziumEngine connector=io.debezium.connector.postgresql.PostgresConnector"
+   },
+   "selftest_compiled_again": {
+    "rc": 0,
+    "seconds": 0.297,
+    "version_line": "CDCV2 VERSION 1794278281972 debezium=3.7.1.Final engine_api=io.debezium.engine.DebeziumEngine connector=io.debezium.connector.postgresql.PostgresConnector"
+   },
+   "selftest_source_launcher": {
+    "rc": 0,
+    "seconds": 1.888,
+    "version_line": "CDCV2 VERSION 1794278283835 debezium=3.7.1.Final engine_api=io.debezium.engine.DebeziumEngine connector=io.debezium.connector.postgresql.PostgresConnector"
+   },
+   "t_run": 41.957
+  },
+  {
+   "javac_s": 1.981,
+   "jdk": "temurin-25",
+   "phase": "compile_and_start",
+   "selftest_compiled": {
+    "rc": 0,
+    "seconds": 0.293,
+    "version_line": "CDCV2 VERSION 1794278286144 debezium=3.7.1.Final engine_api=io.debezium.engine.DebeziumEngine connector=io.debezium.connector.postgresql.PostgresConnector"
+   },
+   "selftest_compiled_again": {
+    "rc": 0,
+    "seconds": 0.268,
+    "version_line": "CDCV2 VERSION 1794278286413 debezium=3.7.1.Final engine_api=io.debezium.engine.DebeziumEngine connector=io.debezium.connector.postgresql.PostgresConnector"
+   },
+   "selftest_source_launcher": {
+    "rc": 0,
+    "seconds": 2.125,
+    "version_line": "CDCV2 VERSION 1794278288519 debezium=3.7.1.Final engine_api=io.debezium.engine.DebeziumEngine connector=io.debezium.connector.postgresql.PostgresConnector"
+   },
+   "t_run": 46.625
+  },
+  {
+   "jars_bytes": 40204549,
+   "jars_count": 73,
+   "jars_s": 0.036,
+   "javac_s": 1.968,
+   "jdk": "temurin-21",
+   "jdk_download_s": 0.85,
+   "jdk_unpack_s": 3.28,
+   "phase": "prepare",
+   "t_run": 52.957
+  },
+  {
+   "error": "SyntaxError: syntax error at or near \"$1\"\nLINE 1: CREATE ROLE cdc_v2_spike_repl LOGIN REPLICATION PASSWORD $1\n                                                                 ^",
+   "mode": "e2e",
+   "phase": "phase_error",
+   "t_run": 69.155,
+   "trace": "Traceback (most recent call last):\n  File \"/tmp/cdc_v2_src/spikes/jvm_on_flight/driver.py\", line 845, in main\n    phases[m]()\n  File \"/tmp/cdc_v2_src/spikes/jvm_on_flight/driver.py\", line 482, in phase_e2e\n    pg = pg_up()\n         ^^^^^^^\n  File \"/tmp/cdc_v2_src/spikes/jvm_on_flight/driver.py\", line 236, in pg_up\n    pw, setup_s = pgf.setup(inst[\"bindir\"])\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/cdc_v2_src/spikes/jvm_on_flight/pgfixture.py\", line 157, in setup\n    c.execute(\"CREATE ROLE %s LOGIN REPLICATION PASSWORD %%s\" % ROLE, (password,))\n  File \"/app/.venv/lib/python3.12/site-packages/psycopg/connection.py\", line 304, in execute\n    raise ex.with_traceback(None)\npsycopg.errors.SyntaxError: syntax error at or near \"$1\"\nLINE 1: CREATE ROLE cdc_v2_spike_repl LOGIN REPLICATION PASSWORD $1\n                                                                 ^\n"
+  }
+ ],
+ "run": {
+  "cancelled_at": null,
+  "config": {
+   "CDC_V2_BIG_ROWS": "10000000",
+   "CDC_V2_COMMIT": "93bd5c5fc51cef8402451f1779902274b25400db",
+   "CDC_V2_DEADLINE": "2300",
+   "CDC_V2_JDK": "temurin-21",
+   "CDC_V2_SMALL_TX": "100000",
+   "CDC_V2_SPIKE_MODE": "jdk,e2e",
+   "CDC_V2_TPUT_ONLY": "all",
+   "CDC_V2_TPUT_ROWS": "1000000"
+  },
+  "created_at": "2026-11-10T02:37:19.257+00:00",
+  "ended_at": "2026-11-10T02:38:31.255+00:00",
+  "exit_code": 1,
+  "flight_id": "ff81b6f6-8cea-4f5d-b6f6-7de4f01d4d61",
+  "flight_name": "cdc_v2_spike_jvm",
+  "flight_version": 1,
+  "is_scheduled": false,
+  "observed_states": [
+   {
+    "observed_at": "2026-11-10T02:37:19.725956+00:00",
+    "state": "PENDING"
+   },
+   {
+    "observed_at": "2026-11-10T02:37:22.219771+00:00",
+    "state": "RUNNING"
+   },
+   {
+    "observed_at": "2026-11-10T02:38:33.007210+00:00",
+    "state": "FAILED"
+   }
+  ],
+  "run_id": "01a1c351-2bed-7007-a567-5c17eca33ab3",
+  "run_number": 1,
+  "scheduled_at": "2026-11-10T02:37:19.212+00:00",
+  "started_at": "2026-11-10T02:37:19.848+00:00",
+  "started_by_id": "<redacted>",
+  "started_by_name": "<redacted>",
+  "state": "FAILED",
+  "status": "FAILED"
+ }
+}

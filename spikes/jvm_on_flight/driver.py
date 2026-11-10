@@ -627,6 +627,12 @@ def tx_test(name, n_rows, props=None, heap="1g", jvm_opts=(), timeout=600, jfr=F
     done = eng.wait_events(e0 + n_rows, timeout)
     stream_cpu = cw_stream.stop()
     rec["jvm_threads_cpu_s_commit_to_last"] = thread_delta(th0, thread_cpu(eng.jvm_pid))
+    if not done and eng.jvm_pid and alive(eng.jvm_pid):
+        rc, dump, _ = sh([STATE["home"] + "/bin/jcmd", str(eng.jvm_pid), "Thread.print"], timeout=60)
+        blocks = [b for b in dump.split("\n\n") if ("debezium" in b or "cdc_v2" in b or "pool-" in b)]
+        rec["stall_thread_dump"] = [b[:1500] for b in blocks[:8]]
+        rec["stall_stats"] = eng.stats()
+        rec["stall_slot"] = pgf.slot_state()
     all_cpu = cw_all.stop()
     stop_sampling.set()
     s = eng.stats()
@@ -706,6 +712,8 @@ def phase_profile():
 
 
 PROFILE_VARIANTS = [
+    ("poll10_retest", {"poll.interval.ms": "10"}, ()),
+    ("poll10_batch8k_retest", {"max.batch.size": "8192", "max.queue.size": "32768", "poll.interval.ms": "10"}, ()),
     ("decimal_string", {"decimal.handling.mode": "string"}, ()),
     ("decimal_double", {"decimal.handling.mode": "double"}, ()),
     ("parallelgc_decimal_double", {"decimal.handling.mode": "double"}, ("-XX:+UseParallelGC",)),
