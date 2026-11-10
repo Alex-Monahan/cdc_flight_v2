@@ -4,20 +4,32 @@ Last updated: 2026-11-09, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 
 ## Where the build stands
 
-- **Stage 1 (local), phase P1 Environment — in progress.**
+- **Stage 1 (local). P1 Environment: gate passed on 2026-11-09** (one item cannot be shown from this session, see the
+  table). **P2 Platform spike: in progress**, with the hazard research of P5 running alongside.
 - Stage 2 (PlanetScale) cannot start: of its names only `PLANETSCALE_ORG` and `PLANETSCALE_DATABASE` are in the env
-  file. The service token and the connection values are owed by the owner.
+  file (checked again at the P1 gate). The service token and the connection values are owed by the owner.
 
-## P1 gate
+## P1 gate — passed 2026-11-09
 
 | Item | State | Evidence |
 |---|---|---|
 | Session start checks | 1 and 4 pass; 2 resolved by the owner; **3 not enforced in this session** (owner informed) | `evidence/p1/session_start.md` |
 | Newest stable Postgres installed with Homebrew | done — `postgresql@18` 18.6_1; the service on port 5432 untouched | `evidence/p1/postgres_install.md` |
-| `tools/localpg` brings a primary and a replica up and down | **in progress** (implementation worker) | — |
+| `tools/localpg` brings a primary and a replica up and down | done — 22 self-tests pass (`pytest -m localpg tests/localpg`, 49 s); reset 2.2 s, up 0.7 s, down 0.4 s; no process left after `down`; port 5432 still served by the owner's unchanged process | `evidence/p1/localpg.md`, `docs/localpg.md` |
 | Connectivity to MotherDuck | pass, with the session's `motherduck_token` (PLAN §9), DuckDB client 1.5.6 | `evidence/p1/motherduck_connectivity.txt` |
 | A commit that carries a planted fake credential is rejected | pass — content and message | `evidence/p1/secret_gate.txt` |
-| Canary denials counted in the audit receipt | **cannot be shown from this session** (guard not active here) | `evidence/p1/session_start.md` |
+| Canary denials counted in the audit receipt | **cannot be shown from this session** (guard not active here). Receipt at the gate: status `ok`, findings 0, last run 20 minutes before the gate | `evidence/p1/session_start.md` |
+
+## P2 gate — open
+
+| Spike (PLAN §2 A) | State | Report |
+|---|---|---|
+| 4 Flight SQL functions, platform facts | done | `docs/spike/flight_platform.md` |
+| 3 MotherDuck semantics | running | `docs/spike/md_semantics.md` |
+| 1 JVM and stock Debezium on a Flight | running | `docs/spike/jvm_on_flight.md` |
+| 2 Run semantics | running | `docs/spike/run_semantics.md` |
+| 5 Local throughput (first indication) | waits for 3 (load method) and 1 (JVM program) | `docs/spike/local_throughput.md` |
+| `docs/spike_report.md` and the architecture decision record | after the spikes | — |
 
 ## Decisions
 
@@ -28,6 +40,9 @@ Last updated: 2026-11-09, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 | 2026-11-09 | `duckdb==1.5.6` pinned: MotherDuck refuses a 2.0.0 client | orchestrator |
 | 2026-11-09 | Python project managed with `uv` (`pyproject.toml`, `uv.lock`), package `cdc_v2` under `src/` | orchestrator |
 | 2026-11-09 | Fetch and push of this clone use the repository-only credential through the clone's git configuration | orchestrator |
+| 2026-11-09 | The default `pytest` run is hermetic (tier T0). Suites that start local Postgres clusters or real Flights are opt-in markers (`localpg`, `flight_integration`), so parallel workers do not collide on ports | orchestrator |
+| 2026-11-09 | SPEC R23 "database user name" means names that come from the env file (provider or stage 2 roles; the scanner's exact-value layer enforces it). The role names that `tools/localpg` creates for local fixtures (`cdc_v2_boot`, `cdc_v2_admin`, `cdc_v2_runtime`) are code and appear in the repository | orchestrator |
+| 2026-11-09 | The JVM spike uses a throw-away Postgres installed inside the Flight container, as a spike fixture only, to prove that stock Debezium streams on F16. The product never installs Postgres; numbers from it are indications, not performance results | orchestrator |
 
 ## Questions for the owner / owed by the owner
 
@@ -55,22 +70,23 @@ Each in its own worktree and branch (Opus, high effort); the orchestrator merges
 
 | Job | Phase | Started | Delivers |
 |---|---|---|---|
-| Implementation worker: `tools/localpg` | P1 | 2026-11-09 | the tool, `tests/localpg/`, `docs/localpg.md`, `evidence/p1/localpg.md` |
 | Spike worker: MotherDuck semantics | P2 (§2 A 3) | 2026-11-09 | `spikes/md_semantics/`, `docs/spike/md_semantics.md`, `evidence/p2/md_semantics/` |
 | Hazard researcher: Debezium facts, replica decoding, hazard catalog | P5 research, started early | 2026-11-09 | `docs/research/debezium.md`, `docs/research/replica_decoding.md`, `docs/wal_hazards.md` |
-| Spike worker: JVM and stock Debezium on a Flight | P2 (§2 A 1) | 2026-11-10 | `flights/spike_jvm/`, `docs/spike/jvm_on_flight.md`, `evidence/p2/jvm_on_flight/` |
-| Spike worker: run semantics | P2 (§2 A 2) | 2026-11-10 | `flights/spike_runs/`, `docs/spike/run_semantics.md`, `evidence/p2/run_semantics/` |
+| Spike worker: JVM and stock Debezium on a Flight | P2 (§2 A 1) | 2026-11-09 | `flights/spike_jvm/`, `docs/spike/jvm_on_flight.md`, `evidence/p2/jvm_on_flight/` |
+| Spike worker: run semantics | P2 (§2 A 2) | 2026-11-09 | `flights/spike_runs/`, `docs/spike/run_semantics.md`, `evidence/p2/run_semantics/` |
 
-Waiting for `tools/localpg`: the local throughput spike (§2 A 5).
+Not started yet: the local throughput spike (§2 A 5). It uses the load method that the MotherDuck semantics spike
+finds fastest and the JVM program of the JVM spike, and it should not share this machine's CPU with them.
 
 Finished and merged:
 
-- 2026-11-10 — Flight tooling and platform facts (§2 A 4): `tools/flightctl`, `src/cdc_v2/flightctl.py`,
+- 2026-11-09 — `tools/localpg` (P1): the tool, `tests/localpg/`, `docs/localpg.md`, `evidence/p1/localpg.md`.
+- 2026-11-09 — Flight tooling and platform facts (§2 A 4): `tools/flightctl`, `src/cdc_v2/flightctl.py`,
   `docs/spike/flight_platform.md`, `evidence/p2/flight_platform/`. All spike Flights and the spike secret deleted.
 
 ## Changes to the secret scanner, its tests or `.secretscan-allow` (for the owner's review)
 
-- 2026-11-10, `.secretscan-allow` created with one rule: `^cdc_v2_spike_secret(_CDC_V2_PROBE_SECRET)?$`. It is the
+- 2026-11-09, `.secretscan-allow` created with one rule: `^cdc_v2_spike_secret(_CDC_V2_PROBE_SECRET)?$`. It is the
   *name* of the spike's Flight secret and of the environment variable it produces (no value); the randomness rule
   flagged the name. The scanner and its tests are unchanged.
 
@@ -84,6 +100,11 @@ the exact-value layer.
 
 ## Next steps
 
-1. Finish P1: merge `tools/localpg` with its tests and evidence; close the gate.
-2. P2 platform spike on a real F16 Flight (PLAN §2 A), with the hazard research (P5) starting alongside.
-3. P3 core: oracle, crash-point harness and fuzzers first.
+1. P2: merge the running spikes as they report; run the local throughput spike; write `docs/spike_report.md` and the
+   architecture decision record; send the report to the owner and continue.
+2. P3 core: oracle, crash-point harness and fuzzers first. The harness must give parallel workers isolated sources:
+   a private database on the shared development cluster for ordinary tests, a private cluster (own home and port
+   block, through `tools/localpg`) for destructive drills.
+3. Carry into P5 (from the `tools/localpg` work): slot creation on a standby waits for a running-transactions record
+   and `pg_log_standby_snapshot()` needs a privileged role; a failover slot is synchronised to a standby only after it
+   has advanced past the standby's catalog horizon; raising a standby-matched setting on the primary pauses replay.
