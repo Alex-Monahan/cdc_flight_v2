@@ -1436,9 +1436,12 @@ Open after the review, and what became of it in the fix round (section 14.3):
 
 Two reviews of the delivery `9e389cc`: the coordinator's ("merge after named fixes", items 1 to 7) and a second
 reviewer's, who attacked the layer with programs of its own (items 8 to 16, its findings F0 to F8). Every item
-has a test that fails on the code of `9e389cc`: the new tests were run against that code (the tree of this
-commit with `src` of `9e389cc`), and every test named here failed there, except the permanent test of item 8,
-which passes on both (`fix_round_old_code.json`). The tests without a file are in `test_fix_round.py`.
+has a test that fails on the code of `9e389cc`: the new tests were run against that code (the tree of the test
+commit `611dd93` with `src` of `9e389cc`; `fix_round_old_code.json`). 48 of the 56 new tests and seeded cases
+failed there. The 8 that passed: the permanent test of item 8 (4 cases; F0 did not recur on the old code
+either), 3 seeded cases of `test_how_an_exception_is_sorted` that guard texts the old rules already sorted
+right, and `test_a_child_row_created_from_two_lanes_is_created_with_a_transition_of_its_parent`, which shows the
+callers' rule of item 3 (it holds on the old code too). The tests without a file are in `test_fix_round.py`.
 
 | Item | What was wrong | What was done | Tests |
 |---|---|---|---|

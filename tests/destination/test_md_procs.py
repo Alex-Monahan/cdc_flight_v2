@@ -351,7 +351,10 @@ def test_two_processes_with_the_same_epoch(scene, evidence):
         if point == "stream.committed":
             assert not kinds1 and rows[t1] == 6 and rows[t2] == 3, (point, kinds1, rows)
         if holds:
-            assert rows.get(t1, 0) >= 6, (point, rows)             # the frozen transaction committed after it went on
+            # the frozen transaction commits after it went on, unless MotherDuck ended it while it was frozen (its
+            # lease, about 29 s, section 8.3): then it got an error and the second process applied its events. The
+            # run of 2026-11-10 19:21 UTC saw the second (sut.moved); exactly-once held in both (checked above)
+            assert rows.get(t1, 0) >= 6 or (kinds1 and rows.get(t2, 0) >= 6), (point, kinds1, rows)
         by_point[point] = {
             "first_holds_the_position_row": holds,
             "second_while_the_first_is_frozen": {"errors": counts(error_kinds(blocked)),
@@ -747,7 +750,9 @@ def test_a_real_connection_break_in_a_child(scene, evidence):
         r = case("commit_never_arrives", "stream.commit_sent", lambda: px.set_fault("blackhole", direction="up"),
                  lift_e, "the COMMIT is held by the proxy; after the child's error the connections are reset, so "
                          "the COMMIT is never delivered")
-        assert r["errors_the_sut_got"][:1] == ["CommitUnknown"] and r["transaction_at_the_break_committed"] is False, r
+        # the outcome is unknown to the layer, and either outcome is right: the client delivered the held COMMIT on
+        # a new connection after the reset in the run of 2026-11-10 19:21 UTC (committed), not in the runs before
+        assert r["errors_the_sut_got"][:1] == ["CommitUnknown"], r
 
         stats = px.stats()
         tunnels = relay.tunnels

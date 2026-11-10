@@ -372,6 +372,10 @@ def main(argv=None):
                                                        "destination", "fence_campaign.json"))
     ap.add_argument("--local", action="store_true", help="a local in-memory destination (tier T0)")
     args = ap.parse_args(argv)
+    import signal
+    # SIGTERM ends the campaign with its clean-up (the database is dropped). SIGINT does not: the client library
+    # turns it into an interrupt of the statement in flight, which a round records as its error.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
     commit = commit_of_tree()
     started = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M")
     records = []

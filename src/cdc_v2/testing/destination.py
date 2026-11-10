@@ -29,7 +29,15 @@ TAKEOVER_LEADER_SQL = (
     "UPDATE _cdc.leader SET epoch = epoch + 1, flight_id = ?, run_number = ?, run_id = ?, state = 'leading', "
     "taken_at = uuid_extract_timestamp(uuidv7()) WHERE epoch = ?"
 )
-TAKEOVER_FENCE_SQL = "UPDATE _cdc.fence SET epoch = ? + 1"
+#: Every fence row: the new epoch, and the counter `n` written with a changed value and put back by
+#: `TAKEOVER_FENCE_RESTORE_SQL` in the same transaction. Writing `n` is what makes an open transaction of an old
+#: run that has run its fence statement conflict with the take-over in every case: DuckDB 1.5.6 and MotherDuck do
+#: not record the fence statement's write of the unchanged `epoch` when that column has had no update since it was
+#: last checkpointed (fix round, F0; `docs/design/destination.md` section 14.4).
+TAKEOVER_FENCE_SQL = "UPDATE _cdc.fence SET epoch = ? + 1, n = n + 1"
+TAKEOVER_FENCE_RESTORE_SQL = "UPDATE _cdc.fence SET n = n - 1"
+#: The fence statement of the take-over as design 4.5 writes it: the negative control of the tests of F0.
+TAKEOVER_FENCE_AS_DESIGNED_SQL = "UPDATE _cdc.fence SET epoch = ? + 1"
 TAKEOVER_HEARTBEAT_SQL = (
     "UPDATE _cdc.heartbeat SET epoch = ? + 1, beat_at = uuid_extract_timestamp(uuidv7()), phase = 'starting'"
 )
@@ -62,7 +70,7 @@ def _interrupt_earlier_raw(raw, settings, epoch):
 
 
 def take_over(settings, run_id=None, flight_id="test-flight", run_number=1, timeout_s=45.0, interrupt=True,
-              report=None, pause_s=0.2):
+              report=None, pause_s=0.2, as_designed=False):
     """Take over as design 4.5 says and return the new epoch.
 
     The take-over decides once from which epoch it takes over (``seen``, read at the first attempt) and every
@@ -73,6 +81,9 @@ def take_over(settings, run_id=None, flight_id="test-flight", run_number=1, time
     for earlier epochs (``interrupt=False`` leaves that out, to show what happens without it) and tries again until
     ``timeout_s`` has passed, then raises `TakeoverFailed`. An unknown commit outcome is not repeated blindly: the
     record is read again after more than 2 s and ``run_id`` decides.
+
+    The fence rows get the new epoch and their counter `n` is written and put back (`TAKEOVER_FENCE_SQL`).
+    ``as_designed=True`` writes only the epoch, as design 4.5 does: a negative control for tests (F0).
 
     ``report``, a dict, receives what happened: ``attempts``, ``conflicts``, ``interrupted``, ``seconds``, the text
     class of the last error, and ``leader_run_id`` when another run leads."""
@@ -112,7 +123,11 @@ def take_over(settings, run_id=None, flight_id="test-flight", run_number=1, time
                 n = raw.execute(TAKEOVER_LEADER_SQL, [flight_id, run_number, run_id, seen]).fetchone()[0]
                 if n != 1:
                     raise duckdb.TransactionException("Conflict on update! (the leader row has another epoch)")
-                raw.execute(TAKEOVER_FENCE_SQL, [seen])
+                if as_designed:
+                    raw.execute(TAKEOVER_FENCE_AS_DESIGNED_SQL, [seen])
+                else:
+                    raw.execute(TAKEOVER_FENCE_SQL, [seen])
+                    raw.execute(TAKEOVER_FENCE_RESTORE_SQL)
                 raw.execute(TAKEOVER_HEARTBEAT_SQL, [seen])
                 sent_commit = True
                 raw.execute("COMMIT")

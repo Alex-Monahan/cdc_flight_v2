@@ -356,8 +356,11 @@ def transition(tx, machine, key, from_state, to_state, cause, *, detail=None, va
 
     ``values`` (column -> value; `NOW` for MotherDuck's clock) sets more columns of the row in the same UPDATE.
     ``expect`` (column -> value) adds a condition ``column IS NOT DISTINCT FROM value`` for each, and the UPDATE
-    writes those columns too (with their new value from ``values``, or with themselves), so that a concurrent
-    writer of them conflicts. With ``expect`` a count of 0 rolls the transaction back and raises `md.Conflict`:
+    writes those columns too (with their new value from ``values``, or with themselves). A concurrent writer of
+    an expected column conflicts with the transition when the transition changes that column: DuckDB 1.5.6 does
+    not always record a write of an unchanged value (`docs/design/destination.md` section 14.4), so a column
+    that must exclude another writer gets its new value in ``values``. The same holds for a transition from a
+    state to itself. With ``expect`` a count of 0 rolls the transaction back and raises `md.Conflict`:
     what the caller read has changed, so it runs the transaction again (contract C4). ``detail`` goes into the
     log row (`check_fields`). ``tx`` must be an `md.Transaction`, else `md.LaneMisuse`."""
     m = _resolve(machine)

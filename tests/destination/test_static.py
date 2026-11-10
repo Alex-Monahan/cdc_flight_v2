@@ -241,9 +241,9 @@ def test_only_the_layer_holds_the_fence_statement():
     found = [(rel, line) for rel, text in sources() for line, s in statements(text)
              if _FENCE_WRITE.search(s) and not allowed(rel, MAY_WRITE_FENCE)]
     assert found == [], "text that writes _cdc.fence outside the destination layer (contract C4): %r" % (found,)
-    # the fence statement itself stands in exactly one place
+    # the fence statement itself stands in exactly one place (the registration writes `n` too, without `epoch`)
     holders = [rel for rel, text in sources() for line, s in statements(text)
-               if re.search(r"UPDATE\s+_cdc\.fence\s+SET\s+n\s*=\s*n\s*\+\s*1", s)]
+               if re.search(r"UPDATE\s+_cdc\.fence\s+SET\s+n\s*=\s*n\s*\+\s*1\s*,\s*epoch", s)]
     assert holders == ["md/lane.py"]
 
 

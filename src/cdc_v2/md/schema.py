@@ -106,6 +106,7 @@ NAMED_STATEMENTS = {
     "clock": clock_sql,
     "register_connection": registry.REGISTER_SQL,
     "register_fence": registry.REGISTER_FENCE_SQL,
+    "register_fence_restore": registry.REGISTER_FENCE_RESTORE_SQL,
     "list_earlier_connections": registry.LIST_EARLIER_SQL,
     "interrupt_earlier_connections": registry.INTERRUPT_EARLIER_SQL,
     "cleanup_connections": registry.CLEANUP_SQL,

@@ -1,0 +1,4 @@
+{
+  "see": "fix_round.json, key results.black_hole (written by tests/destination/test_md_fix_round.py::test_a_black_holed_path_bounds_every_call_and_the_calls_left_waiting)",
+  "what": "the black-holed network path of the fix round (items 6 and 15); named in src/cdc_v2/md/connection.py"
+}

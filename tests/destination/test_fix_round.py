@@ -181,9 +181,10 @@ def test_a_run_that_bypasses_the_fence_shows_a_duplicate_seq(ex, monkeypatch):
 
 def test_values_and_expect_in_the_same_conditional_update(ex):
     """Item 1. `values` sets more columns in the same UPDATE; `expect` adds a condition and, when the row no
-    longer holds what the transaction read, rolls the transaction back with `Conflict` (the run-again rule). The
-    UPDATE also writes the expected columns, so a concurrent writer of them conflicts (conflicts are per
-    column)."""
+    longer holds what the transaction read, rolls the transaction back with `Conflict` (the run-again rule). A
+    concurrent writer of an expected column conflicts with a transition that changes that column (conflicts are
+    per column; a write of an unchanged value is not always recorded, section 14.4, so the transition writes the
+    new value with `values`)."""
     with ex.stream.transaction() as tx:
         state.create(tx, ex.door, "d1", "closed", "installed", values={"opened": 0})
     with ex.stream.transaction() as tx:
@@ -200,11 +201,12 @@ def test_values_and_expect_in_the_same_conditional_update(ex):
         tx.execute("UPDATE _cdc_example.door SET opened = NULL WHERE door_id = 'd1'")
     with ex.stream.transaction() as tx:
         state.transition(tx, ex.door, "d1", "open", "closed", "null expected", expect={"opened": None})
-    # a writer of an expected column conflicts with the transition, also when the transition does not change it
+    # a writer of an expected column conflicts with the transition that changes it
     control = ex.lane("control", ex.epoch)
     with pytest.raises(md.Conflict):
         with ex.stream.transaction() as tx1:
-            state.transition(tx1, ex.door, "d1", "closed", "open", "keeps opened", expect={"opened": None})
+            state.transition(tx1, ex.door, "d1", "closed", "open", "moves opened", values={"opened": 3},
+                             expect={"opened": None})
             with control.transaction() as tx2:
                 tx2.execute("UPDATE _cdc_example.door SET opened = 7 WHERE door_id = 'd1'")
     assert ex.look.fetchall("SELECT state, opened FROM _cdc_example.door") == [("closed", None)]
@@ -228,6 +230,7 @@ def test_a_registration_while_a_take_over_is_open_does_not_commit(led):
         raw.execute("BEGIN")
         raw.execute(td.TAKEOVER_LEADER_SQL, ["f", 1, "newcomer", led.epoch])
         raw.execute(td.TAKEOVER_FENCE_SQL, [led.epoch])
+        raw.execute(td.TAKEOVER_FENCE_RESTORE_SQL)
         raw.execute(td.TAKEOVER_HEARTBEAT_SQL, [led.epoch])
         with pytest.raises(md.Conflict, match="registration"):
             with lane.transaction() as tx:
@@ -423,6 +426,148 @@ def test_a_take_over_at_every_point_of_a_lane_transaction_keeps_the_fence(dest, 
             state.create(tx, door, fence_campaign.DOOR, "closed", "setup")
         rec = fence_campaign.one_round(dest, probe, hooks, shape, point, 0, door)
         assert rec["verdict"] == "pass", rec
+
+
+# ------------------------------------------------------------------------------ item 8 (F0): the cause, on a local file
+@pytest.fixture
+def file_dest(tmp_path, no_leftovers):
+    """A destination in a local DuckDB file (CHECKPOINT does something there), with the leader tables."""
+    settings = md.Settings(database=str(tmp_path / "d.duckdb"), **td.FAST)
+    dest = td.Destination(settings)
+    conn = dest.connect("init")
+    md.ensure_leader_tables(conn)
+    conn.close()
+    try:
+        yield dest
+    finally:
+        dest.close()
+
+
+def test_duckdb_does_not_record_a_write_of_an_unchanged_value_after_a_checkpoint(tmp_path):
+    """Item 8 (F0), the cause, on local DuckDB 1.5.6 (MotherDuck behaves the same: section 14.4). An open
+    transaction writes a column of a row with the value it already has; another transaction then writes that
+    column: no conflict, and both commit, when the column has had no update since the table was written or
+    checkpointed. With a changed value, or after an earlier update of the column, the conflict is detected. If
+    a later DuckDB records the write, this test fails and the rule of section 6 can be relaxed."""
+    import duckdb
+    raw = duckdb.connect(str(tmp_path / "f.duckdb"))
+    try:
+        def both_commit(first, second, after_checkpoint=True, prime=None):
+            raw.execute("CREATE OR REPLACE TABLE f AS SELECT 'l' || i AS lane, 1::BIGINT AS epoch, 0::BIGINT AS n "
+                        "FROM range(18) t(i)")
+            if prime:
+                raw.execute(prime)
+            if after_checkpoint:
+                raw.execute("CHECKPOINT")
+            a, b = raw.cursor(), raw.cursor()
+            a.execute("BEGIN")
+            a.execute(first)
+            try:
+                b.execute("BEGIN")
+                b.execute(second)
+                b.execute("COMMIT")
+            except duckdb.TransactionException:
+                b.execute("ROLLBACK")
+                a.execute("COMMIT")
+                return False
+            a.execute("COMMIT")
+            return True
+        fence = "UPDATE f SET n = n + 1, epoch = 1 WHERE lane = 'l0' AND epoch = 1"
+        assert both_commit(fence, "UPDATE f SET epoch = 2")                      # the take-over of design 4.5
+        assert both_commit(fence, "UPDATE f SET epoch = 2", after_checkpoint=False)   # a fresh table: the same
+        assert not both_commit(fence, "UPDATE f SET epoch = 2, n = n + 1")       # the take-over writes n: refused
+        assert not both_commit("UPDATE f SET epoch = 7 WHERE lane = 'l0'", "UPDATE f SET epoch = 2")  # a change
+        assert not both_commit("UPDATE f SET n = n + 1, epoch = 3 WHERE lane = 'l0' AND epoch = 3",
+                               "UPDATE f SET epoch = 4", after_checkpoint=False,
+                               prime="UPDATE f SET epoch = 3")                   # after an update of the column
+        assert both_commit("UPDATE f SET epoch = epoch WHERE lane = 'l0'", "UPDATE f SET epoch = 2")
+    finally:
+        raw.close()
+
+
+def test_a_take_over_right_after_a_checkpoint_keeps_the_fence(file_dest, faults):
+    """Item 8 (F0). After a checkpoint the fence statement's write of the unchanged epoch was not recorded, so a
+    take-over that wrote the epoch alone did not conflict with an old run's open transaction, and both
+    committed (8 of 681 rounds on MotherDuck). The take-over now also writes the fence rows' counter `n`, which
+    the fence statement changes: the old transaction cannot commit. The negative control is the take-over as
+    design 4.5 writes it."""
+    epoch = file_dest.lead()
+    c = file_dest.connect("look")
+    c.execute("CREATE TABLE t (k INTEGER, v BIGINT)")
+    c.execute("INSERT INTO t VALUES (1, 0)")
+    results = {}
+    with fence_campaign.Hooks() as hooks:
+        for as_designed in (True, False):
+            lane = file_dest.lane("stream", epoch)
+            with lane.transaction():
+                pass                                            # registered
+            raw = file_dest.raw()
+            raw.execute("CHECKPOINT")
+            raw.close()
+            box = {}
+
+            def take(as_designed=as_designed):
+                box["epoch"] = file_dest.take_over(as_designed=as_designed, timeout_s=5, pause_s=0.02)
+
+            hooks.at("stream.fenced", take)
+            try:
+                with lane.transaction() as tx:
+                    tx.execute(BUMP)
+                results[as_designed] = "committed"
+            except md.DestinationError as e:
+                results[as_designed] = type(e).__name__
+            hooks.clear()
+            assert box["epoch"] == epoch + 1
+            epoch = box["epoch"]
+    assert results[True] == "committed"                         # the negative control: committed after the take-over
+    assert results[False] != "committed", results
+    assert value(c) == 1                                        # only the control's row
+    with pytest.raises(md.FenceLost):
+        with file_dest.lane("backfill.0", epoch - 1).transaction() as tx:
+            tx.execute(BUMP)
+
+
+def test_a_registration_right_after_a_checkpoint_cannot_commit_after_a_take_over(file_dest, faults):
+    """Item 8 (F0) for the registration of item 2. Written as `SET epoch = epoch`, the registration's write was
+    not recorded after a checkpoint either, and a registration that waited before its COMMIT committed after a
+    take-over. It now writes the counter (`n + 1`, then `n - 1`), which the take-over writes too: while the
+    registration waits, the take-over cannot commit. The negative control is the registration and the take-over
+    as they were before."""
+    epoch = file_dest.lead()
+    raw = file_dest.raw()
+    try:                                                         # the negative control, with plain connections
+        raw.execute("CHECKPOINT")
+        old = file_dest.raw()
+        old.execute("BEGIN")
+        old.execute("UPDATE _cdc.fence SET epoch = epoch WHERE lane = 'stream' AND epoch = ?", [epoch])
+        epoch = file_dest.take_over(as_designed=True, timeout_s=5, pause_s=0.02)
+        old.execute("COMMIT")                                    # committed after the take-over: the hazard
+        old.close()
+        raw.execute("CHECKPOINT")
+    finally:
+        raw.close()
+    lane = file_dest.lane("stream", epoch)
+    faults.block_at("md.commit", hits=1)                         # the registration's COMMIT waits
+    box = {}
+
+    def first_transaction():
+        try:
+            with lane.transaction():
+                pass
+        except Exception as e:                                   # noqa: BLE001
+            box["error"] = e
+
+    t = threading.Thread(target=first_transaction)
+    t.start()
+    end = time.monotonic() + 5
+    while not faults.fired(site="md.commit") and time.monotonic() < end:
+        time.sleep(0.01)
+    with pytest.raises(td.TakeoverFailed):
+        file_dest.take_over(timeout_s=0.4, pause_s=0.02)
+    faults.clear()
+    t.join(10)
+    assert "error" not in box                                    # it registered before any take-over committed
+    assert file_dest.take_over(timeout_s=5) == epoch + 1
 
 
 # ------------------------------------------------------------------------------ items 9 to 11: the error mapping

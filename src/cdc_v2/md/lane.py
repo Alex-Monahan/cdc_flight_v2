@@ -50,6 +50,14 @@ log = logging.getLogger("cdc_v2.md")
 #: before the take-over committed then passes its fence and commits after it
 #: (`evidence/p3/destination/fence_columns.json`: 5 of 5 on local DuckDB and on MotherDuck, in both orders). Writing
 #: `epoch` here makes the take-over and the fence statement meet on one column, whatever else either writes.
+#:
+#: That alone is not enough (fix round, F0; `docs/design/destination.md` section 14.4): DuckDB 1.5.6 and MotherDuck
+#: do not record a write of an unchanged value into a column that has had no update since it was last written or
+#: checkpointed. After a checkpoint the `epoch` of this statement is such a write, a take-over that writes `epoch`
+#: alone does not conflict with it, and both commit (8 of 681 rounds of `tests/destination/fence_campaign.py` on
+#: MotherDuck). The counter `n` is always written with a changed value, so a take-over must also write `n` of
+#: every fence row (it adds one and takes it away again: `cdc_v2.testing.destination.take_over`); then the two meet
+#: on `n` in every order.
 FENCE_SQL = "UPDATE _cdc.fence SET n = n + 1, epoch = ? WHERE lane = ? AND epoch = ?"
 FENCE_EPOCH_SQL = "SELECT epoch FROM _cdc.fence WHERE lane = ?"
 

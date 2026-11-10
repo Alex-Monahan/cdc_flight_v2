@@ -108,7 +108,8 @@ def test_conflicts_are_per_column_which_is_why_the_fence_statement_writes_the_ep
     """Seeded regression (evidence/p3/destination/fence_columns.json). DuckDB detects a write-write conflict per
     column. With the statement texts of design 4.2 and 4.5 (fence writes `n`, take-over writes `epoch`) a
     transaction that began before the take-over committed passes its fence and commits after it. The statement the
-    lane really sends also writes `epoch` and is stopped."""
+    lane really sends also writes `epoch` and is stopped. (The take-over of the test support now also writes `n`,
+    fix round F0; the first part uses the take-over as design 4.5 writes it, `as_designed=True`.)"""
     from cdc_v2.md import lane as lane_module
     design_fence = "UPDATE _cdc.fence SET n = n + 1 WHERE lane = ? AND epoch = ?"
     assert "epoch = ?" in lane_module.FENCE_SQL.split("WHERE")[0]
@@ -117,13 +118,13 @@ def test_conflicts_are_per_column_which_is_why_the_fence_statement_writes_the_ep
     try:
         old.execute("BEGIN")
         old.execute(BUMP)
-        assert led.take_over(interrupt=False) == 2
+        assert led.take_over(interrupt=False, as_designed=True) == 2
         assert old.execute(design_fence, ["stream", 1]).fetchone()[0] == 1      # the old snapshot still sees epoch 1
         old.execute("COMMIT")
         assert value(c) == 1 and fence(c) == (2, 1)             # committed after the take-over: the hazard
         old.execute("BEGIN")
         old.execute(BUMP)
-        assert led.take_over(interrupt=False) == 3
+        assert led.take_over(interrupt=False, as_designed=True) == 3
         with pytest.raises(Exception) as info:
             old.execute(lane_module.FENCE_SQL, [2, "stream", 2])
         assert "Conflict on update" in str(info.value)
@@ -584,9 +585,9 @@ def test_an_unclassified_error_after_commit_was_sent_is_commit_unknown(led, faul
     lane = led.lane("stream", led.epoch)
     # An error that this layer does not know (FaultInjected) before COMMIT was sent: rolled back, and its class
     # and the kind of statement are named. A lane's first transaction starts with the transaction that registers
-    # its connection (BEGIN, the INSERT, the UPDATE of the fence row, COMMIT), then BEGIN and the caller's
+    # its connection (BEGIN, the INSERT, two UPDATEs of the fence row, COMMIT), then BEGIN and the caller's
     # statement. The registration is not repeated once it worked.
-    for skip, kind in ((0, "BEGIN"), (1, "INSERT"), (2, "UPDATE"), (3, "BEGIN"), (1, "UPDATE")):
+    for skip, kind in ((0, "BEGIN"), (1, "INSERT"), (2, "UPDATE"), (3, "UPDATE"), (4, "BEGIN"), (1, "UPDATE")):
         faults.raise_at("md.execute", skip=skip, hits=1)
         with pytest.raises(md.StatementError) as info:
             with lane.transaction() as tx:

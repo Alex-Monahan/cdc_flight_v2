@@ -6,11 +6,15 @@ open transaction, and with it rows that the take-over must write
 (`evidence/p3/destination/registry_takeover.json`). No function of this package lists all connections of the
 account.
 
-A registration is a transaction of its own: it inserts the row and writes the epoch of the lane's fence row with
-a condition on the epoch (`REGISTER_FENCE_SQL`), and commits only if that changed exactly one row. A take-over
-writes the same column of the same row, so the two cannot both commit (conflicts are per column,
-`docs/design/destination.md` section 6): a registration that read the old epoch fails, or it commits before the
-take-over, and then the take-over's interrupt of the earlier epochs finds it. (Until the fix round the
+A registration is a transaction of its own: it inserts the row and writes the counter `n` of the lane's fence
+row with a condition on the epoch (`REGISTER_FENCE_SQL`, then `REGISTER_FENCE_RESTORE_SQL`: `n + 1`, then `n - 1`,
+so the counter is unchanged), and commits only if each changed exactly one row. A take-over writes the same
+column of the same row, so the two cannot both commit (conflicts are per column, `docs/design/destination.md`
+section 6): a registration that read the old epoch fails, or it commits before the take-over, and then the
+take-over's interrupt of the earlier epochs finds it. The counter is written with a changed value on purpose:
+DuckDB 1.5.6 (and MotherDuck) does not record a write of an unchanged value into a column that has had no update
+since it was last written or checkpointed, so ``SET epoch = epoch`` is not seen by a later writer
+(`docs/design/destination.md`, section 14.4). (Until the fix round the
 registration was one `INSERT ... SELECT ... FROM _cdc.leader WHERE epoch = ?` in autocommit. It read the leader
 row and wrote only `_cdc.connections`, so one that read the old epoch could commit after the take-over and after
 the new leader's interrupt had read the list.)
@@ -33,9 +37,11 @@ log = logging.getLogger("cdc_v2.md")
 #: Adds one row. Parameters: epoch, lane, connection id. It commits only together with `REGISTER_FENCE_SQL`.
 REGISTER_SQL = ("INSERT INTO _cdc.connections (epoch, lane, connection_id, registered_at) "
                 "VALUES (?, ?, ?::UUID, uuid_extract_timestamp(uuidv7()))")
-#: In the same transaction: must change exactly one row, else `FenceLost`. It writes the column that a take-over
-#: writes, so the registration and a take-over cannot both commit. Parameters: lane, epoch.
-REGISTER_FENCE_SQL = "UPDATE _cdc.fence SET epoch = epoch WHERE lane = ? AND epoch = ?"
+#: In the same transaction: must change exactly one row, else `FenceLost`. It writes the column `n` with a changed
+#: value; a take-over writes `n` too, so the registration and a take-over cannot both commit. Parameters: lane,
+#: epoch. `REGISTER_FENCE_RESTORE_SQL` follows it and puts the counter back.
+REGISTER_FENCE_SQL = "UPDATE _cdc.fence SET n = n + 1 WHERE lane = ? AND epoch = ?"
+REGISTER_FENCE_RESTORE_SQL = "UPDATE _cdc.fence SET n = n - 1 WHERE lane = ? AND epoch = ?"
 #: The connection ids of every epoch before the given one. Parameter: epoch (exclusive).
 LIST_EARLIER_SQL = "SELECT DISTINCT connection_id::VARCHAR FROM _cdc.connections WHERE epoch < ?"
 #: MotherDuck only: interrupts those connections in one statement and counts them. Parameters: epoch (exclusive),
@@ -141,10 +147,11 @@ def _register_once(conn, lane, epoch, d):
 
     step("BEGIN", None, None, True, "BEGIN")
     step(REGISTER_SQL, [epoch, lane, sid], None, None, "INSERT")
-    n = step(REGISTER_FENCE_SQL, [lane, epoch], "count", None, "UPDATE")
-    if n != 1:
-        rollback()
-        raise FenceLost("lane %s: epoch %d no longer leads (the fence row has another epoch)" % (lane, epoch))
+    for sql in (REGISTER_FENCE_SQL, REGISTER_FENCE_RESTORE_SQL):
+        n = step(sql, [lane, epoch], "count", None, "UPDATE")
+        if n != 1:
+            rollback()
+            raise FenceLost("lane %s: epoch %d no longer leads (the fence row has another epoch)" % (lane, epoch))
     job = sess.submit(sess.commit())
     if job is None:
         conn._drop_session(sess)
