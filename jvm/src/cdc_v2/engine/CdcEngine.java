@@ -355,7 +355,8 @@ public final class CdcEngine {
         if (!stopping.compareAndSet(false, true)) {
             return;
         }
-        log("STOP", "");
+        log("STOP", "handler_cpu_ms=" + handlerCpuNs.get() / 1_000_000L + " handler_write_ms="
+                + handlerWriteNs.get() / 1_000_000L + " rows=" + rowsOut.get() + threadCpuSummary());
         Thread t = new Thread(() -> {
             long t0 = System.nanoTime();
             Thread closer = new Thread(() -> {
@@ -388,7 +389,8 @@ public final class CdcEngine {
             catch (IOException ignored) {
                 // the parent may be gone
             }
-            log("EXIT", "reason=stop elapsed_ms=" + ms + threadCpuSummary());
+            log("EXIT", "reason=stop elapsed_ms=" + ms + " handler_cpu_ms=" + handlerCpuNs.get() / 1_000_000L
+                    + " handler_write_ms=" + handlerWriteNs.get() / 1_000_000L + " rows=" + rowsOut.get() + threadCpuSummary());
             Runtime.getRuntime().halt(0);
         }, "cdc_v2-stop");
         t.setDaemon(true);
