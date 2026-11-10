@@ -37,14 +37,16 @@ table → chunk readers (B) → transform (Y) → load, pending log, swap (B, A)
 | P | Source: connections with deadlines, catalog and catalog observation (H-008), publication, slot on a standby and on a primary, slot facts, timeline history, primary heartbeat | 8 (facts only), SPEC 4.4 | — | Opus |
 | L | Leadership: guard, take-over, heartbeat, planned hand-over, release; bootstrap; platform interface and local simulator; the leader machine | 4, 5 | D, H | Fable |
 | Y | Transform: destination type per source type; conversion of the engine's transport form and of the backfill's text form into destination-typed Arrow, inside the process; baseline type families | 6.1, SPEC 2.4 (baseline), 8.3 (place only) | E, P | Opus |
-| S | Stream: transaction assembly, groups, the commit and acknowledge protocol with its crash points, unknown commit outcome, the oversized transaction, supervisor, pipeline process, configuration file | 2, 3, 6.4 | E, D, A; then Y, P, L | Fable |
+| S | Stream: transaction assembly, groups, the commit and acknowledge protocol with its crash points, unknown commit outcome, the oversized transaction, supervisor, pipeline process, configuration file | 2, 3, 6.4 | E, D, A, K; then Y, P, L | Fable |
 | V | Slot continuity: the attach step and its decision, the periodic check, the finding enacted (alert, position, backfill requests) | 8, SPEC 1.8, 4.1 | P, D, E; completes after B | Fable |
 | F | Fuzzers and the campaign ledger: workload, fault, stream, leadership (value fuzzer in the P4 type wave); the consumer loop of SPEC 1.3 and 3.2; hand-overs under load and the hung component of SPEC 4.2 | SPEC §4, PLAN §6 | O, H; attacks S and L as they appear | Opus |
 | B | Backfill and hand-off: chunk planning and readers, pending log, catch-up with repair reads, swap; table and backfill machines | 7, 9 | X, S, A, P, Y | Fable |
 | T | Truncate, drop, drop-and-recreate end to end; remaining machines and the enumeration tests of 1.9 | 6.5, 9, SPEC 1.5 | S, B | Opus |
+| K | Key rule: the catalog reads deferrability, the engine is told which tables are without a key, what Debezium calls a key is measured (added 2026-11-10 after the second review of A) | 6 (rule K), H-015 | E, P | Opus |
 
 Order: E, D, A and P start as writer slots become free (at most four writers at once). Then L (after D), Y (after
-E and P), S (after E, D and A), V (after P and D), F (after O and H), B (after X and S), T last. The gate tests of
+E and P), S (after E, D, A and K), V (after P and D), F (after O and H), B (after X and S), T last. K (after E and P)
+is small and runs when a writer slot is free. The gate tests of
 1.1–1.9 and 4.2 are written by the package that owns the behaviour and run by the T1 harness of package O.
 
 Not in P3, but the contracts leave room for it: history tables and soft deletes (SPEC 8.1, 8.2: P4 builds them
@@ -103,6 +105,15 @@ Every frame: magic, frame type, sequence number (starts at 0, no gaps), payload 
 `zlib` and `java.util.zip.CRC32`, so that neither side needs a library) of everything before it. The reader rejects a frame with a wrong magic, a gap, a bad checksum or a length above the
 configured maximum, and treats the stream as broken: nothing from a broken stream is applied (SPEC §4, stream
 fuzzer).
+
+What the frame format does and does not promise (from the stream fuzzer, package F): The stream has no end frame.
+Only the pipeline's own `STOP` ends a stream cleanly; an end at a frame boundary that the pipeline did not ask
+for is `EngineExited`, and a transaction without its `END` is never applied. A new engine life (`HELLO`,
+sequence 0) may repeat transactions that are already applied; the consumer discards them by position (design 2).
+The checksum protects the pipe, not the engine's encoding: wrong content that was encoded before the checksum
+arrives with a valid checksum, and E's value tests and Y's cross-path test are the defence against it. The reader
+allocates a payload as its bytes arrive, never ahead by the length field, so that a damaged length cannot reserve
+memory (SPEC 5.4). A checksum of the header alone belongs to a later protocol version.
 
 | Frame | Content |
 |---|---|
@@ -219,7 +230,8 @@ child of its own.
 
 ```python
 plan = transform.plan(source_table, schema_frame=None, *, server_version_num) -> TablePlan
-                                        # per column position: destination name and type; `plan.ambiguous` (below)
+                                        # per column position: destination name and type; `plan.ambiguous` and
+                                        # `plan.ambiguous_key` (below)
 transform.stream(plan, rows: pyarrow.RecordBatch) -> pyarrow.RecordBatch      # engine transport form → destination types
 transform.backfill(plan, rows: pyarrow.RecordBatch) -> pyarrow.RecordBatch    # text as Postgres prints it → destination types
 transform.ambiguous(plan, rows: pyarrow.RecordBatch) -> mask or None          # rows whose zero interval is ambiguous
@@ -233,10 +245,18 @@ same source value; a test compares them through a local Postgres for every basel
 cannot be converted raises `ConversionError` with table, column position and `seq`, never the value; it is never
 turned into NULL silently.
 
+Many small batches cost the transform one statement each for some type families. So the stream may concatenate
+`ROWS` batches of one table and schema version within a group before it calls the transform: in memory only, in
+stream order, bounded by `apply.max_group_bytes`. The transform still runs before anything is staged, spilled or
+sent.
+
 The backfill's text form is what Postgres prints under the session settings that package P fixes for every read
 connection (C7; `docs/design/source.md` section 1). The stream's form of every type is the table in section 3 of
-`docs/design/engine.md`; the engine's walsender session has settings of its own (`IntervalStyle=postgres`,
-`DateStyle=ISO`). These are two transport forms on purpose, and the transform is the only code that knows either.
+`docs/design/engine.md`. These are two transport forms on purpose, and the transform is the only code that knows
+either. Where a value travels as the text that Postgres prints on both paths (an array, a composite, a type
+without a mapping), the two sessions must print it alike: the read sessions and the engine's walsender session
+pin the same text settings, `IntervalStyle=postgres` among them (decided in the fix round of Y; before it, an
+array of intervals had two destination values). A new text-output setting is pinned in both places or in none.
 
 **Ambiguous zero interval.** On a source of Postgres 17 or later, `interval 'infinity'` and `'-infinity'` in a
 scalar `interval` column reach the engine as a zero interval: the Postgres driver parses them into nothing, before
@@ -259,6 +279,10 @@ column of the stream is *ambiguous*: it is a real zero, `infinity` or `-infinity
   has another `xmin` and takes the full way.)
 - Not taken: "apply whatever the row holds now, and count it when a later transaction has changed it". It shows,
   for one group, a row that mixes two source transactions.
+- `TablePlan.ambiguous_key` lists the key positions among them (a scalar `interval` key, or a domain over it;
+  it is part of the plan's hash). A table that has one is not streamed: mode `full_refresh` with an alert. The
+  repair read cannot help there, because it reads by that key. No other key type is delivered non-injectively
+  (the review of Y: arrays and composites keep `infinity`; the wide forms of numeric and timestamp are exact).
 - A table without a key that has a scalar interval column on such a source is not streamed: mode `full_refresh`
   with an alert (SPEC 3.5), until P4 decides more.
 - An infinite value puts the column into its wide form, `UNION(INTERVAL, VARCHAR)` (R9, SPEC 2.4), on both paths.
@@ -542,6 +566,10 @@ As delivered by package X; its report defines the interface, and this section is
   same OID with other columns → the schema rule above. A backfill that follows such a finding is entered only past
   `a`, so that its pending log never holds a row of the earlier table. A rename is therefore a drop of the old name
   and, if the new name is replicated, a fresh table; the rename in place of SPEC 2.2 is P4.
+- **Tables that are not streamed.** S asks the catalog and the transform's plan before it routes a table to
+  `streaming`: a table whose plan has an `ambiguous_key`, and a table without a key whose plan has an
+  `ambiguous` column (C3), get mode `full_refresh` with one alert per table. Their rows in the stream are
+  counted and dropped, as for routing `skip`.
 - S runs a group again after `Conflict`, a bounded number of times, building its statements again when the
   conflict came from a DDL (a swap changes the catalog).
 - A table that fails to apply `apply.max_table_attempts` times (default 3) leaves the stream: state `quarantined`,
@@ -599,6 +627,7 @@ never touched; every command names its port.
 | F | `pg-f<n>`, from 55700 in steps of 8, up to 55795 | `cdc_v2_t_f_*` |
 | B | `pg-b`, 55800 (`pg-b2`, 55808) | `cdc_v2_t_b_*` |
 | T | `pg-t`, 55816 | `cdc_v2_t_t_*` |
+| K | the homes of E (`pg-e`, 55620) and P (`pg-p`, 55640; `pg-p2`, 55648), whose workers have finished | none |
 
 TCP fault proxies listen on 55440–55459 (package H); a worker that needs proxies of its own takes ports from the
 upper half of its own range.
@@ -689,6 +718,67 @@ every transaction id in the in-progress list; if one is already `committed`, tak
 is inside iff the snapshot sees it by its 64-bit id. "The stream has passed" = applied position >
 `pg_current_wal_insert_lsn()` read after the snapshot. To be proven with a stopped synchronous standby and a
 negative control.
+
+**Rule K (core design section 6), for S, Y, B, T and the P4 waves.** S: at every `SCHEMA` frame the key flag and
+the key positions must equal the catalog's (Y's `plan` makes the comparison); a difference is a typed error, the
+stream reads the catalog again and restarts the engine with a fresh list of tables without a key; it never applies
+by a key the catalog does not confirm. S and B: a T1 case for a key that changes only its form (`float8` `-0` to
+`0`: the engine sends a key change). T and the schema wave of P4: a change of the key facts of a table (key
+columns, deferrability, replica identity) is a schema change; they are part of the table's shape. Type wave and
+PII rules of P4: the mapping of a key column is injective up to the source's equality; a rule that masks or
+truncates a key column is refused. History of P4: a table with a deferrable primary key gets the plain changelog
+of a table without a key.
+
+**From the review of Y (transform).** S: the batch rule of C3 (concatenate before the transform). S and C10: a
+table whose key holds a column that the stream cannot deliver injectively (`plan.ambiguous_key`: a scalar
+`interval` key on a source of Postgres 17 or later, where `infinity`, `-infinity` and zero arrive alike) is not
+streamed: mode `full_refresh` with an alert; the repair read of C3 cannot help, because it reads by that key.
+Type wave of P4: `json` and `jsonb` become the native `JSON` type with the wide form `UNION(JSON, VARCHAR)` for a
+value DuckDB's JSON refuses (P3 delivers them as `VARCHAR`, lossless); enums stay `VARCHAR` until the owner
+rules (SPEC 2.4 names them among the native types; H-033); the engine's converter prints geometric types as
+Postgres does (P3: Java's float formatting in the stream form); a numeric domain keeps its typmod in the
+catalog's `TypeInfo`. Before P4 grades SPEC 2.4 the oracle gets: rules for the `VARCHAR` member of timestamp and
+interval columns; a timestamp form that does not overflow `bigint`; text comparison for arrays and composites
+delivered as text; the fallback through the type's output function instead of `::text`; `lc_monetary=C` pinned in
+its session; a `timetz` rule by (microseconds, offset). P9: the cost of a 200-column table (52 K rows/s in the
+stream here).
+
+**From the review of F (fuzzers, round 1).** Round 2 of F points the fuzzers at the real system and needs the
+following; each owner's task takes its line. S (C5, C10, with L for epoch and run): the facts for "never two
+writers" are part of the row that the batch machine appends to `_cdc.transitions` for every committed group —
+epoch, run id, previous and new applied position, first and last commit position of its source transactions and
+their count, and a sequence that gives the order of commit; no extra statement per group (SPEC 6.1; the
+round-trip budget); a backfill lane writes the same with table and chunk (B). S (C8): the applied-position
+reader. S: the spill area can be made tiny by a setting (`max_temp_directory_size` of the transform connection
+and of apply's planning database), and "spill area full" is an alert through `alerts.emit` (C4), which is the
+fuzzer's proof of effect. P (C7), E (C2) and S (C12): every source address is configurable per node, so that each
+link can pass through a proxy; MotherDuck is reached only through the `md.*` fault sites. Every owner (C1):
+crash points for the steps of design 3, the lane points of C4, take-over, release, heartbeat, slot creation,
+backfill chunk commit, pending log append and swap, each declared through `cdc_v2.crashpoints`; a point that is
+reached only on some paths says so. P (C7) and the engine's probe: one `application_name` prefix (`cdc_v2_`) for
+every SQL session of the pipeline; the replication session is named by Debezium and is found through the
+`active_pid` of `HELLO`. L (C6): the local platform starts and cancels runs and reports each run's state, start,
+end and exit code. S with D (C10, C4): the quarantine exit and `ApplyInvariantError` are alert rows. B (C10): the
+backfill request table and the `versions` observer for SPEC 3.2. V (C10, `reposition`): the enactment after a
+dropped or invalidated slot and after a promotion. Bug classes that no planted defect of round 1 stands for,
+and that round 2 must plant in the real system or show found: a wrong cut or hand-off (design 7: `R0 < P0`
+accepted, a swap before `R1` is passed, catch-up before all snapshots are passed, a table without a key read
+under several snapshots, an unsettled standby); a double apply after `CommitUnknown`; a table with a deferrable
+key applied on the keyed path (rule K); a slot that is ahead or recreated and ignored (V); a `FATAL` repeated at
+one position (SPEC 4.3).
+
+**The ledger of SPEC section 4 (rules of the orchestrator, 2026-11-10).** No run against the toy replicator
+counts toward a bar. The counters of a fuzzer restart from zero after any change to correctness code, and a
+change of a pinned dependency (Debezium, the JDK, `uv.lock`, the dependencies of `pyproject.toml`) is such a
+change. A change to the measuring instrument (the fuzz package, the oracle, the workload generator, the fault
+harness) restarts the counters of the bars it measures as well, because counts made with a weaker instrument do
+not mean what the SPEC says; an entry in the ledger's exemption file, with its reason, is the only way around
+that, and the orchestrator reads every entry at every gate. A failure of the workload at the source counts as
+`infrastructure` only for causes on a short allow-list (a connection lost during an injected fault; the paused
+load of a primary kill); every other source error is a failure, because the pipeline itself can break the
+application's writes (H-014). Until the owner rules on the reading of "on local Postgres and on PlanetScale, in
+replica mode and in primary mode", a bar with that clause is met when its totals are met and each of the four
+combinations holds at least a quarter of each quantity.
 
 ### 6.3 Simplifications taken
 
