@@ -1,0 +1,60 @@
+{
+  "cancel_again_on_terminal_run": {
+    "error": "Constraint Error: Run 8 is already in terminal state \"cancelled\" and cannot be cancelled",
+    "ok": false
+  },
+  "cancel_called_at": "2026-11-10T02:12:00.881548+00:00",
+  "cancel_result": {
+    "canceled_count": 1
+  },
+  "cancel_returned_at": "2026-11-10T02:12:01.946284+00:00",
+  "final": {
+    "cancelled_at": "2026-11-10T02:12:01.832+00:00",
+    "config": {
+      "CDC_V2_PROBE_FLIGHT_NAME": "cdc_v2_spike_hello",
+      "CDC_V2_PROBE_MODE": "ticks",
+      "CDC_V2_PROBE_NONCE": "<redacted>",
+      "CDC_V2_PROBE_TICKS": "120"
+    },
+    "created_at": "2026-11-10T02:11:54.314+00:00",
+    "ended_at": null,
+    "exit_code": null,
+    "flight_id": "206bf7dc-3ac6-42b7-80c1-cf80008e9fc7",
+    "flight_name": "cdc_v2_spike_hello",
+    "flight_version": 2,
+    "is_scheduled": false,
+    "run_id": "01a1c339-e73f-7c21-9bde-0b60b42e4c69",
+    "run_number": 8,
+    "scheduled_at": "2026-11-10T02:11:54.303+00:00",
+    "started_at": "2026-11-10T02:11:54.641+00:00",
+    "started_by_id": "<redacted>",
+    "started_by_name": "<redacted>",
+    "state": "CANCELLED",
+    "status": "CANCELLED"
+  },
+  "last_log_lines": [
+    "FACT {\"import_done_s\": 0.423}",
+    "TICK 0 1794276718.250",
+    "TICK 1 1794276719.250",
+    "TICK 2 1794276720.250",
+    "TICK 3 1794276721.251"
+  ],
+  "last_tick_printed_after_cancel_call_s": 0.37,
+  "states_after_cancel": [
+    {
+      "local_observed_at": "2026-11-10T02:12:02.369085+00:00",
+      "state": "CANCELLED"
+    }
+  ],
+  "ticks_logged": 4,
+  "timing": {
+    "cancelled_at": "2026-11-10T02:12:01.832+00:00",
+    "created_at": "2026-11-10T02:11:54.314+00:00",
+    "created_to_first_line_s": 3.513,
+    "created_to_started_s": 0.327,
+    "ended_at": null,
+    "scheduled_at": "2026-11-10T02:11:54.303+00:00",
+    "started_at": "2026-11-10T02:11:54.641+00:00",
+    "started_to_first_line_s": 3.186
+  }
+}

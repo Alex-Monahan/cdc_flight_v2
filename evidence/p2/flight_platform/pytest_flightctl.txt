@@ -1,0 +1,15 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.1, pytest-9.2.0, pluggy-1.7.0
+rootdir: <worktree>
+configfile: pyproject.toml
+plugins: hypothesis-6.170.15, timeout-2.4.0
+collected 56 items / 1 deselected / 55 selected
+
+tests/test_flightctl.py ................................................ [ 87%]
+.......                                                                  [100%]
+
+======================= 55 passed, 1 deselected in 0.23s =======================
+
+tests/test_flightctl.py .                                                [100%]
+
+====================== 1 passed, 55 deselected in 11.51s =======================

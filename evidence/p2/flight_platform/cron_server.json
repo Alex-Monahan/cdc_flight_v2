@@ -1,0 +1,64 @@
+{
+  "cases": [
+    {
+      "accepted": false,
+      "cron": "*/30 * * * * *",
+      "error": "Invalid Input Error: Invalid schedule_cron: Cron expression must have 5 space-separated fields (got 6): minute hour day-of-month month day-of-week"
+    },
+    {
+      "accepted": false,
+      "cron": "0 0 1 1 * *",
+      "error": "Invalid Input Error: Invalid schedule_cron: Cron expression must have 5 space-separated fields (got 6): minute hour day-of-month month day-of-week"
+    },
+    {
+      "accepted": false,
+      "cron": "@hourly",
+      "error": "Invalid Input Error: Invalid schedule_cron: Cron expression must have 5 space-separated fields (got 1): minute hour day-of-month month day-of-week"
+    },
+    {
+      "accepted": false,
+      "cron": "@yearly",
+      "error": "Invalid Input Error: Invalid schedule_cron: Cron expression must have 5 space-separated fields (got 1): minute hour day-of-month month day-of-week"
+    },
+    {
+      "accepted": false,
+      "cron": "0 0 31 2 *",
+      "error": "Invalid Input Error: Invalid schedule_cron: Cron expression never runs: day-of-month 31 never occurs in the configured month(s) (February), which have at most 29 days"
+    },
+    {
+      "accepted": false,
+      "cron": "61 * * * *",
+      "error": "Invalid Input Error: Invalid schedule_cron: Cron field 1 (minute) value 61 is out of range 0-59"
+    },
+    {
+      "accepted": false,
+      "cron": "0 0 1 1 MON",
+      "error": "Invalid Input Error: Invalid schedule_cron: Cron field 5 (day-of-week) (\"MON\") is not valid; expected \"*\", a number, a range \"N-M\", or any of those with a step \"/S\" (e.g. */5, 1-15/2), optionally combined with \",\" (e.g. 0,30)"
+    },
+    {
+      "accepted": false,
+      "cron": "0 0 1 JAN *",
+      "error": "Invalid Input Error: Invalid schedule_cron: Cron field 4 (month) (\"JAN\") is not valid; expected \"*\", a number, a range \"N-M\", or any of those with a step \"/S\" (e.g. */5, 1-15/2), optionally combined with \",\" (e.g. 0,30)"
+    },
+    {
+      "accepted": true,
+      "after_clear": {
+        "schedule_cron": "0 0 1 1 *",
+        "schedule_status": "DISABLED"
+      },
+      "cron": "0 0 1 1 *",
+      "schedule_cron": "0 0 1 1 *",
+      "schedule_status": "ACTIVE"
+    }
+  ],
+  "clear_already_cleared": {
+    "error": null,
+    "schedule_cron": "0 0 1 1 *",
+    "schedule_status": "DISABLED"
+  },
+  "clear_never_scheduled": {
+    "error": "Invalid Input Error: Cannot clear schedule: Flight has no schedule"
+  },
+  "left": [],
+  "runs": []
+}

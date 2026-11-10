@@ -24,4 +24,8 @@ packages = ["src/cdc_v2"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q -m 'not flight_integration'"
+markers = [
+    "flight_integration: creates, runs and deletes a real MotherDuck Flight (opt-in: -m flight_integration)",
+]
+pythonpath = ["src"]

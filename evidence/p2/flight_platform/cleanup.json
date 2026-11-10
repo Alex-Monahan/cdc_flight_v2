@@ -1,0 +1,13 @@
+{
+  "cdc_v2_spike_hello": {
+    "deleted": true,
+    "flight_id": "206bf7dc-3ac6-42b7-80c1-cf80008e9fc7",
+    "flight_name": "cdc_v2_spike_hello"
+  },
+  "flights_left_cdc_v2": [],
+  "secret_drop": {
+    "dropped": true,
+    "secret": "cdc_v2_spike_secret"
+  },
+  "secrets_left_cdc_v2": []
+}
