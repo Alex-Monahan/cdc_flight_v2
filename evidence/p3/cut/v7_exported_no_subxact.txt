@@ -1,0 +1,22 @@
+$ tools/cutstress run --label v7_exported_no_subxact --seconds 120 --writers plain,async,abort --takers-own 1 --takers-exported 2 --out evidence/p3/cut/v7_exported_no_subxact.json
+load average before: 5.73 11.53 9.70
+   30s cuts=32702 transactions=123086 violations=0 waiting=112
+   60s cuts=62364 transactions=242366 violations=0 waiting=43
+   90s cuts=93275 transactions=362182 violations=0 waiting=173
+v7_exported_no_subxact: OK
+  Postgres 18.6 (Homebrew), 120 s, writers plain,async,abort, disturbances none, slot on replica
+  cuts checked 125445 (not checked 0), transactions delivered 485337
+  violations of the sound rules: none
+  stream out of E order: 0
+  wrong rules caught (cuts): stmt_as_r0=23616, r1_inside=26065, r1_outside=0, naive_sharp=0, xmax_inside=227, xmin_outside=243
+  unknown set (transactions per cut)   empty     mean   max
+    base                                 0.00%    2.342   383
+    xid                                 99.81%    0.003     3
+    sharp                               65.96%    1.362   382
+    xid+sharp                           99.88%    0.002     3
+    really_visible                      77.49%    0.548   213
+  cuts_with_r0_below_received: 0
+  cuts_that_miss_a_received_transaction: 0
+  cuts_with_r0_eq_r1: 84493
+  cuts taken the own way: 49822, of them quiet (xmin = xmax): 49708 (99.8%), with a violation: 0
+  cuts taken the exported way: 75623, of them quiet (xmin = xmax): 75493 (99.8%), with a violation: 0

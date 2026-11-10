@@ -13,6 +13,7 @@ here and listed in STATUS.md at the gate:
 | 1.7 crash points at every step of a schema change | schema changes (SPEC 2.x) | P4, schema and types |
 | 1.9 schema-change machine; the full quarantine machine (stored rows, slow retries; P3 has the exit to `quarantined` only) | SPEC 2.x, 4.0 | P4, schema and types; failure handling |
 | 1.7 soak of at least 1 h with at least 200 faults | all fuzzers and the whole pipeline | P3 runs a short soak at the gate; the full one is the P6 campaign |
+| 1.1/1.2 for a table the stream cannot carry: an `interval` key, or a table without a key that has a scalar `interval` column, on a source of Postgres 17 or later (C3, C10). P3 skips it with an alert | mode `full_refresh` (SPEC 3.5) | P4, CDC features |
 
 An interface below is a **contract**. A worker who needs a contract changed says so in its report or asks the
 orchestrator; it does not change it alone, because another worker is building against it.
@@ -222,6 +223,12 @@ engine.durable(position)
 engine.stop(deadline)        # STOP, wait, then SIGKILL of the JVM; engine.kill() at any time
 ```
 
+**Tables without a key (package K, as built; `docs/design/engine.md` 4a).** A listed table's `SCHEMA` frame has
+`has_key` 0 and no key positions; its rows carry `b<i>` complete and no `k<i>`. An update or delete of a table
+without a key that arrives without an old image is a FATAL that names the table (`fatal.schema`, `fatal.table`).
+Stock Debezium 3.7.1 cannot stream a name containing `"`: measured, it stops with FATAL at every start, drops the
+table's records silently with event count 0, or delivers the rows of `"q"` as rows of `q` (H-051).
+
 The JVM stays in the process group of the pipeline, so that the bootstrap's kill of that group (design section 5)
 and a freeze of the whole tree reach it. The pipeline kills the JVM by its process id; the JVM starts no lasting
 child of its own.
@@ -279,12 +286,13 @@ column of the stream is *ambiguous*: it is a real zero, `infinity` or `-infinity
   has another `xmin` and takes the full way.)
 - Not taken: "apply whatever the row holds now, and count it when a later transaction has changed it". It shows,
   for one group, a row that mixes two source transactions.
-- `TablePlan.ambiguous_key` lists the key positions among them (a scalar `interval` key, or a domain over it;
-  it is part of the plan's hash). A table that has one is not streamed: mode `full_refresh` with an alert. The
-  repair read cannot help there, because it reads by that key. No other key type is delivered non-injectively
-  (the review of Y: arrays and composites keep `infinity`; the wide forms of numeric and timestamp are exact).
-- A table without a key that has a scalar interval column on such a source is not streamed: mode `full_refresh`
-  with an alert (SPEC 3.5), until P4 decides more.
+- `TablePlan.ambiguous_key` lists the key positions among them (a scalar `interval` key, or a domain over it; it is
+  part of the plan's hash). A table that has one is not streamed (C10: routing `skip` with an alert in P3; the mode
+  `full_refresh` of SPEC 3.5 carries it from P4 on). The repair read cannot help there, because it reads by that key.
+  No other key type is delivered non-injectively (the review of Y: arrays and composites keep `infinity`; the wide
+  forms of numeric and timestamp are exact).
+- A table without a key that has a scalar interval column on such a source is not streamed either (the same
+  rule of C10), until P4 decides more.
 - An infinite value puts the column into its wide form, `UNION(INTERVAL, VARCHAR)` (R9, SPEC 2.4), on both paths.
 - P3: the transform gives the list and the mask; the stream counts marked rows per table (`interval_ambiguous`),
   alerts once per table, and applies the delivered zero. Until the repair exists, an infinite interval in a
@@ -484,6 +492,13 @@ section 8 says. Nothing on the source is fenced by the leader epoch, so every so
 when a deposed run repeats it: `publication.ensure` only adds, the heartbeat write is idempotent, and a slot is
 dropped only by an explicit operator action or by the enactment of a slot finding.
 
+Rule K as built (package K): `SourceTable.has_key`, `primary_key_deferrable`; `TableFacts.has_key`,
+`pk_deferrable`. For a table without a key `key` and `key_attnums` are empty and `key_source` is `None`; the
+transform's key (C3) is `key_attnums`. `shape_hash` and `diff.key_changed` cover deferrability, and
+`TableFacts.identity` includes the replica identity, the identity index's attnums and `pk_deferrable`, so the
+catalog gate (C10) sees a change from `FULL` to `DEFAULT`. `SourceTable.name_problem`: a schema or table name
+containing `"` is refused by `publication.ensure` and reported by `publication.check` (H-051).
+
 ### C8 Oracle and T1 harness (package O)
 
 Details in `docs/oracle.md`. What binds every package that writes a gate test:
@@ -516,7 +531,26 @@ Details in `docs/oracle.md`. What binds every package that writes a gate test:
 
 ### C9 Cut (package X)
 
-As delivered by package X; its report defines the interface, and this section is completed when it merges.
+`cdc_v2.pg.cut` is the only code that takes or judges a cut (`docs/design/cut.md`). Standby: on each
+connection that takes cuts, read `floor = settle_floor(conn)` once; it serves that connection only. Every taker
+also needs `repl`, a second connection to the same standby opened with `replication=database`
+(`connect(target, deadline, replication=True).raw`): B needs a replication connection to every node it reads,
+and every standby we read must accept one from the runtime role. Keyed tables:
+`take_standby_cut_after(conn, repl, p0, deadline, floor)` returns a settled and sealed `StandbyCut` with
+`R0 ≥ P0`, its read-only REPEATABLE READ transaction left open. Tables without a key (rule K):
+`take_keyless_standby_cut(conn, repl, p0, deadline, floor)`; if `cut.way == "exported"` readers call
+`import_snapshot(c, cut.snapshot_id)`, if `"own"` this connection is the one reader. For every `END`, in
+stream order: `cut.observe(E)`, then `cut.classify(E, xid32)`. Primary: `take_primary_cut_after(conn, X,
+deadline)`, or `take_primary_cut` until `mark.admits(cut)` and then `cut = seal_primary_cut(conn, cut,
+deadline)`; either way the cut is sealed (its server has flushed the WAL up to the cut's insert position) and
+its transaction is left open; `classify(xid32)`. The stream lane (package S) starts a
+`GapTracker(unknown_below=next_xid_marker(primary))` at each engine start, calls `delivered_xid32(txId)` for
+each applied `END` and `probe(probe_snapshot(conn))` once per group, and hands `mark()` to B at every `P0` and
+`caught_up_lsn`. At the swap, for every cut the table used: `has_passed(applied)`, then `valid_on(stream)`; if
+false, the backfill starts again. `stream` is `slot.timeline_history` of the stream's node, read at the swap.
+The caller reads nothing about the cut's own node: the taker read it right after the cut and keeps it on the
+cut (`cut.sealed`). A cut from a one-attempt function (`take_standby_cut_own`, `take_standby_cut_exported`,
+`take_primary_cut` without `seal_primary_cut`) is valid nowhere.
 
 ### C10 Stream and backfill (packages S, B, V, T)
 
@@ -567,9 +601,18 @@ As delivered by package X; its report defines the interface, and this section is
   `a`, so that its pending log never holds a row of the earlier table. A rename is therefore a drop of the old name
   and, if the new name is replicated, a fresh table; the rename in place of SPEC 2.2 is P4.
 - **Tables that are not streamed.** S asks the catalog and the transform's plan before it routes a table to
-  `streaming`: a table whose plan has an `ambiguous_key`, and a table without a key whose plan has an
-  `ambiguous` column (C3), get mode `full_refresh` with one alert per table. Their rows in the stream are
-  counted and dropped, as for routing `skip`.
+  `streaming`: a table that the catalog refuses (`identity_problem`), a table whose plan has an `ambiguous_key`,
+  and a table without a key whose plan has an `ambiguous` column (C3) get routing `skip` with one alert per
+  table that names the reason. Their rows in the stream are counted and dropped. The mode `full_refresh` of SPEC
+  3.5 that will carry the last two is built in P4; until then such a table is not replicated (on the list of
+  parts carried to P4). The same holds for a table with a `name_problem` (C7, H-051): routing `skip` with one
+  alert, never in the publication; a rename into such a name removes the table from the publication (T).
+- **Rule K in the stream.** S starts every engine with the catalog's tables without a key, and restarts the
+  engine with a fresh list when a `SCHEMA` frame differs from the catalog and on T's `key_changed` (a key made
+  deferrable is a drop and re-add of the key; whether Debezium then sends a new `SCHEMA` frame was not measured).
+  A FATAL that names a table is a failure of that table: routing `skip`, an alert and quarantine at once (no loop
+  of restarts), the engine started again without it in its include list, and a backfill after a gap once
+  `replica_identity_problem` is `None` again.
 - S runs a group again after `Conflict`, a bounded number of times, building its statements again when the
   conflict came from a DDL (a swap changes the catalog).
 - A table that fails to apply `apply.max_table_attempts` times (default 3) leaves the stream: state `quarantined`,
@@ -729,43 +772,41 @@ PII rules of P4: the mapping of a key column is injective up to the source's equ
 truncates a key column is refused. History of P4: a table with a deferrable primary key gets the plain changelog
 of a table without a key.
 
-**From the review of Y (transform).** S: the batch rule of C3 (concatenate before the transform). S and C10: a
-table whose key holds a column that the stream cannot deliver injectively (`plan.ambiguous_key`: a scalar
-`interval` key on a source of Postgres 17 or later, where `infinity`, `-infinity` and zero arrive alike) is not
-streamed: mode `full_refresh` with an alert; the repair read of C3 cannot help, because it reads by that key.
-Type wave of P4: `json` and `jsonb` become the native `JSON` type with the wide form `UNION(JSON, VARCHAR)` for a
-value DuckDB's JSON refuses (P3 delivers them as `VARCHAR`, lossless); enums stay `VARCHAR` until the owner
-rules (SPEC 2.4 names them among the native types; H-033); the engine's converter prints geometric types as
-Postgres does (P3: Java's float formatting in the stream form); a numeric domain keeps its typmod in the
-catalog's `TypeInfo`. Before P4 grades SPEC 2.4 the oracle gets: rules for the `VARCHAR` member of timestamp and
-interval columns; a timestamp form that does not overflow `bigint`; text comparison for arrays and composites
-delivered as text; the fallback through the type's output function instead of `::text`; `lc_monetary=C` pinned in
-its session; a `timetz` rule by (microseconds, offset). P9: the cost of a 200-column table (52 K rows/s in the
-stream here).
+**From the review of Y (transform).** S: the batch rule of C3 (concatenate before the transform). S and C10: a table
+whose key holds a column that the stream cannot deliver injectively (`plan.ambiguous_key`: a scalar `interval` key on
+a source of Postgres 17 or later, where `infinity`, `-infinity` and zero arrive alike) is not streamed: routing `skip`
+with an alert in P3, mode `full_refresh` from P4 on (C10); the repair read of C3 cannot help, because it reads by that
+key. Type wave of P4: `json` and `jsonb` become the native `JSON` type with the wide form `UNION(JSON, VARCHAR)` for a
+value DuckDB's JSON refuses (P3 delivers them as `VARCHAR`, lossless); enums stay `VARCHAR` until the owner rules
+(SPEC 2.4 names them among the native types; H-033); the engine's converter prints geometric types as Postgres does
+(P3: Java's float formatting in the stream form); a numeric domain keeps its typmod in the catalog's `TypeInfo`.
+Before P4 grades SPEC 2.4 the oracle gets: rules for the `VARCHAR` member of timestamp and interval columns; a
+timestamp form that does not overflow `bigint`; text comparison for arrays and composites delivered as text; the
+fallback through the type's output function instead of `::text`; `lc_monetary=C` pinned in its session; a `timetz`
+rule by (microseconds, offset). P9: the cost of a 200-column table (52 K rows/s in the stream here).
 
 **From the review of F (fuzzers, round 1).** Round 2 of F points the fuzzers at the real system and needs the
-following; each owner's task takes its line. S (C5, C10, with L for epoch and run): the facts for "never two
-writers" are part of the row that the batch machine appends to `_cdc.transitions` for every committed group —
-epoch, run id, previous and new applied position, first and last commit position of its source transactions and
-their count, and a sequence that gives the order of commit; no extra statement per group (SPEC 6.1; the
-round-trip budget); a backfill lane writes the same with table and chunk (B). S (C8): the applied-position
-reader. S: the spill area can be made tiny by a setting (`max_temp_directory_size` of the transform connection
-and of apply's planning database), and "spill area full" is an alert through `alerts.emit` (C4), which is the
-fuzzer's proof of effect. P (C7), E (C2) and S (C12): every source address is configurable per node, so that each
-link can pass through a proxy; MotherDuck is reached only through the `md.*` fault sites. Every owner (C1):
-crash points for the steps of design 3, the lane points of C4, take-over, release, heartbeat, slot creation,
-backfill chunk commit, pending log append and swap, each declared through `cdc_v2.crashpoints`; a point that is
-reached only on some paths says so. P (C7) and the engine's probe: one `application_name` prefix (`cdc_v2_`) for
-every SQL session of the pipeline; the replication session is named by Debezium and is found through the
-`active_pid` of `HELLO`. L (C6): the local platform starts and cancels runs and reports each run's state, start,
-end and exit code. S with D (C10, C4): the quarantine exit and `ApplyInvariantError` are alert rows. B (C10): the
-backfill request table and the `versions` observer for SPEC 3.2. V (C10, `reposition`): the enactment after a
-dropped or invalidated slot and after a promotion. Bug classes that no planted defect of round 1 stands for,
-and that round 2 must plant in the real system or show found: a wrong cut or hand-off (design 7: `R0 < P0`
-accepted, a swap before `R1` is passed, catch-up before all snapshots are passed, a table without a key read
-under several snapshots, an unsettled standby); a double apply after `CommitUnknown`; a table with a deferrable
-key applied on the keyed path (rule K); a slot that is ahead or recreated and ignored (V); a `FATAL` repeated at
-one position (SPEC 4.3).
+following; each owner's task takes its line. S (C5, C10, with L for epoch and run): the facts for "never two writers"
+are part of the row that the batch machine appends to `_cdc.transitions` for every committed group — epoch, run id,
+previous and new applied position, first and last commit position of its source transactions and their count, and a
+sequence that gives the order of commit; no extra statement per group (SPEC 6.1; the round-trip budget); a backfill
+lane writes the same with table and chunk (B). S (C8): the applied-position reader. S: the spill area can be made tiny
+by a setting (`max_temp_directory_size` of the transform connection and of apply's planning database), and "spill area
+full" is an alert through `alerts.emit` (C4), which is the fuzzer's proof of effect. P (C7), E (C2) and S (C12): every
+source address is configurable per node, so that each link can pass through a proxy; MotherDuck is reached only
+through the `md.*` fault sites. Every owner (C1): crash points for the steps of design 3, the lane points of C4,
+take-over, release, heartbeat, slot creation, backfill chunk commit, pending log append and swap, each declared
+through `cdc_v2.crashpoints`; a point that is reached only on some paths says so. P (C7) and the engine's probe: one
+`application_name` prefix (`cdc_v2_`) for every SQL session of the pipeline; the replication session is named by
+Debezium and is found through the `active_pid` of `HELLO`. L (C6): the local platform starts and cancels runs and
+reports each run's state, start, end and exit code. S with D (C10, C4): the quarantine exit and `ApplyInvariantError`
+are alert rows. B (C10): the backfill request table and the `versions` observer for SPEC 3.2. V (C10, `reposition`):
+the enactment after a dropped or invalidated slot and after a promotion. Bug classes that no planted defect of round 1
+stands for, and that round 2 must plant in the real system or show found: a wrong cut or hand-off (design 7: `R0 < P0`
+accepted, a swap before `R1` is passed, catch-up before all snapshots are passed, a table without a key read under
+several snapshots, an unsettled standby); a double apply after `CommitUnknown`; a table with a deferrable key applied
+on the keyed path (rule K), also through an engine started with an empty list of tables without a key; a slot that is
+ahead or recreated and ignored (V); a `FATAL` repeated at one position (SPEC 4.3).
 
 **The ledger of SPEC section 4 (rules of the orchestrator, 2026-11-10).** No run against the toy replicator
 counts toward a bar. The counters of a fuzzer restart from zero after any change to correctness code, and a

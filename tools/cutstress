@@ -1,0 +1,15 @@
+#!/bin/sh
+# Stress test and model check of the cut (docs/design/cut.md).
+#
+#   tools/cutstress run --seconds 30            writers on the primary, cut takers on the standby
+#   tools/cutstress model                       explore the model (no Postgres)
+#   tools/cutstress --help                      everything else
+#
+# Talks only to the private cluster of `tools/localpg --home ~/.cache/cdc_flight_v2/pg-cut --port-base 55600`
+# (override both with --home and --port-base).  It never uses tools/with-env, never reads PG* variables and
+# never falls back to a default port.
+set -eu
+root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$root"
+for name in $(env | sed -n 's/^\(PG[A-Z_]*\)=.*/\1/p'); do unset "$name"; done
+exec uv run -q python -m cdc_v2.testing.cutstress "$@"

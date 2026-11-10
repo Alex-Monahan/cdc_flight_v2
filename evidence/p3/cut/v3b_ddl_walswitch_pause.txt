@@ -1,0 +1,24 @@
+$ tools/cutstress run --label v3b_ddl_walswitch_pause --seconds 120 --writers plain,async,subxact,abort --takers-own 2 --takers-exported 0 --chaos ddl,walswitch,pause --out evidence/p3/cut/v3b_ddl_walswitch_pause.json
+load average before: 42.64 22.15 12.89
+   30s cuts=21802 transactions=119896 violations=0 waiting=65
+   60s cuts=40697 transactions=240066 violations=0 waiting=44
+   90s cuts=60825 transactions=358076 violations=0 waiting=38
+v3b_ddl_walswitch_pause: OK
+  Postgres 18.6 (Homebrew), 121 s, writers plain,async,subxact,abort, disturbances ddl,walswitch,pause, slot on replica
+  cuts checked 81540 (not checked 0), transactions delivered 477939
+  violations of the sound rules: none
+  stream out of E order: 0
+  wrong rules caught (cuts): stmt_as_r0=731, r1_inside=731, r1_outside=1, naive_sharp=0, xmax_inside=31530, xmin_outside=38310
+  unknown set (transactions per cut)   empty     mean   max
+    base                                 0.00%    2.080   561
+    xid                                 64.22%    0.817   286
+    sharp                               66.24%    1.091   561
+    xid+sharp                           71.69%    0.739   286
+    really_visible                      67.02%    1.064   557
+  cuts_with_r0_below_received: 0
+  cuts_that_miss_a_received_transaction: 0
+  cuts_with_r0_eq_r1: 54264
+  cuts taken the own way: 81540, of them quiet (xmin = xmax): 43191 (53.0%), with a violation: 0
+  snapshots dropped because the standby had not settled: 0
+  checker steps: unknown_window, per_key_boundary, missing_rows; rows missing from a cut: 0
+  load average at start [42.64, 22.15, 12.89], at end [9.79, 16.39, 11.85]

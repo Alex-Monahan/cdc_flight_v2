@@ -109,22 +109,87 @@ Package P is built and reviewed. `docs/design/source.md` is the full account.
   only the position of its transactions is used.
 - The slot holder that `slot.facts` reports and `slot.terminate_holder(node, name, expect=…)` takes is the same pair
   (process id, backend start in microseconds) as the engine's `HELLO`.
-- The replication connection of the engine and the read connections of package P are two sessions with different
-  settings (the walsender session has `IntervalStyle=postgres` and `DateStyle=ISO`; read connections have the table
-  of `source.md` section 1). The transform takes the stream's form from the engine's document and the backfill's
-  form from the source's; you pass both through untouched.
+- The replication connection of the engine and the read connections of package P are two sessions. Both pin the
+  same text-output settings (`IntervalStyle=postgres`, `DateStyle=ISO`; plan C3), so a value that travels as
+  Postgres's text is the same text on both paths. The transform takes the stream's form from the engine's document
+  and the backfill's form from the source's; you pass both through untouched.
 - The slot-creation nudge is a non-transactional logical message with prefix `cdc_v2.nudge`. It lies outside the
   engine's default `message.prefix.include.list` (`cdc_v2_.*`) on purpose: it must never reach you.
 - In primary mode, hand the `GapMark` at `group_end` (C9) to `tables.confirm`: on a primary a catalog observation
   is usable for a group only under the rule in package T's task.
 
+## From the transform as built — build on it
+
+Package Y is built and reviewed. `docs/design/transform.md` is the full account (section 1: the interface as
+built; section 2: `WideningNeeded`; section 5: contract notes).
+
+- The plan is built from the catalog alone. A `SCHEMA` frame is only checked against it: column count, position,
+  name, transport form, **key flag and key positions**. `PlanMismatch.differences` lists each difference as
+  (position, field, catalog side, frame side). The backfill's plan and the stream's plan of one table are the same
+  value with the same hash; the hash holds the server's major version.
+- A `Transformer` owns one DuckDB connection and belongs to one thread. Its spill area (`temp_directory`,
+  `max_temp_directory_size`) is given at construction and cannot be changed later; `threads` and `memory_limit`
+  come from your settings.
+- **Concatenate before the transform** (plan C3). Many small batches cost one statement each for some type
+  families (about 1 ms per batch for a table with an `interval`, `uuid`, `timetz`, unconstrained numeric or money
+  column). Concatenate the consecutive `ROWS` batches of one table and schema version within a group, in memory
+  only, in stream order, bounded by `apply.max_group_bytes`, and transform the result once. The transform still
+  runs before anything is staged, spilled or sent. Show the cost per transaction at 2,000 small transactions per
+  second (SPEC 5.3) with and without it.
+- **Tables that are not streamed** (plan C3, C10). A table whose plan has an `ambiguous_key`, and a table without
+  a key whose plan has an `ambiguous` column, get routing `skip` and one alert per table that names the reason;
+  their rows are counted and dropped. Decide it where a table is first routed to `streaming` and again whenever
+  its plan changes. The mode `full_refresh` that will carry such a table is P4.
+- `transform.ambiguous(plan, rows)` takes the batch in transport form, before `transform.stream`.
+- JSON and enums arrive as `VARCHAR` in P3; nothing of yours depends on it.
+
+## From the key rule (package K) — build on it
+
+Rule K (`docs/design/core.md`, start of section 6): a table has a key when its primary key is not deferrable and
+its replica identity is `DEFAULT`, `FULL`, or `USING INDEX` on the primary key's own index. Every other
+publishable table is a table without a key. The catalog is the one authority, and the engine is told which
+tables are without a key (`docs/design/source.md` section 3 and `docs/design/engine.md`, as package K delivered
+them; take the names of the fields from there).
+
+- At every engine start you read the catalog and give the engine the list of tables without a key.
+- At every `SCHEMA` frame the key flag and the key positions must equal the catalog's; `transform.plan` makes
+  the comparison. A difference is never applied: nothing of that table is applied by a key that the catalog does
+  not confirm. The stream reads the catalog again and starts a new engine with a fresh list (a table that
+  appeared after the start, SPEC R20, or a key that became deferrable while the engine ran). Since no `DURABLE`
+  was sent for the group, the new engine delivers it again. If the frame and the catalog still differ after
+  `stream.max_key_restarts` (default 2) at one position, it is a failure of that table (section 7).
+- A table that the catalog refuses (`identity_problem`: for example a deferrable primary key without `REPLICA
+  IDENTITY FULL`) is not streamed: routing `skip`, alert with the catalog's message. So is a table with a
+  `name_problem` (a `"` in its schema or table name, H-051); it is never in the publication.
+- Restart the engine with a fresh list also on package T's `key_changed`: a key made deferrable is a drop and
+  re-add of the key, and whether Debezium then sends a new `SCHEMA` frame was not measured.
+- **A FATAL that names a table** (`fatal.schema`, `fatal.table`; for example an update of a table without a key
+  that arrived without an old image, after somebody changed its replica identity) is a failure of that table, not
+  of the stream: routing `skip`, one alert and quarantine at once, with no loop of restarts; start the engine
+  again without the table in its include list (`table.exclude.list` is a protected setting); the table comes back
+  through a backfill after a gap once the catalog's `replica_identity_problem` is `None` again. Test it with a
+  live change of replica identity while the stream runs.
+- Gate workload (SPEC 1.4 names "swaps inside one transaction, under default and full replica identity"): one
+  table with a deferrable primary key and `REPLICA IDENTITY FULL`, with a swap of two keys in one statement and
+  with "insert a duplicate, then delete the old row" (`tests/pg_source/test_pg_keys.py` has both). It takes the
+  path of a table without a key and must come out equal under the oracle. And one keyed table with a key that
+  changes only its form (`float8` `-0` to `0`: the engine sends a key change).
+
+## From the cut as built (package X) — build on it
+
+Contract C9 (`docs/design/cut.md` 13.4). In primary mode the stream lane keeps the tracker: at each engine start
+`GapTracker(unknown_below=next_xid_marker(primary))`; for each applied `END` `delivered_xid32(txId)`; once per group
+`probe(probe_snapshot(conn))` on a primary connection of the stream lane (one statement); hand `mark()` to the
+backfill (`backfill.on_group`) at every `P0` and `caught_up_lsn`, and to `tables.confirm` at `group_end`. The source
+heartbeat write is also what settles a restarted standby (a standby that has just started can hide a commit until
+it replays the next one; the takers refuse a cut until then). If the decoding replica is promoted, the stream
+switches to the primary rule and the tracker starts again with `unknown_below`.
+
 ## What may be missing when you start
 
-Packages E, D, A and P are merged. Three others may not be yet. Build to their contracts and join when they
-arrive (`git merge origin/main` into your branch):
+Packages E, D, A, P, Y, K and X are merged. Others are not. Build to their contracts and join when they arrive
+(`git merge origin/main` into your branch):
 
-- **Y (transform, C3).** If `cdc_v2.transform` is not on `main`, your tests use a stand-in that converts only
-  the transport types that need no conversion; it lives under `tests/`, never in `src/`.
 - **L (leadership, C12).** If `cdc_v2.leader` is not on `main`, your tests take the epoch from a helper that
   performs the take-over statements of design 4.5 through package D, and the pipeline runs without the heartbeat
   thread. Whichever of you and L is merged second writes the join and its test (C12, last point).
@@ -345,6 +410,31 @@ block (fence, `COMMIT`: package D).
   set of tables: publication, slot, destination tables built from the transform plans, routing `streaming`, the
   pipeline as a process group, and handles to crash it at a named point, freeze it, and wait for a position.
   Until package B exists it registers only tables that were created empty before the slot.
+
+### 10. What the fuzzers of round 2 need from you (plan 6.2, "From the review of F")
+
+Package F points its fuzzers at your pipeline after you are merged. It must be able to see, from outside:
+
+- **Never two writers.** The row that the batch machine appends to `_cdc.transitions` for every committed group
+  carries the facts: epoch, run id, previous and new applied position, first and last commit position of the
+  group's source transactions and their count, and a sequence that gives the order of commit. It is part of the
+  group's own transaction: no extra statement and no extra round trip per group (SPEC 6.1). If package D's
+  `state.transition` has no place for such facts, say so at once; do not build a second log.
+- The applied position only through `stream.applied_position` (C8).
+- **The spill area can be made tiny by a setting** (the transform connection's and apply's planning database's
+  `max_temp_directory_size`), and "spill area full" is an alert through `alerts.emit`: the alert row is the
+  fuzzer's proof that the fault had an effect. Apply raises `ApplySpillFull` for its part; it is the same wait.
+- **Every source address is a setting, per node** (primary, replica, the engine's replication connection), so
+  that each link can pass through package H's proxy. MotherDuck is reached only through the `md.*` fault sites.
+- **Crash points** for every durable step (section 5), declared through `cdc_v2.crashpoints`; a point that is
+  reached only on some paths says so in its declaration.
+- Every SQL session of the pipeline at the source has an `application_name` with the prefix `cdc_v2_`; the
+  replication session is found through the `active_pid` of `HELLO`.
+- The quarantine exit and `ApplyInvariantError` are alert rows (`alerts.emit`), not only log lines.
+
+The stream has no end frame (plan C2): only your own `STOP` ends a stream cleanly. An end at a frame boundary
+that you did not ask for is `EngineExited`, and a transaction without its `END` is never applied. A new engine
+life (`HELLO`, sequence 0) may repeat transactions that are applied; the discard by position is the one defence.
 
 ## Tests
 

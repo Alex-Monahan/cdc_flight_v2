@@ -334,3 +334,8 @@ otherwise, the points below replace the corresponding statements of §0, §4, §
 - **Session start checks.** In a session that was not started through the launcher, check 3 is recorded as
   "not enforced, owner informed" in `STATUS.md` instead of stopping the session. Checks 1, 2 (through
   `tools/with-env`) and 4 are run as written.
+- **No Fable from 2026-11-10 on (owner).** After the account's spend limit stopped every agent, the owner said:
+  "Use Opus everywhere you would have used Fable." Every role of §3 that names Fable (the orchestrator, the
+  core-correctness workers, the second reviewers) is now Opus 5.5 with the same effort (xhigh where §3 says xhigh).
+  A Fable agent that was stopped is not resumed; its work is continued by a new Opus agent in the same worktree
+  from what it committed and left on disk. Every agent call names `opus`; never Sonnet.

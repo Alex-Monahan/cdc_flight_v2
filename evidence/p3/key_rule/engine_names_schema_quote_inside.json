@@ -1,0 +1,28 @@
+{
+  "event_counts": [
+    2,
+    1
+  ],
+  "fatal": false,
+  "rows": {
+    "m": [
+      999
+    ],
+    "t": [
+      1,
+      2
+    ]
+  },
+  "schema": "a\"b",
+  "tables_seen": [
+    [
+      "a\"b54f138",
+      "t"
+    ],
+    [
+      "cdc_v2_e_m_54f138",
+      "m"
+    ]
+  ],
+  "test": "tests/engine/test_engine_names.py::test_the_shapes_as_schema_names[quote inside]"
+}

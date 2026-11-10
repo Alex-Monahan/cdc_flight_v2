@@ -1,6 +1,7 @@
-"""Replica identity (H-014). A table without a primary key needs `REPLICA IDENTITY FULL` before it joins the
-publication, also when it has `REPLICA IDENTITY USING INDEX` (Debezium gives such a table no key, and the engine
-would carry an incomplete old image). In the wrong order, the source's own UPDATE and DELETE on that table fail
+"""Replica identity (H-014, H-015). A table without a key by rule K (no primary key, or a deferrable one) needs
+`REPLICA IDENTITY FULL` before it joins the publication, also when it has `REPLICA IDENTITY USING INDEX` (such a
+table has no key, and the engine would carry an incomplete old image). In the wrong order, the source's own UPDATE
+and DELETE on that table fail
 ("cannot update table … because it does not have a replica identity and publishes updates").
 """
 from __future__ import annotations

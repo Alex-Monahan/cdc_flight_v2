@@ -1,0 +1,76 @@
+{
+ "server_version_num": 180006,
+ "open_cut": {
+  "r0": "3/1A005830",
+  "r1": "3/1A005830",
+  "timeline": 1,
+  "timeline_of_the_source": 1,
+  "server_start_is_the_one_of_its_node": true,
+  "sealed": true,
+  "reading_on_the_cut": {
+   "timeline": 1,
+   "position": "3/1A005830"
+  },
+  "reading_on_the_cut_is_of_its_server_life": true,
+  "has_passed": true,
+  "stream_reading_at_the_swap": {
+   "timeline": 1,
+   "position": "3/1A0058B8"
+  },
+  "valid_at_the_swap": true,
+  "valid_without_the_stream_reading": false,
+  "one_attempt_cut_sealed": false,
+  "one_attempt_cut_valid_at_the_swap": false,
+  "reads_before_promotion": 1
+ },
+ "after_promotion": {
+  "in_recovery": false,
+  "timeline": 2,
+  "timeline_in_the_control_file_right_after": 1,
+  "server_start_unchanged": true,
+  "the_promoted_node_now": {
+   "timeline": 2,
+   "position": "3/1A005A90"
+  },
+  "stream_reading_on_the_source": {
+   "timeline": 1,
+   "position": "3/1A0058B8"
+  },
+  "the_open_cut_is_valid_with_the_stream_on_the_source": true,
+  "stream_reading_on_the_promoted_node": {
+   "timeline": 2,
+   "position": "3/1A005A90"
+  },
+  "the_open_cut_is_valid_with_the_stream_on_the_promoted_node": false,
+  "replay_position_before_a_local_commit": "3/1A0058B8",
+  "replay_position_after_a_local_commit": "3/1A0058B8",
+  "local_commit_record_ends_after_that_position": true,
+  "a_new_snapshot_reads": 2,
+  "the_open_cut_still_reads": 1
+ },
+ "library_on_a_new_cut": "refused: not a standby: pg_is_in_recovery() is false; use take_primary_cut",
+ "library_on_a_new_exported_cut": "refused: not a standby: pg_is_in_recovery() is false; use take_primary_cut",
+ "library_on_a_new_sealed_cut": "refused: not a standby: pg_is_in_recovery() is false; use take_primary_cut",
+ "library_on_a_new_settle_floor": "refused: not a standby: pg_is_in_recovery() is false",
+ "primary_cut_on_the_promoted_node": {
+  "timeline": 2,
+  "insert_position": "3/1A005AC0",
+  "sealed": true,
+  "reading_on_the_cut": {
+   "timeline": 2,
+   "position": "3/1A005AC0"
+  },
+  "has_passed_before_the_next_commit": false,
+  "has_passed": true,
+  "stream_reading_at_the_swap": {
+   "timeline": 2,
+   "position": "3/1A005B48"
+  },
+  "valid_at_the_swap": true,
+  "valid_with_the_stream_on_the_source": false
+ },
+ "ok": true,
+ "replication_slots_left_on_the_primary": [
+  "cdc_v2_phys_replica"
+ ]
+}

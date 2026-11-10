@@ -77,6 +77,12 @@ or contract C7 says elsewhere, these points and that document hold.
 - Refuse to stream when `wal_sender_timeout` is 0 (`ServerFacts.wal_sender_timeout_ms`, read with the slot facts).
 - Your suite reaches the crash points `pg.slot_created` and `pg.holder_terminated` of package P.
 
+## From the cut as built (package X)
+
+A promotion of the decoding replica switches the stream to the primary rule of the cut (package S starts its
+tracker again). You do nothing for open cuts: `valid_on` at the swap rejects them. A restarted standby is unsettled
+until it replays its next commit; that is not a slot finding. (Contract C9, `docs/design/cut.md` 13.4.)
+
 ## Resources
 
 - Postgres: `tools/localpg --home ~/.cache/cdc_flight_v2/pg-v --port-base 55680`, and a second pair

@@ -148,7 +148,7 @@ class Scenario:
     def publish(self, *tables):
         if tables:
             self.pair.p("alter publication %s add table %s" % (
-                self.pub, ", ".join("%s.%s" % (self.schema, t) for t in tables)))
+                self.pub, ", ".join('%s."%s"' % (self.schema, t.replace('"', '""')) for t in tables)))
 
     def settings(self, **kw):
         return self.pair.settings(self.slot, self.pub, **kw)

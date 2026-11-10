@@ -1,0 +1,22 @@
+$ tools/cutstress run --label nc_mid_redo --seconds 150 --writers drop,subxact:subs=3000,plain --takers-own 4 --takers-exported 0 --taker-sleep 0 --out evidence/p3/cut/nc_mid_redo.json
+load average before: 3.60 7.67 8.48
+   30s cuts=129932 transactions=37971 violations=0 waiting=2068
+   60s cuts=268212 transactions=75483 violations=0 waiting=1675
+   90s cuts=405074 transactions=113401 violations=0 waiting=1409
+  120s cuts=544208 transactions=151141 violations=0 waiting=1165
+nc_mid_redo: OK
+  Postgres 18.6 (Homebrew), 164 s, writers drop,subxact:subs=3000,plain, disturbances none, slot on replica
+  cuts checked 715694 (not checked 0), transactions delivered 188441
+  violations of the sound rules: none
+  stream out of E order: 0
+  wrong rules caught (cuts): stmt_as_r0=2535, r1_inside=2535, r1_outside=34497, naive_sharp=34, xmax_inside=97986, xmin_outside=656624
+  unknown set (transactions per cut)   empty     mean   max
+    base                                 0.00%    1.346   106
+    xid                                 73.89%    0.419   105
+    sharp                               76.47%    0.395   105
+    xid+sharp                           76.74%    0.389   105
+    really_visible                      76.65%    0.390   105
+  cuts_with_r0_below_received: 0
+  cuts_that_miss_a_received_transaction: 0
+  cuts_with_r0_eq_r1: 535067
+  cuts taken the own way: 715694, of them quiet (xmin = xmax): 47118 (6.6%), with a violation: 0

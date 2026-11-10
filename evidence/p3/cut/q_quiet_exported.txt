@@ -1,0 +1,23 @@
+$ tools/cutstress run --label q_quiet_exported --seconds 120 --writers plain,subxact,abort --takers-own 1 --takers-exported 0 --takers-quiet 2 --out evidence/p3/cut/q_quiet_exported.json
+load average before: 9.41 8.47 8.65
+   30s cuts=24555 transactions=70814 violations=0 waiting=69
+   60s cuts=45726 transactions=137162 violations=0 waiting=59
+   90s cuts=60985 transactions=196252 violations=0 waiting=68
+q_quiet_exported: OK
+  Postgres 18.6 (Homebrew), 121 s, writers plain,subxact,abort, disturbances none, slot on replica
+  cuts checked 83928 (not checked 0), transactions delivered 266391
+  violations of the sound rules: none
+  stream out of E order: 0
+  wrong rules caught (cuts): stmt_as_r0=4973, r1_inside=5625, r1_outside=1, naive_sharp=0, xmax_inside=18845, xmin_outside=23053
+  unknown set (transactions per cut)   empty     mean   max
+    base                                 0.00%    1.637   139
+    xid                                 77.95%    0.392   123
+    sharp                               73.43%    0.639   138
+    xid+sharp                           83.00%    0.339   123
+    really_visible                      77.15%    0.451   133
+  cuts_with_r0_below_received: 0
+  cuts_that_miss_a_received_transaction: 0
+  cuts_with_r0_eq_r1: 61358
+  cuts taken the own way: 47481, of them quiet (xmin = xmax): 24405 (51.4%), with a violation: 0
+  cuts taken the quiet way: 36447, of them quiet (xmin = xmax): 36447 (100.0%), with a violation: 0
+  snapshots dropped by the quiet takers: 104616

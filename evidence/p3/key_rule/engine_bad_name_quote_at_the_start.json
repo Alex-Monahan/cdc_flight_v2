@@ -1,0 +1,9 @@
+{
+  "cause": [
+    "java.lang.IllegalArgumentException"
+  ],
+  "fatal": "org.apache.kafka.connect.errors.ConnectException",
+  "name": "\"b",
+  "outcome": "fatal",
+  "test": "tests/engine/test_engine_keys.py::test_names_stock_debezium_cannot_stream[quote at the start]"
+}
