@@ -37,8 +37,10 @@ says elsewhere, these points and that document hold.
   generator) and injects byte faults with `pipefaults`; it needs no JVM. The decoder stays broken after its first
   error, by design: a test that expects recovery restarts the reader.
 - `END.event_count` = rows + `TRUNCATE` frames + transactional `MESSAGE` frames; a key change counts two; an `END`
-  with count 0 is legal. `HEARTBEAT` frames may arrive inside a transaction. `seq` starts at 0 for every engine
-  life. A generator that breaks one of these on purpose is a negative control.
+  with count 0 is legal. `HEARTBEAT` frames may arrive anywhere, also inside a transaction, and never move the
+  applied position (plan C2): a generated stream whose `HEARTBEAT` carries a position above the last `END` must
+  change nothing. `seq` starts at 0 for every engine life. A generator that breaks one of these on purpose is a
+  negative control.
 
 ## Resources
 

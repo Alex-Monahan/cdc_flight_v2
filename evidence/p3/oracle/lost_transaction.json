@@ -1,0 +1,24 @@
+{
+  "position": "0/345CB80",
+  "positioned_after_replay": {
+    "destination_position": "0/345CB80",
+    "equal": false,
+    "missing_rows": 1,
+    "sample": [
+      {
+        "id": "11",
+        "v": "lost"
+      }
+    ],
+    "source_position": "0/345CB80"
+  },
+  "positioned_on_lagging_standby": {
+    "refused": "source standby replayed only up to 0/345CAD0, not the position 0/345CB80",
+    "seconds": 3.0
+  },
+  "unpositioned_on_lagging_standby": {
+    "equal": true,
+    "note": "the hazard: both sides lack the lost row"
+  },
+  "what": "the last source transaction is lost by a stand-in pipeline that still reports its position; the oracle reads a standby whose replay is paused (private cluster)"
+}

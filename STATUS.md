@@ -7,9 +7,10 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 - **Stage 1 (local). P1 Environment: gate passed on 2026-11-09** (one item cannot be shown from this session, see
   the table). **P2 Platform spike: gate passed on 2026-11-10** — every spike is done and merged, the report
   (`docs/spike_report.md`) is complete and was sent to the owner; nothing found contradicts SPEC, so the build
-  continues without waiting. **P3 Core: in progress** (table below): the fault harness is merged; the oracle is in
-  its round of fixes; the engine is finished and under review; the cut, the destination basics and the source
-  package are being built; the task file of every package is written.
+  continues without waiting. **P3 Core: in progress** (table below): the fault harness and the oracle are
+  merged; the engine is finished and reviewed twice, and its round of fixes waits for a free writer slot; the cut,
+  the destination basics, the source package and the apply package are being built; the task file of every
+  package is written.
 - Stage 2 (PlanetScale) cannot start: of its names only `PLANETSCALE_ORG` and `PLANETSCALE_DATABASE` are in the env
   file (checked again at the P1 gate). The service token and the connection values are owed by the owner.
 
@@ -48,17 +49,17 @@ green on T1 (local primary and standby, real MotherDuck, local JVM).
 | Package | What | Worker | State on 2026-11-10 |
 |---|---|---|---|
 | H | Crash points, fault sites, process control, crash runner, TCP fault proxy, byte-stream relay | Opus | **merged** |
-| O | Oracle, T1 harness, evidence writer, workload generator and observer | Opus | **finished**; coordinator's verdict: merge after fixes (below); the fix round is running |
+| O | Oracle, T1 harness, evidence writer, workload generator and observer | Opus | **merged** (fix round included) |
 | X | The cut: where a snapshot lies in the stream | Fable | running |
-| E | Engine: the JVM program around stock Debezium, frames, the Python side | Opus | **finished**; under review by the coordinator and a second reviewer (acknowledgement path); findings below |
+| E | Engine: the JVM program around stock Debezium, frames, the Python side | Opus | **finished**; both reviews say: merge after fixes (below); the fix round goes to its worker when a writer slot is free |
 | D | Destination basics: lanes, fence, deadlines, errors, `_cdc` schema, transition function, alert records | Fable | running |
-| A | Apply: the statements over a change set, keyed and keyless | Opus | task written; starts after O is merged |
+| A | Apply: the statements over a change set, keyed and keyless | Opus | running |
 | P | Source: connections, catalog and its observation, publication, slot, slot facts, timeline, heartbeat | Opus | running; first repairs `tools/localpg` for Postgres 16 |
 | L | Leadership: guard, take-over, heartbeat, hand-over, bootstrap, platform interface | Fable | task written; after D |
 | Y | Transform: source types to destination types | Opus | task written; after E and P |
 | S | Stream: transactions, groups, commit and acknowledge, supervisor, pipeline process | Fable | task written; after E, D, A, P |
 | V | Slot continuity | Fable | task written; after S |
-| F | Fuzzers (stream, workload, fault, leadership), the consumer loop of 1.3 and 3.2 | Opus | task written; after O (H is merged) |
+| F | Fuzzers (stream, workload, fault, leadership), the consumer loop of 1.3 and 3.2 | Opus | task written; starts when a writer slot is free (H and O are merged) |
 | B | Backfill and hand-off | Fable | task written; after X, S, A, P, Y |
 | T | The catalog gate, truncate, drop and recreate, the document and the test over all state machines | Opus | task written; after S, B |
 
@@ -100,6 +101,11 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
 | 2026-11-10 | The records of one transaction are found by their order in the stream (BEGIN … END), not by Debezium's transaction `id`, which differs from record to record; only the END record carries the transaction's commit end position (`docs/design/core.md` §2) | orchestrator |
 | 2026-11-10 | `tools/localpg` cannot start a pair on the Postgres 16 binaries (it writes a setting and reads slot columns that exist from 17 on). Package P repairs it first, as a commit of its own; the tests that packages E, V and T owe on 16 run after that | orchestrator |
 | 2026-11-10 | Local test versions: Postgres 18 is required (SPEC R15); facts that differ by version are also run on the installed Postgres 16; Postgres 17 is not installed and nothing more is installed. The version of the stage 2 instance decides what else is needed | orchestrator |
+| 2026-11-10 | Contract C2, attach rule: Debezium gives every replication connection the same application name, so the pipeline recognises its own engine by the slot holder's process id together with that backend's start time, which the engine reads and names in `HELLO`. Never by the process id alone. The engine never attaches a second time by itself | orchestrator, with the coordinator's text |
+| 2026-11-10 | **Only END records are acknowledged.** A Debezium heartbeat never moves the applied position and is never marked by the engine. Reason (second review of the engine): Debezium dispatches a heartbeat that already carries a transaction's commit position before that transaction's END record exists; a pipeline written to the earlier contract lost 80 of 20,000 transactions in the reviewer's run. On an idle source the position moves with the pipeline's own heartbeat write, a row in a published table on the primary every 10 s (which SPEC 4.6 needs anyway). Contract C2, design sections 2 and 3, and the tasks of S, F, P and E say so | orchestrator |
+| 2026-11-10 | A black-holed replication connection (neither Debezium nor the driver notices one) is found by two rules: the slot-continuity check sees that the holder is gone once the server has ended the silent walsender (`wal_sender_timeout` + the check interval; a `wal_sender_timeout` of 0 is refused), and the stream's marker rule of SPEC 4.6 (a marker written on the primary must come back within 60 s; counted only while no transaction is open). Engine frames prove that the engine is alive, not that its connection is | orchestrator, with the coordinator |
+| 2026-11-10 | The engine refuses configuration that would weaken a guarantee (acknowledgement, offsets, retries, skipped operations, snapshot and publication modes, converter, heartbeat interval outside 0–10 s), on the Python side and again in the JVM against the effective configuration | orchestrator, from the coordinator's review |
+| 2026-11-10 | The apply design takes two findings of the oracle package: DuckDB does not write an `UPDATE` whose new value compares equal to the stored one (`-0`/`0`, `1 mon`/`30 days`), so changed columns of such types need a shape that always writes; and the keyless grouping key must be exact for such types, in the oracle's canonical form (design 6.2, 6.3; open point 3 settled) | orchestrator |
 
 ## Questions for the owner / owed by the owner
 
@@ -156,6 +162,27 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
   the node that holds the slot), before the apply. A hand-over or failover that falls behind such a transaction
   therefore cannot meet the 120 s; working rule: such a recovery is logged with the size of the transaction and
   reported separately, and it is **not** removed from the 5.2 statistic.
+- **A replication connection that goes silent (SPEC 5.2 "max ≤ 60 s", SPEC 4.6).** When the network path of the
+  replication connection black-holes, nothing fails: the server ends the silent walsender only after
+  `wal_sender_timeout` (60 s by default), and the marker rule of SPEC 4.6 allows 60 s before the connection is torn
+  down. Noticing therefore takes 60–90 s and recovery about 70–100 s in all, so the latency of that one event is
+  above 60 s by construction, and "back under 30 s within 120 s" is met only narrowly. Working rule: such an event
+  is reported with its cause and counted in the 5.2 statistic as it is; if the owner wants it noticed faster, the
+  marker interval of 4.6 must be shortened (cost: more heartbeat writes on the source).
+- **"≥ 10,000 injected faults" (SPEC §4, fault fuzzer).** Working rule: a fault counts only when its effect was
+  observed (the process died at the point, the proxy held or cut an open connection, a backend was terminated); an
+  injection that hit nothing is logged and not counted. The bar is claimed only when every kind of fault the system
+  supports has at least 100 counted injections, so that 10,000 cheap faults of one kind cannot pass for the
+  campaign.
+- **A table that is dropped and created again, and a rename (SPEC 1.9), in P3.** The destination follows the
+  source's names. After a drop and recreate the old destination table is dropped (or renamed under `on_source_drop:
+  retain`) and the name is absent at the destination until the new table's first snapshot is complete. A rename is
+  treated as a drop and, if the new name is configured, a fresh table with a new backfill. Renaming in place belongs
+  to the schema wave of P4.
+- **Postgres 17 locally.** Homebrew has 16 and 18 installed here; the facts that differ by version are run on both.
+  The coordinator asks for 17 as well (infinite intervals exist from 17; some slot columns start there). Nothing
+  more is installed without the owner's word; say so if `postgresql@17` should be installed. Otherwise 17 is covered
+  only if the stage 2 instance runs it.
 - **Slot creation on a standby and the admin role.** A slot on a standby needs a running-transactions record from
   the primary. Unaided it took 0.95–8.1 s locally; with `pg_log_standby_snapshot()` on the primary 0.7–0.9 s, but
   the local role that is shaped like a provider's admin role was refused that function (only a superuser may call it
@@ -212,6 +239,11 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
   local runs used the machine's OpenJDK 23).
 - Whether the provider's admin role may call `pg_log_standby_snapshot()`, and how long a slot creation on the
   replica takes without it.
+- The engine reads the slot's holder over an SQL connection of its own. Behind a provider's proxy or pooler that
+  connection must reach the same server as the replication connection (hazard H-047); show it on PlanetScale, in
+  both modes.
+- The engine tests that depend on the server version (a lower flush position does not move the slot back; the holder
+  pair; infinite intervals) on the version the provider runs.
 - PlanetScale's documented slot policy (slots without `failover = true` are flagged and planned failovers held back
   for 3 days): does a slot on a replica trigger it?
 
@@ -221,53 +253,44 @@ Each in its own worktree and branch; the orchestrator merges. The P3 packages ar
 
 | Job | Phase | Started | Delivers |
 |---|---|---|---|
-| Package O, fix round (Opus, high; the worker that built it). Home `pg-o`, ports 55520–55527, MotherDuck databases `cdc_v2_t_o_*` | P3 | 2026-11-10 | the four fixes the coordinator requires and its list of smaller ones |
 | Package X, the cut (Fable, xhigh). Library, a small `pgoutput` decoder for tests, a stress tool with a negative control, the argument from the Postgres source. Home `pg-cut`, ports 55600–55607. No MotherDuck use | P3 | 2026-11-10 | `src/cdc_v2/pg/cut.py`, `src/cdc_v2/testing/pgoutput.py`, `tools/cutstress`, `tests/cut/`, `docs/design/cut.md`, `evidence/p3/cut/` |
 | Package D, destination basics (Fable, xhigh). MotherDuck databases `cdc_v2_t_d_*`. No Postgres | P3 | 2026-11-10 | `src/cdc_v2/md/`, `src/cdc_v2/state/`, `src/cdc_v2/alerts.py`, `docs/design/destination.md`, `docs/state_machines.md`, `evidence/p3/destination/` |
 | Package P, the source (Opus, high). Homes `pg-p` and `pg-p2`, ports 55640–55655; the `tools/localpg` self-tests on their own home. No MotherDuck, no JVM | P3 | 2026-11-10 | first `tools/localpg` on Postgres 16; then `src/cdc_v2/pg/`, `tests/source/`, `docs/design/source.md`, `evidence/p3/source/` |
-| Coordinator (Opus, xhigh): review of package E before its merge | P3 | 2026-11-10 | verdict, text for contract C2 and the tasks of S, V, P |
-| Second reviewer (Fable, read-only): the acknowledgement path of package E | P3 | 2026-11-10 | findings on what the engine confirms to the slot and when |
+| Package A, apply (Opus, high). MotherDuck databases `cdc_v2_t_a_*`. No Postgres, no JVM | P3 | 2026-11-10 | `apply_group`, `truncate`, the statement shapes for tables with and without a key, tests against the oracle's canonical form, cost numbers on MotherDuck |
 
 Finished, not merged yet: **package E** (branch pushed; JVM program `jvm/src/cdc_v2/engine/`, the Python side
-`src/cdc_v2/stream/{frames,engine,jvm}.py`, `tests/engine/`, `docs/design/engine.md`, `evidence/p3/engine/`). Its
-findings that reach other packages (each is checked by the reviewers before it becomes a rule):
+`src/cdc_v2/stream/{frames,engine,jvm}.py`, `tests/engine/`, `docs/design/engine.md`, `evidence/p3/engine/`).
+Both reviews say "merge after fixes"; the fix round is written and goes to the worker that built the engine as
+soon as one of the four writer slots is free. What must change:
 
-- Debezium sets the application name of its replication connection to a fixed text, so contract C2's "unique
-  application name" cannot be met. Proposal: the engine reports the process id and the start time of its walsender
-  in HELLO, and the pipeline recognises its engine by those.
-- Neither Debezium nor the Postgres driver notices a black-holed replication connection (not within 150 s). The
-  pipeline must notice it itself: a heartbeat it wrote at the source does not come back.
+- From the second review (acknowledgement path). The engine never confirmed more than it was told was durable, in
+  every run. But a heartbeat could carry the commit position of a transaction not delivered yet (loss under the
+  earlier contract; now only END records are acknowledged, see Decisions), and the bounded list of unconfirmed
+  records could stop the slot from following while the pipeline was more than about 24,000 transactions behind
+  (no loss, but WAL is kept and a restart decodes the backlog again): the list gets a stated bound. The restart
+  test did not catch a planted over-acknowledgement; it gets a lagging pipeline and a kept negative control.
+- From the coordinator. Extra properties could override settings that carry a guarantee (now refused, on both
+  sides). `HELLO` was sent although no backend held the slot (now `FATAL`). The holder probe fell back to
+  `localhost` and port 5432 (now refused). `FATAL` gets the position and the table and never a source value.
+  Values the driver cannot parse (infinite intervals, very large intervals) get a test of what the engine writes
+  before it stops and whether leaving the table out lets the stream pass.
+- Smaller: the hermetic tests take 16 s (to be cut); three missing cases of the event count; proxy ports through a
+  parameter of the harness; the tests owed on Postgres 16 read their binaries from the environment so that they can
+  be repeated once `tools/localpg` runs on 16.
+
+Its findings that reach other packages (now rules in the contracts and the tasks):
+
+- Debezium sets the application name of its replication connection to a fixed text; the engine is recognised by
+  the holder's process id and backend start time (contract C2).
+- Neither Debezium nor the Postgres driver notices a black-holed replication connection (not within 150 s); see
+  Decisions for who notices it.
 - Debezium's own heartbeat does not advance while the WAL holds only changes of tables outside the publication; an
   idle slot needs a heartbeat that the publication carries (package P).
 - The END record's `event_count` counts rows, one TRUNCATE record per table and transactional logical messages; a
   key change counts two.
-- Found by reading the driver's source, not yet shown by test: an interval with more than 2^31 hours or an infinite
-  interval (Postgres 17+) may end the engine before our converter sees the value.
 - Local rates (indications): 59.7K rows/s at 1,000 rows per transaction, 64–71K rows/s in a 1M-row transaction,
   15.9K one-row transactions per second; our own handler costs 1.2–1.3 µs of the 28 µs per row.
 - Not tested on Postgres 16 (waits for the `tools/localpg` repair).
-
-Finished and reviewed, not merged yet: **package O** (branch pushed; 8 commits, 36 files). The coordinator's
-verdict is "merge after fixes": the comparison must be taken at a stated stream position
-(`compare(..., position=Q)`, contract C8); a comparison that compared nothing must raise instead of passing; the
-T1 fixtures must take their cluster and their MotherDuck prefix from the environment (plan §4), so that no two
-workers share a cluster; and the package must use the shared modules for positions and deadlines and one writer
-of evidence files. The same worker is making the fixes now. Oracle `src/cdc_v2/oracle/` with
-`tools/oracle` and `docs/oracle.md`; T1 harness `src/cdc_v2/testing/{pg,md,loader,datasets}.py`; evidence writer
-`src/cdc_v2/evidence.py`; workload generator and observer. Its own numbers: 196 default tests in about 9 s; 80 T1
-tests in 2 min 38 s; 60 planted differences all detected; an equal 5M-row table compared at 213,000 rows/s, one
-changed value in it found in 76 s, 173 MB peak. Findings that change the design (they go into `docs/design/core.md`
-at the merge, and are already in the task of package A):
-
-- DuckDB does not write an `UPDATE` whose new value compares equal to the stored one: `-0` stays `-0` after
-  `SET 0`, `1 mon` stays after `SET 30 days` (local DuckDB and MotherDuck). The source and the oracle tell these
-  values apart, so the apply statements must use a shape that always writes.
-- `GROUP BY` and `PARTITION BY` merge `-0` and `0`, NaN and −NaN, and equal intervals of different form; the
-  keyless apply needs a grouping key that keeps them apart.
-- Open point 3 (canonical comparison) is settled by the oracle; a source NULL in a UNION column must be written
-  as a real NULL.
-- DuckDB reads a Postgres BC date text as an AD date; float texts differ between the two servers (the oracle
-  compares bits). Both go to the transform package.
 
 Written by the orchestrator for P3: `docs/design/p3_plan.md` — the packages of the core (engine, destination
 basics and leadership, apply, source, stream, fuzzers, backfill and hand-off, truncate/drop and the machines), the
@@ -286,6 +309,30 @@ for the cut worker.
 
 Finished and merged:
 
+- 2026-11-10 — P3 package O, the oracle and the T1 harness (reviewed by the coordinator, fix round included):
+  `src/cdc_v2/oracle/`, `tools/oracle`, `docs/oracle.md`; T1 harness
+  `src/cdc_v2/testing/{pg,md,loader,datasets}.py` and the shared fixtures in `tests/conftest.py`; redaction
+  library `src/cdc_v2/evidence.py` with one writer of
+  evidence files (`cdc_v2.testing.harness_evidence.write_evidence`); seeded workload generator and transfers
+  observer; `evidence/p3/oracle/`. A comparison is taken at a stated stream position (`compare(..., position=Q,
+  slot_name=…)`: the source snapshot is at or past Q and the destination's applied position is read in the same
+  read transaction); a comparison without a position must say so and is not a gate result; a comparison that
+  compared nothing raises. Fixtures take their cluster and MotherDuck prefix from the environment; destructive
+  commands on the default home are refused; every MotherDuck statement has a deadline. Numbers: default run 309
+  passed, 1 skipped; 88 T1 tests; 60 planted differences all detected; an equal 5M-row table compared in 23.6 s
+  (211,500 rows/s), one changed value in it found in 77 s, 172 MB peak. Findings that changed the design (now in
+  `docs/design/core.md` 6.2, 6.3 and open point 3, and in the task of package A): DuckDB does not write an `UPDATE`
+  whose new value compares equal to the stored one (`-0` stays after `SET 0`, `1 mon` after `SET 30 days`);
+  `GROUP BY` and `PARTITION BY` merge such values, so the keyless apply needs an exact grouping key; a source NULL
+  in a UNION column must be written as a real NULL; DuckDB reads a Postgres BC date text as an AD date and float
+  texts differ between the two servers (both go to the transform package). After the merge the harness test of
+  the TCP proxy against Postgres was changed to take its cluster from the same fixture. The default test run now
+  takes about 50 s (to be cut). The coordinator checked the four must-fixes again on `main`: all closed; one hole
+  found and closed (a named home that was not built yet, given without a port base, would have been built on the
+  default home's ports — the fixtures now refuse it). The same re-check found the rule "only `END` records are
+  acknowledged" sound; the sentences that still relied on a heartbeat position are corrected (plan 6.2, tasks of E,
+  P, S), and C2, C8 and C10 gained one rule each (an `END` without `lsn_commit` is `FATAL`; the table list and
+  standby reads of a gate comparison; every reposition is followed by a new engine).
 - 2026-11-10 — Local streaming rate of stock Debezium on the replica's slot (§2 A 5, part 2):
   `spikes/local_throughput/stream_*.py`, `spikes/local_throughput/java/FactsMain.java`,
   `docs/spike/local_streaming.md`, `evidence/p2/local_streaming/`. **Indications only, laptop numbers.** One
@@ -391,11 +438,11 @@ the exact-value layer.
 
 ## Next steps
 
-1. P2 gate: merge the local streaming measurement when it reports, fill its section in `docs/spike_report.md`,
-   send the report to the owner, continue.
-2. P3: every task file is written. When a writer slot is free: the fix round of package O, then its merge (then
-   A and F); P; review and merge X, E, D as they report (then L after D, Y after E and P, S after E, D, A, P);
-   then V, B, T in the order of the table above. Plan C9 is completed from package X's report when it merges.
+1. P3, as writer slots become free (at most four): the fix round of package E (message written), then package F.
+   Review and merge X, D, P, A and E as they report: the coordinator reviews each, D also gets a second reviewer.
+   Then L after D, Y after E and P, S after E, D, A and P; then V, B, T in the order of the table above. Plan C9 is
+   completed from package X's report when it merges.
+2. After P's repair of `tools/localpg` is on `main`: repeat the engine's version-dependent tests on Postgres 16.
 3. Carry into P5 (from the `tools/localpg` work): slot creation on a standby waits for a running-transactions record
    and `pg_log_standby_snapshot()` needs a privileged role; a failover slot is synchronised to a standby only after it
    has advanced past the standby's catalog horizon; raising a standby-matched setting on the primary pauses replay.
