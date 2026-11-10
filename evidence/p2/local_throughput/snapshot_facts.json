@@ -1,0 +1,313 @@
+{
+ "started_utc": "2026-11-10T03:09:30Z",
+ "load_avg": [
+  3.7,
+  6.9,
+  8.21
+ ],
+ "export_import": {
+  "replica_in_recovery": true,
+  "server_version": "18.6 (Homebrew)",
+  "settings": {
+   "default_transaction_isolation": "read committed",
+   "hot_standby_feedback": "on",
+   "max_standby_archive_delay": "30000",
+   "max_standby_streaming_delay": "30000"
+  },
+  "export_on_standby": {
+   "ok": true,
+   "snapshot_id_shape": "00000027-<n>-<n>"
+  },
+  "import_4_readers": {
+   "ok": true,
+   "marker_rows_seen_by_importers": [
+    1,
+    1,
+    1,
+    1
+   ],
+   "marker_rows_seen_by_fresh": 1,
+   "consistent": false
+  },
+  "import_after_exporter_ended": {
+   "ok": false,
+   "error": "snapshot \"<snapshot>\" does not exist"
+  },
+  "serializable_on_standby": {
+   "ok": false,
+   "error": "cannot use serializable mode in a hot standby\nHINT:  You can use REPEATABLE READ instead."
+  },
+  "export_in_read_committed": {
+   "ok": true
+  }
+ },
+ "duckdb_statements": [
+  "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;",
+  "SELECT pg_export_snapshot()",
+  "COPY (SELECT \"bal\" FROM \"public\".\"snap_t\" WHERE ctid BETWEEN '(0,0)'::tid AND '(20000,0)'::tid) TO STDOUT (FORMAT \"binary\");",
+  "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY",
+  "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY",
+  "SET TRANSACTION SNAPSHOT '<id>'",
+  "SET TRANSACTION SNAPSHOT '<id>'",
+  "COPY (SELECT \"bal\" FROM \"public\".\"snap_t\" WHERE ctid BETWEEN '(20000,0)'::tid AND '(40000,0)'::tid) TO STDOUT (FORMAT \"binary\");",
+  "COPY (SELECT \"bal\" FROM \"public\".\"snap_t\" WHERE ctid BETWEEN '(40000,0)'::tid AND '(60000,0)'::tid) TO STDOUT (FORMAT \"binary\");",
+  "COPY (SELECT \"bal\" FROM \"public\".\"snap_t\" WHERE ctid BETWEEN '(60000,0)'::tid AND '(4294967295,0)'::tid) TO STDOUT (FORMAT \"binary\");",
+  "COMMIT"
+ ],
+ "writer": {
+  "transfer_txns": 43134,
+  "rewrite_txns": 40,
+  "errors": []
+ },
+ "mixed_state": {
+  "duckdb_threads8": {
+   "rounds": 8,
+   "mixed_rounds": 0,
+   "results": [
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 0.33,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 0.32,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 0.33,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 0.32,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 0.28,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 0.24,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 0.3,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 0.31,
+     "mixed": false
+    }
+   ]
+  },
+  "duckdb_threads2_all_columns": {
+   "rounds": 8,
+   "mixed_rounds": 0,
+   "results": [
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 1.34,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 1.21,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 1.17,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 1.32,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 1.28,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 1.48,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 1.0,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 1.91,
+     "mixed": false
+    }
+   ]
+  },
+  "copy_shared_snapshot": {
+   "rounds": 8,
+   "mixed_rounds": 0,
+   "results": [
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 2.39,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 2.32,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 2.17,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 2.21,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 2.28,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 2.49,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 2.24,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 2.24,
+     "mixed": false
+    }
+   ]
+  },
+  "copy_own_snapshots": {
+   "rounds": 8,
+   "mixed_rounds": 3,
+   "results": [
+    {
+     "count": 3000005,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 2.25,
+     "mixed": true
+    },
+    {
+     "count": 3000174,
+     "distinct": 2999940,
+     "sum": -2,
+     "wall_s": 2.25,
+     "mixed": true
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 2.49,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 2.22,
+     "mixed": false
+    },
+    {
+     "count": 2999989,
+     "distinct": 2999989,
+     "sum": -5,
+     "wall_s": 2.25,
+     "mixed": true
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 2.3,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 2.32,
+     "mixed": false
+    },
+    {
+     "count": 3000000,
+     "distinct": 3000000,
+     "sum": 0,
+     "wall_s": 2.28,
+     "mixed": false
+    }
+   ]
+  }
+ },
+ "finished_utc": "2026-11-10T03:10:27Z"
+}

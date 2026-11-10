@@ -8,7 +8,8 @@
 2. Mixed-state test. Table snap_t (3M rows: id, bal, pad) on the primary; sum(bal) = 0 always. Writer threads on the
    primary move one unit between two random rows per transaction and periodically rewrite 1 % of the rows (new tuple
    versions on other pages). Parallel readers on the replica check count(*) = N, count(DISTINCT id) = N, sum(bal) = 0:
-     a. DuckDB's Postgres reader, threads 8, pg_pages_per_task 200;
+     a. DuckDB's Postgres reader: threads 8, pg_pages_per_task 200, columns id and bal; and threads 2,
+        pg_pages_per_task 50, every column (a longer scan);
      b. our parallel COPY with a shared exported snapshot (control: must be consistent);
      c. our parallel COPY, every worker its own snapshot (negative control: shows the test can see a mixed state).
 3. Which statements DuckDB sends (pg_debug_show_queries, captured from a child process).
@@ -128,8 +129,8 @@ class Writers:
             while not self.stop.is_set():
                 a, b = rnd.randint(1, N_ROWS), rnd.randint(1, N_ROWS)
                 try:
-                    c.execute("UPDATE public.snap_t SET bal = bal - 1 WHERE id = %s", (a,))
-                    c.execute("UPDATE public.snap_t SET bal = bal + 1 WHERE id = %s", (b,))
+                    for rid, delta in sorted([(a, -1), (b, 1)]):  # lock order by id: no deadlocks
+                        c.execute("UPDATE public.snap_t SET bal = bal + %s WHERE id = %s", (delta, rid))
                     c.commit()
                     self.txns += 1
                 except Exception as e:
@@ -162,9 +163,11 @@ class Writers:
             t.join()
 
 
-def check_duckdb(con) -> dict:
+def check_duckdb(con, all_columns: bool = False) -> dict:
     t0 = time.time()
-    n, nd, s = con.execute("SELECT count(*), count(DISTINCT id), sum(bal) FROM pg.public.snap_t").fetchone()
+    extra = ", sum(length(pad) + gen)" if all_columns else ""
+    n, nd, s, *_ = con.execute(f"SELECT count(*), count(DISTINCT id), sum(bal){extra} FROM pg.public.snap_t"
+                               ).fetchone()
     return {"count": n, "distinct": nd, "sum": int(s), "wall_s": round(time.time() - t0, 2),
             "mixed": not (n == N_ROWS and nd == N_ROWS and s == 0)}
 
@@ -231,14 +234,15 @@ import common as C
 con = duckdb.connect(config={{"threads": 4}})
 con.execute("LOAD postgres")
 con.execute("SET pg_pages_per_task = 20000")
-con.execute(f"ATTACH '{{C.dsn('replica','runtime')}}' AS pg (TYPE postgres, READ_ONLY)")
 con.execute("SET pg_debug_show_queries = true")
+con.execute(f"ATTACH '{{C.dsn('replica','runtime')}}' AS pg (TYPE postgres, READ_ONLY)")
 print(con.execute("SELECT count(*), sum(bal) FROM pg.public.snap_t").fetchall())
 """
     p = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=300, cwd=C.HERE)
-    lines = [C.redact(x) for x in p.stdout.splitlines() if x.strip()]
-    return [x for x in lines if not x.startswith("SELECT") or "snapshot" in x.lower() or "recovery" in x.lower()
-            ][:40] + [f"... {len(lines)} lines in total"]
+    import re
+    keep = re.compile(r"(?i)snapshot|^BEGIN|^COPY|^COMMIT|^ROLLBACK|recovery")
+    return [re.sub(r"SNAPSHOT '[^']+'", "SNAPSHOT '<id>'", C.redact(x)).strip()
+            for x in (p.stdout + p.stderr).splitlines() if keep.search(x.strip())][:40]
 
 
 def main():
@@ -254,11 +258,17 @@ def main():
     con.execute("LOAD postgres")
     con.execute("SET pg_pages_per_task = 200")
     con.execute(f"ATTACH '{C.dsn('replica', 'runtime')}' AS pg (TYPE postgres, READ_ONLY)")
-    res = {"duckdb_threads8": [], "copy_shared_snapshot": [], "copy_own_snapshots": []}
+    con2 = duckdb.connect(config={**C.md_config("2GB"), "threads": 2})
+    con2.execute("LOAD postgres")
+    con2.execute("SET pg_pages_per_task = 50")
+    con2.execute(f"ATTACH '{C.dsn('replica', 'runtime')}' AS pg (TYPE postgres, READ_ONLY)")
+    res = {"duckdb_threads8": [], "duckdb_threads2_all_columns": [], "copy_shared_snapshot": [],
+           "copy_own_snapshots": []}
     w = Writers().start()
     time.sleep(2)
     for i in range(a.rounds):
         for name, fn in (("duckdb_threads8", lambda: check_duckdb(con)),
+                         ("duckdb_threads2_all_columns", lambda: check_duckdb(con2, True)),
                          ("copy_shared_snapshot", lambda: check_copy(True)),
                          ("copy_own_snapshots", lambda: check_copy(False))):
             r = fn()
