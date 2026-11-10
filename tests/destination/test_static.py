@@ -19,9 +19,13 @@ from cdc_v2.testing import machines as tm
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC = os.path.join(ROOT, "src", "cdc_v2")
 
-#: Where a DuckDB connection may be opened: the layer, its test helpers, and the Flight control client (it creates
-#: and runs Flights; it holds no pipeline state).
-MAY_CONNECT = ("md/", "testing/", "flightctl.py")
+#: Where a DuckDB connection may be opened: the layer, its test helpers, the Flight control client (it creates
+#: and runs Flights; it holds no pipeline state) and the oracle (package O). The oracle judges the pipeline, so it
+#: must not read through the pipeline's own layer; it is allowed because it only reads
+#: (`test_the_oracle_only_reads`).
+MAY_CONNECT = ("md/", "testing/", "flightctl.py", "oracle/")
+#: Places of `MAY_CONNECT` whose SQL text must hold no statement that writes and no COMMIT.
+READ_ONLY = ("oracle/",)
 #: Where text that writes `_cdc.fence` may stand: the layer (fence statement, initialisation) and the take-over of
 #: the test helper. The bootstrap `flights/cdc_v2/main.py` (package L) is outside `src/` and compared separately.
 MAY_WRITE_FENCE = ("md/", "testing/destination.py")
@@ -149,6 +153,29 @@ _ROW_REMOVAL = re.compile(r"\b(?:DELETE\s+FROM|INSERT\s+(?:OR\s+\w+\s+)?INTO|MER
 
 def statements(source):
     return tm._strings(ast.parse(source))
+
+
+_WRITES = re.compile(r"\b(?:INSERT\s+(?:OR\s+\w+\s+)?INTO|UPDATE\s+[\w\".{}%]+\s+SET|DELETE\s+FROM|MERGE\s+INTO|"
+                     r"TRUNCATE|CREATE\s+(?:OR\s+REPLACE\s+)?(?:TEMP\w*\s+)?(?:TABLE|SCHEMA|DATABASE|VIEW|MACRO)|"
+                     r"DROP\s+(?:TABLE|SCHEMA|DATABASE|VIEW)|ALTER\s+(?:TABLE|DATABASE)|COPY\s|ATTACH\s|COMMIT)\b",
+                     re.IGNORECASE)
+
+
+def test_the_oracle_only_reads():
+    """Seeded by the merge of package O: its `oracle/mdexec.py` opens a DuckDB connection of its own, and the
+    comparison opens a read transaction on it (`BEGIN`, later `ROLLBACK`). Contract C4 says that no other module
+    issues `BEGIN` or `COMMIT`; what that sentence protects is that nothing is committed past the fence. So the
+    oracle may connect as long as no SQL text of it writes or commits, in either database."""
+    for s in ("INSERT INTO t VALUES (1)", "update t set a = 1", "COMMIT", "CREATE TEMP TABLE x AS SELECT 1",
+              "DROP TABLE t", "DELETE FROM t", "create or replace view v as select 1", "ALTER TABLE t ADD COLUMN c INT"):
+        assert _WRITES.search(s), s
+    for s in ("SELECT count(*) FROM t", "BEGIN TRANSACTION", "ROLLBACK", "the last update of the row",
+              "BEGIN ISOLATION LEVEL REPEATABLE READ, READ ONLY"):
+        assert not _WRITES.search(s), s
+    assert all(allowed(p, MAY_CONNECT) for p in READ_ONLY)
+    found = [(rel, line, s[:60]) for rel, text in sources() if allowed(rel, READ_ONLY)
+             for line, s in statements(text) if _WRITES.search(s)]
+    assert found == [], "a statement that writes or commits in code that may only read: %r" % (found,)
 
 
 def test_only_the_layer_holds_the_fence_statement():
