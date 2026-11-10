@@ -25,3 +25,6 @@ packages = ["src/cdc_v2"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+markers = [
+    "localpg: self-tests of tools/localpg; start local Postgres clusters on ports 55460-55467 (deselect with -m \"not localpg\")",
+]

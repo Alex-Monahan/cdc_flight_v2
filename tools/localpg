@@ -1,0 +1,1261 @@
+#!/usr/bin/env python3
+"""localpg - the only way this build manages its local Postgres clusters (PLAN §5, tier T1).
+
+Python 3 standard library only. Runs the Homebrew formula's own binaries from $CDC_V2_PG_BIN; never `brew services`.
+Data, TLS material and generated passwords live under $CDC_V2_PG_HOME (default ~/.cache/cdc_flight_v2/pg).
+
+Safety rules that are enforced in code:
+  * every Postgres client invocation names its host (the private socket directory) and port explicitly, the port is
+    checked against this home's port range, and a port range that would contain 5432 is refused;
+  * all PG* variables of the caller are removed from the environment of every subprocess;
+  * a server process is only ever signalled after it was identified through the postmaster.pid of one of this home's
+    data directories (pid, data directory and start time verified), or as a child of such a postmaster;
+  * every subprocess call has a timeout.
+
+Run `localpg --help` or see docs/localpg.md.
+"""
+from __future__ import annotations
+
+import argparse
+import base64
+import contextlib
+import errno
+import fcntl
+import hashlib
+import hmac
+import json
+import os
+import re
+import secrets
+import shutil
+import signal
+import subprocess
+import sys
+import time
+
+BOOT, ADMIN, RUNTIME = "cdc_v2_boot", "cdc_v2_admin", "cdc_v2_runtime"
+ROLES = {"bootstrap": BOOT, "admin": ADMIN, "runtime": RUNTIME}
+DATABASE = "cdc_v2_test"
+FORBIDDEN_PORT = 5432
+MAX_NODES = 8                       # ports base .. base+7 (55432..55439 by default; 55440+ belong to TCP proxies)
+DEFAULT_PORT_BASE = 55432
+DEFAULT_HOME = "~/.cache/cdc_flight_v2/pg"
+DEFAULT_PG_BIN = "/opt/homebrew/opt/postgresql@18/bin"
+MARKER = ".localpg-home"
+STATE_VERSION = 1
+NAME_RX = re.compile(r"^[a-z][a-z0-9_]{0,23}$")
+SETTING_RX = re.compile(r"^[a-z_][a-z0-9_.]{0,62}$")
+
+# Exit codes
+EXIT_OK, EXIT_ERROR, EXIT_USAGE, EXIT_NOT_RUNNING = 0, 1, 2, 3
+
+# Timeouts in seconds
+T_QUICK, T_SQL, T_CTL, T_BACKUP, T_LOCK = 10, 60, 90, 600, 300
+
+BASE_SETTINGS = [
+    ("listen_addresses", "localhost"),
+    ("unix_socket_permissions", "0700"),
+    ("max_connections", "50"),
+    ("shared_buffers", "128MB"),
+    ("max_wal_senders", "20"),
+    ("max_replication_slots", "20"),
+    ("max_worker_processes", "16"),
+    ("wal_level", "logical"),
+    ("hot_standby", "on"),
+    ("hot_standby_feedback", "on"),
+    ("sync_replication_slots", "on"),
+    ("ssl", "on"),
+    ("ssl_min_protocol_version", "TLSv1.2"),
+    ("password_encryption", "scram-sha-256"),
+    ("log_line_prefix", "%m [%p] %q%u@%d "),
+    ("log_replication_commands", "on"),
+]
+
+
+# A hot standby refuses to run with a smaller value of these than its primary.
+STANDBY_MATCHED = {"max_connections", "max_worker_processes", "max_wal_senders", "max_prepared_transactions",
+                   "max_locks_per_transaction"}
+
+
+class Fail(Exception):
+    def __init__(self, msg, code=EXIT_ERROR):
+        super().__init__(msg)
+        self.code = code
+
+
+def say(msg):
+    print(msg, flush=True)
+
+
+def note(msg):
+    print("localpg: " + msg, file=sys.stderr, flush=True)
+
+
+# --------------------------------------------------------------------------------------------------- configuration
+
+class Config:
+    def __init__(self, home=None, port_base=None, pg_bin=None):
+        raw = home or os.environ.get("CDC_V2_PG_HOME") or DEFAULT_HOME
+        self.home = os.path.abspath(os.path.expanduser(raw))
+        self.pg_bin = os.path.abspath(os.path.expanduser(pg_bin or os.environ.get("CDC_V2_PG_BIN") or DEFAULT_PG_BIN))
+        pb = port_base if port_base is not None else os.environ.get("CDC_V2_PG_PORT_BASE")
+        self.port_base_explicit = pb is not None
+        try:
+            self.port_base = int(pb) if pb is not None else DEFAULT_PORT_BASE
+        except ValueError:
+            raise Fail("port base %r is not a number" % (pb,), EXIT_USAGE)
+        check_port_base(self.port_base)
+        check_home(self.home)
+        self.run_dir = os.path.join(self.home, "run")
+        self.tls_dir = os.path.join(self.home, "tls")
+        self.secrets_dir = os.path.join(self.home, "secrets")
+        self.log_dir = os.path.join(self.home, "logs")
+        self.nodes_dir = os.path.join(self.home, "nodes")
+        self.state_file = os.path.join(self.home, "state.json")
+        self.passwords_json = os.path.join(self.secrets_dir, "passwords.json")
+        self.pgpass = os.path.join(self.secrets_dir, "pgpass")
+        self.ca_cert = os.path.join(self.tls_dir, "ca.crt")
+        self.server_cert = os.path.join(self.tls_dir, "server.crt")
+        self.server_key = os.path.join(self.tls_dir, "server.key")
+        if len(self.run_dir) + len("/.s.PGSQL.65535.lock") > 103:
+            raise Fail("home path too long for a Unix socket directory (%s)" % self.run_dir, EXIT_USAGE)
+
+    def bin(self, name):
+        path = os.path.join(self.pg_bin, name)
+        if not os.access(path, os.X_OK):
+            raise Fail("%s not found in %s (set CDC_V2_PG_BIN)" % (name, self.pg_bin), EXIT_USAGE)
+        return path
+
+    def ports(self):
+        return range(self.port_base, self.port_base + MAX_NODES)
+
+    def data_dir(self, name):
+        return os.path.join(self.nodes_dir, name, "data")
+
+    def log_file(self, name):
+        return os.path.join(self.log_dir, name + ".log")
+
+
+def check_port_base(base):
+    top = base + MAX_NODES - 1
+    if base <= FORBIDDEN_PORT <= top:
+        raise Fail("refused: port range %d-%d would include %d, which belongs to a Postgres outside this build"
+                   % (base, top, FORBIDDEN_PORT), EXIT_USAGE)
+    if base < 1024 or top > 65535:
+        raise Fail("refused: port range %d-%d is outside 1024-65535" % (base, top), EXIT_USAGE)
+
+
+def check_home(home):
+    real = os.path.realpath(home)
+    user_home = os.path.realpath(os.path.expanduser("~"))
+    forbidden = ["/opt/homebrew/var", "/usr/local/var"]
+    if real in ("/", user_home) or os.path.dirname(real) == "/" or real.startswith(user_home + "/Public"):
+        raise Fail("refused: %s cannot be a localpg home" % home, EXIT_USAGE)
+    for f in forbidden:
+        if real == f or real.startswith(f + "/"):
+            raise Fail("refused: %s is under %s, which belongs to a Postgres outside this build" % (home, f),
+                       EXIT_USAGE)
+
+
+# --------------------------------------------------------------------------------------------------- subprocesses
+
+def clean_env(cfg):
+    env = {k: v for k, v in os.environ.items() if not k.startswith("PG")}
+    env.update({"PGPASSFILE": cfg.pgpass, "PGCONNECT_TIMEOUT": "5", "PGGSSENCMODE": "disable",
+                "PGAPPNAME": "localpg", "LC_ALL": "C", "LANG": "C"})
+    return env
+
+
+def run(cmd, timeout, cfg=None, input=None, check=True, env=None):
+    """Run a command with a hard timeout. Returns CompletedProcess with text output."""
+    if env is None:
+        env = clean_env(cfg) if cfg else dict(os.environ, LC_ALL="C")
+    try:
+        p = subprocess.run(cmd, input=input, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                           timeout=timeout, env=env, stdin=None if input is not None else subprocess.DEVNULL)
+    except subprocess.TimeoutExpired:
+        raise Fail("timed out after %ds: %s" % (timeout, os.path.basename(cmd[0]) + " " + " ".join(cmd[1:3])))
+    if check and p.returncode != 0:
+        msg = (p.stderr or p.stdout or "").strip().splitlines()
+        raise Fail("%s failed (exit %d): %s" % (os.path.basename(cmd[0]), p.returncode,
+                                                 msg[-1] if msg else "no output"))
+    return p
+
+
+def assert_own_port(cfg, port):
+    if port == FORBIDDEN_PORT or port not in cfg.ports():
+        raise Fail("refused: port %s is not one of this home's ports (%d-%d)"
+                   % (port, cfg.port_base, cfg.port_base + MAX_NODES - 1), EXIT_USAGE)
+
+
+def psql(cfg, port, sql, db="postgres", user=BOOT, timeout=T_SQL, check=True):
+    """Run SQL through the private Unix socket. Statements are fed on stdin (never on the command line)."""
+    assert_own_port(cfg, port)
+    cmd = [cfg.bin("psql"), "-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-h", cfg.run_dir, "-p", str(port),
+           "-U", user, "-d", db, "-f", "-"]
+    env = clean_env(cfg)
+    env["PGOPTIONS"] = "-c statement_timeout=%d" % ((timeout - 5) * 1000)
+    p = run(cmd, timeout, input=sql, check=check, env=env)
+    return p.stdout.strip() if p.returncode == 0 else None
+
+
+def psql_json(cfg, port, sql, **kw):
+    out = psql(cfg, port, sql, **kw)
+    return json.loads(out) if out else None
+
+
+def lit(s):
+    return "'" + str(s).replace("'", "''") + "'"
+
+
+def ident(s):
+    return '"' + s.replace('"', '""') + '"'
+
+
+def libpq_quote(v):
+    return "'" + str(v).replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+
+# --------------------------------------------------------------------------------------------------- process identity
+
+def ps_start_epoch(pid):
+    p = run(["/bin/ps", "-o", "lstart=", "-p", str(pid)], T_QUICK, check=False)
+    text = p.stdout.strip()
+    if p.returncode != 0 or not text:
+        return None
+    try:
+        return time.mktime(time.strptime(text, "%a %b %d %H:%M:%S %Y"))
+    except ValueError:
+        return None
+
+
+def child_pids(pid):
+    p = run(["/bin/ps", "-A", "-o", "pid=", "-o", "ppid="], T_QUICK)
+    out = []
+    for line in p.stdout.splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[1] == str(pid):
+            out.append(int(parts[0]))
+    return out
+
+
+def alive(pid):
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+
+
+class Postmaster:
+    def __init__(self, pid, start, port, status):
+        self.pid, self.start, self.port, self.status = pid, start, port, status
+
+
+def postmaster_of(cfg, name):
+    """The verified postmaster of a node, or None. Verification: the pid file is in this node's data directory, names
+    that directory, and the process with that pid exists and started when the pid file says it did."""
+    data = cfg.data_dir(name)
+    try:
+        with open(os.path.join(data, "postmaster.pid")) as f:
+            lines = f.read().splitlines()
+        pid, datadir, start, port = int(lines[0]), lines[1], int(lines[2]), int(lines[3])
+    except (OSError, ValueError, IndexError):
+        return None
+    if os.path.realpath(datadir) != os.path.realpath(data):
+        return None
+    try:
+        os.kill(pid, 0)
+    except (ProcessLookupError, PermissionError):
+        return None
+    st = ps_start_epoch(pid)
+    if st is None or abs(st - start) > 5:
+        return None
+    status = lines[7].strip() if len(lines) > 7 else ""
+    return Postmaster(pid, start, port, status)
+
+
+def wait_gone(pids, timeout):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        left = [p for p in pids if alive(p)]
+        if not left:
+            return []
+        time.sleep(0.05)
+    return [p for p in pids if alive(p)]
+
+
+def hard_kill(cfg, name):
+    """SIGKILL a node's postmaster and every child it has, leaving no orphaned backend. The postmaster is stopped
+    first (SIGSTOP) so it cannot fork while its children are collected. Returns the killed pids, or [] if the node
+    was not running."""
+    pm = postmaster_of(cfg, name)
+    if not pm:
+        return []
+    os.kill(pm.pid, signal.SIGSTOP)
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        st = run(["/bin/ps", "-o", "stat=", "-p", str(pm.pid)], T_QUICK, check=False).stdout.strip()
+        if not st or st.startswith("T"):
+            break
+        time.sleep(0.01)
+    kids = child_pids(pm.pid)
+    for k in kids:
+        with contextlib.suppress(ProcessLookupError):
+            os.kill(k, signal.SIGKILL)
+    with contextlib.suppress(ProcessLookupError):
+        os.kill(pm.pid, signal.SIGKILL)
+    left = wait_gone([pm.pid] + kids, 15)
+    if left:
+        raise Fail("%s: processes still present after SIGKILL: %s" % (name, left))
+    return [pm.pid] + kids
+
+
+# --------------------------------------------------------------------------------------------------- state
+
+def load_state(cfg):
+    try:
+        with open(cfg.state_file) as f:
+            st = json.load(f)
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError):
+        return {"version": STATE_VERSION, "initialized": False, "nodes": {}, "port_base": cfg.port_base}
+    if cfg.port_base_explicit and st.get("port_base") != cfg.port_base:
+        raise Fail("home %s was built with port base %s, not %d (use another home or reset with the old base)"
+                   % (cfg.home, st.get("port_base"), cfg.port_base), EXIT_USAGE)
+    cfg.port_base = st.get("port_base", cfg.port_base)
+    check_port_base(cfg.port_base)
+    return st
+
+
+def save_state(cfg, st):
+    tmp = cfg.state_file + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(st, f, indent=2, sort_keys=True)
+    os.replace(tmp, cfg.state_file)
+
+
+def require_state(cfg):
+    st = load_state(cfg)
+    if not st or not st.get("initialized"):
+        raise Fail("no cluster in %s (run `localpg up`)" % cfg.home)
+    return st
+
+
+def resolve_node(cfg, st, ident_):
+    if ident_ in st["nodes"]:
+        return ident_
+    if ident_.isdigit():
+        for n, node in st["nodes"].items():
+            if node["port"] == int(ident_):
+                return n
+    raise Fail("unknown node %r (known: %s)" % (ident_, ", ".join(sorted(st["nodes"]))), EXIT_USAGE)
+
+
+def is_standby_dir(cfg, name):
+    return os.path.exists(os.path.join(cfg.data_dir(name), "standby.signal"))
+
+
+def ordered_nodes(cfg, st, standbys_first=False):
+    names = sorted(st["nodes"], key=lambda n: st["nodes"][n]["port"])
+    prim = [n for n in names if not is_standby_dir(cfg, n)]
+    stby = [n for n in names if is_standby_dir(cfg, n)]
+    return stby + prim if standbys_first else prim + stby
+
+
+@contextlib.contextmanager
+def home_lock(cfg):
+    os.makedirs(cfg.home, mode=0o700, exist_ok=True)
+    fd = os.open(os.path.join(cfg.home, ".lock"), os.O_RDWR | os.O_CREAT, 0o600)
+    deadline = time.time() + T_LOCK
+    try:
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError as e:
+                if e.errno not in (errno.EAGAIN, errno.EACCES) or time.time() > deadline:
+                    raise Fail("another localpg holds the lock on %s" % cfg.home)
+                time.sleep(0.1)
+        yield
+    finally:
+        os.close(fd)
+
+
+# --------------------------------------------------------------------------------------------------- TLS and passwords
+
+def openssl_bin():
+    exe = os.environ.get("CDC_V2_OPENSSL") or shutil.which("openssl", path="/opt/homebrew/bin:" +
+                                                           os.environ.get("PATH", ""))
+    if not exe:
+        raise Fail("openssl not found (set CDC_V2_OPENSSL)")
+    return exe
+
+
+def make_tls(cfg):
+    os.makedirs(cfg.tls_dir, mode=0o700, exist_ok=True)
+    ossl = openssl_bin()
+    d = cfg.tls_dir
+    ca_key = os.path.join(d, "ca.key")
+    cnf = os.path.join(d, "openssl.cnf")
+    with open(cnf, "w") as f:
+        f.write("[req]\ndistinguished_name = dn_ca\nprompt = no\n"
+                "[dn_ca]\nCN = cdc_v2 localpg CA\n"
+                "[dn_srv]\nCN = localhost\n"
+                "[v3_ca]\nbasicConstraints = critical, CA:TRUE\nkeyUsage = critical, keyCertSign, cRLSign\n"
+                "subjectKeyIdentifier = hash\n"
+                "[v3_srv]\nbasicConstraints = critical, CA:FALSE\nkeyUsage = critical, digitalSignature\n"
+                "extendedKeyUsage = serverAuth\nsubjectAltName = DNS:localhost, IP:127.0.0.1, IP:::1\n"
+                "subjectKeyIdentifier = hash\nauthorityKeyIdentifier = keyid, issuer\n")
+    old = os.umask(0o077)
+    try:
+        gen = [ossl, "genpkey", "-algorithm", "EC", "-pkeyopt", "ec_paramgen_curve:P-256", "-out"]
+        run(gen + [ca_key], T_QUICK)
+        run([ossl, "req", "-new", "-x509", "-key", ca_key, "-out", cfg.ca_cert, "-days", "3650", "-config", cnf,
+             "-extensions", "v3_ca"], T_QUICK)
+        run(gen + [cfg.server_key], T_QUICK)
+        csr = os.path.join(d, "server.csr")
+        run([ossl, "req", "-new", "-key", cfg.server_key, "-out", csr, "-subj", "/CN=localhost", "-config", cnf],
+            T_QUICK)
+        run([ossl, "x509", "-req", "-in", csr, "-CA", cfg.ca_cert, "-CAkey", ca_key, "-out", cfg.server_cert,
+             "-days", "825", "-set_serial", "0x" + secrets.token_hex(12), "-extfile", cnf, "-extensions", "v3_srv"],
+            T_QUICK)
+        os.unlink(csr)
+    finally:
+        os.umask(old)
+    for p in (ca_key, cfg.server_key):
+        os.chmod(p, 0o600)
+    for p in (cfg.ca_cert, cfg.server_cert):
+        os.chmod(p, 0o644)
+
+
+def scram_verifier(pw, iterations=4096):
+    """SCRAM-SHA-256 verifier in Postgres' stored format, so the plain text never reaches the server or its log."""
+    salt = os.urandom(16)
+    salted = hashlib.pbkdf2_hmac("sha256", pw.encode(), salt, iterations)
+    client_key = hmac.new(salted, b"Client Key", "sha256").digest()
+    stored_key = hashlib.sha256(client_key).digest()
+    server_key = hmac.new(salted, b"Server Key", "sha256").digest()
+    b64 = lambda b: base64.b64encode(b).decode()
+    return "SCRAM-SHA-256$%d:%s$%s:%s" % (iterations, b64(salt), b64(stored_key), b64(server_key))
+
+
+def write_private(path, text):
+    fd = os.open(path + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(text)
+    os.chmod(path + ".tmp", 0o600)
+    os.replace(path + ".tmp", path)
+
+
+def make_passwords(cfg):
+    os.makedirs(cfg.secrets_dir, mode=0o700, exist_ok=True)
+    creds = {kind: {"user": role, "password": secrets.token_urlsafe(24)} for kind, role in ROLES.items()}
+    write_private(cfg.passwords_json, json.dumps(creds, indent=2) + "\n")
+    hosts = ["localhost", "127.0.0.1", "\\:\\:1", cfg.run_dir.replace("\\", "\\\\").replace(":", "\\:")]
+    lines = ["# generated by tools/localpg - libpq password file (PGPASSFILE / passfile=)"]
+    for c in creds.values():
+        for h in hosts:
+            lines.append("%s:*:*:%s:%s" % (h, c["user"], c["password"]))
+    write_private(cfg.pgpass, "\n".join(lines) + "\n")
+    return creds
+
+
+def load_passwords(cfg):
+    try:
+        with open(cfg.passwords_json) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        raise Fail("password file missing or unreadable (%s); run `localpg reset`" % cfg.passwords_json)
+
+
+# --------------------------------------------------------------------------------------------------- node config
+
+def conf_line(k, v):
+    return "%s = %s\n" % (k, "'" + str(v).replace("'", "''") + "'")
+
+
+def write_node_conf(cfg, st, name):
+    node = st["nodes"][name]
+    data = cfg.data_dir(name)
+    lines = ["# Managed by tools/localpg; rewritten on every change. Overrides: localpg_overrides.conf "
+             "(`localpg set`).\n"]
+    lines.append(conf_line("port", node["port"]))
+    lines.append(conf_line("cluster_name", "cdc_v2_" + name))
+    lines.append(conf_line("unix_socket_directories", cfg.run_dir))
+    for k, v in BASE_SETTINGS:
+        lines.append(conf_line(k, v))
+    lines.append(conf_line("ssl_cert_file", cfg.server_cert))
+    lines.append(conf_line("ssl_key_file", cfg.server_key))
+    up = node.get("upstream")
+    if up:
+        upport = st["nodes"][up]["port"]
+        assert_own_port(cfg, upport)
+        conninfo = " ".join("%s=%s" % (k, libpq_quote(v)) for k, v in [
+            ("host", cfg.run_dir), ("port", upport), ("user", BOOT), ("passfile", cfg.pgpass),
+            ("dbname", "postgres"), ("application_name", name), ("connect_timeout", 5)])
+        lines.append(conf_line("primary_conninfo", conninfo))
+        lines.append(conf_line("primary_slot_name", node["slot"]))
+    lines.append("include_if_exists = 'localpg_overrides.conf'\n")
+    with open(os.path.join(data, "localpg.conf"), "w") as f:
+        f.writelines(lines)
+    ov = node.get("overrides", {})
+    with open(os.path.join(data, "localpg_overrides.conf"), "w") as f:
+        f.write("# Managed by tools/localpg (`localpg set` / `localpg unset`).\n")
+        for k in sorted(ov):
+            f.write(conf_line(k, ov[k]))
+
+
+HBA = """# Managed by tools/localpg. TCP is TLS-only and SCRAM-only; the Unix socket directory is private (mode 0700).
+# TYPE    DATABASE     USER          ADDRESS        METHOD
+local     all          all                          scram-sha-256
+local     replication  all                          scram-sha-256
+hostssl   all          {boot}   127.0.0.1/32   reject
+hostssl   all          {boot}   ::1/128        reject
+hostssl   replication  {boot}   127.0.0.1/32   reject
+hostssl   replication  {boot}   ::1/128        reject
+hostssl   all          all           127.0.0.1/32   scram-sha-256
+hostssl   all          all           ::1/128        scram-sha-256
+hostssl   replication  all           127.0.0.1/32   scram-sha-256
+hostssl   replication  all           ::1/128        scram-sha-256
+hostnossl all          all           0.0.0.0/0      reject
+hostnossl all          all           ::/0           reject
+hostnossl replication  all           0.0.0.0/0      reject
+hostnossl replication  all           ::/0           reject
+"""
+
+
+# --------------------------------------------------------------------------------------------------- node lifecycle
+
+def start_node(cfg, name, wait=True):
+    if postmaster_of(cfg, name):
+        return False
+    data = cfg.data_dir(name)
+    os.makedirs(cfg.run_dir, mode=0o700, exist_ok=True)
+    os.makedirs(cfg.log_dir, mode=0o700, exist_ok=True)
+    log = cfg.log_file(name)
+    size = os.path.getsize(log) if os.path.exists(log) else 0
+    cmd = [cfg.bin("pg_ctl"), "start", "-D", data, "-l", log, "-t", "60"] + (["-w"] if wait else ["-W"])
+    p = run(cmd, T_CTL, cfg=cfg, check=False)
+    if p.returncode != 0:
+        raise Fail("%s did not start: %s (log: %s)" % (name, last_log_error(log, size), log))
+    return True
+
+
+def last_log_error(log, offset):
+    try:
+        with open(log, errors="replace") as f:
+            f.seek(offset)
+            lines = f.read().splitlines()
+    except OSError:
+        return "no log"
+    bad = [l for l in lines if re.search(r"\b(FATAL|PANIC|ERROR)\b", l)]
+    return (bad or lines or ["no log output"])[-1].strip()
+
+
+def stop_node(cfg, name, mode="fast"):
+    """Stop a node and wait until the postmaster and all its children are gone. Escalates to immediate shutdown and
+    finally to SIGKILL. Returns True if the node was running."""
+    pm = postmaster_of(cfg, name)
+    if not pm:
+        return False
+    kids = child_pids(pm.pid)
+    p = run([cfg.bin("pg_ctl"), "stop", "-D", cfg.data_dir(name), "-m", mode, "-w", "-t", "60"], T_CTL, cfg=cfg,
+            check=False)
+    if p.returncode != 0 and postmaster_of(cfg, name):
+        note("%s: %s shutdown failed, trying immediate" % (name, mode))
+        run([cfg.bin("pg_ctl"), "stop", "-D", cfg.data_dir(name), "-m", "immediate", "-w", "-t", "30"], T_CTL,
+            cfg=cfg, check=False)
+    if postmaster_of(cfg, name):
+        hard_kill(cfg, name)
+    left = wait_gone([pm.pid] + kids, 15)
+    for k in left:          # children of the identified postmaster that outlived it
+        with contextlib.suppress(ProcessLookupError):
+            os.kill(k, signal.SIGKILL)
+    if wait_gone(left, 5):
+        raise Fail("%s: processes still present after stop: %s" % (name, left))
+    return True
+
+
+def node_info(cfg, port):
+    return psql_json(cfg, port, """
+select json_build_object(
+  'in_recovery', pg_is_in_recovery(),
+  'server_version', current_setting('server_version'),
+  'current_lsn', case when pg_is_in_recovery() then null else pg_current_wal_lsn()::text end,
+  'walfile_tli', case when pg_is_in_recovery() then null else substr(pg_walfile_name(pg_current_wal_lsn()), 1, 8) end,
+  'checkpoint_tli', (pg_control_checkpoint()).timeline_id,
+  'receive_lsn', pg_last_wal_receive_lsn()::text,
+  'replay_lsn', pg_last_wal_replay_lsn()::text,
+  'replay_age_s', extract(epoch from now() - pg_last_xact_replay_timestamp()),
+  'replay_pause_state', case when pg_is_in_recovery() then pg_get_wal_replay_pause_state() end,
+  'wal_receiver', (select row_to_json(r) from (select status, received_tli, sender_port, slot_name
+                   from pg_stat_wal_receiver) r),
+  'replication', (select coalesce(json_agg(row_to_json(r) order by application_name), '[]'::json) from (
+                   select application_name, state, sent_lsn::text, write_lsn::text, flush_lsn::text,
+                          replay_lsn::text, extract(epoch from replay_lag) as replay_lag_s, sync_state
+                   from pg_stat_replication) r),
+  'slots', (select coalesce(json_agg(row_to_json(s) order by slot_name), '[]'::json) from (
+                   select slot_name, slot_type, plugin, database, active, active_pid, wal_status, temporary, failover,
+                          synced, conflicting, invalidation_reason, restart_lsn::text,
+                          confirmed_flush_lsn::text from pg_replication_slots) s))
+""", timeout=T_QUICK + 10)
+
+
+def timeline_of(info):
+    if info.get("walfile_tli"):
+        return int(info["walfile_tli"], 16)
+    wr = info.get("wal_receiver") or {}
+    return wr.get("received_tli") or info.get("checkpoint_tli")
+
+
+def lsn_int(s):
+    if not s:
+        return None
+    hi, lo = s.split("/")
+    return (int(hi, 16) << 32) + int(lo, 16)
+
+
+def wait_streaming(cfg, st, name, timeout=60):
+    port = st["nodes"][name]["port"]
+    deadline = time.time() + timeout
+    last = None
+    while time.time() < deadline:
+        info = psql_json(cfg, port, "select row_to_json(r) from (select status from pg_stat_wal_receiver) r",
+                         timeout=T_QUICK + 5, check=False)
+        last = (info or {}).get("status")
+        if last == "streaming":
+            return True
+        time.sleep(0.1)
+    raise Fail("%s: WAL receiver not streaming after %ds (status %s)" % (name, timeout, last))
+
+
+def current_primary(cfg, st, explicit=None):
+    if explicit:
+        name = resolve_node(cfg, st, explicit)
+        pm = postmaster_of(cfg, name)
+        if not pm or psql(cfg, st["nodes"][name]["port"], "select pg_is_in_recovery()") != "f":
+            raise Fail("%s is not a running primary" % name)
+        return name
+    found = []
+    for name in ordered_nodes(cfg, st):
+        if is_standby_dir(cfg, name) or not postmaster_of(cfg, name):
+            continue
+        if psql(cfg, st["nodes"][name]["port"], "select pg_is_in_recovery()") == "f":
+            found.append(name)
+    if not found:
+        raise Fail("no running primary (run `localpg up`)")
+    if len(found) > 1:
+        raise Fail("more than one running primary (%s); name one with --from" % ", ".join(found), EXIT_USAGE)
+    return found[0]
+
+
+def init_primary(cfg, st, name, port):
+    creds = load_passwords(cfg)
+    data = cfg.data_dir(name)
+    shutil.rmtree(os.path.dirname(data), ignore_errors=True)
+    os.makedirs(os.path.dirname(data), mode=0o700)
+    pwfile = os.path.join(cfg.secrets_dir, "initdb.pw")
+    write_private(pwfile, creds["bootstrap"]["password"] + "\n")
+    try:
+        run([cfg.bin("initdb"), "-D", data, "-U", BOOT, "--pwfile", pwfile, "--auth", "scram-sha-256",
+             "--encoding", "UTF8", "--locale", "C", "--no-sync", "--data-checksums"], T_BACKUP, cfg=cfg)
+    finally:
+        with contextlib.suppress(OSError):
+            os.unlink(pwfile)
+    with open(os.path.join(data, "postgresql.conf"), "a") as f:
+        f.write("\n# tools/localpg settings (override everything above)\ninclude = 'localpg.conf'\n")
+    with open(os.path.join(data, "pg_hba.conf"), "w") as f:
+        f.write(HBA.format(boot=BOOT.ljust(13)))
+    st["nodes"][name] = {"port": port, "upstream": None, "slot": None, "ready": False, "overrides": {}}
+    save_state(cfg, st)
+    write_node_conf(cfg, st, name)
+    start_node(cfg, name)
+    psql(cfg, port, """
+create role {admin} with login nosuperuser createdb createrole replication password {apw};
+grant pg_monitor, pg_signal_backend to {admin} with admin option;
+""".format(admin=ADMIN, apw=lit(scram_verifier(creds["admin"]["password"]))))
+    # The admin role creates the runtime role and the test database, as on a managed provider.
+    psql(cfg, port, """
+create role {rt} with login nosuperuser replication password {rpw};
+create database {db};
+""".format(rt=RUNTIME, rpw=lit(scram_verifier(creds["runtime"]["password"])), db=DATABASE), user=ADMIN)
+    st["nodes"][name]["ready"] = True
+    save_state(cfg, st)
+
+
+def create_standby(cfg, st, name, port, upstream):
+    assert_own_port(cfg, port)
+    upport = st["nodes"][upstream]["port"]
+    slot = "cdc_v2_phys_" + name
+    st["nodes"][name] = {"port": port, "upstream": upstream, "slot": slot, "ready": False, "overrides": {}}
+    save_state(cfg, st)
+    psql(cfg, upport, "select pg_create_physical_replication_slot({s}, true) where not exists "
+                      "(select 1 from pg_replication_slots where slot_name = {s});".format(s=lit(slot)))
+    data = cfg.data_dir(name)
+    shutil.rmtree(os.path.dirname(data), ignore_errors=True)
+    os.makedirs(os.path.dirname(data), mode=0o700)
+    run([cfg.bin("pg_basebackup"), "-h", cfg.run_dir, "-p", str(upport), "-U", BOOT, "-w", "-D", data,
+         "-X", "stream", "-S", slot, "-c", "fast", "--no-sync"], T_BACKUP, cfg=cfg)
+    open(os.path.join(data, "standby.signal"), "w").close()
+    write_node_conf(cfg, st, name)
+    start_node(cfg, name)
+    wait_streaming(cfg, st, name)
+    st["nodes"][name]["ready"] = True
+    save_state(cfg, st)
+
+
+def drop_slot_on(cfg, st, host_node, slot):
+    """Best effort: drop a physical slot on a running node."""
+    if not host_node or host_node not in st["nodes"] or not postmaster_of(cfg, host_node):
+        return False
+    out = psql(cfg, st["nodes"][host_node]["port"],
+               "select count(pg_drop_replication_slot(slot_name)) from pg_replication_slots "
+               "where slot_name = {s} and not active;".format(s=lit(slot)), check=False)
+    return out not in (None, "0")
+
+
+def remove_node(cfg, st, name):
+    node = st["nodes"][name]
+    stop_node(cfg, name)
+    if node.get("slot"):
+        drop_slot_on(cfg, st, node.get("upstream"), node["slot"])
+    shutil.rmtree(os.path.join(cfg.nodes_dir, name), ignore_errors=True)
+    del st["nodes"][name]
+    save_state(cfg, st)
+
+
+def stop_everything_found(cfg, kill=False):
+    """Stop every postmaster found through a pid file under this home (state or not): standbys first."""
+    if not os.path.isdir(cfg.nodes_dir):
+        return []
+    names = sorted(os.listdir(cfg.nodes_dir), key=lambda n: (not is_standby_dir(cfg, n), n))
+    stopped = []
+    for n in names:
+        if os.path.isdir(cfg.data_dir(n)):
+            if (hard_kill(cfg, n) if kill else stop_node(cfg, n)):
+                stopped.append(n)
+    return stopped
+
+
+def wipe_home(cfg):
+    if os.path.isdir(cfg.home):
+        entries = set(os.listdir(cfg.home)) - {".lock", MARKER}
+        if entries and not os.path.exists(os.path.join(cfg.home, MARKER)):
+            raise Fail("refused: %s is not empty and is not a localpg home (no %s marker)" % (cfg.home, MARKER),
+                       EXIT_USAGE)
+        for e in entries:
+            p = os.path.join(cfg.home, e)
+            if os.path.isdir(p) and not os.path.islink(p):
+                shutil.rmtree(p)
+            else:
+                os.unlink(p)
+    os.makedirs(cfg.home, mode=0o700, exist_ok=True)
+    with open(os.path.join(cfg.home, MARKER), "w") as f:
+        f.write("This directory is managed by tools/localpg of cdc_flight_v2. `localpg reset` wipes it.\n")
+
+
+def build_fresh(cfg):
+    stop_everything_found(cfg)
+    wipe_home(cfg)
+    for d in (cfg.run_dir, cfg.log_dir, cfg.nodes_dir):
+        os.makedirs(d, mode=0o700, exist_ok=True)
+    st = {"version": STATE_VERSION, "initialized": False, "port_base": cfg.port_base, "nodes": {},
+          "created": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
+    save_state(cfg, st)
+    make_tls(cfg)
+    make_passwords(cfg)
+    init_primary(cfg, st, "primary", cfg.port_base)
+    create_standby(cfg, st, "replica", cfg.port_base + 1, "primary")
+    st["initialized"] = True
+    save_state(cfg, st)
+    return st
+
+
+# --------------------------------------------------------------------------------------------------- commands
+
+def cmd_up(cfg, args):
+    t0 = time.time()
+    with home_lock(cfg):
+        st = load_state(cfg)
+        if not st or not st.get("initialized"):
+            if st is not None or (os.path.isdir(cfg.home) and set(os.listdir(cfg.home)) - {".lock", MARKER}):
+                note("half-initialised home found; rebuilding it")
+            build_fresh(cfg)
+            say("up: built and started primary (%d) and replica (%d) in %.1f s"
+                % (cfg.port_base, cfg.port_base + 1, time.time() - t0))
+            return EXIT_OK
+        for name in [n for n, node in st["nodes"].items() if not node.get("ready")]:
+            note("discarding half-created node %s" % name)
+            remove_node(cfg, st, name)
+        report = []
+        for name in ordered_nodes(cfg, st):
+            report.append("%s (%d) %s" % (name, st["nodes"][name]["port"],
+                                          "started" if start_node(cfg, name) else "already running"))
+        for name in ordered_nodes(cfg, st):
+            up = st["nodes"][name].get("upstream")
+            if is_standby_dir(cfg, name) and up in st["nodes"] and postmaster_of(cfg, up):
+                wait_streaming(cfg, st, name)
+    say("up: %s (%.1f s)" % ("; ".join(report), time.time() - t0))
+    return EXIT_OK
+
+
+def cmd_down(cfg, args):
+    t0 = time.time()
+    with home_lock(cfg):
+        st = load_state(cfg)
+        stopped = stop_everything_found(cfg)
+    say("down: %s (%.1f s)" % ("stopped " + ", ".join(stopped) if stopped else "nothing was running",
+                               time.time() - t0))
+    return EXIT_OK
+
+
+def cmd_reset(cfg, args):
+    t0 = time.time()
+    with home_lock(cfg):
+        load_state(cfg)          # validates the port base against an existing home
+        build_fresh(cfg)
+    say("reset: wiped %s and started primary (%d) and replica (%d) in %.1f s"
+        % (cfg.home, cfg.port_base, cfg.port_base + 1, time.time() - t0))
+    return EXIT_OK
+
+
+def next_free(cfg, st):
+    used = {n["port"] for n in st["nodes"].values()}
+    for i in range(MAX_NODES):
+        port = cfg.port_base + i
+        if port not in used:
+            return i, port
+    raise Fail("all %d node ports are in use" % MAX_NODES)
+
+
+def cmd_add_standby(cfg, args):
+    t0 = time.time()
+    with home_lock(cfg):
+        st = require_state(cfg)
+        upstream = current_primary(cfg, st, args.source)
+        i, port = next_free(cfg, st)
+        name = args.name or "standby%d" % i
+        if not NAME_RX.match(name) or name in st["nodes"]:
+            raise Fail("invalid or existing node name %r" % name, EXIT_USAGE)
+        create_standby(cfg, st, name, port, upstream)
+    say("add-standby: %s on port %d streaming from %s (%.1f s)" % (name, port, upstream, time.time() - t0))
+    return EXIT_OK
+
+
+def cmd_promote(cfg, args):
+    t0 = time.time()
+    with home_lock(cfg):
+        st = require_state(cfg)
+        name = resolve_node(cfg, st, args.node)
+        port = st["nodes"][name]["port"]
+        if not postmaster_of(cfg, name):
+            raise Fail("%s is not running" % name)
+        info = node_info(cfg, port)
+        if not info["in_recovery"]:
+            raise Fail("%s is not a standby" % name)
+        old_tli = timeline_of(info)
+        run([cfg.bin("pg_ctl"), "promote", "-D", cfg.data_dir(name), "-w", "-t", "60"], T_CTL, cfg=cfg)
+        deadline = time.time() + 60
+        while psql(cfg, port, "select pg_is_in_recovery()") != "f":
+            if time.time() > deadline:
+                raise Fail("%s still in recovery 60 s after promote" % name)
+            time.sleep(0.1)
+        new_tli = timeline_of(node_info(cfg, port))
+        node = st["nodes"][name]
+        former = node.get("upstream")
+        dropped = drop_slot_on(cfg, st, former, node["slot"]) if node.get("slot") else False
+        node.update({"upstream": None, "slot": None, "promoted_from": former})
+        save_state(cfg, st)
+        write_node_conf(cfg, st, name)
+    out = {"node": name, "port": port, "old_timeline": old_tli, "new_timeline": new_tli,
+           "seconds": round(time.time() - t0, 2), "former_upstream": former, "dropped_slot_on_former": dropped}
+    if args.json:
+        say(json.dumps(out))
+    else:
+        say("promote: %s (%d) is primary, timeline %s -> %s (%.1f s)" % (name, port, old_tli, new_tli,
+                                                                          time.time() - t0))
+    return EXIT_OK
+
+
+def cmd_follow(cfg, args):
+    t0 = time.time()
+    with home_lock(cfg):
+        st = require_state(cfg)
+        name = resolve_node(cfg, st, args.node)
+        target = current_primary(cfg, st, args.upstream)
+        if not is_standby_dir(cfg, name):
+            raise Fail("%s is not a standby" % name, EXIT_USAGE)
+        node = st["nodes"][name]
+        old_up, old_slot = node.get("upstream"), node.get("slot")
+        slot = "cdc_v2_phys_" + name
+        psql(cfg, st["nodes"][target]["port"],
+             "select pg_create_physical_replication_slot({s}, true) where not exists "
+             "(select 1 from pg_replication_slots where slot_name = {s});".format(s=lit(slot)))
+        node.update({"upstream": target, "slot": slot})
+        save_state(cfg, st)
+        write_node_conf(cfg, st, name)
+        if postmaster_of(cfg, name):
+            stop_node(cfg, name)
+        start_node(cfg, name)
+        wait_streaming(cfg, st, name)
+        if old_up and old_up != target and old_slot:
+            drop_slot_on(cfg, st, old_up, old_slot)
+    say("follow: %s streams from %s (%.1f s)" % (name, target, time.time() - t0))
+    return EXIT_OK
+
+
+def cmd_kill(cfg, args):
+    with home_lock(cfg):
+        st = require_state(cfg)
+        name = resolve_node(cfg, st, args.node)
+        pids = hard_kill(cfg, name)
+    say("kill: %s" % ("SIGKILL %s: postmaster %d and %d children" % (name, pids[0], len(pids) - 1)
+                      if pids else "%s was not running" % name))
+    return EXIT_OK
+
+
+def cmd_remove(cfg, args):
+    with home_lock(cfg):
+        st = require_state(cfg)
+        name = resolve_node(cfg, st, args.node)
+        remove_node(cfg, st, name)
+    say("remove: %s stopped and deleted" % name)
+    return EXIT_OK
+
+
+def parse_assignments(items):
+    out = {}
+    for it in items:
+        if "=" not in it:
+            raise Fail("expected NAME=VALUE, got %r" % it, EXIT_USAGE)
+        k, v = it.split("=", 1)
+        k = k.strip().lower()
+        if not SETTING_RX.match(k):
+            raise Fail("invalid setting name %r" % k, EXIT_USAGE)
+        if k in ("port", "unix_socket_directories", "listen_addresses", "primary_conninfo", "primary_slot_name",
+                 "ssl", "ssl_cert_file", "ssl_key_file"):
+            raise Fail("%s is managed by localpg and cannot be overridden" % k, EXIT_USAGE)
+        out[k] = v.strip()
+    return out
+
+
+def apply_settings(cfg, st, names, keys):
+    """Reload or restart the running nodes among `names` so that `keys` take effect. Returns a report."""
+    report = []
+    for name in names:
+        port = st["nodes"][name]["port"]
+        if not postmaster_of(cfg, name):
+            report.append("%s: stopped (applies at next start)" % name)
+            continue
+        psql(cfg, port, "select pg_reload_conf();")
+        time.sleep(0.2)
+        errs = psql_json(cfg, port, "select coalesce(json_agg(json_build_object('name', name, 'error', error)), "
+                                    "'[]'::json) from pg_file_settings where error is not null;") or []
+        # "setting could not be applied" means: postmaster context, needs a restart
+        real = [e for e in errs if e["error"] != "setting could not be applied"]
+        if real:
+            raise Fail("%s: configuration error: %s" % (name, "; ".join("%s: %s" % (e["name"] or "?", e["error"])
+                                                                         for e in real)))
+        pending = sorted({e["name"] for e in errs if e["name"]} | set(filter(None, (psql(
+            cfg, port, "select string_agg(name, ',') from pg_settings where pending_restart;") or "").split(","))))
+        pending = ",".join(pending)
+        how = "reloaded"
+        if pending:
+            stop_node(cfg, name)
+            start_node(cfg, name)
+            how = "restarted (%s)" % pending
+        values = psql_json(cfg, port, "select coalesce(json_object_agg(name, setting || coalesce(unit, '')), "
+                                      "'{}'::json) from pg_settings where name = any(array[%s]);"
+                           % ",".join(lit(k) for k in keys)) if keys else {}
+        report.append("%s: %s %s" % (name, how, " ".join("%s=%s" % kv for kv in sorted(values.items()))))
+    return report
+
+
+def cmd_set(cfg, args):
+    with home_lock(cfg):
+        st = require_state(cfg)
+        names = list(st["nodes"]) if args.node == "all" else [resolve_node(cfg, st, args.node)]
+        if args.unset:
+            keys = [k.strip().lower() for k in args.assignments]
+            for n in names:
+                for k in keys:
+                    st["nodes"][n]["overrides"].pop(k, None)
+        else:
+            changes = parse_assignments(args.assignments)
+            keys = list(changes)
+            matched = sorted(set(keys) & STANDBY_MATCHED)
+            if matched and args.node != "all":
+                note("warning: a standby needs %s >= its primary's value; consider `localpg set all ...`"
+                     % ", ".join(matched))
+            for n in names:
+                port = st["nodes"][n]["port"]
+                if postmaster_of(cfg, n):
+                    known = psql(cfg, port, "select string_agg(name, ',') from pg_settings where name = any(array[%s]);"
+                                 % ",".join(lit(k) for k in keys)) or ""
+                    unknown = set(keys) - set(known.split(","))
+                    if unknown:
+                        raise Fail("unknown setting(s): %s" % ", ".join(sorted(unknown)), EXIT_USAGE)
+                st["nodes"][n]["overrides"].update(changes)
+        save_state(cfg, st)
+        for n in names:
+            write_node_conf(cfg, st, n)
+        report = apply_settings(cfg, st, names, keys)
+    for r in report:
+        say(("unset: " if args.unset else "set: ") + r)
+    return EXIT_OK
+
+
+def gather_status(cfg):
+    st = load_state(cfg)
+    out = {"home": cfg.home, "port_base": cfg.port_base, "initialized": bool(st and st.get("initialized")),
+           "nodes": []}
+    if not st:
+        return out, False
+    infos = {}
+    for name in sorted(st["nodes"], key=lambda n: st["nodes"][n]["port"]):
+        node = st["nodes"][name]
+        pm = postmaster_of(cfg, name)
+        rec = {"name": name, "port": node["port"], "running": bool(pm), "pid": pm.pid if pm else None,
+               "upstream": node.get("upstream"), "ready": node.get("ready", False),
+               "role": "standby" if is_standby_dir(cfg, name) else "primary",
+               "overrides": node.get("overrides", {})}
+        if pm:
+            try:
+                info = node_info(cfg, node["port"])
+            except Fail as e:
+                info, rec["error"] = None, str(e)
+            if info:
+                infos[name] = info
+                wr = info.get("wal_receiver") or {}
+                rec.update({"role": "standby" if info["in_recovery"] else "primary",
+                            "server_version": info["server_version"], "timeline": timeline_of(info),
+                            "current_lsn": info["current_lsn"], "receive_lsn": info["receive_lsn"],
+                            "replay_lsn": info["replay_lsn"], "wal_receiver_status": wr.get("status"),
+                            "replay_pause_state": info["replay_pause_state"],
+                            "replication": info["replication"], "slots": info["slots"]})
+        out["nodes"].append(rec)
+    by_name = {r["name"]: r for r in out["nodes"]}
+    for r in out["nodes"]:
+        if r["role"] != "standby" or not r["running"]:
+            continue
+        up = by_name.get(r.get("upstream") or "")
+        if up and up.get("current_lsn") and r.get("replay_lsn"):
+            r["replay_lag_bytes"] = max(0, lsn_int(up["current_lsn"]) - lsn_int(r["replay_lsn"]))
+        for repl in (up or {}).get("replication", []):
+            if repl["application_name"] == r["name"]:
+                r["replication_state"] = repl["state"]
+                r["replay_lag_s"] = repl["replay_lag_s"]
+    all_running = out["initialized"] and all(r["running"] for r in out["nodes"])
+    out["all_running"] = all_running
+    return out, all_running
+
+
+def fmt_bytes(n):
+    if n is None:
+        return "-"
+    for unit in ("B", "kB", "MB", "GB"):
+        if n < 1024 or unit == "GB":
+            return ("%d %s" % (n, unit)) if unit == "B" else ("%.1f %s" % (n, unit))
+        n /= 1024.0
+
+
+def cmd_status(cfg, args):
+    out, all_running = gather_status(cfg)
+    if args.json:
+        say(json.dumps(out, indent=2, default=str))
+        return EXIT_OK if all_running else EXIT_NOT_RUNNING
+    if not out["nodes"]:
+        say("no cluster in %s" % cfg.home)
+        return EXIT_NOT_RUNNING
+    say("home %s, port base %d%s" % (cfg.home, cfg.port_base, "" if out["initialized"] else " (half-initialised)"))
+    rows = [("NODE", "PORT", "STATE", "ROLE", "VERSION", "TLI", "LSN (current/replay)", "UPSTREAM", "REPLICATION",
+             "LAG")]
+    for r in out["nodes"]:
+        lsn = r.get("current_lsn") or r.get("replay_lsn") or "-"
+        lag = "-"
+        if r["role"] == "standby" and r["running"]:
+            lag = fmt_bytes(r.get("replay_lag_bytes"))
+            if r.get("replay_lag_s") is not None:
+                lag += " / %.2f s" % r["replay_lag_s"]
+        repl = r.get("replication_state") or r.get("wal_receiver_status") or "-"
+        if r.get("replay_pause_state") not in (None, "not paused"):
+            repl += " (replay %s)" % r["replay_pause_state"]
+        if r["role"] == "primary":
+            repl = "%d sender(s)" % len(r.get("replication") or []) if r["running"] else "-"
+        rows.append((r["name"], str(r["port"]), "running" if r["running"] else "stopped", r["role"],
+                     r.get("server_version", "-"), str(r.get("timeline") or "-"), lsn,
+                     r.get("upstream") or "-", repl, lag))
+    widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]))]
+    for row in rows:
+        say("  ".join(c.ljust(w) for c, w in zip(row, widths)).rstrip())
+    slots = [(r["name"], s) for r in out["nodes"] for s in (r.get("slots") or [])]
+    if slots:
+        say("slots:")
+        srows = [("NODE", "SLOT", "TYPE", "ACTIVE", "WAL_STATUS", "FAILOVER", "SYNCED", "RESTART_LSN")]
+        for n, s in slots:
+            srows.append((n, s["slot_name"], s["slot_type"] + ("/" + s["plugin"] if s.get("plugin") else ""),
+                          "yes" if s["active"] else "no", s.get("wal_status") or "-",
+                          "yes" if s.get("failover") else "no", "yes" if s.get("synced") else "no",
+                          s.get("restart_lsn") or "-"))
+        widths = [max(len(row[i]) for row in srows) for i in range(len(srows[0]))]
+        for row in srows:
+            say("  " + "  ".join(c.ljust(w) for c, w in zip(row, widths)).rstrip())
+    return EXIT_OK if all_running else EXIT_NOT_RUNNING
+
+
+def dsn(cfg, port, role, db=DATABASE):
+    return " ".join("%s=%s" % kv for kv in [("host", "localhost"), ("port", port), ("dbname", db), ("user", role),
+                                             ("sslmode", "verify-full"), ("sslrootcert", cfg.ca_cert),
+                                             ("passfile", cfg.pgpass)])
+
+
+def cmd_conninfo(cfg, args):
+    st = require_state(cfg)
+    nodes = []
+    for name in sorted(st["nodes"], key=lambda n: st["nodes"][n]["port"]):
+        port = st["nodes"][name]["port"]
+        nodes.append({"name": name, "port": port, "role": "standby" if is_standby_dir(cfg, name) else "primary",
+                      "running": bool(postmaster_of(cfg, name)), "upstream": st["nodes"][name].get("upstream"),
+                      "dsn_admin": dsn(cfg, port, ADMIN), "dsn_runtime": dsn(cfg, port, RUNTIME)})
+    prim = [n for n in nodes if n["role"] == "primary"]
+    stby = [n for n in nodes if n["role"] == "standby"]
+    out = {"host": "localhost", "hosts": ["localhost", "127.0.0.1", "::1"], "socket_dir": cfg.run_dir,
+           "database": DATABASE, "sslmode": "verify-full", "ca_cert": cfg.ca_cert,
+           "passwords_json": cfg.passwords_json, "pgpass": cfg.pgpass, "roles": dict(ROLES),
+           "primary": prim[0] if prim else None, "replica": stby[0] if stby else None, "nodes": nodes,
+           "port_base": cfg.port_base}
+    if args.show_passwords:
+        out["passwords"] = {k: v["password"] for k, v in load_passwords(cfg).items()}
+    if args.env:
+        node = next((n for n in nodes if n["name"] == resolve_node(cfg, st, args.node)), None) if args.node \
+            else out["primary"]
+        role = ROLES[args.env]
+        if args.env == "bootstrap":
+            raise Fail("the bootstrap superuser is for localpg only (Unix socket); use admin or runtime", EXIT_USAGE)
+        for k, v in [("PGHOST", "localhost"), ("PGPORT", node["port"]), ("PGDATABASE", DATABASE), ("PGUSER", role),
+                     ("PGSSLMODE", "verify-full"), ("PGSSLROOTCERT", cfg.ca_cert), ("PGPASSFILE", cfg.pgpass)]:
+            say("export %s=%s" % (k, libpq_quote(v) if " " in str(v) else v))
+        return EXIT_OK
+    if args.json:
+        say(json.dumps(out, indent=2))
+        return EXIT_OK
+    say("database %s on localhost (TLS only: sslmode=verify-full sslrootcert=%s)" % (DATABASE, cfg.ca_cert))
+    say("roles: admin %s, runtime %s (bootstrap superuser %s: localpg only, Unix socket)" % (ADMIN, RUNTIME, BOOT))
+    say("password files (mode 600): %s, %s" % (cfg.passwords_json, cfg.pgpass))
+    for n in nodes:
+        say("  %-10s %-8s port %d  %s" % (n["name"], n["role"], n["port"], n["dsn_runtime"]))
+    if args.show_passwords:
+        for k, v in out["passwords"].items():
+            say("password %s: %s" % (ROLES[k], v))
+    return EXIT_OK
+
+
+def cmd_sql(cfg, args):
+    st = require_state(cfg)
+    name = resolve_node(cfg, st, args.node)
+    port = st["nodes"][name]["port"]
+    sql = args.command if args.command is not None else sys.stdin.read()
+    db = args.db or (DATABASE if args.role != "bootstrap" else "postgres")
+    if args.role == "bootstrap":
+        out = psql(cfg, port, sql, db=db, timeout=args.timeout)
+    else:
+        assert_own_port(cfg, port)
+        cmd = [cfg.bin("psql"), "-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-d",
+               dsn(cfg, port, ROLES[args.role], db), "-f", "-"]
+        out = run(cmd, args.timeout, cfg=cfg, input=sql).stdout.strip()
+    if out:
+        say(out)
+    return EXIT_OK
+
+
+def cmd_logs(cfg, args):
+    st = require_state(cfg)
+    name = resolve_node(cfg, st, args.node)
+    try:
+        with open(cfg.log_file(name), errors="replace") as f:
+            lines = f.read().splitlines()
+    except OSError:
+        raise Fail("no log for %s" % name)
+    for l in lines[-args.lines:]:
+        say(l)
+    return EXIT_OK
+
+
+# --------------------------------------------------------------------------------------------------- CLI
+
+def build_parser():
+    p = argparse.ArgumentParser(prog="localpg", description="Manage this build's local Postgres primary and "
+                                "standbys (PLAN §5). Exit codes: 0 ok, 1 error, 2 usage/refused, 3 not running.")
+    p.add_argument("--home", help="data home (default $CDC_V2_PG_HOME or %s)" % DEFAULT_HOME)
+    p.add_argument("--port-base", type=int, help="first port (default $CDC_V2_PG_PORT_BASE or %d); nodes use "
+                   "base..base+%d" % (DEFAULT_PORT_BASE, MAX_NODES - 1))
+    p.add_argument("--pg-bin", help="Postgres binaries (default $CDC_V2_PG_BIN or %s)" % DEFAULT_PG_BIN)
+    sub = p.add_subparsers(dest="cmd", metavar="COMMAND")
+    sub.required = True
+    sub.add_parser("up", help="start primary and replica, building them if needed (idempotent)")
+    sub.add_parser("down", help="stop every node of this home; leaves no process behind")
+    sub.add_parser("reset", help="stop, wipe and rebuild from any state, then start")
+    s = sub.add_parser("status", help="nodes, roles, timelines, LSNs, replication and slots")
+    s.add_argument("--json", action="store_true")
+    s = sub.add_parser("add-standby", help="add a streaming standby of the current primary")
+    s.add_argument("--name", help="node name (default standbyN, N = port offset)")
+    s.add_argument("--from", dest="source", help="primary to clone and follow (default: the running primary)")
+    s = sub.add_parser("promote", help="promote a standby; reports the new timeline")
+    s.add_argument("node")
+    s.add_argument("--json", action="store_true")
+    s = sub.add_parser("follow", help="re-point a standby at another primary (e.g. after a promotion)")
+    s.add_argument("node")
+    s.add_argument("upstream", nargs="?", help="new upstream (default: the running primary)")
+    s = sub.add_parser("kill", help="SIGKILL a node's postmaster and all its children (crash test)")
+    s.add_argument("node")
+    s = sub.add_parser("remove", help="stop a node, drop its slot upstream and delete its data")
+    s.add_argument("node")
+    s = sub.add_parser("set", help="override server settings on one node (or all) and reload/restart as needed")
+    s.add_argument("node", help="node name, port, or 'all'")
+    s.add_argument("assignments", nargs="+", metavar="NAME=VALUE")
+    s.set_defaults(unset=False)
+    s = sub.add_parser("unset", help="remove setting overrides and reload/restart as needed")
+    s.add_argument("node", help="node name, port, or 'all'")
+    s.add_argument("assignments", nargs="+", metavar="NAME")
+    s.set_defaults(unset=True)
+    s = sub.add_parser("conninfo", help="connection facts (never passwords unless --show-passwords)")
+    s.add_argument("--json", action="store_true")
+    s.add_argument("--show-passwords", action="store_true", help="print the generated passwords")
+    s.add_argument("--env", choices=["admin", "runtime", "bootstrap"], help="print libpq export lines for a role")
+    s.add_argument("--node", help="node for --env (default: the primary)")
+    s = sub.add_parser("sql", help="run SQL on a node (bootstrap: Unix socket; admin/runtime: TLS verify-full)")
+    s.add_argument("node")
+    s.add_argument("-c", "--command", help="SQL (default: read stdin)")
+    s.add_argument("--role", choices=list(ROLES), default="bootstrap")
+    s.add_argument("--db", help="database (default %s; postgres for bootstrap)" % DATABASE)
+    s.add_argument("--timeout", type=int, default=T_SQL)
+    s = sub.add_parser("logs", help="print the end of a node's server log")
+    s.add_argument("node")
+    s.add_argument("-n", "--lines", type=int, default=40)
+    return p
+
+
+COMMANDS = {"up": cmd_up, "down": cmd_down, "reset": cmd_reset, "status": cmd_status, "add-standby": cmd_add_standby,
+            "promote": cmd_promote, "follow": cmd_follow, "kill": cmd_kill, "remove": cmd_remove, "set": cmd_set,
+            "unset": cmd_set, "conninfo": cmd_conninfo, "sql": cmd_sql, "logs": cmd_logs}
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+    try:
+        cfg = Config(args.home, args.port_base, args.pg_bin)
+        return COMMANDS[args.cmd](cfg, args)
+    except Fail as e:
+        print("localpg: error: %s" % e, file=sys.stderr)
+        return e.code
+    except KeyboardInterrupt:
+        print("localpg: interrupted", file=sys.stderr)
+        return EXIT_ERROR
+
+
+if __name__ == "__main__":
+    sys.exit(main())
