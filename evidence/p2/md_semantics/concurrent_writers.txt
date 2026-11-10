@@ -1,0 +1,206 @@
+== different tables, insert/insert [overlap]: no conflict
+     A: INSERT INTO t1 VALUES (5000, 1) -> OK rows=1
+     B: INSERT INTO t2 VALUES (5000, 2) -> OK rows=1
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1001, 1, 0, 1)], 't2': [(1001, 2, 0, 1)], 'state': [0, 0]}
+== different tables, insert/insert [stale]: no conflict
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: INSERT INTO t1 VALUES (5000, 1) -> OK rows=1
+     B: INSERT INTO t2 VALUES (5000, 2) -> OK rows=1
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1001, 1, 0, 1)], 't2': [(1001, 2, 0, 1)], 'state': [0, 0]}
+== same table, append/append [overlap]: no conflict
+     A: INSERT INTO t1 VALUES (5000, 1) -> OK rows=1
+     B: INSERT INTO t1 VALUES (5001, 2) -> OK rows=1
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1002, 3, 0, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== same table, append/append [stale]: no conflict
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: INSERT INTO t1 VALUES (5000, 1) -> OK rows=1
+     B: INSERT INTO t1 VALUES (5001, 2) -> OK rows=1
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1002, 3, 0, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== same table, update/update different rows [overlap]: no conflict
+     A: UPDATE t1 SET v = 1 WHERE id = 10 -> OK rows=1
+     B: UPDATE t1 SET v = 2 WHERE id = 11 -> OK rows=1
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1000, 3, 1, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== same table, update/update different rows [stale]: no conflict
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: UPDATE t1 SET v = 1 WHERE id = 10 -> OK rows=1
+     B: UPDATE t1 SET v = 2 WHERE id = 11 -> OK rows=1
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1000, 3, 1, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== same table, update/update same row [overlap]: CONFLICT (B fails); retry OK
+     A: UPDATE t1 SET v = 1 WHERE id = 10 -> OK rows=1
+     B: UPDATE t1 SET v = 2 WHERE id = 10 -> TransactionException: TransactionContext Error: Conflict on update!
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1000, 2, 2, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== same table, update/update same row [stale]: CONFLICT (B fails); retry OK
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: UPDATE t1 SET v = 1 WHERE id = 10 -> OK rows=1
+     B: UPDATE t1 SET v = 2 WHERE id = 10 -> TransactionException: TransactionContext Error: Conflict on update!
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1000, 2, 2, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== same table, delete/update same row [overlap]: no conflict
+     A: DELETE FROM t1 WHERE id = 10 -> OK rows=1
+     B: UPDATE t1 SET v = 2 WHERE id = 10 -> OK rows=1
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(999, 0, None, 0)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== same table, delete/update same row [stale]: no conflict
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: DELETE FROM t1 WHERE id = 10 -> OK rows=1
+     B: UPDATE t1 SET v = 2 WHERE id = 10 -> OK rows=1
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(999, 0, None, 0)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== same table, delete/delete same row [overlap]: CONFLICT (B fails); retry OK
+     A: DELETE FROM t1 WHERE id = 10 -> OK rows=1
+     B: DELETE FROM t1 WHERE id = 10 -> TransactionException: TransactionContext Error: Conflict on tuple deletion!
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(999, 0, None, 0)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== same table, delete/delete same row [stale]: CONFLICT (B fails); retry OK
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: DELETE FROM t1 WHERE id = 10 -> OK rows=1
+     B: DELETE FROM t1 WHERE id = 10 -> TransactionException: TransactionContext Error: Conflict on tuple deletion!
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(999, 0, None, 0)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== same table, update/append [overlap]: no conflict
+     A: UPDATE t1 SET v = 1 WHERE id = 10 -> OK rows=1
+     B: INSERT INTO t1 VALUES (5001, 2) -> OK rows=1
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1001, 3, 1, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== same table, update/append [stale]: no conflict
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: UPDATE t1 SET v = 1 WHERE id = 10 -> OK rows=1
+     B: INSERT INTO t1 VALUES (5001, 2) -> OK rows=1
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1001, 3, 1, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== same table, set-based update/update disjoint halves [overlap]: no conflict
+     A: UPDATE t1 SET v = 1 WHERE id < 500 -> OK rows=500
+     B: UPDATE t1 SET v = 2 WHERE id >= 500 -> OK rows=500
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1000, 1500, 1, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== same table, set-based update/update disjoint halves [stale]: no conflict
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: UPDATE t1 SET v = 1 WHERE id < 500 -> OK rows=500
+     B: UPDATE t1 SET v = 2 WHERE id >= 500 -> OK rows=500
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1000, 1500, 1, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== different tables, each also updates its own state row [overlap]: no conflict
+     A: INSERT INTO t1 VALUES (5000, 1) -> OK rows=1
+     A: UPDATE state SET pos = pos + 1 WHERE stream = 's1' -> OK rows=1
+     B: INSERT INTO t2 VALUES (5000, 2) -> OK rows=1
+     B: UPDATE state SET pos = pos + 1 WHERE stream = 's2' -> OK rows=1
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1001, 1, 0, 1)], 't2': [(1001, 2, 0, 1)], 'state': [1, 1]}
+== different tables, each also updates its own state row [stale]: no conflict
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: INSERT INTO t1 VALUES (5000, 1) -> OK rows=1
+     A: UPDATE state SET pos = pos + 1 WHERE stream = 's1' -> OK rows=1
+     B: INSERT INTO t2 VALUES (5000, 2) -> OK rows=1
+     B: UPDATE state SET pos = pos + 1 WHERE stream = 's2' -> OK rows=1
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1001, 1, 0, 1)], 't2': [(1001, 2, 0, 1)], 'state': [1, 1]}
+== different tables, both update ONE shared state row [overlap]: CONFLICT (B fails); retry OK
+     A: INSERT INTO t1 VALUES (5000, 1) -> OK rows=1
+     A: UPDATE state SET pos = pos + 1 WHERE stream = 's1' -> OK rows=1
+     B: INSERT INTO t2 VALUES (5000, 2) -> OK rows=1
+     B: UPDATE state SET pos = pos + 1 WHERE stream = 's1' -> TransactionException: TransactionContext Error: Conflict on update!
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1001, 1, 0, 1)], 't2': [(1001, 2, 0, 1)], 'state': [2, 0]}
+== different tables, both update ONE shared state row [stale]: CONFLICT (B fails); retry OK
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: INSERT INTO t1 VALUES (5000, 1) -> OK rows=1
+     A: UPDATE state SET pos = pos + 1 WHERE stream = 's1' -> OK rows=1
+     B: INSERT INTO t2 VALUES (5000, 2) -> OK rows=1
+     B: UPDATE state SET pos = pos + 1 WHERE stream = 's1' -> TransactionException: TransactionContext Error: Conflict on update!
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1001, 1, 0, 1)], 't2': [(1001, 2, 0, 1)], 'state': [2, 0]}
+== DDL vs DML: ALTER ADD COLUMN t1 / INSERT t1 [overlap]: CONFLICT (B fails); retry failed: BinderException: Binder Error: table t1 has 3 columns but 2 values were supplied
+     A: ALTER TABLE t1 ADD COLUMN extra VARCHAR -> OK rows=[]
+     B: INSERT INTO t1 VALUES (5001, 2) -> TransactionException: TransactionContext Error: Transaction conflict: attempting to insert into table "t1" but it has been altered by a different transaction
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1000, 0, 0, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== DDL vs DML: ALTER ADD COLUMN t1 / INSERT t1 [stale]: CONFLICT (B fails); retry failed: BinderException: Binder Error: table t1 has 3 columns but 2 values were supplied
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: ALTER TABLE t1 ADD COLUMN extra VARCHAR -> OK rows=[]
+     B: INSERT INTO t1 VALUES (5001, 2) -> TransactionException: TransactionContext Error: Transaction conflict: attempting to insert into table "t1" but it has been altered by a different transaction
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1000, 0, 0, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== DDL vs DML: ALTER ADD COLUMN t1 / UPDATE t1 [overlap]: CONFLICT (B fails); retry OK
+     A: ALTER TABLE t1 ADD COLUMN extra VARCHAR -> OK rows=[]
+     B: UPDATE t1 SET v = 2 WHERE id = 11 -> TransactionException: TransactionContext Error: Transaction conflict: attempting to update table "t1" but it has been altered by a different transaction
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1000, 2, 0, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== DDL vs DML: ALTER ADD COLUMN t1 / UPDATE t1 [stale]: CONFLICT (B fails); retry OK
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: ALTER TABLE t1 ADD COLUMN extra VARCHAR -> OK rows=[]
+     B: UPDATE t1 SET v = 2 WHERE id = 11 -> TransactionException: TransactionContext Error: Transaction conflict: attempting to update table "t1" but it has been altered by a different transaction
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1000, 2, 0, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== DML vs DDL: INSERT t1 / ALTER ADD COLUMN t1 [overlap]: CONFLICT (A fails); retry failed: BinderException: Binder Error: table t1 has 3 columns but 2 values were supplied
+     A: INSERT INTO t1 VALUES (5001, 2) -> OK rows=1
+     B: ALTER TABLE t1 ADD COLUMN extra VARCHAR -> OK rows=[]
+     A: COMMIT -> TransactionException: TransactionContext Error: Failed to commit: MotherDuck transaction statement failed: TransactionContext Error: Failed to commit: Transaction conflict: attempting to insert into table "t1" but it has been altered by a different transaction
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1000, 0, 0, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== DML vs DDL: INSERT t1 / ALTER ADD COLUMN t1 [stale]: no conflict
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: INSERT INTO t1 VALUES (5001, 2) -> OK rows=1
+     B: ALTER TABLE t1 ADD COLUMN extra VARCHAR -> OK rows=[]
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1001, 2, 0, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== DDL vs DML on another table: ALTER t1 / INSERT t2 [overlap]: no conflict
+     A: ALTER TABLE t1 ADD COLUMN extra VARCHAR -> OK rows=[]
+     B: INSERT INTO t2 VALUES (5001, 2) -> OK rows=1
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1000, 0, 0, 1)], 't2': [(1001, 2, 0, 1)], 'state': [0, 0]}
+== DDL vs DML on another table: ALTER t1 / INSERT t2 [stale]: no conflict
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: ALTER TABLE t1 ADD COLUMN extra VARCHAR -> OK rows=[]
+     B: INSERT INTO t2 VALUES (5001, 2) -> OK rows=1
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1000, 0, 0, 1)], 't2': [(1001, 2, 0, 1)], 'state': [0, 0]}
+== DDL vs DDL, different tables [overlap]: no conflict
+     A: ALTER TABLE t1 ADD COLUMN extra VARCHAR -> OK rows=[]
+     B: ALTER TABLE t2 ADD COLUMN extra VARCHAR -> OK rows=[]
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1000, 0, 0, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== DDL vs DDL, different tables [stale]: no conflict
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: ALTER TABLE t1 ADD COLUMN extra VARCHAR -> OK rows=[]
+     B: ALTER TABLE t2 ADD COLUMN extra VARCHAR -> OK rows=[]
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1000, 0, 0, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== DDL vs DDL, same table [overlap]: CONFLICT (B fails); retry OK
+     A: ALTER TABLE t1 ADD COLUMN extra VARCHAR -> OK rows=[]
+     B: ALTER TABLE t1 ADD COLUMN extra2 VARCHAR -> TransactionException: TransactionContext Error: Catalog write-write conflict on alter with "t1"
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1000, 0, 0, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== DDL vs DDL, same table [stale]: CONFLICT (B fails); retry OK
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: ALTER TABLE t1 ADD COLUMN extra VARCHAR -> OK rows=[]
+     B: ALTER TABLE t1 ADD COLUMN extra2 VARCHAR -> TransactionException: TransactionContext Error: Catalog write-write conflict on alter with "t1"
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1000, 0, 0, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== CREATE TABLE vs CREATE TABLE, different names [overlap]: no conflict
+     A: CREATE TABLE t3 (a INT) -> OK rows=[]
+     B: CREATE TABLE t4 (a INT) -> OK rows=[]
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1000, 0, 0, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== CREATE TABLE vs CREATE TABLE, different names [stale]: no conflict
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: CREATE TABLE t3 (a INT) -> OK rows=[]
+     B: CREATE TABLE t4 (a INT) -> OK rows=[]
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1000, 0, 0, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== ALTER TYPE vs INSERT same table [overlap]: CONFLICT (B fails); retry OK
+     A: ALTER TABLE t1 ALTER COLUMN v TYPE HUGEINT -> OK rows=[]
+     B: INSERT INTO t1 VALUES (5001, 2) -> TransactionException: TransactionContext Error: Transaction conflict: attempting to insert into table "t1" but it has been altered by a different transaction
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1001, 2, 0, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== ALTER TYPE vs INSERT same table [stale]: CONFLICT (B fails); retry OK
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: ALTER TABLE t1 ALTER COLUMN v TYPE HUGEINT -> OK rows=[]
+     B: INSERT INTO t1 VALUES (5001, 2) -> TransactionException: TransactionContext Error: Transaction conflict: attempting to insert into table "t1" but it has been altered by a different transaction
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(1001, 2, 0, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== swap (DROP t1 + RENAME staging) vs INSERT t1 [overlap]: CONFLICT (B fails); retry OK
+     A: DROP TABLE t1 -> OK rows=[]
+     A: ALTER TABLE t1_staging RENAME TO t1 -> OK rows=[]
+     B: INSERT INTO t1 VALUES (5001, 2) -> OK rows=1
+     B: COMMIT -> TransactionException: TransactionContext Error: Failed to commit: MotherDuck transaction statement failed: TransactionContext Error: Failed to commit: Transaction conflict: attempting to insert into table "t1" but it has been dropped by a different transaction
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(2001, 14002, 7, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== swap (DROP t1 + RENAME staging) vs INSERT t1 [stale]: CONFLICT (B fails); retry OK
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: DROP TABLE t1 -> OK rows=[]
+     A: ALTER TABLE t1_staging RENAME TO t1 -> OK rows=[]
+     B: INSERT INTO t1 VALUES (5001, 2) -> TransactionException: TransactionContext Error: Transaction conflict: attempting to insert into table "t1" but it has been dropped by a different transaction
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(2001, 14002, 7, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== INSERT t1 vs swap (DROP t1 + RENAME staging) [overlap]: no conflict
+     A: INSERT INTO t1 VALUES (5001, 2) -> OK rows=1
+     B: DROP TABLE t1 -> OK rows=[]
+     B: ALTER TABLE t1_staging RENAME TO t1 -> OK rows=[]
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(2000, 14000, 7, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== INSERT t1 vs swap (DROP t1 + RENAME staging) [stale]: no conflict
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: INSERT INTO t1 VALUES (5001, 2) -> OK rows=1
+     B: DROP TABLE t1 -> OK rows=[]
+     B: ALTER TABLE t1_staging RENAME TO t1 -> OK rows=[]
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(2000, 14000, 7, 1)], 't2': [(1000, 0, 0, 1)], 'state': [0, 0]}
+== swap of t1 vs INSERT into a different table t2 [overlap]: no conflict
+     A: DROP TABLE t1 -> OK rows=[]
+     A: ALTER TABLE t1_staging RENAME TO t1 -> OK rows=[]
+     B: INSERT INTO t2 VALUES (5001, 2) -> OK rows=1
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(2000, 14000, 7, 1)], 't2': [(1001, 2, 0, 1)], 'state': [0, 0]}
+== swap of t1 vs INSERT into a different table t2 [stale]: no conflict
+     B: SELECT count(*) FROM t2 -> OK rows=1000
+     A: DROP TABLE t1 -> OK rows=[]
+     A: ALTER TABLE t1_staging RENAME TO t1 -> OK rows=[]
+     B: INSERT INTO t2 VALUES (5001, 2) -> OK rows=1
+     final (count, sum(v), v of id 10, rows with id 10): {'t1': [(2000, 14000, 7, 1)], 't2': [(1001, 2, 0, 1)], 'state': [0, 0]}
+database dropped

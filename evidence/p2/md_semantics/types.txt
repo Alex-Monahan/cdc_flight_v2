@@ -1,0 +1,54 @@
+== 1. in-place widening inside a transaction with DML
+   [OK] int_to_bigint: ALTER ... TYPE BIGINT + INSERT + UPDATE in one transaction, committed: [(2, '9223372036854775807', 'BIGINT'), (11, '2147483647', 'BIGINT')]
+   [OK] float_to_double: ALTER ... TYPE DOUBLE + INSERT + UPDATE in one transaction, committed: [(2, '1.0000000000000002', 'DOUBLE'), (11, '1.5', 'DOUBLE')]
+   [OK] decimal_10_2_to_38_2: ALTER ... TYPE DECIMAL(38,2) + INSERT + UPDATE in one transaction, committed: [(2, '123456789012345678901234567890.12', 'DECIMAL(38,2)'), (11, '12345678.91', 'DECIMAL(38,2)')]
+   [OK] decimal_18_4_to_38_10: ALTER ... TYPE DECIMAL(38,10) + INSERT + UPDATE in one transaction, committed: [(2, '1234567890123456789012345678.0123456789', 'DECIMAL(38,10)'), (11, '12345678901234.5678000000', 'DECIMAL(38,10)')]
+   [OK] varchar_n_to_varchar: ALTER ... TYPE VARCHAR + INSERT + UPDATE in one transaction, committed: [(2, 'abcdefghij', 'VARCHAR'), (11, 'abcde', 'VARCHAR')]
+   [OK] smallint_to_integer: ALTER ... TYPE INTEGER + INSERT + UPDATE in one transaction, committed: [(2, '2147483647', 'INTEGER'), (11, '32767', 'INTEGER')]
+   [OK] timestamp_to_timestamptz: ALTER ... TYPE TIMESTAMPTZ + INSERT + UPDATE in one transaction, committed: [(2, '2020-12-31 17:00:00-07', 'TIMESTAMP WITH TIME ZONE'), (11, '2020-01-01 00:00:00-07', 'TIMESTAMP WITH TIME ZONE')]
+   [ERROR] int_to_bigint on a PRIMARY KEY column: BinderException: Binder Error: Cannot change the type of a column that has a UNIQUE or PRIMARY KEY constraint specified
+   [ERROR] int_to_bigint on a column used by a non-PK index (CREATE INDEX): CatalogException: Catalog Error: Cannot change the type of this column: an index depends on it!
+   [OK] rollback of ALTER TYPE restores the old type: [(1, 'INTEGER')]
+== 2. ALTER ... TYPE UNION(old, new), inside a transaction with DML
+   [OK] bigint -> UNION(i BIGINT, f DOUBLE), implicit cast, then insert a DOUBLE, committed: [(1, '42', 'i'), (2, '1e+300', 'f'), (3, '2.5', 'f')]
+   [OK] bigint -> UNION with explicit USING union_value(i := v): [('42', 'i')]
+   [OK] double -> UNION(f DOUBLE, i BIGINT) (float column receives a bigint): [(1, '0.1', 'f'), (2, '9007199254740993', 'i')]
+   [OK] text -> UNION(s VARCHAR, i INTEGER): [(1, 'abc', 's'), (2, '17', 's'), (3, '17', 'i')]
+   [OK] DECIMAL(38,10) -> UNION(n DECIMAL(38,10), s VARCHAR) and a NaN / huge numeric as text: [(1, '3.1415926535', 'n'), (2, 'NaN', 's'), (3, '1e400', 's'), (4, '12.5000000000', 'n')]
+   [OK] second change: add a member to an existing union (UNION(i,f) -> UNION(i,f,s)): [(1, '42', 'i'), (2, '1e+300', 'f'), (3, '2.5', 'f'), (4, 'text', 's')]
+   [OK] rollback of ALTER ... TYPE UNION restores the old type and rows: [(1, 'BIGINT')]
+   column type of u1.v now: UNION(i BIGINT, f DOUBLE, s VARCHAR)
+== 3. UNION values in DML, keys, joins, comparisons, checksums
+   [OK] INSERT ... SELECT from a DOUBLE staging column into the UNION column: [('7.25', 'f')]
+   [OK] INSERT ... SELECT from a BIGINT staging column into the UNION column: [('8', 'i')]
+   [OK] UPDATE sets a value of the other member: [('99', 'i')]
+   [OK] WHERE k = 1 (plain integer literal) matches which rows: [('int one',)]
+   [OK] WHERE k = 1::BIGINT matches which rows: [('int one',)]
+   [OK] WHERE k = 1.0::DOUBLE matches which rows: [('double one',)]
+   [OK] k = union_value(i := 1) equality (union vs union, same tag): [('int one',)]
+   [OK] ORDER BY a union column (across members): [('1',), ('8',), ('99',), ('1.0',), ('7.25',), (None,)]
+   [OK] GROUP BY / DISTINCT a union column: is int 1 the same group as double 1.0?: [(2,)]
+   [OK] hash(): union BIGINT 1 vs plain BIGINT 1 vs union DOUBLE 1.0: [(False, False)]
+   [OK] hash() stable across server and client (same value hashed remotely and locally): [(17970267147294058266,)]
+      local hash of union BIGINT 1: 17970267147294058266
+   [OK] join on union columns: [('double one', 'j-dbl'), ('int one', 'j-int')]
+   [ERROR] PRIMARY KEY on a UNION column: InvalidTypeException: Invalid type Error: Invalid Type [UNION(i BIGINT, f DOUBLE)]: Invalid type for index key.
+   [ERROR] ALTER a PRIMARY KEY column to UNION: BinderException: Binder Error: Cannot change the type of a column that has a UNIQUE or PRIMARY KEY constraint specified
+   [OK] MERGE keyed on a union column: [('2.5', 'ins'), ('1', 'new')]
+   [OK] DELETE ... USING keyed on a union column: [(1,)]
+   [OK] canonical text for an oracle: k::VARCHAR per member: [('i', '99'), ('f', '1.0'), ('i', '1'), (None, None), ('i', '8'), ('f', '7.25')]
+== 4. UNION through Arrow and Parquet
+   [OK] fetch as Arrow: arrow type of k = sparse_union<i: int64=0, f: double=1, s: string=2>
+   [OK] INSERT INTO <md table> SELECT * FROM <arrow table with a union column>: [(1, '1', 'i'), (2, '2.5', 'f'), (3, 'x', 's'), (4, None, None)]
+   [OK] COPY (SELECT ... union column) TO local Parquet, read back: [(1, '(0, 1, NULL, NULL)', 'STRUCT(UTINYINT, BIGINT, DOUBLE, VARCHAR)'), (2, '(1, NULL, 2.5, NULL)', 'STRUCT(UTINYINT, BIGINT, DOUBLE, VARCHAR)'), (3, '(2, NULL, NULL, x)', 'STRUCT(UTINYINT, BIGINT, DOUBLE, VARCHAR)'), (4, None, 'STRUCT(UTINYINT, BIGINT, DOUBLE, VARCHAR)')]
+   [OK] INSERT INTO union table SELECT FROM that Parquet file: [(1, '1', 'i'), (2, '2.5', 'f'), (3, 'x', 's'), (4, None, None)]
+== 5. timing of type changes on a 10,000,000-row table (server side), each in its own transaction together with a 1,000-row INSERT
+   INTEGER -> BIGINT: 0.38 s
+   FLOAT -> DOUBLE: 0.54 s
+   DECIMAL(18,4) -> DECIMAL(38,10): 0.68 s
+   DECIMAL(38,10) -> UNION(n DECIMAL(38,10), s VARCHAR): 0.59 s
+   BIGINT -> UNION(i BIGINT, f DOUBLE): 0.63 s
+   UNION(i,f) -> UNION(i,f,s) (add a member): 0.72 s
+   VARCHAR -> UNION(s VARCHAR, i INTEGER): 1.46 s
+   rows after: 10,007,000; final types: [('id', 'INTEGER'), ('a', 'UNION(i BIGINT, f DOUBLE, s VARCHAR)'), ('f', 'DOUBLE'), ('d', 'UNION(n DECIMAL(38,10), s VARCHAR)'), ('s', 'UNION(s VARCHAR, i INTEGER)')]
+database dropped

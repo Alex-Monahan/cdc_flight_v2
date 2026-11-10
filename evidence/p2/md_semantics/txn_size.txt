@@ -1,0 +1,40 @@
+== Part 1: one transaction, INSERT then UPDATE then DELETE of 10,000,000 rows (lineitem width, 16 columns)
+   rows: 10000000
+   insert_s: 20.79
+   inserted: 10000000
+   update_s: 0.24
+   updated: 10000000
+   delete_s: 0.28
+   deleted: 10000000
+   commit_s: 0.08
+   status: committed
+   total_s: 21.4
+   rows_after: 1000
+   client_peak_rss_mb: 88
+   => 1,402,192 row changes per second over the whole transaction
+   variant: INSERT 10,000,000 then UPDATE them, commit (rows survive): {'insert_s': 20.14, 'update_s': 0.14, 'commit_s': 8.91, 'total_s': 29.2}
+== Part 2: apply shapes from a staged table on the server; target holds 10,000,000 rows; one transaction per measurement
+   insert_select                    batch     10,000:     0.22 s        46,056 rows/s
+   delete_using                     batch     10,000:     0.26 s        38,947 rows/s
+   update_from                      batch     10,000:     0.18 s        57,053 rows/s
+   merge_half_update_half_insert    batch     10,000:     0.24 s        41,523 rows/s
+   delete_insert_upsert             batch     10,000:     0.28 s        35,606 rows/s
+   insert_or_replace_pk             batch     10,000:     0.31 s        32,760 rows/s
+   insert_select                    batch  1,000,000:     0.66 s     1,506,503 rows/s
+   delete_using                     batch  1,000,000:     0.46 s     2,154,430 rows/s
+   update_from                      batch  1,000,000:     0.73 s     1,375,238 rows/s
+   merge_half_update_half_insert    batch  1,000,000:     5.87 s       170,365 rows/s
+   delete_insert_upsert             batch  1,000,000:     0.87 s     1,148,281 rows/s
+   insert_or_replace_pk             batch  1,000,000:     1.62 s       616,140 rows/s
+   insert_select                    batch 10,000,000:     1.32 s     7,549,369 rows/s
+   delete_using                     batch 10,000,000:     1.98 s     5,045,553 rows/s
+   update_from                      batch 10,000,000:     0.98 s    10,188,280 rows/s
+   merge_half_update_half_insert    batch 10,000,000:     2.14 s     4,673,445 rows/s
+   delete_insert_upsert             batch 10,000,000:     3.06 s     3,271,390 rows/s
+   insert_or_replace_pk             batch 10,000,000:     8.42 s     1,187,165 rows/s
+== Part 3: small transactions sent from the client (INSERT VALUES + state UPDATE + COMMIT), 60 s each
+   batch   1 rows, 1 connection(s):    3.8 commits/s,        4 rows/s, txn latency p50 0.257 s p99 0.319 s
+   batch   1 rows, 4 connection(s):   15.1 commits/s,       15 rows/s, txn latency p50 0.263 s p99 0.345 s
+   batch 100 rows, 1 connection(s):    3.1 commits/s,      308 rows/s, txn latency p50 0.320 s p99 0.418 s
+   batch 100 rows, 4 connection(s):   11.9 commits/s,     1190 rows/s, txn latency p50 0.332 s p99 0.443 s
+database dropped

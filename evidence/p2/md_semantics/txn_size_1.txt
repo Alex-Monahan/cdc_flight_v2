@@ -1,0 +1,16 @@
+== Part 1: one transaction, INSERT then UPDATE then DELETE of 50,000,000 rows (lineitem width, 16 columns)
+   rows: 50000000
+   insert_s: 101.11
+   inserted: 50000000
+   update_s: 0.81
+   updated: 50000000
+   delete_s: 0.69
+   deleted: 50000000
+   commit_s: 0.11
+   status: committed
+   total_s: 102.72
+   rows_after: 1000
+   client_peak_rss_mb: 89
+   => 1,460,327 row changes per second over the whole transaction
+   variant: INSERT 50,000,000 then UPDATE them, commit (rows survive): {'insert_s': 100.88, 'update_s': 0.18, 'commit_s': 38.42, 'total_s': 139.48}
+database dropped

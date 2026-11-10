@@ -1,0 +1,45 @@
+
+== DDL rollback (state seen from a second connection):
+   drop_rename {'restored': True, 'other_conn_saw_before_state_mid_txn': True}
+   create_or_replace {'restored': True, 'other_conn_saw_before_state_mid_txn': True}
+   alter_add_col_and_dml {'restored': True, 'other_conn_saw_before_state_mid_txn': True}
+   alter_type_and_dml {'restored': True, 'other_conn_saw_before_state_mid_txn': True}
+   rename_column {'restored': True, 'other_conn_saw_before_state_mid_txn': True}
+   create_new_table {'restored': True, 'other_conn_saw_before_state_mid_txn': True}
+
+== variant drop_rename: 1000 swaps in 531 s
+   {'role': 'writer', 'swaps_done': 1000, 'errors': {}, 'swap_txn_seconds': {'n': 1000, 'min': 0.29294896125793457, 'p50': 0.3531529903411865, 'p90': 0.3704090118408203, 'p99': 0.41205596923828125, 'max': 0.8598830699920654, 'mean': 0.3437785680294037}, 'last_v': 1009}
+   {'role': 'reader0', 'observations': {'ok': 3965}, 'errors': {}, 'version_went_backwards': 0, 'distinct_versions_seen': 1001, 'poll_seconds': {'n': 3965, 'min': 0.0751640796661377, 'p50': 0.1506819725036621, 'p90': 0.21030306816101074, 'p99': 0.2571992874145508, 'max': 0.3744540214538574, 'mean': 0.13446774446648577}}
+   {'role': 'reader1', 'observations': {'ok': 3949}, 'errors': {}, 'version_went_backwards': 0, 'distinct_versions_seen': 1001, 'poll_seconds': {'n': 3949, 'min': 0.07490682601928711, 'p50': 0.150864839553833, 'p90': 0.20999598503112793, 'p99': 0.26995015144348145, 'max': 0.4512948989868164, 'mean': 0.13501918010996636}}
+  TOTAL observations {'ok': 7914}; anomalies 0; backwards 0
+
+== variant create_or_replace: 300 swaps in 161 s
+   {'role': 'writer', 'swaps_done': 300, 'errors': {}, 'swap_txn_seconds': {'n': 300, 'min': 0.30704307556152344, 'p50': 0.354464054107666, 'p90': 0.3700380325317383, 'p99': 0.4453411102294922, 'max': 0.8760998249053955, 'mean': 0.3528171833356222}, 'last_v': 1309}
+   {'role': 'reader1', 'observations': {'ok': 1250}, 'errors': {}, 'version_went_backwards': 0, 'distinct_versions_seen': 301, 'poll_seconds': {'n': 1250, 'min': 0.0737009048461914, 'p50': 0.12900805473327637, 'p90': 0.20749783515930176, 'p99': 0.2440052032470703, 'max': 0.2873709201812744, 'mean': 0.1301800931930542}}
+   {'role': 'reader0', 'observations': {'ok': 1245}, 'errors': {}, 'version_went_backwards': 0, 'distinct_versions_seen': 301, 'poll_seconds': {'n': 1245, 'min': 0.0747690200805664, 'p50': 0.12714600563049316, 'p90': 0.20509004592895508, 'p99': 0.24656915664672852, 'max': 0.35397768020629883, 'mean': 0.1307692269244826}}
+  TOTAL observations {'ok': 2495}; anomalies 0; backwards 0
+
+== variant rename_away: 300 swaps in 186 s
+   {'role': 'writer', 'swaps_done': 300, 'errors': {}, 'swap_txn_seconds': {'n': 300, 'min': 0.37378716468811035, 'p50': 0.43900227546691895, 'p90': 0.4540839195251465, 'p99': 0.5165698528289795, 'max': 0.7883810997009277, 'mean': 0.43572779099146525}, 'last_v': 1609}
+   {'role': 'reader1', 'observations': {'ok': 1542}, 'errors': {}, 'version_went_backwards': 0, 'distinct_versions_seen': 301, 'poll_seconds': {'n': 1542, 'min': 0.07132411003112793, 'p50': 0.09575772285461426, 'p90': 0.20682787895202637, 'p99': 0.23567414283752441, 'max': 0.3344388008117676, 'mean': 0.12164750900095385}}
+   {'role': 'reader0', 'observations': {'ok': 1537}, 'errors': {}, 'version_went_backwards': 0, 'distinct_versions_seen': 301, 'poll_seconds': {'n': 1537, 'min': 0.07308793067932129, 'p50': 0.09137606620788574, 'p90': 0.20358610153198242, 'p99': 0.23567509651184082, 'max': 0.3343050479888916, 'mean': 0.12200171992463886}}
+  TOTAL observations {'ok': 3079}; anomalies 0; backwards 0
+
+== variant drop_rename_new_schema: 300 swaps in 159 s
+   {'role': 'writer', 'swaps_done': 300, 'errors': {}, 'swap_txn_seconds': {'n': 300, 'min': 0.29686927795410156, 'p50': 0.3580350875854492, 'p90': 0.3733541965484619, 'p99': 0.40862202644348145, 'max': 0.7271993160247803, 'mean': 0.3552539920806885}, 'last_v': 1909}
+   {'role': 'reader0', 'observations': {'ok': 1222}, 'errors': {}, 'version_went_backwards': 0, 'distinct_versions_seen': 301, 'poll_seconds': {'n': 1222, 'min': 0.07253789901733398, 'p50': 0.14835786819458008, 'p90': 0.2028489112854004, 'p99': 0.2352280616760254, 'max': 0.32753682136535645, 'mean': 0.13204034045948335}}
+   {'role': 'reader1', 'observations': {'ok': 1212}, 'errors': {}, 'version_went_backwards': 0, 'distinct_versions_seen': 301, 'poll_seconds': {'n': 1212, 'min': 0.07498812675476074, 'p50': 0.1499011516571045, 'p90': 0.19882678985595703, 'p99': 0.246718168258667, 'max': 0.3443131446838379, 'mean': 0.1331202454692853}}
+  TOTAL observations {'ok': 2434}; anomalies 0; backwards 0
+
+== variant drop_rename_autocommit: 300 swaps in 160 s
+   {'role': 'writer', 'swaps_done': 300, 'errors': {}, 'swap_txn_seconds': {'n': 300, 'min': 0.3051488399505615, 'p50': 0.3273611068725586, 'p90': 0.3656468391418457, 'p99': 0.4439818859100342, 'max': 0.49428224563598633, 'mean': 0.3380300800005595}, 'last_v': 2209}
+   {'role': 'reader1', 'observations': {'ok': 596, 'missing_table': 341}, 'errors': {'CatalogException: Catalog Error: Table with name t does not exist!': 341}, 'version_went_backwards': 0, 'distinct_versions_seen': 301, 'poll_seconds': {'n': 596, 'min': 0.0755162239074707, 'p50': 0.16764521598815918, 'p90': 0.2194671630859375, 'p99': 0.2818019390106201, 'max': 0.31587815284729004, 'mean': 0.17692490272073938}}
+   {'role': 'reader0', 'observations': {'ok': 624, 'missing_table': 306}, 'errors': {'CatalogException: Catalog Error: Table with name t does not exist!': 306}, 'version_went_backwards': 0, 'distinct_versions_seen': 301, 'poll_seconds': {'n': 624, 'min': 0.07813096046447754, 'p50': 0.16840505599975586, 'p90': 0.20972990989685059, 'p99': 0.29062986373901367, 'max': 0.3691251277923584, 'mean': 0.17640433135705116}}
+  TOTAL observations {'ok': 1220, 'missing_table': 647}; anomalies 647; backwards 0
+
+== reader inside its own transaction across swaps: {'same_version_again': 18}
+   writer: {'role': 'writer', 'swaps_done': 60, 'errors': {}, 'swap_txn_seconds': {'n': 60, 'min': 0.31125664710998535, 'p50': 0.3228490352630615, 'p90': 0.3540961742401123, 'p99': 0.4134678840637207, 'max': 0.4221811294555664, 'mean': 0.3301563541094462}, 'last_v': 2269}
+
+== long scans (5000000 rows) across swaps: outcomes {'consistent': 324}; scan seconds {'n': 324, 'min': 0.19971609115600586, 'p50': 0.2124781608581543, 'p90': 0.29624438285827637, 'p99': 0.3317887783050537, 'max': 0.3825869560241699, 'mean': 0.23131469223234388}
+   writer: {'swaps': 15, 'errors': {}, 'swap_txn_s': {'n': 15, 'min': 0.3071591854095459, 'p50': 0.36495304107666016, 'p90': 0.40442609786987305, 'p99': 0.4080228805541992, 'max': 0.4080228805541992, 'mean': 0.3569933891296387}}
+database dropped

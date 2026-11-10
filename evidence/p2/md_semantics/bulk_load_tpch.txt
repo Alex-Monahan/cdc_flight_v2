@@ -1,0 +1,7 @@
+CAVEAT: client-side rates below are limited by the uplink of the machine running this; first indication only.
+== 6,000,000 rows: generated 7 Parquet files, 150 MB (25 B/row compressed) in 3 s
+   parquet_copy         6,000,000 rows:     12.1 s    497,388 rows/s  {'rows': 6001215, 'seconds': 12.07, 'rows_per_s': 497388, 'parquet_MB_per_s': 12.4}
+   arrow_stream         6,000,000 rows:     10.9 s    548,353 rows/s  {'rows': 6001215, 'seconds': 10.94, 'rows_per_s': 548353, 'parquet_MB_per_s': 13.7}
+   appender             6,000,000 rows:     23.5 s    255,390 rows/s  {'rows': 6001215, 'seconds': 23.5, 'rows_per_s': 255390, 'parquet_MB_per_s': 6.4}
+   parallel_parquet     6,000,000 rows:      8.4 s    710,472 rows/s  {'rows': 6001215, 'seconds': 8.45, 'rows_per_s': 710472, 'processes': 4, 'parquet_MB_per_s': 17.7}
+database dropped; temporary files removed

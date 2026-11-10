@@ -1,0 +1,35 @@
+{
+  "spike": "swap_long_scan",
+  "duckdb_client": "1.5.6",
+  "started_utc": "2026-11-10T02:34:02Z",
+  "note": "measured from a laptop over the public internet; performance numbers are indications only",
+  "long_scan": {
+    "rows": 5000000,
+    "outcomes": {
+      "consistent": 96
+    },
+    "scan_s": {
+      "n": 96,
+      "min": 1.050436019897461,
+      "p50": 1.0888469219207764,
+      "p90": 1.1497578620910645,
+      "p99": 1.1948521137237549,
+      "max": 1.2403149604797363,
+      "mean": 1.0975862890481949
+    },
+    "writer": {
+      "swaps": 20,
+      "errors": {},
+      "swap_txn_s": {
+        "n": 20,
+        "min": 0.2993500232696533,
+        "p50": 0.35637331008911133,
+        "p90": 0.38394689559936523,
+        "p99": 0.3857462406158447,
+        "max": 0.3857462406158447,
+        "mean": 0.3464300990104675
+      }
+    }
+  },
+  "finished_utc": "2026-11-10T02:35:57Z"
+}

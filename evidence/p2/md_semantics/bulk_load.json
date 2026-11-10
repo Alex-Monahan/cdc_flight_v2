@@ -1,0 +1,98 @@
+{
+  "spike": "bulk_load",
+  "duckdb_client": "1.5.6",
+  "started_utc": "2026-11-10T02:51:02Z",
+  "note": "measured from a laptop over the public internet; performance numbers are indications only",
+  "caveat": "client-side methods are limited by this machine's uplink; the numbers that count are measured by running this script inside a Flight",
+  "results": {
+    "parquet_insert@1000000": {
+      "rows": 1000000,
+      "seconds": 4.79,
+      "rows_per_s": 208859,
+      "parquet_MB_per_s": 3.3
+    },
+    "parquet_copy@1000000": {
+      "rows": 1000000,
+      "seconds": 2.96,
+      "rows_per_s": 337502,
+      "parquet_MB_per_s": 5.3
+    },
+    "arrow_stream@1000000": {
+      "rows": 1000000,
+      "seconds": 3.0,
+      "rows_per_s": 333177,
+      "parquet_MB_per_s": 5.3
+    },
+    "appender@1000000": {
+      "error": "InvalidInputException: Invalid Input Error: Failed to cast value: Casting value \"10.00\" to type DECIMAL(3,2) failed: value is out of range!"
+    },
+    "csv_insert@1000000": {
+      "rows": 1000000,
+      "seconds": 2.56,
+      "rows_per_s": 390921,
+      "parquet_MB_per_s": 6.2
+    },
+    "parallel_parquet@1000000": {
+      "rows": 1000000,
+      "seconds": 3.22,
+      "rows_per_s": 310741,
+      "processes": 1,
+      "parquet_MB_per_s": 4.9
+    },
+    "server_generator@1000000": {
+      "rows": 1000000,
+      "seconds": 2.57,
+      "rows_per_s": 389663
+    },
+    "server_copy@1000000": {
+      "rows": 1000000,
+      "seconds": 0.53,
+      "rows_per_s": 1875574
+    },
+    "parquet_insert@10000000": {
+      "rows": 10000000,
+      "seconds": 15.26,
+      "rows_per_s": 655206,
+      "parquet_MB_per_s": 10.3
+    },
+    "parquet_copy@10000000": {
+      "rows": 10000000,
+      "seconds": 15.48,
+      "rows_per_s": 645972,
+      "parquet_MB_per_s": 10.2
+    },
+    "arrow_stream@10000000": {
+      "rows": 10000000,
+      "seconds": 12.61,
+      "rows_per_s": 793017,
+      "parquet_MB_per_s": 12.5
+    },
+    "appender@10000000": {
+      "error": "InvalidInputException: Invalid Input Error: Failed to cast value: Casting value \"10.00\" to type DECIMAL(3,2) failed: value is out of range!"
+    },
+    "csv_insert@10000000": {
+      "rows": 10000000,
+      "seconds": 14.8,
+      "rows_per_s": 675460,
+      "parquet_MB_per_s": 10.6
+    },
+    "parallel_parquet@10000000": {
+      "rows": 10000000,
+      "seconds": 12.16,
+      "rows_per_s": 822228,
+      "processes": 4,
+      "parquet_MB_per_s": 12.9
+    },
+    "server_generator@10000000": {
+      "rows": 10000000,
+      "seconds": 21.5,
+      "rows_per_s": 465160
+    },
+    "server_copy@10000000": {
+      "rows": 10000000,
+      "seconds": 1.39,
+      "rows_per_s": 7214061
+    }
+  },
+  "finished_utc": "2026-11-10T02:53:51Z"
+}

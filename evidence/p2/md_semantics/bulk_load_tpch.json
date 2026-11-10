@@ -1,0 +1,35 @@
+{
+  "spike": "bulk_load_tpch",
+  "duckdb_client": "1.5.6",
+  "started_utc": "2026-11-10T02:54:01Z",
+  "note": "measured from a laptop over the public internet; performance numbers are indications only",
+  "caveat": "client-side methods are limited by this machine's uplink; the numbers that count are measured by running this script inside a Flight",
+  "results": {
+    "parquet_copy@6000000": {
+      "rows": 6001215,
+      "seconds": 12.07,
+      "rows_per_s": 497388,
+      "parquet_MB_per_s": 12.4
+    },
+    "arrow_stream@6000000": {
+      "rows": 6001215,
+      "seconds": 10.94,
+      "rows_per_s": 548353,
+      "parquet_MB_per_s": 13.7
+    },
+    "appender@6000000": {
+      "rows": 6001215,
+      "seconds": 23.5,
+      "rows_per_s": 255390,
+      "parquet_MB_per_s": 6.4
+    },
+    "parallel_parquet@6000000": {
+      "rows": 6001215,
+      "seconds": 8.45,
+      "rows_per_s": 710472,
+      "processes": 4,
+      "parquet_MB_per_s": 17.7
+    }
+  },
+  "finished_utc": "2026-11-10T02:55:05Z"
+}
