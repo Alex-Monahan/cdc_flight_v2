@@ -13,6 +13,7 @@ here and listed in STATUS.md at the gate:
 | 1.7 crash points at every step of a schema change | schema changes (SPEC 2.x) | P4, schema and types |
 | 1.9 schema-change machine; the full quarantine machine (stored rows, slow retries; P3 has the exit to `quarantined` only) | SPEC 2.x, 4.0 | P4, schema and types; failure handling |
 | 1.7 soak of at least 1 h with at least 200 faults | all fuzzers and the whole pipeline | P3 runs a short soak at the gate; the full one is the P6 campaign |
+| 1.1/1.2 for a table the stream cannot carry: an `interval` key, or a table without a key that has a scalar `interval` column, on a source of Postgres 17 or later (C3, C10). P3 skips it with an alert | mode `full_refresh` (SPEC 3.5) | P4, CDC features |
 
 An interface below is a **contract**. A worker who needs a contract changed says so in its report or asks the
 orchestrator; it does not change it alone, because another worker is building against it.
@@ -230,7 +231,8 @@ child of its own.
 
 ```python
 plan = transform.plan(source_table, schema_frame=None, *, server_version_num) -> TablePlan
-                                        # per column position: destination name and type; `plan.ambiguous` (below)
+                                        # per column position: destination name and type; `plan.ambiguous` and
+                                        # `plan.ambiguous_key` (below)
 transform.stream(plan, rows: pyarrow.RecordBatch) -> pyarrow.RecordBatch      # engine transport form → destination types
 transform.backfill(plan, rows: pyarrow.RecordBatch) -> pyarrow.RecordBatch    # text as Postgres prints it → destination types
 transform.ambiguous(plan, rows: pyarrow.RecordBatch) -> mask or None          # rows whose zero interval is ambiguous
@@ -251,8 +253,11 @@ sent.
 
 The backfill's text form is what Postgres prints under the session settings that package P fixes for every read
 connection (C7; `docs/design/source.md` section 1). The stream's form of every type is the table in section 3 of
-`docs/design/engine.md`; the engine's walsender session has settings of its own (`IntervalStyle=postgres`,
-`DateStyle=ISO`). These are two transport forms on purpose, and the transform is the only code that knows either.
+`docs/design/engine.md`. These are two transport forms on purpose, and the transform is the only code that knows
+either. Where a value travels as the text that Postgres prints on both paths (an array, a composite, a type
+without a mapping), the two sessions must print it alike: the read sessions and the engine's walsender session
+pin the same text settings, `IntervalStyle=postgres` among them (decided in the fix round of Y; before it, an
+array of intervals had two destination values). A new text-output setting is pinned in both places or in none.
 
 **Ambiguous zero interval.** On a source of Postgres 17 or later, `interval 'infinity'` and `'-infinity'` in a
 scalar `interval` column reach the engine as a zero interval: the Postgres driver parses them into nothing, before
@@ -275,8 +280,13 @@ column of the stream is *ambiguous*: it is a real zero, `infinity` or `-infinity
   has another `xmin` and takes the full way.)
 - Not taken: "apply whatever the row holds now, and count it when a later transaction has changed it". It shows,
   for one group, a row that mixes two source transactions.
-- A table without a key that has a scalar interval column on such a source is not streamed: mode `full_refresh`
-  with an alert (SPEC 3.5), until P4 decides more.
+- `TablePlan.ambiguous_key` lists the key positions among them (a scalar `interval` key, or a domain over it; it is
+  part of the plan's hash). A table that has one is not streamed (C10: routing `skip` with an alert in P3; the mode
+  `full_refresh` of SPEC 3.5 carries it from P4 on). The repair read cannot help there, because it reads by that key.
+  No other key type is delivered non-injectively (the review of Y: arrays and composites keep `infinity`; the wide
+  forms of numeric and timestamp are exact).
+- A table without a key that has a scalar interval column on such a source is not streamed either (the same
+  rule of C10), until P4 decides more.
 - An infinite value puts the column into its wide form, `UNION(INTERVAL, VARCHAR)` (R9, SPEC 2.4), on both paths.
 - P3: the transform gives the list and the mask; the stream counts marked rows per table (`interval_ambiguous`),
   alerts once per table, and applies the delivered zero. Until the repair exists, an infinite interval in a
@@ -558,6 +568,12 @@ As delivered by package X; its report defines the interface, and this section is
   same OID with other columns → the schema rule above. A backfill that follows such a finding is entered only past
   `a`, so that its pending log never holds a row of the earlier table. A rename is therefore a drop of the old name
   and, if the new name is replicated, a fresh table; the rename in place of SPEC 2.2 is P4.
+- **Tables that are not streamed.** S asks the catalog and the transform's plan before it routes a table to
+  `streaming`: a table that the catalog refuses (`identity_problem`), a table whose plan has an `ambiguous_key`,
+  and a table without a key whose plan has an `ambiguous` column (C3) get routing `skip` with one alert per
+  table that names the reason. Their rows in the stream are counted and dropped. The mode `full_refresh` of SPEC
+  3.5 that will carry the last two is built in P4; until then such a table is not replicated (on the list of
+  parts carried to P4).
 - S runs a group again after `Conflict`, a bounded number of times, building its statements again when the
   conflict came from a DDL (a swap changes the catalog).
 - A table that fails to apply `apply.max_table_attempts` times (default 3) leaves the stream: state `quarantined`,
@@ -717,19 +733,18 @@ PII rules of P4: the mapping of a key column is injective up to the source's equ
 truncates a key column is refused. History of P4: a table with a deferrable primary key gets the plain changelog
 of a table without a key.
 
-**From the review of Y (transform).** S: the batch rule of C3 (concatenate before the transform). S and C10: a
-table whose key holds a column that the stream cannot deliver injectively (`plan.ambiguous_key`: a scalar
-`interval` key on a source of Postgres 17 or later, where `infinity`, `-infinity` and zero arrive alike) is not
-streamed: mode `full_refresh` with an alert; the repair read of C3 cannot help, because it reads by that key.
-Type wave of P4: `json` and `jsonb` become the native `JSON` type with the wide form `UNION(JSON, VARCHAR)` for a
-value DuckDB's JSON refuses (P3 delivers them as `VARCHAR`, lossless); enums stay `VARCHAR` until the owner
-rules (SPEC 2.4 names them among the native types; H-033); the engine's converter prints geometric types as
-Postgres does (P3: Java's float formatting in the stream form); a numeric domain keeps its typmod in the
-catalog's `TypeInfo`. Before P4 grades SPEC 2.4 the oracle gets: rules for the `VARCHAR` member of timestamp and
-interval columns; a timestamp form that does not overflow `bigint`; text comparison for arrays and composites
-delivered as text; the fallback through the type's output function instead of `::text`; `lc_monetary=C` pinned in
-its session; a `timetz` rule by (microseconds, offset). P9: the cost of a 200-column table (52 K rows/s in the
-stream here).
+**From the review of Y (transform).** S: the batch rule of C3 (concatenate before the transform). S and C10: a table
+whose key holds a column that the stream cannot deliver injectively (`plan.ambiguous_key`: a scalar `interval` key on
+a source of Postgres 17 or later, where `infinity`, `-infinity` and zero arrive alike) is not streamed: routing `skip`
+with an alert in P3, mode `full_refresh` from P4 on (C10); the repair read of C3 cannot help, because it reads by that
+key. Type wave of P4: `json` and `jsonb` become the native `JSON` type with the wide form `UNION(JSON, VARCHAR)` for a
+value DuckDB's JSON refuses (P3 delivers them as `VARCHAR`, lossless); enums stay `VARCHAR` until the owner rules
+(SPEC 2.4 names them among the native types; H-033); the engine's converter prints geometric types as Postgres does
+(P3: Java's float formatting in the stream form); a numeric domain keeps its typmod in the catalog's `TypeInfo`.
+Before P4 grades SPEC 2.4 the oracle gets: rules for the `VARCHAR` member of timestamp and interval columns; a
+timestamp form that does not overflow `bigint`; text comparison for arrays and composites delivered as text; the
+fallback through the type's output function instead of `::text`; `lc_monetary=C` pinned in its session; a `timetz`
+rule by (microseconds, offset). P9: the cost of a 200-column table (52 K rows/s in the stream here).
 
 **From the review of F (fuzzers, round 1).** Round 2 of F points the fuzzers at the real system and needs the
 following; each owner's task takes its line. S (C5, C10, with L for epoch and run): the facts for "never two

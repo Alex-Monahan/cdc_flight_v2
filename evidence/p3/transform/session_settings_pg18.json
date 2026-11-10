@@ -1,0 +1,49 @@
+{
+  "identical": {
+    "f_af": true,
+    "f_aiv": true,
+    "f_atz": true,
+    "f_by": true,
+    "f_cp": true,
+    "f_dt": true,
+    "f_f4": true,
+    "f_f8": true,
+    "f_iv": true,
+    "f_mn": true,
+    "f_num": true,
+    "f_rtz": true,
+    "f_tm": true,
+    "f_tmz": true,
+    "f_ts": true,
+    "f_tz": true,
+    "mix": true
+  },
+  "role_settings": {
+    "DateStyle": "SQL, DMY",
+    "IntervalStyle": "sql_standard",
+    "TimeZone": "Asia/Kathmandu",
+    "bytea_output": "escape",
+    "extra_float_digits": "-15",
+    "lc_monetary": "en_US.UTF-8"
+  },
+  "tables": [
+    "f_af",
+    "f_aiv",
+    "f_atz",
+    "f_by",
+    "f_cp",
+    "f_dt",
+    "f_f4",
+    "f_f8",
+    "f_iv",
+    "f_mn",
+    "f_num",
+    "f_rtz",
+    "f_tm",
+    "f_tmz",
+    "f_ts",
+    "f_tz",
+    "mix"
+  ],
+  "test": "tests/transform/test_transform_crosspath.py::test_role_level_session_settings_change_nothing"
+}
