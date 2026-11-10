@@ -333,12 +333,21 @@ def create(node: PgConnection, name: str, deadline: Deadline, *, primary: PgConn
 
 
 def _create_stmt(node: PgConnection, sql: str, name: str, deadline: Deadline) -> str:
+    # A creation whose client is gone (process killed) must not finish the slot later: with this setting the
+    # backend checks the socket every second while it waits and aborts the creation when the client has closed.
+    node.execute("SET client_connection_check_interval = 1000", deadline=deadline, what="slot.create")
     try:
         return node.scalar(sql, (name, PLUGIN), deadline=deadline, what="slot.create")
     except errors.SourceError as e:
         if e.sqlstate == "42710":
             raise SlotExists("slot %s already exists" % name, e.sqlstate) from None
         raise
+    finally:
+        if not node.closed:
+            try:
+                node.execute("RESET client_connection_check_interval", deadline=Deadline.after(2), what="slot.create")
+            except (errors.SourceError, DeadlineExceeded):
+                pass
 
 
 def _abandon(node: PgConnection, name: str, creator: tuple[int, int], primary, method, nudges, waited,
