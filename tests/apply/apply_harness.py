@@ -293,6 +293,26 @@ def cut_scenario(conn, seed: int, form: str = "local", table: str = "t"):
 # ------------------------------------------------------------------------------------------------ rounds (item 7)
 
 
+def repair(conn, target, meta, rows, replace: bool = True) -> None:
+    """Load a repair read as docs/design/apply.md 2.6 says: in one transaction, the rows of each key deleted and the
+    source's row inserted (`replace=False`: a plain INSERT, the wrong way, kept for the test that shows it)."""
+    from apply_sim import values_table
+    from cdc_v2.apply.types import exact, join_wrap, quote_ident
+    if not rows:
+        return
+    conn.register("cdc_v2_test_repair", values_table(list(meta.columns), rows))
+    try:
+        with StandInTx(conn) as tx:
+            if replace:
+                cond = " AND ".join("%s = %s" % (join_wrap(exact("t.%s" % c.qname, c.dtype), c.dtype),
+                                                 join_wrap(exact("r.%s" % quote_ident(c.name), c.dtype), c.dtype))
+                                    for c in meta.key_columns)
+                tx.execute("DELETE FROM %s AS t USING cdc_v2_test_repair AS r WHERE %s" % (target.sql(), cond))
+            tx.execute("INSERT INTO %s SELECT * FROM cdc_v2_test_repair" % target.sql())
+    finally:
+        conn.unregister("cdc_v2_test_repair")
+
+
 def rounds_scenario(conn, seed: int, form: str = "local", table: str = "t", n_txn: int = 8, max_ops: int = 4,
                     max_snapshots: int = 6, toast_rate: float = 0.8, repeat: bool = False, apply_fn=None,
                     check_bound: bool = True):
@@ -350,10 +370,7 @@ def rounds_scenario(conn, seed: int, form: str = "local", table: str = "t", n_tx
                 assert any(sup.get(c.position, 0) <= lo for c in meta.value_columns), \
                     "seed %d: a key reported unresolved although every value is in the round's records" % seed
         rows = [v for v in states[end] if exact_key(v) in U]       # the repair read, at the round's end
-        if rows:
-            conn.register("cdc_v2_test_repair", values_table(list(meta.columns), rows))
-            conn.execute("INSERT INTO %s SELECT * FROM cdc_v2_test_repair" % target.sql())
-            conn.unregister("cdc_v2_test_repair")
+        repair(conn, target, meta, rows)
         lo = end
     got = dest_canon(conn, target, meta)
     want = literal_rows_canon(list(meta.columns), states[n_txn])

@@ -91,6 +91,13 @@ class _Counting:
         return self._tx.register(name, data)
 
 
+def _require_spill_dir(settings: ApplySettings) -> None:
+    import os
+    if not settings.local_temp_directory or not os.path.isdir(settings.local_temp_directory):
+        raise ApplySettingsError("ApplySettings.local_temp_directory must name an existing directory (the "
+                                 "pipeline's spill area) for a local change set")
+
+
 def _ucols(cs) -> list:
     return [c for c in cs.u_columns() if not c.key]
 
@@ -110,10 +117,7 @@ def apply_group(tx, target: Target, change_set: Union[LocalChangeSet, RelationCh
     meta = change_set.meta
     ucols = _ucols(change_set)
     if isinstance(change_set, LocalChangeSet):
-        import os
-        if not settings.local_temp_directory or not os.path.isdir(settings.local_temp_directory):
-            raise ApplySettingsError("ApplySettings.local_temp_directory must name an existing directory (the "
-                                     "pipeline's spill area) for a local change set")
+        _require_spill_dir(settings)
         backend = LocalBackend(ctx, target, meta, change_set.rows, settings.statement_rows, settings.local_threads,
                                settings.local_memory_limit, settings.local_temp_directory,
                                settings.local_max_temp_directory_size)
@@ -375,15 +379,23 @@ def reduce_duplicates(tx, target: Target, change_set: Union[LocalChangeSet, Rela
     ks = ", ".join("%s AS x%d" % (exact(c.k, c.dtype), c.position) for c in keys)
     nn = " AND ".join("%s IS NOT NULL" % c.k for c in keys)
     if isinstance(change_set, LocalChangeSet):
-        import duckdb
-        L = duckdb.connect(":memory:")
-        L.execute("SET arrow_lossless_conversion = true")
+        # the keys are computed in the planning database, under the limits of ApplySettings (as apply_group)
+        from .backend import _Guarded, _discard_db, _planning_db
+        _require_spill_dir(settings)
+        db, key = _planning_db(settings.local_threads, settings.local_memory_limit, settings.local_temp_directory,
+                               settings.local_max_temp_directory_size)
+        L = _Guarded(db.cursor())
         try:
+            L.execute("SET SESSION arrow_lossless_conversion = true")
             L.register("src_rows", change_set.rows)
             data = L.execute("SELECT DISTINCT * FROM (SELECT %s FROM src_rows UNION ALL SELECT %s FROM src_rows WHERE %s)"
                              % (xs, ks, nn)).to_arrow_table()
-        finally:
+        except LocalSpill:
             L.close()
+            _discard_db(key)
+            raise ApplySpillFull("%s: the keys of a local change set of %d records exceeded the memory limit and the "
+                                 "spill limit" % (target, change_set.rows.num_rows)) from None
+        L.close()
         if data.num_rows == 0:
             return 0
         tx.register("cdc_v2_apply_keys", data)
