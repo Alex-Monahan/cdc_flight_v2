@@ -8,12 +8,13 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
   table). **P2 Platform spike: gate passed on 2026-11-10** — every spike is done and merged, the report
   (`docs/spike_report.md`) is complete and was sent to the owner; nothing found contradicts SPEC, so the build
   continues without waiting. **P3 Core: in progress** (table below): the fault harness, the oracle, the source
-  package, the engine, the transform and the apply package are merged; the question the second review raised — which tables have a key — is measured and decided
-  (rule K, below) and has a small package of its own, which is merged; the cut is merged; the destination basics are
-  reviewed twice and in a fix round of sixteen items (the first is one unexplained result at the fence: once in 30
-  runs on MotherDuck an old run's empty transaction was answered "committed" after a take-over; it did not recur in
-  237 further cases and is now being reproduced with full diagnostics); round 1 of the fuzzers (against a toy
-  replicator) is reviewed and in its fix round; the task file of every package is written.
+  package, the engine, the transform and the apply package are merged; the question the second review raised — which
+  tables have a key — is measured and decided (rule K, below) and has a small package of its own, which is merged; the
+  cut is merged; the destination basics are reviewed twice and in a fix round of sixteen items (the first is one
+  unexplained result at the fence: once in 30 runs on MotherDuck an old run's empty transaction was answered
+  "committed" after a take-over; it did not recur in 237 further cases and is now being reproduced with full
+  diagnostics); round 1 of the fuzzers (against a toy replicator) is merged; the task file of every package is
+  written.
 - Stage 2 (PlanetScale) cannot start: of its names only `PLANETSCALE_ORG` and `PLANETSCALE_DATABASE` are in the env
   file (checked again at the P1 gate). The service token and the connection values are owed by the owner.
 
@@ -62,7 +63,7 @@ green on T1 (local primary and standby, real MotherDuck, local JVM).
 | Y | Transform: source types to destination types | Opus | **merged** (`362d00b`; one review, one fix round, one last check) |
 | S | Stream: transactions, groups, commit and acknowledge, supervisor, pipeline process | Opus (was Fable) | task written; after E, D, A, P, K |
 | V | Slot continuity | Opus (was Fable) | task written; after S |
-| F | Fuzzers (stream, workload, fault, leadership), the consumer loop of 1.3 and 3.2 | Opus | **round 1 delivered** (branch `p3-f-fuzzers`, against a toy replicator); fix round of 15 items delivered (`19b4a52`) and re-checked: **merge after three fixes** and a stronger fence self-test, **running**; round 2, against the real system, after S, L, B, V |
+| F | Fuzzers (stream, workload, fault, leadership), the consumer loop of 1.3 and 3.2 | Opus | **round 1 merged** (`29614f0`; against a toy replicator; one review, two fix rounds: the ledger of SPEC 4, suite 1.7, the fence drill in every leadership seed); round 2, against the real system, after S, L, B, V (its task takes the coordinator's list of what to plant for K, X, A and D) |
 | B | Backfill and hand-off | Opus (was Fable) | task written; after X, S, A, P, Y |
 | T | The catalog gate, truncate, drop and recreate, the document and the test over all state machines | Opus | task written; after S, B |
 | K | The key rule: the catalog reads whether a primary key is deferrable, the engine is told which tables are without a key, what Debezium calls a key is measured (added 2026-11-10) | Opus | **merged** (`947aabd`; one review, one fix round) |
@@ -334,7 +335,6 @@ Each in its own worktree and branch; the orchestrator merges. The P3 packages ar
 | Job | Phase | Started | Delivers |
 |---|---|---|---|
 | Package D, destination basics: **delivered** on branch `worktree-agent-a5e245130333b3efe` (`9e389cc`). The coordinator's review is in; the second reviewer (Opus, xhigh, reading only; the first one was stopped by the spend limit, its MotherDuck test runs are kept; MotherDuck databases `cdc_v2_t_d_rv_*`) that attacks the fence, the unknown commit outcome, deadlines, the error mapping and the transition function with cases of its own and runs the package's MotherDuck tests once more on the last commit | P3 | 2026-11-10 | the second verdict (the coordinator's is in: merge after named fixes); then one fix round — `_cdc.transitions` gets the lane, a sequence that gives the order of commit, and the facts of a group; a connection's registration must fail when a take-over came in between; a machine declares which lane creates its rows; the evidence names the commit and the command that really ran — then the merge, and D's notes in the tasks of L and S |
-| Package F, fuzzers (Opus, high): **fix round running** on branch `p3-f-fuzzers` (15 items: ledger rules, suite 1.7 again, reductions, two table shapes, the shared-memory repair of `tools/localpg`, the frame reader's allocation). Homes `pg-f<n>`, ports 55700 + 8·n; localpg self-test ports | P3 | 2026-11-10 | the four fuzzers with seeds and replay, the consumer loop of SPEC 1.3 and 3.2, their self-tests with planted defects. Owed: the fix round below |
 
 **Package A, apply — delivered 2026-11-10; two reviews; fix round delivered, under its last checks.** The
 coordinator's verdict was "merge after a short fix round". The second reviewer (Fable) then tested the model the
