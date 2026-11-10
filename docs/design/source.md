@@ -1,7 +1,7 @@
 # Source side (package P): `cdc_v2.pg`
 
 Status: built in P3 (2026-11-10). Contract: `docs/design/p3_plan.md` C0, C1, C7. Evidence: `evidence/p3/source/`
-(`localpg_pg18.json`, `localpg_pg16.json`, written by the `localpg` suite with `CDC_V2_P_EVIDENCE=1`; three files
+(`localpg_pg18.json`, `localpg_pg16.json`, written by the `localpg` suite with `CDC_V2_P_EVIDENCE=1`; five files
 of single tests are named where they are used). Every number below comes from those files; they were measured on a
 shared laptop and are indications only.
 
@@ -210,6 +210,13 @@ name and type is a drop of one `attnum` and an add of another, never a rename.
   `ALTER TABLE` on the parent does not reach the partitions; a partition attached later needs its own call). The catalog observation reports the same rule as `TableFacts.replica_identity_problem`.
   The wrong order is shown by test: a keyless table added without FULL makes the source's own `UPDATE` and `DELETE`
   fail (SQLSTATE 55000, "does not have a replica identity and publishes updates").
+- What Postgres lets a key be is measured in `tests/pg_source/test_pg_keys.py` (Postgres 16.6 and 18.6, hazard
+  H-015, evidence `replica_identity_keys_pg16.json` and `replica_identity_keys_pg18.json`): an immediate key is
+  checked row by row, so the decoded stream never shows two rows with one key; a deferrable primary key is not a
+  replica identity (a published table with one and `REPLICA IDENTITY DEFAULT` refuses its own `UPDATE` and
+  `DELETE`, SQLSTATE 55000), and with `REPLICA IDENTITY FULL` it is the only table shape whose stream can show two
+  rows with one key. **Open until package K is merged:** the catalog and `check` do not read
+  `pg_index.indimmediate` yet and call such a table keyed.
 - `next_xid` (X of design 7.5) = `pg_snapshot_xmax(pg_current_snapshot())` read after the change committed: the first
   unassigned transaction id. Every transaction with a smaller id started before the change.
 - `publication.state(conn)` → `PublicationState(exists, oid, owner, all_tables, publish, via_root,
@@ -515,6 +522,7 @@ CDC_V2_P_PG_MAJOR=16 uv run pytest -m localpg tests/pg_source                   
 CDC_V2_P_EVIDENCE=1 …                                                           # also writes evidence/p3/source/
 CDC_V2_P_EVIDENCE=1 CDC_V2_P_EVIDENCE_NAME=x.json … -k <test>                   # a partial run names its own file
 CDC_V2_P_BRACKET_RUNS=40 … -k test_bracket_on_primary                           # repeats the primary bracket run
+CDC_V2_P_EVIDENCE=1 CDC_V2_P_EVIDENCE_NAME=replica_identity_keys_pg18.json … tests/pg_source/test_pg_keys.py  # H-015
 ```
 
 The `localpg` suite builds or starts its own pairs through `tools/localpg`, runs ≈ 9–11 minutes per version (the

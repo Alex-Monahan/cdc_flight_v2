@@ -1,0 +1,123 @@
+{
+  "command": "CDC_V2_P_PG_MAJOR=16 CDC_V2_P_EVIDENCE=1 CDC_V2_P_EVIDENCE_NAME=replica_identity_keys_pg16.json uv run pytest -m localpg tests/pg_source/test_pg_keys.py",
+  "machine_note": "shared 10-core laptop, up to three other workers running; indications only",
+  "major": 16,
+  "psycopg": "3.3.8",
+  "results": {
+    "keys": {
+      "what_postgres_lets_a_key_be": {
+        "catalog": {
+          "def_def": {
+            "identity_index": false,
+            "immediate": false,
+            "replident": "d"
+          },
+          "def_full": {
+            "identity_index": false,
+            "immediate": false,
+            "replident": "f"
+          },
+          "def_imm": {
+            "identity_index": false,
+            "immediate": false,
+            "replident": "d"
+          },
+          "def_uni": {
+            "identity_index": false,
+            "immediate": false,
+            "replident": "d"
+          },
+          "imm": {
+            "identity_index": true,
+            "immediate": true,
+            "replident": "d"
+          },
+          "imm_full": {
+            "identity_index": false,
+            "immediate": true,
+            "replident": "f"
+          }
+        },
+        "deferrable_key_full_identity_direct_swap_decoded": [
+          [
+            [
+              "O",
+              [
+                "1",
+                "a"
+              ]
+            ],
+            [
+              "N",
+              [
+                "2",
+                "a"
+              ]
+            ]
+          ],
+          [
+            [
+              "O",
+              [
+                "2",
+                "b"
+              ]
+            ],
+            [
+              "N",
+              [
+                "1",
+                "b"
+              ]
+            ]
+          ]
+        ],
+        "identity_using_a_deferrable_index": [
+          "0A000",
+          "cannot use non-immediate index \"def_uni_id\" as replica identity"
+        ],
+        "immediate_key_swap_and_shift_in_one_statement": {
+          "imm": [
+            [
+              "23505",
+              "duplicate key value violates unique constraint \"imm_pkey\""
+            ],
+            [
+              "23505",
+              "duplicate key value violates unique constraint \"imm_pkey\""
+            ]
+          ],
+          "imm_full": [
+            [
+              "23505",
+              "duplicate key value violates unique constraint \"imm_full_pkey\""
+            ],
+            [
+              "23505",
+              "duplicate key value violates unique constraint \"imm_full_pkey\""
+            ]
+          ]
+        },
+        "largest_number_of_holders_of_one_key_in_the_decoded_stream": {
+          "def_full": 2,
+          "imm": 1,
+          "imm_full": 1
+        },
+        "published_deferrable_key_default_identity": [
+          [
+            "55000",
+            "cannot update table \"def_imm\" because it does not have a replica identity and publishes updates"
+          ],
+          [
+            "55000",
+            "cannot delete from table \"def_def\" because it does not have a replica identity and publishes deletes"
+          ]
+        ]
+      }
+    }
+  },
+  "server_versions": {
+    "pg-p2": "PostgreSQL 16.6 (Homebrew) on aarch64-apple-darwin24.1.0, compiled by Apple clang version 16.0.0 (clang-1600.0.26.4), 64-bit"
+  },
+  "what": "package P (source) tests on a private tools/localpg pair; times in seconds"
+}

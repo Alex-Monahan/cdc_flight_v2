@@ -419,6 +419,25 @@ stays in place behind every entry.
   (`PostgresChangeRecordEmitter`) **[src]**; swaps `A→B, B→A` in one transaction pass through an intermediate state that
   violates uniqueness if applied statement by statement. FULL identity on a keyless table: a delete of one of several
   identical rows carries the whole old row; applying it as `DELETE … WHERE all columns =` deletes all copies.
+- **What Postgres lets a key be** (**[test]** Postgres 16.6 and 18.6, `tests/pg_source/test_pg_keys.py`, evidence
+  `evidence/p3/source/replica_identity_keys_pg16.json` and `replica_identity_keys_pg18.json`).
+  - An immediate key is checked row by row, also under `REPLICA IDENTITY FULL`: `UPDATE t SET id = 3 - id WHERE id IN
+    (1, 2)` and `UPDATE t SET id = id + 1` fail with a unique violation (23505). A swap needs a free third value. In
+    the decoded stream of such a table no key is ever held by two rows, after any record: the changes of one
+    transaction arrive in the order the server made them, transactions arrive in commit order, and a second
+    transaction that inserts a key waits until the first one that touched it has ended. The same holds for the
+    source's coarser equality (`-0 = 0`, `1 mon = 30 days`, `1.0 = 1.00`, a nondeterministic collation): two rows the
+    source calls equal never exist together.
+  - A deferrable key is not a replica identity. `ALTER TABLE … REPLICA IDENTITY USING INDEX` on a deferrable unique
+    index is refused (0A000, `cannot use non-immediate index … as replica identity`). A deferrable primary key
+    (initially immediate or initially deferred) gives no identity under `REPLICA IDENTITY DEFAULT`
+    (`pg_get_replica_identity_index` is NULL), and the published table refuses its own `UPDATE` and `DELETE`
+    (55000), as a table without a primary key does (H-014).
+  - Only a table with a deferrable primary key and `REPLICA IDENTITY FULL` can hold two rows with one key inside a
+    transaction, and its decoded stream shows that state: the direct swap `UPDATE t SET id = 3 - id WHERE id IN
+    (1, 2)` arrives as `(1,a) → (2,a)`, then `(2,b) → (1,b)`; after the first record two rows hold key 2. An insert
+    of a duplicate followed by a delete of the old row in one transaction works too. A record of such a table that
+    names only a key does not say which row it means.
 - **Reproduction.** P: `BEGIN; UPDATE cdc_v2_t SET id = -id WHERE id IN (1,2); UPDATE cdc_v2_t SET id = 2 WHERE id = -1;
   UPDATE cdc_v2_t SET id = 1 WHERE id = -2; COMMIT;`; keyless: `CREATE TABLE cdc_v2_dup (a int) ; ALTER TABLE cdc_v2_dup
   REPLICA IDENTITY FULL; INSERT INTO cdc_v2_dup VALUES (1),(1),(1); DELETE FROM cdc_v2_dup WHERE ctid = (SELECT ctid FROM
