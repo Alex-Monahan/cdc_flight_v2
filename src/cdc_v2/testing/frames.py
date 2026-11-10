@@ -243,6 +243,12 @@ def encode_payload(frame):
         b.posmap(frame.positions)
         b.str(frame.schema)
         b.str(frame.table)
+        if frame.failing_position is None:
+            b.flag(False)
+        else:
+            b.flag(True)
+            b.opt_u64(frame.failing_position.get("lsn"))
+            b.opt_u64(frame.failing_position.get("txId"))
         return F.FATAL, bytes(b.b)
     raise TypeError("not a frame: %r" % (frame,))
 
@@ -494,7 +500,12 @@ def generate_one(seed):
         causes.append((a, g.text(g.u(10))))
     pos = g.posmap()
     fs = g.text(g.u(5))
-    out.append(F.Fatal(cls, msg, tuple(causes), pos, fs, g.text(g.u(5))))
+    ft = g.text(g.u(5))
+    failing = None
+    if g.coin():
+        lsn = g.opt_long()
+        failing = {"lsn": lsn, "txId": g.opt_long()}
+    out.append(F.Fatal(cls, msg, tuple(causes), pos, fs, ft, failing))
     return out
 
 

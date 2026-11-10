@@ -76,7 +76,7 @@ value: kind 0 none, 1 i64, 2 `str`, 3 `flag`), keys sorted (Java `TreeMap<String
 | MESSAGE | 7 | u64 seq, str prefix, flag transactional, bin content, posmap |
 | HEARTBEAT | 8 | u64 seq, posmap (information only: no ack_position; never acknowledged) |
 | BATCH_END | 9 | u32 records in the engine batch, opt_u64 newest ack_position handed to Debezium so far |
-| FATAL | 10 | str class, str safe message, u16 n, n × (str class, str safe message) of the cause chain, posmap of the last record handed over, str schema and str table of the record being handled (empty when unknown) |
+| FATAL | 10 | str class, str safe message, u16 n, n × (str class, str safe message) of the cause chain, posmap of the last record handed over, str schema and str table of the record being handled (empty when unknown), `failing_position`: flag, then (if 1) opt_u64 lsn, opt_u64 txId of the event Debezium names as failing |
 
 A column **buffer** is u32 byte length, zero bytes up to a multiple of 8 counted from the payload start, the bytes,
 zero bytes up to the next multiple of 8. So every buffer starts 8-aligned inside the payload; Python reads each
@@ -188,16 +188,22 @@ Everything else is as §8.4 (memory offset store, `offset.flush.interval.ms=0`, 
 `publication.autocreate.mode`, `publication.name`, `slot.name`, `plugin.name`, `converters`, `cdcv2.*`,
 `tombstones.on.delete`, `heartbeat.interval.ms`, `heartbeat.action.query`, `replica.identity.autoset.values`,
 `read.only`, `signal.*`, `offset.mismatch.strategy`, `unavailable.value.placeholder`, `decimal.handling.mode`,
-`binary.handling.mode`, `include.unknown.datatypes`, `record.processing.order`, the connection keys and `cdc_v2.*`.
+`binary.handling.mode`, `include.unknown.datatypes`, `record.processing.order`, `schema.refresh.mode`, the
+connection keys and `cdc_v2.*`, and the options that silently change or drop values or rows: every key with the
+prefix `column.` (`column.mask.*`, `column.truncate.to.*`, `column.mask.hash.*`, `column.exclude.list`,
+`column.include.list`, …), `transforms` and `transforms.*`, `predicates` and `predicates.*`, `message.key.columns`,
+`table.include.list` (it comes only from `table_include`), `table.exclude.list`, `schema.include.list`,
+`schema.exclude.list`.
 `EngineSettings` requires 0 < `heartbeat_interval_ms` ≤ 10,000 (with 0 HELLO never comes on an idle source and the
 last transaction before an idle period is never confirmed). The JVM checks the effective configuration again before
 anything else (`ProtectedConfig`): every guarantee-carrying key must have exactly our value (`skipped.operations=none`,
 memory offset store, `offset.flush.interval.ms=0`, `lsn.flush.mode=connector`, both retry settings 0,
 `provide.transaction.metadata=true`, `snapshot.mode=no_data`, `publication.autocreate.mode=disabled`, our converter,
-`tombstones.on.delete=false`, `offset.mismatch.strategy=no_validation`, `plugin.name=pgoutput`), the
-behaviour-adding keys must be absent, the heartbeat interval must be in 1..10,000 ms and the host and port must be
-present (no default host, never port 5432); otherwise FATAL naming the key, never a value (25 `jvm` cases in
-`test_java_refuses_a_weakened_configuration`, 25 hermetic cases in `test_extra_may_not_set_a_protected_key`).
+`tombstones.on.delete=false`, `offset.mismatch.strategy=no_validation`, `plugin.name=pgoutput`,
+`record.processing.order=ORDERED`, `include.unknown.datatypes=true`, `schema.refresh.mode=columns_diff`), the
+behaviour-adding and value-changing keys above must be absent (`table.include.list` is allowed: Python sets it), the heartbeat interval must be in 1..10,000 ms and the host and port must be
+present (no default host, never port 5432); otherwise FATAL naming the key, never a value (41 `jvm` cases in
+`test_java_refuses_a_weakened_configuration`, 43 hermetic cases in `test_extra_may_not_set_a_protected_key`).
 
 JVM: `-Xmx` from `EngineSettings.heap_mb` (512 MB default), `-XX:+UseParallelGC` (the spike measured +7 %),
 `-XX:+ExitOnOutOfMemoryError` (an OOM ends the JVM instead of leaving it half alive), `-XX:MaxDirectMemorySize=64m`,
@@ -243,10 +249,14 @@ line, three repeats, a value between two held ENDs) leave the slot as specified 
 line is logged as `BAD_COMMAND` and ignored.
 
 **The held list and its bound.** `HeldEnds` holds every k-th END plus always the newest one. When more than
-`cdc_v2.ack.max.pending` (4,096) samples are held, every second one is dropped (the oldest kept) and k doubles; when
-the list empties, k returns to 1. A `DURABLE p` confirms an END that lies at most **k − 1 END records below the newest
-END at or below p, with k ≤ max(1, 2 × lead / 4096)**, where lead is the number of ENDs the engine has received beyond
-the oldest one not yet confirmed; it never confirms above p. Example: 60,000 ENDs read with no DURABLE, then DURABLE
+`cdc_v2.ack.max.pending` (4,096) samples are held, the newest sample and every second one counted back from it are
+kept, and the oldest one too, so no gap between held samples exceeds the new k; k doubles; when the list empties, k
+returns to 1. **Bound: after a `DURABLE p`, the newest END confirmed so far lies at most k − 1 END records below the
+newest END at or below p, with k ≤ max(1, 2 × lead / limit)**, where lead is the number of ENDs the engine has
+received beyond the oldest one not yet confirmed; it is never above p. This holds for every limit ≥ 2, odd or even:
+`test_java_held_list_property_random_limits` checks it for random limits 2–41 and random add/take sequences (seeds
+1–3, 60 rounds each, 35,000–38,000 takes per seed, 0 violations); the previous thinning, which could leave the newest
+sample only in the tail where the next END overwrote it, fails that test with odd limits (580 violations for seed 1). Example: 60,000 ENDs read with no DURABLE, then DURABLE
 for END #20,000, #36,000 and #60,000: the slot reached #19,985, #35,985 and #60,000 (15 behind; stated bound 28)
 within 0.7–0.8 s each and was never above (`held_list_bound.json`). The first version's thinning dropped the oldest
 entry at every thinning and stopped following while the pipeline was more than about 24,000 ENDs behind.
@@ -409,15 +419,22 @@ parse never reaches our code. Measured on the Postgres 18.6 pair (`test_engine_v
   three complete). Never a partial ROWS of
   the failing transaction. FATAL carries the position fields of the last record handed over; its cause message
   `Error while processing event at offset {…}` names the failing event's offset (`txId`, `lsn`), the same in every
-  attempt. The table is not known to the engine (the failure is in Debezium's thread, before a record exists).
+  attempt; the engine parses `lsn` and `txId` from it and sends them as `failing_position` in the FATAL frame
+  (never the text). `failing_position` was present and equal over three starts
+  (`test_unparsable_interval_ends_in_fatal_without_the_value`); `positions` (the last record handed over) can differ
+  between starts (txId 580034 against 580035 in one run, equal in the last). The stream compares `failing_position`.
+  The table is not known to the engine (the failure is in Debezium's thread, before a record exists).
   Neither the value nor a marker column of the row appears in the FATAL frame, the JVM output or the Python log. A
   restart ends again at the same transaction, 1.4–1.5 s after the start. **With the table left out of
   `table.include.list` the transaction passes**: it arrives as BEGIN and END with `event_count` 0 and the stream goes
   on (the next transaction's row arrives). So package S can quarantine one table: find the candidate tables (those
   with a column of a type in this class, here `interval`; or by elimination), restart the engine with them excluded,
   and backfill them.
-- **`interval 'infinity'` and `interval '-infinity'`** (Postgres 17+): pgjdbc's `PGInterval` parses them **into the
-  zero interval, silently**; the engine delivers `0 months 0 days 0 microseconds`, the same as a real zero
+- **An infinite interval arrives as a zero interval; the engine cannot tell them apart and changes nothing — the
+  rule is the pipeline's** (the transform marks a zero interval from a source of Postgres 17 or later, the stream
+  reads the true value from the source). Interval arrays are not affected: they travel as their text form, which
+  keeps `infinity`. Details: `interval 'infinity'` and `interval '-infinity'` (Postgres 17+): pgjdbc's `PGInterval`
+  parses them **into the zero interval, silently**; the engine delivers `0 months 0 days 0 microseconds`, the same as a real zero
   (`infinite_interval.json`, `test_infinite_interval_is_delivered_as_zero`). Our converter receives only the parsed
   object; the text is gone, so the engine cannot tell. **This is silent data loss with stock Debezium and must be
   decided outside the engine** (a finding for the orchestrator): for example a guard in the transform that treats a
@@ -474,8 +491,17 @@ here (P9).
 9. `posmap` integers are signed 64-bit in Python.
 10. The marker `jvm` is registered in `pyproject.toml` and excluded from the default run; `tests/engine/conftest.py`
     also skips `jvm` tests unless `-m` selects them (the skip reason).
-11. FATAL has fields beyond C2's list: the position fields of the last record handed over, and schema and table of
-    the record being handled (empty when unknown). Its messages are filtered (section 7).
+11. FATAL has fields beyond C2's list: the position fields of the last record handed over, schema and table of
+    the record being handled (empty when unknown), and `failing_position` ({`lsn`, `txId`} of the event that
+    Debezium names in "Error while processing event at offset {…}"; absent when no exception names one). Compare
+    `failing_position`, not `positions`, to recognise "the same place" across restarts. Its messages are filtered
+    (section 7).
+12. **Two transport forms of text, on purpose.** The walsender session of the engine uses `IntervalStyle=postgres`
+    and `DateStyle=ISO` (`driver.options`, section 4); the read connections of the source package use `iso_8601`
+    and `ISO, YMD`. The stream form of every type is the table of section 3 of this document; the backfill form is
+    the source package's.
+13. The source package's nudge writes a logical message with the prefix `cdc_v2.nudge`, which lies outside the
+    default `message.prefix.include.list` (`cdc_v2_.*`) on purpose: it never reaches the pipeline.
 
 ## 13. Review
 

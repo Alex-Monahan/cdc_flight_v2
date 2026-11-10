@@ -158,7 +158,13 @@ def base_props():
     ("heartbeat.interval.ms", "60000"), ("heartbeat.action.query", "select 1"),
     ("replica.identity.autoset.values", "*.*:FULL"), ("read.only", "true"), ("signal.enabled.channels", "source"),
     ("offset.commit.policy", "x"), ("offset.storage.file.filename", "/x"), ("cdcv2.extra", "1"),
-    ("database.hostname", ""), ("database.port", None), ("skipped.operations", None)])
+    ("database.hostname", ""), ("database.port", None), ("skipped.operations", None),
+    ("record.processing.order", "UNORDERED"), ("include.unknown.datatypes", "false"),
+    ("schema.refresh.mode", "columns_diff_exclude_unchanged_toast"), ("column.mask.with.5.chars", "s.t.c"),
+    ("column.truncate.to.10.chars", "s.t.c"), ("column.mask.hash.SHA-256.with.salt.x", "s.t.c"),
+    ("column.exclude.list", "s.t.c"), ("column.include.list", "s.t.c"), ("transforms", "x"),
+    ("transforms.x.type", "y"), ("predicates", "p"), ("predicates.p.type", "q"), ("message.key.columns", "s.t:c"),
+    ("table.exclude.list", "s.t"), ("schema.include.list", "s"), ("schema.exclude.list", "s")])
 def test_java_refuses_a_weakened_configuration(artifacts, key, value):
     props = base_props()
     if value is None:
@@ -184,3 +190,28 @@ def test_java_held_list_bound_and_end_without_lsn_commit(artifacts):
     assert r["takes"][0]["confirmed"] is None and r["after_empty_spacing"] == 1
     assert r["refill_confirmed"] == 1000 * (60000 + 15)
     assert r["end_without_lsn_commit"] == "END record without lsn_commit in its offset"
+
+
+@pytest.mark.parametrize("seed", [1, 2, 3])
+def test_java_held_list_property_random_limits(artifacts, seed):
+    """Random limits (odd ones included) and random add/take sequences: every take(p) returns an END with ack <= p,
+    and afterwards the newest END <= p lies at most k - 1 records above the newest END confirmed so far. (The first
+    version's thinning fails this with odd limits: 580 violations for seed 1, 100 rounds.)"""
+    p = java(artifacts, "--held-property", str(seed), "60", timeout=300)
+    r = json.loads(p.stdout.strip().splitlines()[-1])
+    assert r["odd_limits"] > 0 and r["takes"] > 10000
+    assert r["returned_above_p"] == 0 and r["beyond_k_minus_1"] == 0, r
+    from stream_helpers import evidence
+    evidence("held_list_property_seed%d.json" % seed, dict(r, test="tests/engine/test_jvm.py::"
+                                                              "test_java_held_list_property_random_limits"))
+
+
+@pytest.mark.parametrize("message,want", [
+    ("Error while processing event at offset {transaction_id=7, lsn_proc=90, lsn_events_processed=1, "
+     "messageType=INSERT, lsn_commit=90, lsn=88, txId=7, ts_usec=1}", "88 7"),
+    ("Error while processing event at offset {lsn=5}", "5 -1"),
+    ("Error while processing event at offset {no positions here}", "null"),
+    ("An exception occurred in the change event producer.", "null")])
+def test_java_failing_position_parsing(artifacts, message, want):
+    p = java(artifacts, "--failing-position", message)
+    assert p.stdout.strip() == want

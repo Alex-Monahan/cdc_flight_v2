@@ -54,6 +54,9 @@ PROTECTED_KEYS = (
     "heartbeat.action.query", "replica.identity.autoset.values", "read.only", "signal.", "offset.mismatch.strategy",
     "unavailable.value.placeholder", "decimal.handling.mode", "binary.handling.mode", "include.unknown.datatypes",
     "record.processing.order", "database.password", "database.hostname", "database.port", "cdc_v2.",
+    # options that silently change or drop values or rows; the include list comes only from table_include
+    "column.", "transforms", "transforms.", "predicates", "predicates.", "message.key.columns",
+    "table.include.list", "table.exclude.list", "schema.include.list", "schema.exclude.list", "schema.refresh.mode",
 )
 
 
@@ -379,7 +382,7 @@ class Engine:
             self._reap(deadline.within(5))
             raise EngineFatal(F.Fatal(self._scrub(f.error_class), self._scrub(f.message),
                                       tuple((self._scrub(c), self._scrub(m)) for c, m in f.causes),
-                                      f.positions, f.schema, f.table))
+                                      f.positions, f.schema, f.table, f.failing_position))
         problem = None
         if isinstance(f, F.Hello):
             if self.hello is not None:

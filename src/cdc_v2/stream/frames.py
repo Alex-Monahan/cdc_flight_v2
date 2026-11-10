@@ -161,6 +161,7 @@ class Fatal:
     positions: dict = field(default_factory=dict)   # position fields of the last record handed over
     schema: str = ""                    # the table of the record being handled, when known
     table: str = ""
+    failing_position: Optional[dict] = None   # {"lsn": int|None, "txId": int|None} of the failing event, if named
 
 
 Frame = Any
@@ -344,7 +345,9 @@ def parse_payload(ftype, payload, validate=True):
     elif ftype == FATAL:
         cls, msg = c.str(), c.str()
         causes = tuple((c.str(), c.str()) for _ in range(c.u16()))
-        f = Fatal(cls, msg, causes, c.posmap(), c.str(), c.str())
+        pos, schema, table = c.posmap(), c.str(), c.str()
+        failing = {"lsn": c.opt_u64(), "txId": c.opt_u64()} if c.flag() else None
+        f = Fatal(cls, msg, causes, pos, schema, table, failing)
     else:
         raise EngineBroken("unknown frame type %d" % ftype)
     c.done()

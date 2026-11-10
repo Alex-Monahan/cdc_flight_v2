@@ -187,7 +187,12 @@ PROTECTED_EXAMPLES = ["skipped.operations", "offset.storage", "offset.storage.fi
                       "cdcv2.type", "cdcv2.anything", "tombstones.on.delete", "heartbeat.interval.ms",
                       "heartbeat.action.query", "replica.identity.autoset.values", "read.only",
                       "signal.data.collection", "signal.enabled.channels", "offset.mismatch.strategy",
-                      "cdc_v2.max.value.bytes", "database.password", "slot.name"]
+                      "cdc_v2.max.value.bytes", "database.password", "slot.name", "record.processing.order",
+                      "include.unknown.datatypes", "schema.refresh.mode", "column.mask.with.5.chars",
+                      "column.truncate.to.10.chars", "column.mask.hash.SHA-256.with.salt.x", "column.exclude.list",
+                      "column.include.list", "transforms", "transforms.x.type", "predicates", "predicates.p.type",
+                      "message.key.columns", "table.include.list", "table.exclude.list", "schema.include.list",
+                      "schema.exclude.list"]
 
 
 @pytest.mark.parametrize("key", PROTECTED_EXAMPLES)

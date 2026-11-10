@@ -36,11 +36,17 @@ final class ProtectedConfig {
         REQUIRED.put("tombstones.on.delete", "false");
         REQUIRED.put("offset.mismatch.strategy", "no_validation");
         REQUIRED.put("plugin.name", "pgoutput");
+        REQUIRED.put("record.processing.order", "ORDERED");
+        REQUIRED.put("include.unknown.datatypes", "true");
+        REQUIRED.put("schema.refresh.mode", "columns_diff");
     }
 
     /** Keys (or prefixes ending in '.') that must not be present at all. */
     static final List<String> FORBIDDEN = List.of("heartbeat.action.query", "replica.identity.autoset.values",
-            "read.only", "signal.", "offset.commit.policy", "offset.storage.");
+            "read.only", "signal.", "offset.commit.policy", "offset.storage.",
+            // options that silently change or drop values or rows
+            "column.", "transforms", "transforms.", "predicates", "predicates.", "message.key.columns",
+            "table.exclude.list", "schema.include.list", "schema.exclude.list");
 
     static void check(Map<String, String> c) {
         for (Map.Entry<String, String> e : REQUIRED.entrySet()) {

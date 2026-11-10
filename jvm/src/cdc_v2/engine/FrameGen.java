@@ -284,6 +284,14 @@ final class FrameGen {
         posmap(b);
         b.str(text(u(5)));
         b.str(text(u(5)));
+        if (coin()) {
+            b.u8(1);
+            b.optU64(optLong());
+            b.optU64(optLong());
+        }
+        else {
+            b.u8(0);
+        }
         out.frame(FrameOut.FATAL, b);
     }
 

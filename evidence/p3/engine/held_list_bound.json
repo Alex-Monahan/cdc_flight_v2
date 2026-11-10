@@ -11,13 +11,13 @@
       "behind": 15,
       "confirmed_end": 35985,
       "durable_for_end": 36000,
-      "seconds": 0.7
+      "seconds": 0.71
     },
     {
       "behind": 0,
       "confirmed_end": 60000,
       "durable_for_end": 60000,
-      "seconds": 0.7
+      "seconds": 0.71
     }
   ],
   "stated_bound_end_records": 28,

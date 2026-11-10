@@ -57,16 +57,18 @@ def test_unparsable_interval_ends_in_fatal_without_the_value(pair, scenario, art
         runs.append({"seconds_to_fatal": round(secs, 2), "frames_before_fatal": kinds(got),
                      "fatal_class": err.frame.error_class, "fatal_message": err.frame.message,
                      "fatal_causes": [list(c) for c in err.frame.causes],
-                     "fatal_positions": err.frame.positions, "fatal_table": err.frame.schema + "." + err.frame.table})
+                     "fatal_positions": err.frame.positions, "fatal_table": err.frame.schema + "." + err.frame.table,
+                     "failing_position": err.frame.failing_position})
     # every attempt ends at the same transaction: nothing of it beyond its BEGIN is framed (how much of the
     # transactions before it is framed depends on how far the engine's queue was drained), and the cause names
     # the offset of the failing event, the same in every attempt
     for r in runs:
         assert ("Rows", "bad") not in r["frames_before_fatal"]
         assert r["frames_before_fatal"].count(("End", "")) <= 1      # at most the transaction before it
-    failing = [next(m for _c, m in r["fatal_causes"] if m.startswith("Error while processing event at offset"))
-               for r in runs]
-    assert len({f.split("ts_usec")[0] for f in failing}) == 1
+    failing = [r["failing_position"] for r in runs]
+    assert all(f and f.get("lsn") and f.get("txId") for f in failing), failing
+    assert all(f == failing[0] for f in failing)                   # the same place on every start
+    positions_equal = all(r["fatal_positions"] == runs[0]["fatal_positions"] for r in runs)
     # with the table left out of table.include.list the transaction passes (END with count 0) and the stream goes on
     with Engine(sc.settings(table_include=s + ".ok"), None, artifacts) as eng:
         col = Collector(eng).run(lambda c: len(c.txns) >= 3, timeout=60)
@@ -77,6 +79,7 @@ def test_unparsable_interval_ends_in_fatal_without_the_value(pair, scenario, art
         "test": "tests/engine/test_engine_values.py::test_unparsable_interval_ends_in_fatal_without_the_value",
         "value": "interval '2562047788 hours' (hour part above 2^31)", "runs": runs,
         "value_or_marker_in_fatal_or_logs": False,
+        "failing_position_equal_over_starts": True, "positions_of_last_record_equal_over_starts": positions_equal,
         "with_table_excluded": {"end_counts": [t.end.event_count for t in col.txns[:3]],
                                 "rows_after": [r["a1"] for r in col.rows_of("ok")]}})
 

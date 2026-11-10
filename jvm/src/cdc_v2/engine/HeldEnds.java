@@ -9,11 +9,11 @@ import java.util.Map;
  * The END records the engine holds until a DURABLE confirms them (docs/design/engine.md, section 5).
  *
  * <p>Bounded and uniformly spaced: every k-th END is held as a sample, plus always the newest END (the tail). When
- * more than {@code limit} samples are held, every second one is dropped (the oldest is kept) and k doubles; when the
- * list empties, k returns to 1. Dropping is always safe: a DURABLE then confirms an older END, never a newer one.
- * Bound: a {@code DURABLE p} confirms an END that lies at most k − 1 END records below the newest END at or below p,
- * with k ≤ max(1, 2 × lead / limit), where lead is the number of END records the engine has received beyond the
- * oldest one not yet confirmed.
+ * more than {@code limit} samples are held, every second one is dropped (the newest and the oldest are kept) and k
+ * doubles; when the list empties, k returns to 1. Dropping is always safe: a DURABLE then confirms an older END, never a newer one.
+ * Bound: after a {@code DURABLE p}, the newest END confirmed so far lies at most k − 1 END records below the newest
+ * END at or below p, with k ≤ max(1, 2 × lead / limit), where lead is the number of END records the engine has
+ * received beyond the oldest one not yet confirmed; it is never above p. This holds for every limit ≥ 2.
  */
 final class HeldEnds<T> {
 
@@ -65,15 +65,20 @@ final class HeldEnds<T> {
         }
     }
 
+    /**
+     * Keep the newest sample and every second one counted back from it (gaps become 2k), and the oldest one (its gap
+     * to the next kept sample is k or 2k). So no gap exceeds the new k, whatever the limit, odd or even.
+     */
     private void thin() {
         List<Entry<T>> all = new ArrayList<>(samples);
         samples.clear();
-        for (int i = 0; i < all.size(); i += 2) {
-            samples.addLast(all.get(i));
+        int n = all.size();
+        int first = (n - 1) % 2;            // index of the oldest sample on the newest's parity
+        if (first == 1) {
+            samples.addLast(all.get(0));
         }
-        Entry<T> newest = all.get(all.size() - 1);
-        if (samples.peekLast() != newest && tail == null) {
-            tail = newest;          // the newest END stays held
+        for (int i = first; i < n; i += 2) {
+            samples.addLast(all.get(i));
         }
         k *= 2;
     }

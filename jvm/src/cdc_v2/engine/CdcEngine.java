@@ -148,6 +148,16 @@ public final class CdcEngine {
             HeldSelftest.main();
             return;
         }
+        if (args.length == 3 && args[0].equals("--held-property")) {
+            HeldSelftest.property(Long.parseLong(args[1]), Integer.parseInt(args[2]));
+            return;
+        }
+        if (args.length == 2 && args[0].equals("--failing-position")) {
+            // test mode: the failing position parsed from one message (the message is a test input, not a value)
+            long[] f = failingPosition(new RuntimeException("x", new RuntimeException(args[1])));
+            System.out.println(f == null ? "null" : f[0] + " " + f[1]);
+            return;
+        }
         if (args.length >= 1 && args[0].equals("--splitmix")) {
             for (int i = 1; i < args.length; i++) {
                 System.out.println(Long.toUnsignedString(Crash.splitmix64(Long.parseUnsignedLong(args[i]))));
@@ -462,6 +472,40 @@ public final class CdcEngine {
         return "";
     }
 
+    static final java.util.regex.Pattern EVENT_AT = java.util.regex.Pattern.compile(
+            "^Error while processing event at offset \\{(.*)\\}");
+    static final java.util.regex.Pattern LSN_FIELD = java.util.regex.Pattern.compile("(?:^|[ ,])lsn=(\\d+)");
+    static final java.util.regex.Pattern TXID_FIELD = java.util.regex.Pattern.compile("(?:^|[ ,])txId=(\\d+)");
+
+    /**
+     * The failing event's position, parsed from Debezium's "Error while processing event at offset {…}" in the cause
+     * chain: {lsn, txId}, -1 for a field that is absent; null when no exception names an event. Only these two numbers
+     * leave this method, never the text.
+     */
+    static long[] failingPosition(Throwable error) {
+        int depth = 0;
+        for (Throwable t = error; t != null && depth < 16; t = t.getCause(), depth++) {
+            String m = t.getMessage();
+            if (m == null) {
+                continue;
+            }
+            java.util.regex.Matcher e = EVENT_AT.matcher(m);
+            if (!e.find()) {
+                continue;
+            }
+            String inner = e.group(1);
+            java.util.regex.Matcher l = LSN_FIELD.matcher(inner);
+            java.util.regex.Matcher x = TXID_FIELD.matcher(inner);
+            long lsn = l.find() ? Long.parseLong(l.group(1)) : -1;
+            long txid = x.find() ? Long.parseLong(x.group(1)) : -1;
+            if (lsn < 0 && txid < 0) {
+                continue;
+            }
+            return new long[] {lsn, txid};
+        }
+        return null;
+    }
+
     /** Writes a FATAL frame and halts with 1: class, safe message, cause chain, position fields of the last record
      *  handed over, schema and table of the record being handled (empty when unknown). Never a source value. */
     static synchronized void fatal(Throwable error) {
@@ -481,6 +525,15 @@ public final class CdcEngine {
             Consumer.posmap(b, lastHandedOffset);
             b.str(fatalSchema);
             b.str(fatalTable);
+            long[] failing = failingPosition(error);
+            if (failing == null) {
+                b.u8(0);
+            }
+            else {
+                b.u8(1);
+                b.optU64(failing[0] < 0 ? null : failing[0]);
+                b.optU64(failing[1] < 0 ? null : failing[1]);
+            }
             out.frame(FrameOut.FATAL, b);
             out.flush();
         }

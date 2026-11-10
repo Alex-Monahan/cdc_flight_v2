@@ -49,6 +49,70 @@ final class HeldSelftest {
         System.out.println(b);
     }
 
+    /**
+     * Test mode {@code CdcEngine --held-property <seed> <rounds>}: random limits (2..41, odd ones included) and random
+     * sequences of add and take. END acks are 1, 2, 3, …; for every take(p) it checks that the entry returned has
+     * ack ≤ p, and that afterwards the newest END ≤ p lies at most k − 1 records above the newest END confirmed so far
+     * (k: the spacing before or after the take, the larger). Prints one JSON object with the counts.
+     */
+    static void property(long seed, int rounds) {
+        java.util.Random rnd = new java.util.Random(seed);
+        long takes = 0;
+        long adds = 0;
+        long above = 0;
+        long distance = 0;
+        int oddLimits = 0;
+        long maxK = 0;
+        for (int r = 0; r < rounds; r++) {
+            int limit = 2 + rnd.nextInt(40);
+            oddLimits += limit % 2;
+            HeldEnds<Long> h = new HeldEnds<>(limit);
+            long next = 1;
+            long confirmed = 0;
+            int steps = 500 + rnd.nextInt(5000);
+            for (int s = 0; s < steps; s++) {
+                if (rnd.nextInt(10) < 8) {
+                    int burst = 1 + rnd.nextInt(rnd.nextBoolean() ? 3 : 400);
+                    for (int i = 0; i < burst; i++) {
+                        h.add(next, next);
+                        next++;
+                        adds++;
+                    }
+                    continue;
+                }
+                long p;
+                int kind = rnd.nextInt(4);
+                if (kind == 0) {
+                    p = next + rnd.nextInt(5);                        // above everything
+                }
+                else if (kind == 1) {
+                    p = Math.max(0, confirmed - rnd.nextInt(5));      // at or below what is confirmed
+                }
+                else {
+                    p = confirmed + (long) (rnd.nextDouble() * (next - confirmed));
+                }
+                long kBefore = h.spacing();
+                HeldEnds.Entry<Long> e = h.take(p);
+                long k = Math.max(kBefore, h.spacing());
+                maxK = Math.max(maxK, k);
+                takes++;
+                if (e != null) {
+                    if (e.ack > p) {
+                        above++;
+                    }
+                    confirmed = Math.max(confirmed, e.ack);
+                }
+                long newestLe = Math.min(p, next - 1);
+                if (newestLe > confirmed && newestLe - confirmed > k - 1) {
+                    distance++;
+                }
+            }
+        }
+        System.out.println("{\"seed\":" + seed + ",\"rounds\":" + rounds + ",\"odd_limits\":" + oddLimits
+                + ",\"adds\":" + adds + ",\"takes\":" + takes + ",\"returned_above_p\":" + above
+                + ",\"beyond_k_minus_1\":" + distance + ",\"max_k\":" + maxK + "}");
+    }
+
     private HeldSelftest() {
     }
 }
