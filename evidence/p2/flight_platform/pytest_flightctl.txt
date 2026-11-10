@@ -1,6 +1,6 @@
 ============================= test session starts ==============================
 platform darwin -- Python 3.13.1, pytest-9.2.0, pluggy-1.7.0
-rootdir: /Users/alex/Documents/claude_auto/cdc_flight_v2/.claude/worktrees/agent-a45037ac12e66c072
+rootdir: <worktree>
 configfile: pyproject.toml
 plugins: hypothesis-6.170.15, timeout-2.4.0
 collected 56 items / 1 deselected / 55 selected
