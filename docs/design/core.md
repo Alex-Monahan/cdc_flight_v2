@@ -315,6 +315,10 @@ every replayed change rewrites or removes the whole row by key, in commit order.
 ranges between two snapshots is either read twice or not at all; in both cases the change that moved it is in the
 replayed log and leaves exactly one correct row. Catch-up starts only after all chunks are loaded.
 
+Rows also move without any change record when the table is rewritten (`VACUUM FULL`, `CLUSTER`, a rewriting
+`ALTER TABLE`, `TRUNCATE`). Every chunk therefore reads `pg_relation_filenode` under its own snapshot; if it
+differs from the value of the table's first chunk, the loaded chunks are discarded and the backfill starts again.
+
 ### 7.4 Tables without a key
 
 A change cannot be attributed to a `ctid` range, and replaying a change twice changes a row count. So the whole
@@ -332,3 +336,72 @@ Changes written before the publication change are not published, even if their t
 adding a table to the publication, the pipeline notes the primary's next transaction id `X`, and the table's first
 snapshot must have `xmin ≥ X`: every transaction that wrote to the table before the change has then finished and
 is `inside`. **[test]** in the discovery work of P4, including a transaction that stays open across the change.
+
+## 8. Slot continuity
+
+Checked at every slot acquisition and every `slot.verify_interval` (default 30 s) while streaming, before the
+engine may read (SPEC 1.8, 4.1). `_cdc.stream_state` stores, next to the applied position: slot name, the server's
+system identifier, the timeline, and the slot's creation identity (**[test]** which catalog values identify a
+recreated slot of the same name on Postgres 17 and 18).
+
+| Finding | Meaning | Action |
+|---|---|---|
+| slot `confirmed_flush_lsn` ≤ applied position, same identity, applied position on the server's timeline history | continuous | stream from the slot; discard by position |
+| slot ahead of the applied position | changes were consumed elsewhere or the slot was advanced | alert, automatic backfill of all CDC tables, stream from the slot's position |
+| slot missing, recreated, or `wal_status = 'lost'` / invalidated | history is gone | alert, new slot, automatic backfill |
+| different system identifier, or applied position not on the timeline history | different server or diverged history (failover) | as the replica rules of SPEC 4.1 decide: continue if the position is proven to be on the new history, else alert and backfill |
+
+The Flight never exits because of a slot finding. The timeline history is read over a replication connection
+(`TIMELINE_HISTORY`); **[test]** that the role and the PlanetScale endpoint allow it, otherwise a failover is
+always treated as a break.
+
+## 9. State machines
+
+Each machine is one module with an enumerated state set and one transition table; `transition(conn, machine, key,
+from, to, cause)` is the only function that writes a state. It runs inside the caller's transaction, fails if the
+stored state is not `from` or the pair is not in the table, and appends a row to `_cdc.transitions`. States live in
+`_cdc` tables and change in the same transaction as the data they govern.
+
+| Machine | Key | States |
+|---|---|---|
+| leader / run | epoch | `starting` → `leading` → `releasing` → `released`; `superseded`; `failed` |
+| slot and stream | slot | `unverified` → `verified` → `streaming` ⇄ `stalled`; `broken` → `rebuilding` → `verified` |
+| table replication | table | `discovered` → `awaiting_approval` / `backfilling` → `streaming`; `streaming` → `backfilling`; `refresh_only`; `quarantined`; `retained`; `dropped` |
+| backfill progress | table, backfill id | `planned` → `reading` → `catching_up` → `swapping` → `done`; `abandoned` |
+| schema change | table, change id | `detected` → `applying` → `applied`; `failed` |
+| batch commit / ack | group | `staged` → `committed` → `acknowledged`; `discarded` |
+| quarantine | table | `healthy` → `retrying(n)` → `quarantined` → `healthy` |
+
+The tables above are the starting point; the worker who builds a machine fixes its final transition table in code
+and in `docs/state_machines.md`, and the T0 tests enumerate every pair.
+
+## 10. Modules
+
+```
+flights/cdc_v2/main.py      bootstrap (section 5)
+jvm/                        engine: embedded Debezium, consumer, Arrow writer, ack reader
+src/cdc_v2/config.py        configuration model and validation
+src/cdc_v2/md/              MotherDuck connections, lanes, fence, clock, deadlines
+src/cdc_v2/pg/              source connections, catalog, slot and publication, cut (7.2)
+src/cdc_v2/state/           transition function and the machines of section 9
+src/cdc_v2/leader/          guard, take-over, heartbeat, release
+src/cdc_v2/stream/          engine process, record decoding, grouping, commit/ack protocol
+src/cdc_v2/apply/           staging and the statements of section 6
+src/cdc_v2/backfill/        chunk planning, readers, pending log, catch-up, swap
+src/cdc_v2/supervisor.py    component deadlines, restarts, progress for the heartbeat
+src/cdc_v2/crashpoints.py   named crash points, switched on by environment for the harness
+src/cdc_v2/oracle/          source/destination comparison used by every test tier
+```
+
+## 11. Open points
+
+| # | Point | Decided by |
+|---|---|---|
+| 1 | Cut on a standby (7.2) is exact as described | P3 stress test |
+| 2 | `rowid` is usable to delete exactly k identical rows (6.3) | P3 test on MotherDuck |
+| 3 | Canonical comparison form for UNION and NaN (6.3) | P3, with the oracle |
+| 4 | Staging tables versus direct apply for small groups (6.1) | Flight measurement in P2 |
+| 5 | Appends by the stream lane and reads by the backfill lane on one pending log do not conflict (7.1) | P3 test on MotherDuck |
+| 6 | Identity of a recreated slot; reading the timeline history (8) | P3, stage 2 for PlanetScale |
+| 7 | Publication join rule (7.5) | P4 discovery work |
+| 8 | Guard over the Postgres endpoint; hand-over that starts the new leader before the old one stops | after P6, if the numbers ask for it |
