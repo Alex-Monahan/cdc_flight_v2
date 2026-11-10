@@ -1,0 +1,31 @@
+{
+  "test": "tests/engine/test_engine_stream.py::test_schema_change_between_transactions",
+  "versions": [
+    [
+      "id:int32",
+      "a:int32",
+      "b:text"
+    ],
+    [
+      "id:int32",
+      "a:int32",
+      "b:text",
+      "c:numeric_text"
+    ],
+    [
+      "id:int32",
+      "b:text",
+      "c:numeric_text"
+    ],
+    [
+      "id:int32",
+      "bb:text",
+      "c:numeric_text"
+    ],
+    [
+      "id:int64",
+      "bb:text",
+      "c:numeric_text"
+    ]
+  ]
+}

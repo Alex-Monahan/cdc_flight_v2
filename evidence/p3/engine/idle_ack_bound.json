@@ -1,0 +1,26 @@
+{
+  "bound": "heartbeat.interval.ms + 1 s",
+  "measured": {
+    "300": {
+      "all_s": [
+        0.297,
+        0.066,
+        0.094,
+        0.066,
+        0.148
+      ],
+      "max_s": 0.297
+    },
+    "500": {
+      "all_s": [
+        0.12,
+        0.263,
+        0.15,
+        0.231,
+        0.231
+      ],
+      "max_s": 0.263
+    }
+  },
+  "test": "tests/engine/test_engine_ack.py::test_idle_acknowledgement_bound"
+}

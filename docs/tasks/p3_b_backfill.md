@@ -50,6 +50,25 @@ says elsewhere, these points and that document hold.
 - A table that the stream quarantined because the engine cannot read one of its values (package S) is backfilled
   "after a gap": its `P0` and its hand-off follow the same rules as any other gap.
 
+## From the source package as built — build on it
+
+Package P is built and reviewed. `docs/design/source.md` is the full account; where it differs from what this task
+or contract C7 says elsewhere, these points and that document hold.
+
+- Every read goes through `pg.connect` with the read settings (`source.md` section 1): they pin the text form
+  that package Y's `transform.backfill` expects (`IntervalStyle=iso_8601`, `DateStyle=ISO, YMD`,
+  `extra_float_digits=3`, `bytea_output=hex`, UTC, `lc_monetary=C`). Never set a session setting of your own on a
+  read connection, and never read through a connection that was not opened this way.
+- A raw `COPY` runs inside `conn.guard`, so that the deadline closes the socket and server errors arrive as the
+  package's error classes. `RecoveryConflict` (a standby cancelled the read) means: read the chunk again. It is
+  not a failure of the table and does not count towards quarantine.
+- `TableFacts.key_attnums` never include the `INCLUDE` columns of an index. Chunk ranges and repair reads use
+  exactly these columns.
+- `relfilenode` is not part of a table's identity (a rewrite changes it and keeps the table); check it per chunk
+  as section 4 says, with the catalog reader of package P.
+- On a source of Postgres 17 or later the backfill reads `infinity` and `-infinity` in interval columns as they
+  are. The stream cannot (plan C3, "Ambiguous zero interval"); nothing follows for you in P3.
+
 ## What may be missing when you start
 
 Packages X, E, D, A, P, Y, S and O are merged. Package V (slot continuity) may or may not be: its finding reaches

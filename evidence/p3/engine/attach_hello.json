@@ -1,0 +1,6 @@
+{
+  "application_name_on_server": "Debezium Streaming",
+  "hello_active_pid_equals_slot_active_pid": true,
+  "hello_backend_start_equals_pg_stat_activity": true,
+  "test": "tests/engine/test_engine_attach.py::test_hello_names_the_backend_that_holds_the_slot"
+}

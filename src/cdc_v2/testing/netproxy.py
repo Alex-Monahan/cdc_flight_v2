@@ -195,10 +195,15 @@ class _Conn:
 class NetProxy:
     """One proxy: listener, connections, faults, counters, control socket. Runs its own event loop thread."""
 
-    def __init__(self, target_host, target_port, port=None, control=True):
+    def __init__(self, target_host, target_port, port=None, control=True, port_range=None):
+        """`port_range` (first, last), inclusive: where a free port is leased; default 55440-55459. A package
+        that needs proxies of its own passes the upper half of its own range (docs/design/p3_plan.md section 4)."""
         check_target(target_host, target_port)
         self.target_host, self.target_port = target_host, target_port
         self.want_port = port
+        self.port_first, self.port_last = port_range or (PORT_FIRST, PORT_LAST)
+        if not (0 < self.port_first <= self.port_last < 65536) or self.port_first <= 5432 <= self.port_last:
+            raise ProxyError("bad proxy port range %r" % (port_range,))
         self.want_control = control
         self.lease = None
         self.port = None
@@ -249,10 +254,11 @@ class NetProxy:
 
     async def _open(self):
         self.cond = asyncio.Condition()
-        ports = [self.want_port] if self.want_port else list(range(PORT_FIRST, PORT_LAST + 1))
+        first, last = self.port_first, self.port_last
+        ports = [self.want_port] if self.want_port else list(range(first, last + 1))
         for p in ports:
-            if not PORT_FIRST <= p <= PORT_LAST:
-                raise ProxyError("port %d is outside %d-%d" % (p, PORT_FIRST, PORT_LAST))
+            if not first <= p <= last:
+                raise ProxyError("port %d is outside %d-%d" % (p, first, last))
             lease = try_lease(p)
             if lease is None:
                 continue
@@ -268,7 +274,7 @@ class NetProxy:
             self.lease = lease
             break
         if self.lease is None:
-            raise ProxyError("no free proxy port in %d-%d" % (PORT_FIRST, PORT_LAST))
+            raise ProxyError("no free proxy port in %d-%d" % (first, last))
         if self.want_control:
             path = self.lease.control_path
             if os.path.exists(path):

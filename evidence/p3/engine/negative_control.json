@@ -1,0 +1,5 @@
+{
+  "rows_lost_over_the_kills": 0,
+  "samples_above_applied": 52,
+  "test": "tests/engine/test_engine_ack.py::test_negative_control_one_end_ahead_is_caught"
+}

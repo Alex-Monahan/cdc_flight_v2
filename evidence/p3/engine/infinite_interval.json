@@ -1,0 +1,10 @@
+{
+  "delivered": {
+    "1": "0 months 0 days 0 microseconds",
+    "2": "0 months 0 days 0 microseconds",
+    "3": "0 months 0 days 0 microseconds"
+  },
+  "finding": "infinity and -infinity arrive as the zero interval, indistinguishable from a real zero",
+  "server_version": "18.6 (Homebrew)",
+  "test": "tests/engine/test_engine_values.py::test_infinite_interval_is_delivered_as_zero"
+}

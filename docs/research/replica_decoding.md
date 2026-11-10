@@ -58,7 +58,10 @@ PostgreSQL 18 knows four invalidation causes (`ReplicationSlotInvalidationCause`
 names in `pg:src/backend/replication/slot.c`): `wal_removed`, `rows_removed`, `wal_level_insufficient`,
 `idle_timeout` **[src]**, shown in `pg_replication_slots.invalidation_reason` (17+) **[doc]**
 (<https://www.postgresql.org/docs/18/view-pg-replication-slots.html>). `conflicting` (16+) is true for slots invalidated
-by a conflict with recovery (`rows_removed`, `wal_level_insufficient`) **[doc]**. An invalidated slot can never be used
+by a conflict with recovery (`rows_removed`, `wal_level_insufficient`) **[doc]**. Measured in P3 (package P): on
+Postgres 16 a slot invalidated by the WAL cap shows `conflicting = true` (16 has no `invalidation_reason`); from 17 on
+it shows `conflicting = false` and `invalidation_reason = 'wal_removed'`. A slot is invalid when `wal_status = 'lost'`,
+or `invalidation_reason` is set, or `conflicting` is true (`SlotFacts.invalid`). An invalidated slot can never be used
 again: "lost means that this slot is no longer usable" **[doc]**. Debezium does not check any of these columns and
 retries forever on an invalidated slot (debezium/dbz#2430; debezium.md §2.8).
 

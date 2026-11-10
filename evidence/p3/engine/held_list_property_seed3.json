@@ -1,0 +1,11 @@
+{
+  "adds": 14133284,
+  "beyond_k_minus_1": 0,
+  "max_k": 2048,
+  "odd_limits": 24,
+  "returned_above_p": 0,
+  "rounds": 60,
+  "seed": 3,
+  "takes": 35043,
+  "test": "tests/engine/test_jvm.py::test_java_held_list_property_random_limits"
+}
