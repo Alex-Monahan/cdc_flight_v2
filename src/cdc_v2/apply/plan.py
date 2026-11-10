@@ -4,18 +4,24 @@ The plan is a list of SQL steps. Each step materialises one relation from the ch
 The same text runs in a local DuckDB connection over Arrow data (local form) and inside the caller's MotherDuck
 transaction over the rows already there (relation form); a `Backend` decides where (`backend.py`).
 
-Tables with a key: the model is "the source table, one key at a time" (docs/design/apply.md 2). Per exact key,
-records are ordered by (transaction, seq). `c` adds a row version (an *arrival*) at the back of the key's queue,
-`d` removes the front one, `u` changes the front one; the row the destination holds when the change set starts is
-arrival 0 if the source had it then. Whether it had it (`p`) follows from the records almost always; where it does
-not (a `c` and a later `d` in one transaction, with nothing before), stream mode asks the destination and catch-up
-mode reports the key as unresolved. A key change (`d` of the old key directly followed by `c` with `k<i>` set)
-links the new arrival to the arrival that `d` removed; unchanged values are found by following these links back.
+Tables with a key (docs/design/apply.md 2): only an immediate key reaches this path, so no two source rows hold one
+key after any record (rule K, H-015). Per exact key, records are ordered by (transaction, seq); the first record
+fixes `p`, whether the source held the key when the change set starts (c: 0; u, d: 1), and a key whose records
+leave it with less than none or more than one row (or a u without a row) is `bad` (both modes raise). A `c` creates
+an arrival (index p + creates before it), `d` and `u` act on arrival `d_before`; the key ends with arrival `n_d`
+if p + n_c - n_d = 1. Arrival 0 of a held key is the destination row. A key change (`d` of the old key directly
+followed by its `c` with `k<i>` set, in one transaction) links the new arrival to the arrival that `d` removed;
+the value of an unchanged column is found by following these links back (`res`) to a record that carries it or to
+a destination row (a *root*). Stream mode asks the destination nothing: the root is the row the source held at the
+start. Catch-up looks the root up (`rootcnt`, one statement) and uses it only under rules 1 and 3
+(docs/design/apply.md 2.3); otherwise the key is unresolved. Outputs: `del` (keys whose row goes), `upd` (rows
+moved from root `rx` to key `x` and set), `copy` (the same for a key whose stored form cannot be changed by an
+UPDATE), `ins` and, in catch-up, `unres`.
 
 One rule for every step (docs/design/apply.md 5): a value of a row never passes through an aggregate, a window or
 QUALIFY. DuckDB normalises -0 and NaN inside nested values there (and in a CREATE TABLE AS with QUALIFY, even
 inside a STRUCT). Those operators see only integers and exact keys (`types.exact`, which hold no FLOAT, DOUBLE or
-INTERVAL); a value is fetched at the end, by a join on the record number that supplies it.
+INTERVAL); values are read from r0 by record position at the end (local form: by Arrow `take`).
 """
 from __future__ import annotations
 
@@ -233,14 +239,15 @@ SELECT DISTINCT {fx} FROM (
         steps.append(Step("act0", "sql", """
 SELECT d.*,
   CASE WHEN d.how = 'complete' THEN 'ins'
-       WHEN d.how = 'ref' AND r2.n = 1 AND kr.n_c = 0 THEN 'upd'
+       WHEN d.how = 'ref' AND r2.n = 1 AND (kr.n_c = 0 OR (kr.n_c = 1 AND {same})) THEN 'upd'
        WHEN d.how IN ('ref', 'unres') AND d.crn IS NOT NULL AND d.crn = d.first_rn AND r3.n = 1 THEN 'upd3'
        ELSE 'unres' END AS action0
 FROM {dec} AS d
 LEFT JOIN {rc} AS r2 ON {j2}
 LEFT JOIN {kp} AS kr ON kr.kx = d.rkx
 LEFT JOIN {rc} AS r3 ON {j3}
-""".format(dec=R("dec"), rc=R("rootcnt"), kp=R("kp"), j2=rc("r2", "d.rkx"), j3=rc("r3", "d.kx"))))
+""".format(dec=R("dec"), rc=R("rootcnt"), kp=R("kp"), j2=rc("r2", "d.rkx"), j3=rc("r3", "d.kx"),
+           same="d.rkx = d.kx")))
         root = "CASE WHEN action0 = 'upd3' THEN kx ELSE rkx END"
         action = "CASE WHEN action0 = 'upd3' THEN 'upd' ELSE action0 END"
         src_act = R("act0")
@@ -266,16 +273,15 @@ LEFT JOIN {r} AS rf ON rf.rn = a.lrn
     steps.append(Step("act", "sql", act_sql))
 
     # outputs: values are read from the records by record number
-    # del. Stream: the keys the source held at the start (p = 1), except roots that K3 moves; the destination
-    # equals the source then, so each has exactly one row and K1's count must equal their number (core.py). Keys
-    # with p = 0 must have no row: they are added to K1 (expected to remove nothing) whenever K1 runs anyway, and,
-    # with `check_new_keys`, also when it would not (an insert-only change set). Catch-up: every key of the change
-    # set (the table was loaded under other snapshots), the row of an unresolved key included: it is stale, a later
-    # call must not take values from it, and the repair read loads it again (docs/design/apply.md 2.6).
+    # del. Stream: the keys the source held at the start (p = 1), except roots that K3 moves or K7 copies; the
+    # destination equals the source then, so each has exactly one row. Keys with p = 0 must have no row: a key
+    # that ends with a row is checked inside K6, K3 or K7 (`check_new_keys`, docs/design/apply.md 2.5); a key that
+    # the change set creates and removes again is checked here, in K1. K1 counts per key (statements.k1_delete).
+    # Catch-up: every key of the change set (the table was loaded under other snapshots), the row of an unresolved
+    # key included: it is stale, a later call must not take values from it, and the repair read loads it (2.6).
     if mode == "stream":
-        pfilter = (" AND (kp.p = 1 OR {chk} OR EXISTS (SELECT 1 FROM {kp} AS k2 WHERE k2.p = 1 AND NOT EXISTS "
-                   "(SELECT 1 FROM {act} AS a2 WHERE a2.action IN ('upd', 'copy') AND a2.root = k2.kx)))"
-                   ).format(chk="true" if check_new_keys else "false", kp=R("kp"), act=R("act"))
+        pfilter = (" AND (kp.p = 1 OR (%s AND NOT EXISTS (SELECT 1 FROM %s AS a0 WHERE a0.kx = kp.kx)))"
+                   % ("true" if check_new_keys else "false", R("act")))
     else:
         pfilter = ""
     steps.append(Step("del", "sql", """
@@ -295,14 +301,20 @@ WHERE true{pfilter}
     ixcols = ["rl.pos AS p_l"] + ["r%d.pos AS p_%d" % (c.position, c.position) for c in ucols]
     vrecipe = ([(c.a, "take", c.a, "p_l") for c in keys] + [(c.a, "take", c.a, "p_l") for c in nonu]
                + [(c.a, "take", c.a, "p_%d" % c.position) for c in ucols])
+    # ins also carries its exact key x<i> (K6 checks that the key is free, check_new_keys)
+    insx = [flat_x(meta, "a.kx")]
+    insx_recipe = [("x%d" % c.position, "ix", "x%d" % c.position) for c in keys]
     steps.append(Step("ins", "sql", "SELECT %s FROM %s AS a %s WHERE a.action = 'ins'"
-                      % (", ".join(vcols), R("act"), vjoins),
-                      ix_sql="SELECT %s FROM %s AS a %s WHERE a.action = 'ins'" % (", ".join(ixcols), R("act"), ixjoins),
-                      recipe=tuple(vrecipe)))
-    keycols = [flat_x(meta, "a.root", "rx"), flat_x(meta, "a.kx")]
+                      % (", ".join(insx + vcols), R("act"), vjoins),
+                      ix_sql="SELECT %s FROM %s AS a %s WHERE a.action = 'ins'"
+                      % (", ".join(insx + ixcols), R("act"), ixjoins),
+                      recipe=tuple(insx_recipe + vrecipe)))
+    # xp: whether the source held the target key at the start (a target with p = 0 must have no row; K3, K7)
+    keycols = [flat_x(meta, "a.root", "rx"), flat_x(meta, "a.kx"),
+               "CAST((SELECT kq.p FROM %s AS kq WHERE kq.kx = a.kx) AS BIGINT) AS xp" % R("kp")]
     hcols = ["(a.s%d IS NOT NULL) AS h%d" % (c.position, c.position) for c in ucols]
     keyrecipe = ([("rx%d" % c.position, "ix", "rx%d" % c.position) for c in keys]
-                 + [("x%d" % c.position, "ix", "x%d" % c.position) for c in keys])
+                 + [("x%d" % c.position, "ix", "x%d" % c.position) for c in keys] + [("xp", "ix", "xp")])
     hrecipe = [("h%d" % c.position, "ix", "h%d" % c.position) for c in ucols]
     for name in ("upd", "copy"):
         steps.append(Step(name, "sql", "SELECT %s FROM %s AS a %s WHERE a.action = '%s'"
@@ -332,6 +344,10 @@ def keyed_stats_sql(meta: TableMeta, ucols: List[Column], rel: Callable[[str], s
         "(SELECT count(*) FROM (SELECT tord, seq FROM {r0} GROUP BY ALL HAVING count(*) > 1)) AS n_dupseq",
         "(SELECT count(*) FROM {r0} WHERE tord IS NULL OR seq IS NULL) AS n_nullorder",
         "(SELECT count(*) FROM {kp} WHERE bad) AS n_bad",
+        # two keys the change set ends with that the source's equality merges (-0 and 0, 1 mon and 30 days):
+        # not a source history (DuckDB's GROUP BY merges them as the source does)
+        "(SELECT count(*) FROM (SELECT 1 FROM {act} AS a JOIN {r} AS q ON q.rn = a.lrn GROUP BY %s "
+        "HAVING count(*) > 1)) AS n_samesrc" % ", ".join("q.%s" % c.a for c in meta.key_columns),
         "(SELECT count(*) FROM {act} WHERE action = 'unres') AS n_unres_final",
         "(SELECT count(*) FROM {del}) AS n_del",
         "(SELECT count(*) FROM {del} WHERE p = 1) AS n_del_held",

@@ -184,6 +184,9 @@ def _keyed(ctx, backend, target, meta, ucols, mode, cs, counts, settings):
     if stats["n_keynull"] or stats["n_okeypartial"]:
         raise ApplyInvariantError("%s: %d records without a key value, %d with a partial old key"
                                   % (target, stats["n_keynull"], stats["n_okeypartial"]))
+    if stats["n_samesrc"]:
+        raise ApplyInvariantError("%s: %d keys that the change set ends with are one key at the source (-0 and 0, "
+                                  "1 mon and 30 days)" % (target, stats["n_samesrc"]))
     if stats["n_bad"]:
         # both modes: records that no source history can produce (a c at a key that holds a row, a u or d at a
         # key that holds none; rule K, H-015)
@@ -193,17 +196,54 @@ def _keyed(ctx, backend, target, meta, ucols, mode, cs, counts, settings):
         if stats["n_unres_final"]:
             raise ApplyInvariantError("%s: %d keys whose unchanged values have no source" % (target,
                                                                                            stats["n_unres_final"]))
-    sh = Shapes(meta, target, ucols)
-    n_upd, n_copy = int(stats["n_upd"]), int(stats["n_copy"])
-    if stats["n_del"]:
+    n_copy = int(stats["n_copy"])
+    # a copy finds its old row by row id; a column named rowid hides it, so it is renamed around the statements
+    with (_rowid_free(ctx, target, meta) if n_copy else _same(meta)) as smeta:
+        upos = {c.position for c in ucols}
+        _keyed_statements(ctx, backend, target, smeta, [c for c in smeta.columns if c.position in upos], mode,
+                          stats, counts, settings)
+    if mode == "catch_up":
+        ctx.shape = "plan"
+        counts.unresolved = backend.fetch_arrow("unres")         # with the key types, also when empty
+
+
+class _same:
+    def __init__(self, meta):
+        self.meta = meta
+
+    def __enter__(self):
+        return self.meta
+
+    def __exit__(self, et, ev, tb):
+        return False
+
+
+def _keyed_statements(ctx, backend, target, meta, ucols, mode, stats, counts, settings):
+    """The statements in their order (docs/design/apply.md 3.4): K1; C0 (the copy roots' row ids, before any row
+    moves); K2, K3; K7, K8 (by row id); K4, K5; K6. In stream mode each statement acts on a key only where the
+    destination holds what the source held at the start, so that its count is a count of keys (2.5)."""
+    stream = mode == "stream"
+    sh = Shapes(meta, target, ucols, per_key=stream, new_keys=settings.check_new_keys)
+    n_del, n_upd, n_copy, n_ins = (int(stats[k]) for k in ("n_del", "n_upd", "n_copy", "n_ins"))
+    if n_del:
         ctx.shape = "K1"
         for rel in backend.statement_relations("del", chunked=True):
-            counts.deleted += ctx.execute(sh.k1_delete(rel)) or 0
-        if mode == "stream" and counts.deleted != stats["n_del_held"]:
-            # the destination equals the source at the start of the change set: one row per key the source held,
-            # none for a key whose first record is a create
-            raise ApplyInvariantError("%s: %d destination rows removed for %d keys the source held at the start"
-                                      % (target, counts.deleted, stats["n_del_held"]))
+            got = ctx.execute(sh.k1_delete(rel)) or 0
+            counts.deleted += got
+            want = backend.current_sum("p")
+            want = int(stats["n_del_held"]) if want is None else want
+            if stream and got != want:
+                # the destination equals the source at the start: one row per key the source held, none per key it
+                # did not hold; K1 removes the rows only when every key of its slice is so (statements.k1_delete)
+                raise ApplyInvariantError("%s: K1 removed %d rows for %d keys the source held at the start (a key "
+                                          "with another number of rows)" % (target, got, want))
+    copy_rel = None
+    if n_copy:
+        ctx.shape = "C0"
+        copy_rel, found, roots = backend.copy_with_rowids("copy", sh)
+        if copy_rel is None:
+            raise ApplyInvariantError("%s: %d keys to copy, %d rows found at %d of them" % (target, n_copy, found,
+                                                                                           roots))
     if n_upd:
         upd_rel = list(backend.statement_relations("upd", chunked=False))[0]
         if sh.sentinel_mover:
@@ -212,15 +252,15 @@ def _keyed(ctx, backend, target, meta, ucols, mode, cs, counts, settings):
         ctx.shape = "K3"
         moved = ctx.execute(sh.k3_move(upd_rel))
         if moved != n_upd:
-            raise ApplyInvariantError("%s: %d of %d rows to update found in the destination" % (target, moved or 0,
-                                                                                              n_upd))
+            raise ApplyInvariantError("%s: %d of %d rows to update found in the destination%s"
+                                      % (target, moved or 0, n_upd, " (each alone at its key, and its new key free)"
+                                         if sh.per_key else ""))
         counts.updated += moved
     if n_copy:
-        rel = list(backend.statement_relations("copy", chunked=False))[0]
         ctx.shape = "K7"
-        copied = ctx.execute(sh.k7_copy(rel))
+        copied = ctx.execute(sh.k7_copy(copy_rel))
         ctx.shape = "K8"
-        removed = ctx.execute(sh.k8_delete_copied(rel))
+        removed = ctx.execute(sh.k8_delete_copied(copy_rel))
         if copied != n_copy or removed != n_copy:
             raise ApplyInvariantError("%s: %d rows to copy, %s copied, %s removed" % (target, n_copy, copied, removed))
         counts.inserted += copied
@@ -234,13 +274,14 @@ def _keyed(ctx, backend, target, meta, ucols, mode, cs, counts, settings):
                 ctx.execute(sh.k4_sentinel_column(c, upd_rel))
             ctx.shape = "K5.%d" % c.position
             ctx.execute(sh.k5_set_column(c, upd_rel))
-    if stats["n_ins"]:
+    if n_ins:
         ctx.shape = "K6"
+        got = 0
         for rel in backend.statement_relations("ins", chunked=True):
-            counts.inserted += ctx.execute(sh.k6_insert(rel)) or 0
-    if mode == "catch_up":
-        ctx.shape = "plan"
-        counts.unresolved = backend.fetch_arrow("unres")         # with the key types, also when empty
+            got += ctx.execute(sh.k6_insert(rel)) or 0
+        if sh.new_keys and got != n_ins:
+            raise ApplyInvariantError("%s: %d of %d rows to insert have a free key" % (target, got, n_ins))
+        counts.inserted += got
 
 
 def _keyless(ctx, backend, target, meta, ucols, cs, counts):

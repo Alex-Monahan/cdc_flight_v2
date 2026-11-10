@@ -117,14 +117,17 @@ def run_case(case, conn, form="local", table="t"):
     create_table(conn, SCHEMA, table, case.meta, case.start)
     before = dest_canon(conn, target, case.meta)
     info = {"case": case.name, "form": form, "mode": case.mode}
+    settings = test_settings(**(case.settings or {}))
     if case.error:
         exc = {"invariant": ApplyInvariantError, "changeset": ChangeSetError}[case.error]
         with pytest.raises(exc):
-            apply_sets(conn, target, case.meta, case.sets, mode=case.mode, form=form, one_tx=case.one_tx)
+            apply_sets(conn, target, case.meta, case.sets, mode=case.mode, form=form, one_tx=case.one_tx,
+                       settings=settings)
         assert dest_canon(conn, target, case.meta) == before, "the caller's roll-back leaves the table as it was"
         info["error"] = case.error
         return info
-    counts = apply_sets(conn, target, case.meta, case.sets, mode=case.mode, form=form, one_tx=case.one_tx)
+    counts = apply_sets(conn, target, case.meta, case.sets, mode=case.mode, form=form, one_tx=case.one_tx,
+                        settings=settings)
     got = dest_canon(conn, target, case.meta)
     want = literal_rows_canon(list(case.meta.columns), case.expect)
     assert got == want, "%s/%s: destination differs:\n extra %s\n missing %s" % (case.name, form, got - want,
@@ -139,7 +142,8 @@ def run_case(case, conn, form="local", table="t"):
         assert got_u == want_u, (got_u, want_u)
         info["unresolved"] = len(got_u)
     if case.twice:
-        apply_sets(conn, target, case.meta, case.sets, mode=case.mode, form=form, one_tx=case.one_tx)
+        apply_sets(conn, target, case.meta, case.sets, mode=case.mode, form=form, one_tx=case.one_tx,
+                   settings=settings)
         again = dest_canon(conn, target, case.meta)
         assert again == got, "%s/%s: a second catch-up changed the table" % (case.name, form)
         info["idempotent"] = True

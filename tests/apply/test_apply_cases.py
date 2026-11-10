@@ -13,7 +13,7 @@ from apply_harness import local_conn, run_case, test_settings
 _ALL = all_cases()
 _FULL = os.environ.get("CDC_V2_APPLY_FULL") == "1"
 CASES = [(c, "local") for c in _ALL] + [(c, "relation") for i, c in enumerate(_ALL)
-                                        if _FULL or c.mode == "catch_up" or c.error]
+                                        if _FULL or c.mode == "catch_up" or c.error or "relation" in c.forms]
 
 
 _SHARED = []
@@ -28,7 +28,7 @@ def test_case(case, form):
     run_case(case, _SHARED[0].cursor(), form, table="t%d" % len(_SHARED))
 
 
-_CUT = [c for c in _ALL if c.meta.has_key and c.mode == "stream" and not c.error]
+_CUT = [c for c in _ALL if c.meta.has_key and c.mode == "stream" and not c.error and not c.settings]
 
 
 @pytest.mark.parametrize("case", [c for i, c in enumerate(_CUT) if _FULL or i % 5 == 0], ids=lambda c: c.name)

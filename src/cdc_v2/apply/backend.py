@@ -17,6 +17,7 @@ from typing import Iterator, Optional
 
 import duckdb
 import pyarrow as pa
+import pyarrow.compute  # noqa: F401 - pa.compute
 
 from .meta import TableMeta, Target
 from .plan import Step, key_join
@@ -105,10 +106,12 @@ class LocalBackend:
         self.planning = True
         db, self.db_key = _planning_db(threads, memory_limit, temp_directory, max_temp)
         self.L = _Guarded(db.cursor())
-        self.L.execute("SET TimeZone = 'UTC'")
+        # SET SESSION: the database is shared by the calls of this thread (and a plain SET of some options is
+        # global); each setting stays with this cursor
+        self.L.execute("SET SESSION TimeZone = 'UTC'")
         # UUID, TIME WITH TIME ZONE and JSON leave as Arrow extension types; without this they would become
         # VARCHAR and TIME (the offset lost) on their way to the destination.
-        self.L.execute("SET arrow_lossless_conversion = true")
+        self.L.execute("SET SESSION arrow_lossless_conversion = true")
         self.schema = "p_%d" % next(_calls)
         self.L.execute("CREATE SCHEMA %s" % self.schema)
         # the position of each record: values are read by it at the end (plan.py, r0)
@@ -181,12 +184,35 @@ class LocalBackend:
         data = self.assemble(name) if name in self.recipes else self.fetch_arrow(name)
         view = VIEW_PREFIX + name
         if not chunked or data.num_rows <= self.statement_rows:
+            self.current = data
             self.tx.register(view, data)
             yield view
             return
         for off in range(0, data.num_rows, self.statement_rows):
-            self.tx.register(view, data.slice(off, self.statement_rows))
+            self.current = data.slice(off, self.statement_rows)
+            self.tx.register(view, self.current)
             yield view
+
+    def current_sum(self, column: str) -> Optional[int]:
+        """The sum of `column` over the slice that the last relation of statement_relations holds."""
+        return int(pa.compute.sum(self.current.column(column)).as_py() or 0)
+
+    def copy_with_rowids(self, name: str, sh):
+        """C0: the row id of every copy root, in one statement on the destination. Returns (the relation for K7
+        and K8 with column `rid`, or None unless each root has exactly one row; rows found; roots found)."""
+        data = self.assemble(name) if name in self.recipes else self.fetch_arrow(name)
+        data = data.append_column("ci", pa.array(range(data.num_rows), type=pa.int64()))
+        roots = VIEW_PREFIX + name + "_roots"
+        self.tx.register(roots, data.select(["ci"] + ["rx%d" % c.position for c in self.meta.key_columns]))
+        found = self.tx.fetch_arrow(sh.c0_copy_roots(roots))
+        cis = found.column("ci").to_pylist()
+        if not (len(cis) == len(set(cis)) == data.num_rows):
+            return None, len(cis), len(set(cis))
+        order = pa.compute.sort_indices(found, sort_keys=[("ci", "ascending")])
+        data = data.append_column("rid", found.column("rid").take(order).cast(pa.int64()))
+        view = VIEW_PREFIX + name
+        self.tx.register(view, data)
+        return view, len(cis), len(cis)
 
     def finish(self) -> None:
         pass
@@ -258,6 +284,21 @@ class RemoteBackend:
 
     def statement_relations(self, name: str, chunked: bool) -> Iterator[str]:
         yield self.rel(name)
+
+    def current_sum(self, column: str) -> Optional[int]:
+        return None                                          # never sliced: the plan's own count holds
+
+    def copy_with_rowids(self, name: str, sh):
+        """C0 (see LocalBackend): a table of the copies with the row id of each root."""
+        out = name + "_rid"
+        self.created.append(out)
+        keys = ", ".join("n.rx%d" % c.position for c in self.meta.key_columns)
+        self.tx.execute("CREATE TABLE %s AS SELECT n.*, t.rowid AS rid FROM %s AS n JOIN %s AS t ON %s"
+                        % (self.rel(out), self.rel(name), self.target.sql(), key_join(sh.meta, "t", "n", "rx")))
+        q = self.query_one("SELECT count(*) AS n, count(DISTINCT struct_pack(%s)) AS k, (SELECT count(*) FROM %s) AS "
+                           "want FROM %s AS n" % (keys, self.rel(name), self.rel(out)))
+        ok = q["n"] == q["k"] == q["want"]
+        return (self.rel(out) if ok else None), q["n"], q["k"]
 
     def finish(self) -> None:
         # one DROP per table: DuckDB refuses at COMMIT a DROP SCHEMA ... CASCADE of tables created in the same

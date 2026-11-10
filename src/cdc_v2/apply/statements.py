@@ -12,8 +12,14 @@ __all__ = ["Shapes"]
 
 
 class Shapes:
-    def __init__(self, meta: TableMeta, target: Target, ucols: List[Column]):
+    """`per_key`: stream mode, the statements act on a key only where the destination holds exactly the rows the
+    source held at the start (a count per key inside the statement, docs/design/apply.md 2.5). `new_keys`: also
+    check inside K3, K6 and K7 that a key the source did not hold has no row (`ApplySettings.check_new_keys`)."""
+
+    def __init__(self, meta: TableMeta, target: Target, ucols: List[Column], per_key: bool = False,
+                 new_keys: bool = False):
         self.meta, self.target = meta, target
+        self.per_key, self.new_keys = per_key, new_keys and per_key
         self.T = target.sql()
         self.ucols = [c for c in ucols if not c.key]
         upos = {c.position for c in self.ucols}
@@ -27,8 +33,26 @@ class Shapes:
 
     # -------------------------------------------------------------------------------------------- keyed
 
+    def _one_row(self, prefix: str) -> str:
+        """The destination holds exactly one row at the relation's key `prefix`<i> (evaluated on the table as
+        the statement starts)."""
+        return " AND (SELECT count(*) FROM %s AS t2 WHERE %s) = 1" % (self.T, key_join(self.meta, "t2", "n", prefix))
+
+    def _free_target(self) -> str:
+        """A target key that the source did not hold at the start (xp = 0) has no row."""
+        return " AND (n.xp = 1 OR NOT EXISTS (SELECT 1 FROM %s AS t3 WHERE %s))" % (
+            self.T, key_join(self.meta, "t3", "n", "x"))
+
     def k1_delete(self, rel: str) -> str:
-        return "DELETE FROM %s AS t USING %s AS n WHERE %s" % (self.T, rel, key_join(self.meta, "t", "n", "x"))
+        """Stream (`per_key`): the rows of the relation's keys go only if every key holds p rows (p = 1: the
+        source held it, p = 0: it did not); otherwise the count differs from the number of keys with p = 1 (none
+        go, or, when no key has p = 1, all rows found go), whatever the sums of rows are."""
+        cond = ""
+        if self.per_key:
+            cond = (" AND (NOT EXISTS (SELECT 1 FROM {rel} AS n2 WHERE (SELECT count(*) FROM {T} AS t2 WHERE {j2}) "
+                    "<> n2.p) OR NOT EXISTS (SELECT 1 FROM {rel} AS n3 WHERE n3.p = 1))").format(
+                rel=rel, T=self.T, j2=key_join(self.meta, "t2", "n2", "x"))
+        return "DELETE FROM %s AS t USING %s AS n WHERE %s%s" % (self.T, rel, key_join(self.meta, "t", "n", "x"), cond)
 
     def _need(self, c: Column) -> str:
         """The new value is not NULL and differs exactly from the stored one."""
@@ -45,7 +69,9 @@ class Shapes:
     def k3_move(self, rel: str) -> str:
         cols = list(self.meta.key_columns) + self.mover_cols
         sets = ", ".join("%s = n.%s" % (c.qname, c.a) for c in cols)
-        return "UPDATE %s AS t SET %s FROM %s AS n WHERE %s" % (self.T, sets, rel, key_join(self.meta, "t", "n", "rx"))
+        return "UPDATE %s AS t SET %s FROM %s AS n WHERE %s%s%s" % (
+            self.T, sets, rel, key_join(self.meta, "t", "n", "rx"), self._one_row("rx") if self.per_key else "",
+            self._free_target() if self.new_keys else "")
 
     def k4_sentinel_column(self, c: Column, rel: str) -> str:
         return "UPDATE %s AS t SET %s = %s FROM %s AS n WHERE %s%s AND %s" % (
@@ -62,19 +88,29 @@ class Shapes:
 
     def k6_insert(self, rel: str) -> str:
         cols = list(self.meta.columns)
-        return "INSERT INTO %s (%s) SELECT %s FROM %s" % (self.T, ", ".join(c.qname for c in cols),
-                                                           ", ".join(c.a for c in cols), rel)
+        free = (" WHERE NOT EXISTS (SELECT 1 FROM %s AS t WHERE %s)" % (self.T, key_join(self.meta, "t", "n", "x"))
+                if self.new_keys else "")
+        return "INSERT INTO %s (%s) SELECT %s FROM %s AS n%s" % (self.T, ", ".join(c.qname for c in cols),
+                                                                  ", ".join("n.%s" % c.a for c in cols), rel, free)
+
+    def c0_copy_roots(self, rel: str) -> str:
+        """The row id of each copy root (column `ci` of the relation numbers them), read before any statement of
+        the call moves or inserts a row (docs/design/apply.md 3.4)."""
+        return "SELECT n.ci, t.rowid AS rid FROM %s AS n JOIN %s AS t ON %s" % (rel, self.T,
+                                                                               key_join(self.meta, "t", "n", "rx"))
 
     def k7_copy(self, rel: str) -> str:
+        """Insert the copies; the old row is found by its row id (`rid`, from C0), never by its key."""
         cols = list(self.meta.columns)
         upos = {c.position for c in self.ucols}
         sel = ", ".join(("CASE WHEN n.h%d THEN n.%s ELSE t.%s END" % (c.position, c.a, c.qname))
                         if c.position in upos else "n.%s" % c.a for c in cols)
-        return "INSERT INTO %s (%s) SELECT %s FROM %s AS n JOIN %s AS t ON %s" % (
-            self.T, ", ".join(c.qname for c in cols), sel, rel, self.T, key_join(self.meta, "t", "n", "rx"))
+        return "INSERT INTO %s (%s) SELECT %s FROM %s AS n JOIN %s AS t ON t.rowid = n.rid%s" % (
+            self.T, ", ".join(c.qname for c in cols), sel, rel, self.T,
+            self._free_target().replace(" AND ", " WHERE ", 1) if self.new_keys else "")
 
     def k8_delete_copied(self, rel: str) -> str:
-        return "DELETE FROM %s AS t USING %s AS n WHERE %s" % (self.T, rel, key_join(self.meta, "t", "n", "rx"))
+        return "DELETE FROM %s WHERE rowid IN (SELECT rid FROM %s)" % (self.T, rel)
 
     # -------------------------------------------------------------------------------------------- keyless
 
@@ -105,7 +141,7 @@ class Shapes:
                 "WHERE rk > 1)").format(T=self.T, part=part, rel=rel, cond=key_join(self.meta, "t", "n", "x"))
 
     def shape_bound(self) -> int:
-        """How many statement shapes this table can use (keyed: K1-K8 with one K4/K5 per column)."""
+        """How many statement shapes this table can use (keyed: K1-K8 and C0 with one K4/K5 per column)."""
         if not self.meta.has_key:
             return 2
-        return 6 + len(self.per_column) + len([c for c in self.ucols if affected(c.dtype)])
+        return 7 + len(self.per_column) + len([c for c in self.ucols if affected(c.dtype)])

@@ -66,6 +66,7 @@ class Case:
     forms: tuple = ("local",)
     max_statements: Optional[int] = None                # per change set, local form
     twice: bool = False                                 # catch_up: apply again, the table must not change
+    settings: Optional[dict] = None                     # ApplySettings fields other than the defaults of the tests
 
 
 # the standard keyed table: id key, `big` can be unchanged (TOAST), d DOUBLE (not), iv INTERVAL (can be unchanged)
@@ -311,7 +312,8 @@ def type_key_cases() -> List[Case]:
     cs = []
     for kind in ("int", "bigint", "decimal", "double", "varchar", "blob", "uuid", "date", "ts", "timetz", "interval"):
         spec = SPECS[kind]
-        k = spec.keys
+        # the keys the change set ends with are distinct at the source (1 mon -30 days and 0 seconds are one key)
+        k = spec.keys if kind != "interval" else spec.keys[:4] + spec.keys[5:]
         meta = TableMeta((Column(0, "k", spec.type, key=True), Column(1, "big", "VARCHAR", unchanged_possible=True)))
         start = [{0: k[0], 1: "'a'"}, {0: k[1], 1: "'b'"}, {0: k[2], 1: "'c'"}]
         r = (R().c(1, {0: k[3], 1: "'n'"}).u(1, {0: k[0], 1: None}, unchanged=[1]).move(1, {0: k[1]}, {0: k[4], 1: None}, unchanged=[1])
@@ -431,5 +433,121 @@ def keyless_cases() -> List[Case]:
     return cs
 
 
+def round2_cases() -> List[Case]:
+    """The second fix round: X1 and its variants (a form-only key change next to a move onto its old form), the
+    per-key count checks (report 4b), the new-key check inside the statements (item 9) and catch-up rule 1 for
+    d(K) c(K, k=K) (item 5)."""
+    cs = []
+    both = ("local", "relation")
+    # (k1 DOUBLE key, k2 INTEGER key, v, big unchanged-possible)
+    KC = TableMeta((Column(0, "k1", "DOUBLE", key=True), Column(1, "k2", "INTEGER", key=True), Column(2, "v", "VARCHAR"),
+                    Column(3, "big", "VARCHAR", unchanged_possible=True)))
+    P0, Z, F5, F9 = "0.0::DOUBLE", NZ, "5.0::DOUBLE", "9.0::DOUBLE"
+
+    def kc(k1, k2, v, big):
+        return {0: k1, 1: k2, 2: v, 3: big}
+
+    def key(k1, k2):
+        return {0: k1, 1: k2}
+    # X1: the form-only change first (-0,1 -> 0,2 is copied), then 5,5 moves onto the old form -0,1 (K3)
+    r = (R().move(1, key(Z, "1"), kc(P0, "2", "'a2'", None), unchanged=[3])
+         .move(1, key(F5, "5"), kc(Z, "1", "'b2'", None), unchanged=[3]))
+    x1_start = [kc(Z, "1", "'a'", "'Ba'"), kc(F5, "5", "'b'", "'Bb'")]
+    x1_end = [kc(P0, "2", "'a2'", "'Ba'"), kc(Z, "1", "'b2'", "'Bb'")]
+    cs.append(Case("round2_X1_form_change_then_move_onto_its_old_form", KC, x1_start, [r.out], x1_end, forms=both))
+    cs.append(Case("round2_X1_two_change_sets_one_transaction", KC, x1_start, [r.out[:2], r.out[2:]], x1_end,
+                   one_tx=True, forms=both))
+    # the form-only change second: 0,2 moves away (K3) first, then -0,1 is copied onto 0,2
+    r = (R().move(1, key(P0, "2"), kc(F5, "5", "'b2'", None), unchanged=[3])
+         .move(1, key(Z, "1"), kc(P0, "2", "'a2'", None), unchanged=[3]))
+    cs.append(Case("round2_form_change_second_onto_a_moved_root", KC,
+                   [kc(Z, "1", "'a'", "'Ba'"), kc(P0, "2", "'b'", "'Bb'")], [r.out],
+                   [kc(P0, "2", "'a2'", "'Ba'"), kc(F5, "5", "'b2'", "'Bb'")], forms=both))
+    # two form-only changes in a chain: 0,2 -> -0,3 is copied, then -0,1 -> 0,2 is copied onto its root
+    r = (R().move(1, key(P0, "2"), kc(Z, "3", "'b2'", None), unchanged=[3])
+         .move(1, key(Z, "1"), kc(P0, "2", "'a2'", None), unchanged=[3]))
+    cs.append(Case("round2_two_form_changes_in_a_chain", KC, [kc(Z, "1", "'a'", "'Ba'"), kc(P0, "2", "'b'", "'Bb'")],
+                   [r.out], [kc(P0, "2", "'a2'", "'Ba'"), kc(Z, "3", "'b2'", "'Bb'")], forms=both))
+    # three keys in a ring through a temporary key: -0,1 -> 0,2 (copy), 0,2 -> 5,5 and 5,5 -> -0,1 (K3)
+    r = (R().move(1, key(P0, "2"), kc(F9, "9", "'t'", None), unchanged=[3])
+         .move(1, key(Z, "1"), kc(P0, "2", "'a2'", None), unchanged=[3])
+         .move(1, key(F5, "5"), kc(Z, "1", "'c2'", None), unchanged=[3])
+         .move(1, key(F9, "9"), kc(F5, "5", "'b2'", None), unchanged=[3]))
+    cs.append(Case("round2_three_keys_in_a_ring_with_a_form_change", KC,
+                   [kc(Z, "1", "'a'", "'Ba'"), kc(P0, "2", "'b'", "'Bb'"), kc(F5, "5", "'c'", "'Bc'")],
+                   [r.out], [kc(P0, "2", "'a2'", "'Ba'"), kc(F5, "5", "'b2'", "'Bb'"), kc(Z, "1", "'c2'", "'Bc'")],
+                   forms=both))
+    # X1 with an INTERVAL key part: 1 month,1 -> 30 days,2 is copied, then 1 day,5 moves onto 1 month,1
+    KI = TableMeta((Column(0, "k1", "INTERVAL", key=True), Column(1, "k2", "INTEGER", key=True),
+                    Column(2, "v", "VARCHAR"), Column(3, "big", "VARCHAR", unchanged_possible=True)))
+    M, D30, D1 = "INTERVAL '1 month'", "INTERVAL '30 days'", "INTERVAL '1 day'"
+    r = (R().move(1, key(M, "1"), kc(D30, "2", "'a2'", None), unchanged=[3])
+         .move(1, key(D1, "5"), kc(M, "1", "'b2'", None), unchanged=[3]))
+    cs.append(Case("round2_X1_interval_key_part", KI, [kc(M, "1", "'a'", "'Ba'"), kc(D1, "5", "'b'", "'Bb'")], [r.out],
+                   [kc(D30, "2", "'a2'", "'Ba'"), kc(M, "1", "'b2'", "'Bb'")], forms=both))
+    # report 4b: the count checks counted sums. The destination holds key 1 twice and lacks key 3.
+    TV = TableMeta((Column(0, "id", "BIGINT", key=True), Column(1, "v", "VARCHAR"),
+                    Column(2, "big", "VARCHAR", unchanged_possible=True)))
+
+    def tv(i, v, big):
+        return {0: str(i), 1: v, 2: big}
+    wrong = [tv(1, "'a'", "'B1'"), tv(1, "'a'", "'B1'"), tv(2, "'b'", "'B2'")]
+    r = R().move(1, {0: "1"}, tv(11, "'x'", None), unchanged=[2]).move(1, {0: "3"}, tv(13, "'y'", None), unchanged=[2])
+    cs.append(Case("round2_4b_moves_of_a_doubled_and_a_missing_key_raise", TV, wrong, [r.out], error="invariant",
+                   forms=both))
+    r = R().d(1, {0: "1"}).d(1, {0: "3"})
+    cs.append(Case("round2_4b_deletes_of_a_doubled_and_a_missing_key_raise", TV, wrong, [r.out], error="invariant",
+                   forms=both))
+    r = R().u(1, tv(1, "'x'", None), unchanged=[2]).u(1, tv(3, "'y'", None), unchanged=[2])
+    cs.append(Case("round2_4b_updates_of_a_doubled_and_a_missing_key_raise", TV, wrong, [r.out], error="invariant",
+                   forms=both))
+    # a doubled root of a form-only key change
+    KD = TableMeta((Column(0, "k", "DOUBLE", key=True), Column(1, "big", "VARCHAR", unchanged_possible=True)))
+    r = R().move(1, {0: NZ}, {0: P0, 1: None}, unchanged=[1])
+    cs.append(Case("round2_copy_of_a_doubled_root_raises", KD, [{0: NZ, 1: "'A'"}, {0: NZ, 1: "'A'"}], [r.out],
+                   error="invariant", forms=both))
+    # item 9: the new keys are checked inside K6 (an insert-only change set is one statement), K3 and K7 (a move
+    # onto a key that must be free)
+    r = R().c(1, tv(2, "'n'", "'N'"))
+    cs.append(Case("round2_insert_at_a_held_key_raises", TV, [tv(2, "'b'", "'B2'")], [r.out], error="invariant",
+                   forms=both))
+    cs.append(Case("round2_insert_at_a_held_key_unchecked_with_the_switch_off", TV, [tv(2, "'b'", "'B2'")], [r.out],
+                   [tv(2, "'b'", "'B2'"), tv(2, "'n'", "'N'")], settings={"check_new_keys": False}))
+    r = R().move(1, {0: "1"}, tv(2, "'x'", None), unchanged=[2])
+    cs.append(Case("round2_move_onto_a_held_free_key_raises", TV, [tv(1, "'a'", "'B1'"), tv(2, "'b'", "'B2'")],
+                   [r.out], error="invariant", forms=both))
+    cs.append(Case("round2_move_onto_a_held_free_key_unchecked_with_the_switch_off", TV,
+                   [tv(1, "'a'", "'B1'"), tv(2, "'b'", "'B2'")], [r.out],
+                   [tv(2, "'x'", "'B1'"), tv(2, "'b'", "'B2'")], settings={"check_new_keys": False}))
+    r = R().move(1, {0: NZ}, {0: P0, 1: None}, unchanged=[1])
+    cs.append(Case("round2_copy_onto_a_held_free_key_raises", KD, [{0: NZ, 1: "'A'"}, {0: P0, 1: "'X'"}], [r.out],
+                   error="invariant", forms=both))
+    r = R().c(1, tv(5, "'n'", "'N'")).c(1, tv(6, "'m'", "'M'"))
+    cs.append(Case("round2_insert_only_is_one_statement", TV, [tv(1, "'a'", "'B1'")], [r.out],
+                   [tv(1, "'a'", "'B1'"), tv(5, "'n'", "'N'"), tv(6, "'m'", "'M'")], max_statements=1))
+    # item 5: catch-up, d(K) c(K, k=K) with an unchanged value: the destination row at K is the row before or after
+    # the pair, and both hold the same value of the unchanged column (rule 1, docs/design/apply.md 2.3)
+    r = R().move(1, {0: "1"}, tv(1, "'v2'", None), unchanged=[2])
+    cs.append(Case("round2_catch_up_self_key_change_resolves", TV, [tv(1, "'a'", "'B1'")], [r.out],
+                   [tv(1, "'v2'", "'B1'")], mode="catch_up", unresolved=[], twice=True, forms=both))
+    cs.append(Case("round2_catch_up_self_key_change_loaded_after_the_pair_resolves", TV, [tv(1, "'v2'", "'B1'")],
+                   [r.out], [tv(1, "'v2'", "'B1'")], mode="catch_up", unresolved=[], forms=both))
+    # back to the same key through another one: 1 -> 2 -> 1
+    r = R().move(1, {0: "1"}, tv(2, "'v2'", None), unchanged=[2]).move(1, {0: "2"}, tv(1, "'v3'", None), unchanged=[2])
+    cs.append(Case("round2_catch_up_back_through_another_key_resolves", TV, [tv(1, "'a'", "'B1'")], [r.out],
+                   [tv(1, "'v3'", "'B1'")], mode="catch_up", unresolved=[], forms=both))
+    # a full update between two self key changes: complete, nothing to take from the destination
+    r = (R().move(1, {0: "1"}, tv(1, "'v2'", None), unchanged=[2]).u(2, tv(1, "'v3'", "'NEW'"))
+         .move(3, {0: "1"}, tv(1, "'v4'", None), unchanged=[2]))
+    cs.append(Case("round2_catch_up_full_update_between_self_key_changes", TV, [tv(1, "'a'", "'B1'")], [r.out],
+                   [tv(1, "'v4'", "'NEW'")], mode="catch_up", unresolved=[]))
+    # two creates at the key that both take the value from the destination: rule 1 is kept to one create (open)
+    r = R().move(1, {0: "1"}, tv(1, "'v2'", None), unchanged=[2]).move(2, {0: "1"}, tv(1, "'v3'", None), unchanged=[2])
+    cs.append(Case("round2_catch_up_two_self_key_changes_stay_unresolved", TV, [tv(1, "'a'", "'B1'")], [r.out],
+                   [], mode="catch_up", unresolved=[("1",)], forms=both))
+    return cs
+
+
 def all_cases() -> List[Case]:
-    return keyed_cases() + special_cases() + type_key_cases() + keyless_cases()
+    return keyed_cases() + special_cases() + type_key_cases() + keyless_cases() + round2_cases()
+
