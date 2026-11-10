@@ -20,8 +20,16 @@
         "src/cdc_v2/artifacts.py",
         "jvm/src",
         "flights/cdc_v2",
+        "jvm/debezium.lock.json",
+        "jvm/jdk.lock.json",
+        "uv.lock",
+        "pyproject.toml",
+        "src/cdc_v2/testing",
+        "src/cdc_v2/oracle",
         "src/cdc_v2/crashpoints.py",
-        "src/cdc_v2/faultsites.py"
+        "src/cdc_v2/faultsites.py",
+        "src/cdc_v2/evidence.py",
+        "tools/fuzz"
       ],
       "against_minimum_total": {
         "divergences": {
@@ -53,12 +61,84 @@
       },
       "bar_met": false,
       "combos": {
+        "all_met": false,
+        "fraction": 0.25,
         "missing": [
           "local/replica",
           "local/primary",
           "planetscale/replica",
           "planetscale/primary"
         ],
+        "per_combination": {
+          "local/primary": {
+            "faults": {
+              "met": false,
+              "minimum": 2500.0,
+              "value": 0
+            },
+            "hours": {
+              "met": false,
+              "minimum": 25.0,
+              "value": 0.0
+            },
+            "seeds": {
+              "met": false,
+              "minimum": 125.0,
+              "value": 0
+            }
+          },
+          "local/replica": {
+            "faults": {
+              "met": false,
+              "minimum": 2500.0,
+              "value": 0
+            },
+            "hours": {
+              "met": false,
+              "minimum": 25.0,
+              "value": 0.0
+            },
+            "seeds": {
+              "met": false,
+              "minimum": 125.0,
+              "value": 0
+            }
+          },
+          "planetscale/primary": {
+            "faults": {
+              "met": false,
+              "minimum": 2500.0,
+              "value": 0
+            },
+            "hours": {
+              "met": false,
+              "minimum": 25.0,
+              "value": 0.0
+            },
+            "seeds": {
+              "met": false,
+              "minimum": 125.0,
+              "value": 0
+            }
+          },
+          "planetscale/replica": {
+            "faults": {
+              "met": false,
+              "minimum": 2500.0,
+              "value": 0
+            },
+            "hours": {
+              "met": false,
+              "minimum": 25.0,
+              "value": 0.0
+            },
+            "seeds": {
+              "met": false,
+              "minimum": 125.0,
+              "value": 0
+            }
+          }
+        },
         "required": [
           "local/replica",
           "local/primary",
@@ -89,10 +169,73 @@
         },
         {
           "fixed_commit": null,
+          "id": "fault-toy-ack_early-replica-s103-29f9c8f",
+          "outcome": "diverged",
+          "regression_test": "tests/fuzz/regressions/test_fault_toy_ack_early_replica_s103_29f9c8f.py",
+          "seed": 103,
+          "self_test": true,
+          "system": "toy-ack_early"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-ack_early-replica-s2-b09e06a",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 2,
+          "self_test": true,
+          "system": "toy-ack_early"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-ack_early-replica-s3-5bd69ae",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 3,
+          "self_test": true,
+          "system": "toy-ack_early"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-ack_early-replica-s8-b09e06a",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 8,
+          "self_test": true,
+          "system": "toy-ack_early"
+        },
+        {
+          "fixed_commit": null,
           "id": "fault-toy-position_apart-replica-s1-ffdd6f4",
           "outcome": "diverged",
           "regression_test": null,
           "seed": 1,
+          "self_test": true,
+          "system": "toy-position_apart"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-position_apart-replica-s2-b09e06a",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 2,
+          "self_test": true,
+          "system": "toy-position_apart"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-position_apart-replica-s3-5bd69ae",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 3,
+          "self_test": true,
+          "system": "toy-position_apart"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-position_apart-replica-s9-b09e06a",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 9,
           "self_test": true,
           "system": "toy-position_apart"
         },
@@ -104,6 +247,24 @@
           "seed": 1,
           "self_test": true,
           "system": "toy-skip_on_reconnect"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-skip_on_reconnect-replica-s2-b09e06a",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 2,
+          "self_test": true,
+          "system": "toy-skip_on_reconnect"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-swallow-replica-s2-b09e06a",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 2,
+          "self_test": true,
+          "system": "toy-swallow"
         }
       ],
       "failures_fixed": 0,
@@ -111,21 +272,31 @@
       "groups": [
         {
           "all_runs": {
-            "divergences": 1,
-            "faults": 1,
+            "divergences": 5,
+            "faults": 23,
             "faults_per_kind": {
-              "kill_point": 1
+              "dest_error": 1,
+              "hang_point": 1,
+              "kill_group": 7,
+              "kill_point": 9,
+              "kill_point_later": 3,
+              "net_drop": 1,
+              "spill_full": 1
             },
-            "hours": 0.0054,
+            "hours": 0.0637,
             "no_effect_per_kind": {
-              "kill_point_later": 1
+              "kill_point": 1,
+              "kill_point_later": 1,
+              "spill_full": 1
             },
             "outcomes": {
-              "diverged": 1
+              "diverged": 3,
+              "pass": 2,
+              "violation": 2
             },
-            "rounds": 57,
-            "runs": 1,
-            "seeds": 1
+            "rounds": 466,
+            "runs": 7,
+            "seeds": 7
           },
           "counted": {
             "divergences": 0,
@@ -176,22 +347,23 @@
         {
           "all_runs": {
             "divergences": 0,
-            "faults": 7,
+            "faults": 36,
             "faults_per_kind": {
-              "kill_group": 1,
-              "kill_point": 4,
-              "kill_point_later": 2
+              "kill_group": 11,
+              "kill_point": 14,
+              "kill_point_later": 11
             },
-            "hours": 0.0185,
+            "hours": 0.0959,
             "no_effect_per_kind": {
-              "kill_point": 2
+              "kill_point": 7,
+              "kill_point_later": 3
             },
             "outcomes": {
-              "pass": 1
+              "pass": 5
             },
-            "rounds": 183,
-            "runs": 1,
-            "seeds": 1
+            "rounds": 816,
+            "runs": 5,
+            "seeds": 5
           },
           "counted": {
             "divergences": 0,
@@ -241,22 +413,24 @@
         },
         {
           "all_runs": {
-            "divergences": 1,
-            "faults": 4,
+            "divergences": 4,
+            "faults": 27,
             "faults_per_kind": {
-              "kill_point": 2,
-              "kill_point_later": 2
+              "kill_group": 11,
+              "kill_point": 9,
+              "kill_point_later": 7
             },
-            "hours": 0.0125,
+            "hours": 0.0643,
             "no_effect_per_kind": {
-              "kill_point": 1
+              "kill_point": 3
             },
             "outcomes": {
-              "diverged": 1
+              "diverged": 4,
+              "pass": 1
             },
-            "rounds": 130,
-            "runs": 1,
-            "seeds": 1
+            "rounds": 527,
+            "runs": 5,
+            "seeds": 5
           },
           "counted": {
             "divergences": 0,
@@ -306,20 +480,24 @@
         },
         {
           "all_runs": {
-            "divergences": 1,
-            "faults": 2,
+            "divergences": 2,
+            "faults": 4,
             "faults_per_kind": {
+              "net_drop": 1,
               "net_reset": 1,
-              "src_terminate": 1
+              "src_terminate": 2
             },
-            "hours": 0.0034,
-            "no_effect_per_kind": {},
+            "hours": 0.0077,
+            "no_effect_per_kind": {
+              "net_blackhole": 1
+            },
             "outcomes": {
-              "diverged": 1
+              "diverged": 1,
+              "violation": 1
             },
-            "rounds": 36,
-            "runs": 1,
-            "seeds": 1
+            "rounds": 72,
+            "runs": 2,
+            "seeds": 2
           },
           "counted": {
             "divergences": 0,
@@ -366,12 +544,77 @@
               "src_terminate": 5
             }
           }
+        },
+        {
+          "all_runs": {
+            "divergences": 1,
+            "faults": 13,
+            "faults_per_kind": {
+              "dest_error": 13
+            },
+            "hours": 0.0216,
+            "no_effect_per_kind": {
+              "dest_error": 2
+            },
+            "outcomes": {
+              "pass": 1,
+              "violation": 1
+            },
+            "rounds": 249,
+            "runs": 2,
+            "seeds": 2
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-swallow",
+          "tier": "local",
+          "weights": {
+            "not_attacked": [
+              "dest_delay",
+              "dest_hang",
+              "freeze",
+              "hang_point",
+              "kill_group",
+              "kill_point",
+              "kill_point_later",
+              "net_blackhole",
+              "net_drop",
+              "net_latency",
+              "net_reset",
+              "replica_promote",
+              "replica_restart",
+              "slot_drop",
+              "slot_invalidate",
+              "spill_full",
+              "src_cancel",
+              "src_lock",
+              "src_long_txn",
+              "src_restart_primary",
+              "src_terminate",
+              "src_wal_switch"
+            ],
+            "weights": {
+              "dest_error": 7
+            }
+          }
         }
       ],
       "restart": {
-        "commit": "6e114bce2692ac0f54989a16b6e0a434299e8fbd",
-        "subject": "P3 engine: held list keeps the newest sample (bound for every limit, property test), value-changing options forbidden, F",
-        "why": "touches jvm/src/cdc_v2/engine/CdcEngine.java, jvm/src/cdc_v2/engine/FrameGen.java, jvm/src/cdc_v2/engine/HeldEnds.java, jvm/src/cdc_v2/engine/HeldSelftest.java, jvm/src/cdc_v2/engine/ProtectedConfig.java"
+        "commit": "5bd69ae9a5eb143c7a566369e4d20b47160c67f5",
+        "subject": "Replay of a reduced case: consumer loops only when a consumer loop found it; the oracle decides the others",
+        "why": "touches src/cdc_v2/testing/fuzz/reduce.py"
       }
     },
     "leadership": {
@@ -383,7 +626,16 @@
         "src/cdc_v2/pipeline.py",
         "src/cdc_v2/stream",
         "flights/cdc_v2",
-        "src/cdc_v2/crashpoints.py"
+        "jvm/debezium.lock.json",
+        "jvm/jdk.lock.json",
+        "uv.lock",
+        "pyproject.toml",
+        "src/cdc_v2/testing",
+        "src/cdc_v2/oracle",
+        "src/cdc_v2/crashpoints.py",
+        "src/cdc_v2/faultsites.py",
+        "src/cdc_v2/evidence.py",
+        "tools/fuzz"
       ],
       "against_minimum_total": {
         "rounds": {
@@ -431,6 +683,24 @@
           "seed": 2,
           "self_test": true,
           "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s5-b09e06a",
+          "outcome": "error",
+          "regression_test": null,
+          "seed": 5,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s8-5bd69ae",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 8,
+          "self_test": true,
+          "system": "toy-no_fence"
         }
       ],
       "failures_fixed": 0,
@@ -439,19 +709,220 @@
         {
           "all_runs": {
             "divergences": 0,
-            "faults": 3,
+            "faults": 14,
             "faults_per_kind": {
-              "dest_delay": 1,
-              "net_reset": 1,
-              "spill_full": 1
+              "dest_delay": 4,
+              "dest_error": 2,
+              "net_blackhole": 1,
+              "net_latency": 1,
+              "net_reset": 3,
+              "spill_full": 1,
+              "src_terminate": 2
             },
-            "hours": 0.0195,
-            "no_effect_per_kind": {},
+            "hours": 0.0967,
+            "no_effect_per_kind": {
+              "dest_delay": 1,
+              "spill_full": 1,
+              "src_terminate": 1
+            },
             "outcomes": {
               "error": 1,
-              "pass": 1
+              "pass": 7
             },
-            "rounds": 6,
+            "rounds": 30,
+            "runs": 8,
+            "seeds": 8
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-correct",
+          "tier": "local",
+          "weights": null
+        },
+        {
+          "all_runs": {
+            "divergences": 3,
+            "faults": 11,
+            "faults_per_kind": {
+              "dest_error": 2,
+              "net_blackhole": 1,
+              "net_drop": 1,
+              "net_latency": 2,
+              "net_reset": 2,
+              "spill_full": 2,
+              "src_terminate": 1
+            },
+            "hours": 0.0819,
+            "no_effect_per_kind": {
+              "dest_delay": 1,
+              "net_blackhole": 1,
+              "net_reset": 1,
+              "src_terminate": 1
+            },
+            "outcomes": {
+              "error": 1,
+              "pass": 4,
+              "violation": 3
+            },
+            "rounds": 22,
+            "runs": 8,
+            "seeds": 8
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-no_fence",
+          "tier": "local",
+          "weights": null
+        }
+      ],
+      "restart": {
+        "commit": "5bd69ae9a5eb143c7a566369e4d20b47160c67f5",
+        "subject": "Replay of a reduced case: consumer loops only when a consumer loop found it; the oracle decides the others",
+        "why": "touches src/cdc_v2/testing/fuzz/reduce.py"
+      }
+    },
+    "stream": {
+      "affects": [
+        "src/cdc_v2/stream",
+        "src/cdc_v2/transform",
+        "jvm/src",
+        "jvm/debezium.lock.json",
+        "jvm/jdk.lock.json",
+        "uv.lock",
+        "pyproject.toml",
+        "src/cdc_v2/testing",
+        "src/cdc_v2/oracle",
+        "src/cdc_v2/crashpoints.py",
+        "src/cdc_v2/faultsites.py",
+        "src/cdc_v2/evidence.py",
+        "tools/fuzz"
+      ],
+      "against_minimum_total": {},
+      "bar_met": null,
+      "counted_total": {
+        "divergences": 0,
+        "faults": 0,
+        "faults_per_kind": {},
+        "hours": 0.0,
+        "no_effect_per_kind": {},
+        "outcomes": {},
+        "rounds": 0,
+        "runs": 0,
+        "seeds": 0
+      },
+      "failures": [
+        {
+          "fixed_commit": null,
+          "id": "stream-toy-trust_frames-replica-s1-ffdd6f4",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-trust_frames"
+        },
+        {
+          "fixed_commit": null,
+          "id": "stream-toy-trust_frames-replica-s2-b09e06a",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 2,
+          "self_test": true,
+          "system": "toy-trust_frames"
+        }
+      ],
+      "failures_fixed": 0,
+      "failures_open": 0,
+      "groups": [
+        {
+          "against_minimum": {},
+          "all_runs": {
+            "divergences": 0,
+            "faults": 200000,
+            "faults_per_kind": {
+              "ack_regress": 10414,
+              "content_replaced_same_shape": 10358,
+              "cut_at_boundary": 10334,
+              "drop_begin": 10162,
+              "drop_end": 10196,
+              "dup_txn_same_life": 10248,
+              "end_count": 10304,
+              "flip_header_length": 10214,
+              "flip_header_seq": 10180,
+              "flip_header_type": 10299,
+              "flip_payload": 10202,
+              "foreign_rows": 10408,
+              "heartbeat_ahead": 10302,
+              "huge_length": 4939,
+              "new_life_replay": 10417,
+              "pipefault": 10217,
+              "raw_drop_frame": 10333,
+              "raw_dup_run": 10260,
+              "raw_swap": 10147,
+              "swap_records": 10066
+            },
+            "hours": 0.173,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "pass": 2
+            },
+            "rounds": 0,
+            "runs": 2,
+            "seeds": 2
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "self_test": false,
+          "source_mode": "offline",
+          "system": "engine-reader",
+          "tier": "offline",
+          "weights": null
+        },
+        {
+          "all_runs": {
+            "divergences": 0,
+            "faults": 102,
+            "faults_per_kind": {
+              "stream_bytes": 102
+            },
+            "hours": 0.0235,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "pass": 2
+            },
+            "rounds": 258,
             "runs": 2,
             "seeds": 2
           },
@@ -476,181 +947,19 @@
         {
           "all_runs": {
             "divergences": 2,
-            "faults": 2,
+            "faults": 14,
             "faults_per_kind": {
-              "net_latency": 1,
-              "spill_full": 1
+              "stream_bytes": 14
             },
-            "hours": 0.0196,
-            "no_effect_per_kind": {
-              "dest_delay": 1
-            },
+            "hours": 0.0054,
+            "no_effect_per_kind": {},
             "outcomes": {
-              "violation": 2
+              "diverged": 1,
+              "violation": 1
             },
-            "rounds": 4,
+            "rounds": 47,
             "runs": 2,
             "seeds": 2
-          },
-          "counted": {
-            "divergences": 0,
-            "faults": 0,
-            "faults_per_kind": {},
-            "hours": 0.0,
-            "no_effect_per_kind": {},
-            "outcomes": {},
-            "rounds": 0,
-            "runs": 0,
-            "seeds": 0
-          },
-          "note": "self-test of the fuzzers: never counted toward the bar",
-          "self_test": true,
-          "source_mode": "replica",
-          "system": "toy-no_fence",
-          "tier": "local",
-          "weights": null
-        }
-      ],
-      "restart": {
-        "commit": "6e114bce2692ac0f54989a16b6e0a434299e8fbd",
-        "subject": "P3 engine: held list keeps the newest sample (bound for every limit, property test), value-changing options forbidden, F",
-        "why": "touches src/cdc_v2/stream/engine.py, src/cdc_v2/stream/frames.py"
-      }
-    },
-    "stream": {
-      "affects": [
-        "src/cdc_v2/stream",
-        "src/cdc_v2/transform",
-        "jvm/src"
-      ],
-      "against_minimum_total": {},
-      "bar_met": null,
-      "counted_total": {
-        "divergences": 0,
-        "faults": 0,
-        "faults_per_kind": {},
-        "hours": 0.0,
-        "no_effect_per_kind": {},
-        "outcomes": {},
-        "rounds": 0,
-        "runs": 0,
-        "seeds": 0
-      },
-      "failures": [
-        {
-          "fixed_commit": null,
-          "id": "stream-toy-trust_frames-replica-s1-ffdd6f4",
-          "outcome": "diverged",
-          "regression_test": null,
-          "seed": 1,
-          "self_test": true,
-          "system": "toy-trust_frames"
-        }
-      ],
-      "failures_fixed": 0,
-      "failures_open": 0,
-      "groups": [
-        {
-          "against_minimum": {},
-          "all_runs": {
-            "divergences": 0,
-            "faults": 100000,
-            "faults_per_kind": {
-              "ack_regress": 5327,
-              "content_replaced_same_shape": 5414,
-              "cut_at_boundary": 5192,
-              "drop_begin": 5286,
-              "drop_end": 5290,
-              "dup_txn_same_life": 5329,
-              "end_count": 5242,
-              "flip_header_length": 5110,
-              "flip_header_seq": 5152,
-              "flip_header_type": 5211,
-              "flip_payload": 5252,
-              "foreign_rows": 5251,
-              "heartbeat_ahead": 5308,
-              "new_life_replay": 5367,
-              "pipefault": 5214,
-              "raw_drop_frame": 5346,
-              "raw_dup_run": 5237,
-              "raw_swap": 5183,
-              "swap_records": 5289
-            },
-            "hours": 0.0848,
-            "no_effect_per_kind": {},
-            "outcomes": {
-              "pass": 1
-            },
-            "rounds": 0,
-            "runs": 1,
-            "seeds": 1
-          },
-          "counted": {
-            "divergences": 0,
-            "faults": 0,
-            "faults_per_kind": {},
-            "hours": 0.0,
-            "no_effect_per_kind": {},
-            "outcomes": {},
-            "rounds": 0,
-            "runs": 0,
-            "seeds": 0
-          },
-          "self_test": false,
-          "source_mode": "offline",
-          "system": "engine-reader",
-          "tier": "offline",
-          "weights": null
-        },
-        {
-          "all_runs": {
-            "divergences": 0,
-            "faults": 42,
-            "faults_per_kind": {
-              "stream_bytes": 42
-            },
-            "hours": 0.0118,
-            "no_effect_per_kind": {},
-            "outcomes": {
-              "pass": 1
-            },
-            "rounds": 130,
-            "runs": 1,
-            "seeds": 1
-          },
-          "counted": {
-            "divergences": 0,
-            "faults": 0,
-            "faults_per_kind": {},
-            "hours": 0.0,
-            "no_effect_per_kind": {},
-            "outcomes": {},
-            "rounds": 0,
-            "runs": 0,
-            "seeds": 0
-          },
-          "note": "self-test of the fuzzers: never counted toward the bar",
-          "self_test": true,
-          "source_mode": "replica",
-          "system": "toy-correct",
-          "tier": "local",
-          "weights": null
-        },
-        {
-          "all_runs": {
-            "divergences": 1,
-            "faults": 11,
-            "faults_per_kind": {
-              "stream_bytes": 11
-            },
-            "hours": 0.0041,
-            "no_effect_per_kind": {},
-            "outcomes": {
-              "diverged": 1
-            },
-            "rounds": 36,
-            "runs": 1,
-            "seeds": 1
           },
           "counted": {
             "divergences": 0,
@@ -672,9 +981,9 @@
         }
       ],
       "restart": {
-        "commit": "6e114bce2692ac0f54989a16b6e0a434299e8fbd",
-        "subject": "P3 engine: held list keeps the newest sample (bound for every limit, property test), value-changing options forbidden, F",
-        "why": "touches jvm/src/cdc_v2/engine/CdcEngine.java, jvm/src/cdc_v2/engine/FrameGen.java, jvm/src/cdc_v2/engine/HeldEnds.java, jvm/src/cdc_v2/engine/HeldSelftest.java, jvm/src/cdc_v2/engine/ProtectedConfig.java"
+        "commit": "5bd69ae9a5eb143c7a566369e4d20b47160c67f5",
+        "subject": "Replay of a reduced case: consumer loops only when a consumer loop found it; the oracle decides the others",
+        "why": "touches src/cdc_v2/testing/fuzz/reduce.py"
       }
     },
     "value": {
@@ -682,7 +991,17 @@
         "src/cdc_v2/transform",
         "src/cdc_v2/apply",
         "src/cdc_v2/stream",
-        "jvm/src"
+        "jvm/src",
+        "jvm/debezium.lock.json",
+        "jvm/jdk.lock.json",
+        "uv.lock",
+        "pyproject.toml",
+        "src/cdc_v2/testing",
+        "src/cdc_v2/oracle",
+        "src/cdc_v2/crashpoints.py",
+        "src/cdc_v2/faultsites.py",
+        "src/cdc_v2/evidence.py",
+        "tools/fuzz"
       ],
       "against_minimum_total": {
         "values_per_family": {
@@ -709,9 +1028,9 @@
       "groups": [],
       "note": "not built yet: the value fuzzer belongs to the P4 type wave (task of package F)",
       "restart": {
-        "commit": "6e114bce2692ac0f54989a16b6e0a434299e8fbd",
-        "subject": "P3 engine: held list keeps the newest sample (bound for every limit, property test), value-changing options forbidden, F",
-        "why": "touches jvm/src/cdc_v2/engine/CdcEngine.java, jvm/src/cdc_v2/engine/FrameGen.java, jvm/src/cdc_v2/engine/HeldEnds.java, jvm/src/cdc_v2/engine/HeldSelftest.java, jvm/src/cdc_v2/engine/ProtectedConfig.java"
+        "commit": "5bd69ae9a5eb143c7a566369e4d20b47160c67f5",
+        "subject": "Replay of a reduced case: consumer loops only when a consumer loop found it; the oracle decides the others",
+        "why": "touches src/cdc_v2/testing/fuzz/reduce.py"
       }
     },
     "workload": {
@@ -731,7 +1050,17 @@
         "src/cdc_v2/deadline.py",
         "src/cdc_v2/artifacts.py",
         "jvm/src",
-        "flights/cdc_v2"
+        "flights/cdc_v2",
+        "jvm/debezium.lock.json",
+        "jvm/jdk.lock.json",
+        "uv.lock",
+        "pyproject.toml",
+        "src/cdc_v2/testing",
+        "src/cdc_v2/oracle",
+        "src/cdc_v2/crashpoints.py",
+        "src/cdc_v2/faultsites.py",
+        "src/cdc_v2/evidence.py",
+        "tools/fuzz"
       ],
       "against_minimum_total": {
         "hours": {
@@ -747,12 +1076,64 @@
       },
       "bar_met": false,
       "combos": {
+        "all_met": false,
+        "fraction": 0.25,
         "missing": [
           "local/replica",
           "local/primary",
           "planetscale/replica",
           "planetscale/primary"
         ],
+        "per_combination": {
+          "local/primary": {
+            "hours": {
+              "met": false,
+              "minimum": 25.0,
+              "value": 0.0
+            },
+            "seeds": {
+              "met": false,
+              "minimum": 250.0,
+              "value": 0
+            }
+          },
+          "local/replica": {
+            "hours": {
+              "met": false,
+              "minimum": 25.0,
+              "value": 0.0
+            },
+            "seeds": {
+              "met": false,
+              "minimum": 250.0,
+              "value": 0
+            }
+          },
+          "planetscale/primary": {
+            "hours": {
+              "met": false,
+              "minimum": 25.0,
+              "value": 0.0
+            },
+            "seeds": {
+              "met": false,
+              "minimum": 250.0,
+              "value": 0
+            }
+          },
+          "planetscale/replica": {
+            "hours": {
+              "met": false,
+              "minimum": 25.0,
+              "value": 0.0
+            },
+            "seeds": {
+              "met": false,
+              "minimum": 250.0,
+              "value": 0
+            }
+          }
+        },
         "required": [
           "local/replica",
           "local/primary",
@@ -774,10 +1155,37 @@
       "failures": [
         {
           "fixed_commit": null,
+          "id": "workload-toy-deferrable_by_key-replica-s1-b09e06a",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-deferrable_by_key"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-keyless_toast_null-replica-s1-b09e06a",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-keyless_toast_null"
+        },
+        {
+          "fixed_commit": null,
           "id": "workload-toy-reorder-replica-s1-ffdd6f4",
           "outcome": "violation",
           "regression_test": null,
           "seed": 1,
+          "self_test": true,
+          "system": "toy-reorder"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-reorder-replica-s2-b09e06a",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 2,
           "self_test": true,
           "system": "toy-reorder"
         },
@@ -792,10 +1200,37 @@
         },
         {
           "fixed_commit": null,
+          "id": "workload-toy-split-replica-s101-a6bc667",
+          "outcome": "violation",
+          "regression_test": "tests/fuzz/regressions/test_workload_toy_split_replica_s101_a6bc667.py",
+          "seed": 101,
+          "self_test": true,
+          "system": "toy-split"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-split-replica-s2-b09e06a",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 2,
+          "self_test": true,
+          "system": "toy-split"
+        },
+        {
+          "fixed_commit": null,
           "id": "workload-toy-swallow-replica-s1-ffdd6f4",
           "outcome": "violation",
           "regression_test": null,
           "seed": 1,
+          "self_test": true,
+          "system": "toy-swallow"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-swallow-replica-s2-b09e06a",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 2,
           "self_test": true,
           "system": "toy-swallow"
         }
@@ -808,14 +1243,14 @@
             "divergences": 0,
             "faults": 0,
             "faults_per_kind": {},
-            "hours": 0.0114,
+            "hours": 0.0231,
             "no_effect_per_kind": {},
             "outcomes": {
-              "pass": 1
+              "pass": 2
             },
-            "rounds": 136,
-            "runs": 1,
-            "seeds": 1
+            "rounds": 254,
+            "runs": 2,
+            "seeds": 2
           },
           "counted": {
             "divergences": 0,
@@ -840,14 +1275,79 @@
             "divergences": 1,
             "faults": 0,
             "faults_per_kind": {},
-            "hours": 0.0005,
+            "hours": 0.0032,
             "no_effect_per_kind": {},
             "outcomes": {
-              "violation": 1
+              "diverged": 1
             },
-            "rounds": 3,
+            "rounds": 36,
             "runs": 1,
             "seeds": 1
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-deferrable_by_key",
+          "tier": "local",
+          "weights": null
+        },
+        {
+          "all_runs": {
+            "divergences": 1,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0032,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "diverged": 1
+            },
+            "rounds": 36,
+            "runs": 1,
+            "seeds": 1
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-keyless_toast_null",
+          "tier": "local",
+          "weights": null
+        },
+        {
+          "all_runs": {
+            "divergences": 2,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0049,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "diverged": 1,
+              "violation": 1
+            },
+            "rounds": 35,
+            "runs": 2,
+            "seeds": 2
           },
           "counted": {
             "divergences": 0,
@@ -869,17 +1369,17 @@
         },
         {
           "all_runs": {
-            "divergences": 1,
+            "divergences": 3,
             "faults": 0,
             "faults_per_kind": {},
-            "hours": 0.0004,
+            "hours": 0.0014,
             "no_effect_per_kind": {},
             "outcomes": {
-              "violation": 1
+              "violation": 3
             },
-            "rounds": 1,
-            "runs": 1,
-            "seeds": 1
+            "rounds": 3,
+            "runs": 3,
+            "seeds": 3
           },
           "counted": {
             "divergences": 0,
@@ -901,17 +1401,17 @@
         },
         {
           "all_runs": {
-            "divergences": 1,
+            "divergences": 2,
             "faults": 0,
             "faults_per_kind": {},
-            "hours": 0.0028,
+            "hours": 0.007,
             "no_effect_per_kind": {},
             "outcomes": {
-              "violation": 1
+              "violation": 2
             },
-            "rounds": 30,
-            "runs": 1,
-            "seeds": 1
+            "rounds": 78,
+            "runs": 2,
+            "seeds": 2
           },
           "counted": {
             "divergences": 0,
@@ -933,9 +1433,9 @@
         }
       ],
       "restart": {
-        "commit": "6e114bce2692ac0f54989a16b6e0a434299e8fbd",
-        "subject": "P3 engine: held list keeps the newest sample (bound for every limit, property test), value-changing options forbidden, F",
-        "why": "touches jvm/src/cdc_v2/engine/CdcEngine.java, jvm/src/cdc_v2/engine/FrameGen.java, jvm/src/cdc_v2/engine/HeldEnds.java, jvm/src/cdc_v2/engine/HeldSelftest.java, jvm/src/cdc_v2/engine/ProtectedConfig.java"
+        "commit": "5bd69ae9a5eb143c7a566369e4d20b47160c67f5",
+        "subject": "Replay of a reduced case: consumer loops only when a consumer loop found it; the oracle decides the others",
+        "why": "touches src/cdc_v2/testing/fuzz/reduce.py"
       }
     }
   },

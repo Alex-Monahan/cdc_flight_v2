@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "5bd69ae9a5eb143c7a566369e4d20b47160c67f5",
+  "first_failure_s": 25.374,
+  "fixed_commit": null,
+  "fuzzer": "fault",
+  "id": "fault-toy-position_apart-replica-s3-5bd69ae",
+  "local_bundle": {
+    "campaign": "20261110T143506-7b4b",
+    "dir": "bundle-fault-toy-position_apart-replica-s3-5bd69ae"
+  },
+  "outcome": "diverged",
+  "reason": "oracle: public.w_dk missing 18 extra 0 different 30",
+  "regression_test": null,
+  "seed": 3,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-position_apart",
+  "system_spec": "toy:position_apart"
+}

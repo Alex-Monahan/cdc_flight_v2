@@ -7,11 +7,12 @@ time; numbers are indications only. docs/testing/fuzzers.md explains every field
 
 | File | What | Command |
 |---|---|---|
-| `variants.json` | every wrong variant of the toy, the fuzzer that found it, after how many seeds and seconds; the correct toy on the same seeds | `tools/fuzz variants` |
-| `suite-1.7-toy-replica/summary.json` | the suite of SPEC 1.7 on the toy: crash points (3 seeds, plus `kill_later` before the commit), network faults, destination errors, source backend termination, slot loss, full spill area, a 15-minute soak | `tools/fuzz suite-1.7 --system toy --soak-minutes 15 --workers 1` |
+| `variants.json` | every row of the variant table: the fuzzer and the signal that found it, after how many seeds and seconds; the correct toy on the same seeds | `tools/fuzz variants` |
+| `reductions.json` | two real reductions (`ack_early` with faults, `split` without): sizes before and after, two replays of each reduced case, the regression test's result | `tools/fuzz run ... --reduce`, `tools/fuzz confirm <id>` |
+| `suite-1.7-toy-replica/summary.json` | the suite of SPEC 1.7 on the toy: crash points (3 seeds, plus `kill_later` before the commit), network faults, destination errors, source backend termination, slot loss, full spill area, a 15-minute soak; labelled a self-test | `tools/fuzz suite-1.7 --system toy --workers 1` |
 | `suite-1.7-toy-replica/crash_ledger.jsonl`, `crash_summary.json` | the crash runner's ledger and summary of that suite | (same) |
 | `suite-1.7-toy-replica/runs.jsonl` | the fault-fuzzer runs of that suite (groups and soak), one line each | (same) |
-| `stream_offline.json` | the stream fuzzer against package E's decoder and the reference assembler: 100,000 cases, kinds, detections, the classes the format cannot detect, negative controls | `tools/fuzz stream-offline --cases 100000 --negative-controls --out …` |
+| `stream_offline.json` | the stream fuzzer against package E's decoder and the reference assembler: 100,000 cases (the decoder changed in the fix round), kinds, detections, the classes the format cannot detect, negative controls | `tools/fuzz stream-offline --cases 100000 --negative-controls --out …` |
 
 The campaign ledger of the toy's self-test runs is `evidence/robustness/` (`ledger.json` from
 `tools/fuzz status --write`).

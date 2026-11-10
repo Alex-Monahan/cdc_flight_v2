@@ -1,0 +1,117 @@
+{
+ "campaign": "20261110T143337-2b61",
+ "checkpoints": [
+  {
+   "catch_up_s": 1.538,
+   "compare_s": 0.024,
+   "equal": true,
+   "final": false,
+   "q": "0/331814B0",
+   "t": 10.776
+  },
+  {
+   "catch_up_s": 1.357,
+   "compare_s": 0.031,
+   "equal": false,
+   "final": false,
+   "q": "0/33526A50",
+   "t": 22.649
+  }
+ ],
+ "clean": true,
+ "commit": "5bd69ae9a5eb143c7a566369e4d20b47160c67f5",
+ "config": {
+  "budget_s": 60.0,
+  "catch_up_s": 90.0,
+  "episode_s": 10.0,
+  "fuzzer": "fault",
+  "ignore_self_report": true,
+  "keep_workdir": false,
+  "observer_interval_s": 0.005,
+  "observers": false,
+  "pace_s": 0.25,
+  "schedule": {
+   "not_attacked": [
+    "dest_delay",
+    "dest_error",
+    "dest_hang",
+    "freeze",
+    "hang_point",
+    "net_blackhole",
+    "net_drop",
+    "net_latency",
+    "net_reset",
+    "replica_promote",
+    "replica_restart",
+    "slot_drop",
+    "slot_invalidate",
+    "spill_full",
+    "src_cancel",
+    "src_lock",
+    "src_long_txn",
+    "src_restart_primary",
+    "src_terminate",
+    "src_wal_switch"
+   ],
+   "per_episode": [
+    1,
+    3
+   ],
+   "weights": {
+    "kill_group": 6,
+    "kill_point": 10,
+    "kill_point_later": 4
+   }
+  },
+  "start_timeout_s": 120.0
+ },
+ "counts": {
+  "checkpoints": 2,
+  "final_rows": 1123,
+  "observations": 0,
+  "rolled_back": 89,
+  "rounds": 72,
+  "transactions": 1440
+ },
+ "duration_s": 24.543,
+ "failure_id": "fault-toy-ack_early-replica-s3-5bd69ae",
+ "faults": {
+  "kill_point": 1,
+  "kill_point_later": 1
+ },
+ "faults_without_effect": [],
+ "first_failure_s": 24.188,
+ "fuzzer": "fault",
+ "instances": {
+  "exits": {
+   "SIGKILL": 4
+  },
+  "started": 5
+ },
+ "no_effect": {},
+ "options": {},
+ "oracle": {
+  "equal": false,
+  "tables": [
+   {
+    "destination_rows": 40,
+    "different_rows": 31,
+    "equal": false,
+    "extra_rows": 0,
+    "missing_on_destination": false,
+    "missing_rows": 18,
+    "source": "public.w_dk",
+    "source_rows": 58
+   }
+  ]
+ },
+ "outcome": "diverged",
+ "reason": "oracle: public.w_dk missing 18 extra 0 different 31",
+ "seed": 3,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T14:33:37Z",
+ "system": "toy-ack_early",
+ "system_spec": "toy:ack_early",
+ "tier": "local"
+}

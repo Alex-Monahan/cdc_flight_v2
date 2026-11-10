@@ -130,8 +130,8 @@ recorded in `_cdc.toy_quarantine` in a fenced transaction, with an event, and th
 | `skip_on_reconnect` | after a lost source connection continues from the slot's newest position | fault fuzzer (network, backends) | `diverged` (oracle); earlier runs `violation` (transfer sum) |
 | `swallow` | ignores an apply error of one table and moves the position on | workload fuzzer | `violation` (debit/credit loop); earlier runs `diverged` |
 | `trust_frames` | applies frames without checking checksum, sequence or count, and a transaction cut off before its END | stream fuzzer | `diverged` (oracle: a changed value) |
-| `keyless_toast_null` | an unchanged TOASTed value of a table without a key is applied as NULL | workload fuzzer (shape `keyless_toast`) | see the table of the fix round below |
-| `deferrable_by_key` | a table with a deferrable primary key and FULL is applied by its key (rule K broken) | workload fuzzer (shape `deferrable_key`) | see the table of the fix round below |
+| `keyless_toast_null` | an unchanged TOASTed value of a table without a key is applied as NULL | workload fuzzer (shape `keyless_toast`) | `diverged` (oracle) |
+| `deferrable_by_key` | a table with a deferrable primary key and FULL is applied by its key (rule K broken) | workload fuzzer (shape `deferrable_key`) | `diverged` (oracle) |
 
 The variant table has two more rows that check the signal, not only the finding: `ack_early_oracle` and
 `position_apart_oracle` run the fault fuzzer with the toy's own `ApplyInvariantError` report ignored
@@ -140,18 +140,35 @@ fault fuzzer with destination errors only and `conflict_rate=0`, so that `swallo
 simulated conflicts. Each row of `variants.json` names the signal that found it (`oracle`, `consumer loop (<check>)`,
 `writer log`, `system self-report`, `catch-up deadline`); a row with a required signal counts as found only by it.
 
-Result (`evidence/p3/fuzzers/variants.json`, commit ffdd6f4, `no_fence` row at 4dffb64): every variant was found on
-the first seed it was run with (bound: 6 seeds for the fault fuzzer, 4 for workload and stream, 3 for leadership),
-and the correct toy passed the same seed every time. Seconds of run until detection: `split` 1.0, `reorder` 1.6
-(consumer loop), `swallow` 9.5, `skip_on_reconnect` 12.1, `trust_frames` 14.4, `ack_early` 18.9, `no_fence` 22.6
-(two writers in round 1), `position_apart` 44.5. In the first table run (before the review fixes) `no_fence` needed
-3 seeds; the leadership fuzzer now pauses longer than the stale age more often and logs the take-over, and found it
-at once in both later runs.
+**Result of the fix round** (`evidence/p3/fuzzers/variants.json`; rows at b09e06a, `no_fence` at de8c9db, the two
+oracle rows at 5bd69ae; clean trees): every row found its variant within its bound and by the required signal, and
+the correct toy passed the same seeds every time.
 
-The offline stream fuzzer (`evidence/p3/fuzzers/stream_offline.json`): 100,000 cases (seeds 1–100,000, 19 fault
-kinds, about 5,200 each, 305 s), no failure; undetected by the format and accepted as such: 5,957 clean ends at a
-frame boundary after a shortening fault and 3,788 content replacements with a valid checksum; the negative controls
-(lenient decoder and trusting assembler) failed 112 of 2,000 cases, so the property can fail.
+| Row | Fuzzer | Signal that found it | Seeds | Seconds into the run |
+|---|---|---|---|---|
+| `split` | workload | consumer loop (debit/credit) | 1 | 1.2 |
+| `trust_frames` | stream | consumer loop (large transaction) | 1 | 4.0 |
+| `ack_early` | fault (process kills) | consumer loop (transfers) | 1 | 10.2 |
+| `keyless_toast_null` | workload | oracle | 1 | 11.3 |
+| `deferrable_by_key` | workload | oracle | 1 | 11.3 |
+| `swallow_dest_errors` | fault (destination errors, `conflict_rate=0`) | consumer loop (debit/credit) | 2 | 11.8 |
+| `swallow` | workload | consumer loop (parent/child) | 1 | 14.5 |
+| `skip_on_reconnect` | fault (network, backends) | consumer loop (transfers) | 1 | 15.2 |
+| `position_apart` | fault (process kills) | system self-report | 1 | 15.5 |
+| `reorder` | workload | oracle | 1 | 15.5 |
+| `no_fence` | leadership | writer log (two writers) | 3 | 21.9 |
+| `ack_early_oracle` | fault, self-report ignored, no consumer loop | oracle | 1 | 24.2 |
+| `position_apart_oracle` | fault, self-report ignored, no consumer loop | oracle | 1 | 25.4 |
+
+`no_fence` needed the full bound of 3 seeds in both runs of the fix round (the first run of the round, before the
+leadership fuzzer paused the current leader on purpose, did not find it in 3 seeds): it is the weakest row, and a
+longer bound or more rounds per seed would make it robust. The oracle rows run without consumer loops, because with
+them a lost transfer is seen by the loops first.
+
+The offline stream fuzzer (`evidence/p3/fuzzers/stream_offline.json`, b09e06a, clean): 100,000 cases (seeds
+100,001–200,000, 20 fault kinds including `huge_length`, 318 s), no failure; undetected by the format and accepted
+as such: 5,843 clean ends at a frame boundary after a shortening fault and 3,433 content replacements with a valid
+checksum; the negative controls failed 97 of 2,000 cases, so the property can fail.
 
 ## 3. The `System` interface
 
@@ -311,7 +328,19 @@ is a violation.
 the reduced replay log applied on one connection, the instance continued (it meets the backlog in large groups, which
 makes grouping bugs repeatable), then the recorded faults one by one, quiesce, catch-up, oracle, consumer loops.
 `reduce` removes rounds, then writers, then entries, then faults (delta debugging; a candidate fails if one of two
-replays fails), writes `case.json` and `tests/fuzz/regressions/test_<id>.py` (marker `localpg`). For a toy variant
+replays fails with the original outcome — another failure is not the same case), writes `case.json` and
+`tests/fuzz/regressions/test_<id>.py` (marker `localpg`). Removing entries can break the workload's own invariants at
+the source (a child whose parent row was removed from the case), so a case found by the oracle is replayed without
+consumer loops, and a replay whose final, equal state still breaks an invariant is `invalid`. `tools/fuzz confirm
+<id>` replays a reduced case twice and runs its regression test (`evidence/p3/fuzzers/reductions.json`).
+
+Two real reductions (fix round): `ack_early` under the fault fuzzer (seed 103, `diverged`): 108 rounds, 2 writers,
+2,177 entries and 5 faults reduced to 5 rounds, 2 writers, 74 entries and 1 fault (`kill_point_later` at
+`toyrep.commit_sent`), 125 replays in 2,500 s; `split` under the workload fuzzer (seed 101, `violation`): 1 round,
+2 writers, 20 entries reduced to 1 round, 1 writer, 1 entry, 12 replays in 31 s. Both reduced cases failed in two
+further replays each, and both regression tests (`tests/fuzz/regressions/`) pass on the correct toy and fail on the
+variant as a strict `xfail`. The first reduction of `ack_early` had accepted a candidate that failed differently
+(a consumer-loop violation the removed entries caused at the source); the rules above came from that. For a toy variant
 the test asserts that the correct toy passes and that the planted bug is still found (`xfail(strict=True)`); for a
 real system it asserts that the case passes, so it fails until the fix lands.
 
@@ -329,14 +358,14 @@ suite whose summary is labelled a smoke run and whose soak never passes (`all_pa
 names the commit and whether the tree was clean. Pass = oracle equality after every run. `summary.json`, `crash_summary.json`, `crash_ledger.jsonl` and
 `runs.jsonl` are the format of the evidence of SPEC 1.7.
 
-**Result on the toy (commit d4deb59, before the review fixes of section 11):** 42 of 42 crash-point scenarios
-passed and all 13 declared points were reached (3 seeds each, plus `toyrep.commit_sent` with `kill_later`); every
-group run and the 15-minute soak ended with oracle equality (soak: 171 counted faults of all 23 kinds, 920 s; suite
-1,250 s). Two shortfalls of the suite itself, not of the system: the destination group drew no `dest_hang` (its kinds
-were drawn at random), and the soak counted 171 faults, below its minimum of 200. Both are fixed (every kind of a
-group in every episode; 3–6 faults per soak episode), but the suite was not run again within this round's campaign
-budget; `evidence/p3/fuzzers/suite-1.7-toy-replica/` holds the run as it was (`all_passed: false` for these two
-reasons).
+**Result on the toy** (`evidence/p3/fuzzers/suite-1.7-toy-replica/`, commit a6bc667, clean tree, labelled a
+self-test, 1,325 s): all passed. 42 of 42 crash-point scenarios passed and all 13 declared points were reached
+(3 seeds each, plus `toyrep.commit_sent` under `kill_later`). Every kind of every group had at least one injection
+with a proven effect: network (blackhole 2, drop 2, latency 1, reset 1), destination (delay 2, error 1, hang 1),
+source backends (terminate 4, cancel 1), slot loss (drop 7, invalidate 4), spill (4). The soak ran 913 s with 208
+faults that had an effect (22 kinds) and 56 without effect (counted apart). Oracle equality after every run.
+Before the fix round, at d4deb59, the suite fell short of its own rules (no `dest_hang`, 171 faults); that run is
+replaced.
 
 ## 7. Tests
 
@@ -497,7 +526,7 @@ Still open:
 - a keyless update with an unchanged TOAST value would insert NULL in the toy; no workload table reaches that case;
 - `register_root` grows by two roots per run, which slows only very long campaigns.
 
-The variant table and the offline stream result were produced again after these fixes; the suite was not (section 6).
+The variant table, the offline stream result and the suite were produced again in the fix round (sections 2 and 6).
 
 ## 12. How long a round takes on this machine
 

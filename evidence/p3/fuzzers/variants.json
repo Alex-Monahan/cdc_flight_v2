@@ -1,6 +1,6 @@
 {
   "about": "Wrong variants of the toy replicator (tests/fuzz/toy/toy.py), the fuzzer and the signal that found each, and the correct toy on the same seeds (docs/testing/fuzzers.md section 2).",
-  "all_found": false,
+  "all_found": true,
   "correct_toy_passed": true,
   "source_node": "replica",
   "variants": [
@@ -39,15 +39,16 @@
     },
     {
       "bound_seeds": 6,
-      "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+      "commit": "5bd69ae9a5eb143c7a566369e4d20b47160c67f5",
+      "consumer_loops": false,
       "correct_toy_passed": true,
       "correct_toy_same_seeds": {
-        "8": "pass"
+        "3": "pass"
       },
-      "expected_finder": "the same, with the toy's self-report ignored: the oracle",
-      "failure_id": null,
-      "first_failure_s_in_run": null,
-      "found": false,
+      "expected_finder": "the same, with the toy's self-report ignored and no consumer loop: the oracle",
+      "failure_id": "fault-toy-ack_early-replica-s3-5bd69ae",
+      "first_failure_s_in_run": 24.188,
+      "found": true,
       "fuzzer": "fault",
       "kinds": [
         "kill_point",
@@ -55,25 +56,20 @@
         "kill_group"
       ],
       "options": null,
-      "other_findings": [
-        {
-          "seed": 8,
-          "signal": "consumer loop (transfers)"
-        }
-      ],
-      "outcome": null,
-      "reason": null,
+      "other_findings": [],
+      "outcome": "diverged",
+      "reason": "oracle: public.w_dk missing 18 extra 0 different 31",
       "required_signal": "oracle",
       "row": "ack_early_oracle",
-      "seconds_until_found": null,
+      "seconds_until_found": 24.5,
       "seeds_run": [
-        8
+        3
       ],
-      "seeds_until_found": null,
+      "seeds_until_found": 1,
       "self_report_ignored": true,
-      "signal": null,
+      "signal": "oracle",
       "variant": "ack_early",
-      "wall_s": 92.2
+      "wall_s": 89.1
     },
     {
       "bound_seeds": 6,
@@ -110,15 +106,15 @@
     },
     {
       "bound_seeds": 6,
-      "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+      "commit": "5bd69ae9a5eb143c7a566369e4d20b47160c67f5",
+      "consumer_loops": false,
       "correct_toy_passed": true,
       "correct_toy_same_seeds": {
-        "8": "pass",
-        "9": "pass"
+        "3": "pass"
       },
-      "expected_finder": "the same, with the toy's self-report ignored: the oracle",
-      "failure_id": "fault-toy-position_apart-replica-s9-b09e06a",
-      "first_failure_s_in_run": 67.824,
+      "expected_finder": "the same, with the toy's self-report ignored and no consumer loop: the oracle",
+      "failure_id": "fault-toy-position_apart-replica-s3-5bd69ae",
+      "first_failure_s_in_run": 25.374,
       "found": true,
       "fuzzer": "fault",
       "kinds": [
@@ -129,19 +125,18 @@
       "options": null,
       "other_findings": [],
       "outcome": "diverged",
-      "reason": "oracle: public.w_dk missing 6 extra 0 different 35; public.w_nkt missing 38 extra 23 different 0",
+      "reason": "oracle: public.w_dk missing 18 extra 0 different 30",
       "required_signal": "oracle",
       "row": "position_apart_oracle",
-      "seconds_until_found": 144.5,
+      "seconds_until_found": 25.7,
       "seeds_run": [
-        8,
-        9
+        3
       ],
-      "seeds_until_found": 2,
+      "seeds_until_found": 1,
       "self_report_ignored": true,
       "signal": "oracle",
       "variant": "position_apart",
-      "wall_s": 211.5
+      "wall_s": 26.8
     },
     {
       "bound_seeds": 4,
@@ -203,36 +198,37 @@
     },
     {
       "bound_seeds": 3,
-      "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+      "commit": "de8c9db330853cb61b1d0f14c2ed7dfcc43c68c7",
+      "consumer_loops": true,
       "correct_toy_passed": true,
       "correct_toy_same_seeds": {
-        "3": "pass",
-        "4": "pass",
-        "5": "pass"
+        "6": "pass",
+        "7": "pass",
+        "8": "pass"
       },
       "expected_finder": "leadership fuzzer: two writers",
-      "failure_id": null,
-      "first_failure_s_in_run": null,
-      "found": false,
+      "failure_id": "leadership-toy-no_fence-replica-s8-5bd69ae",
+      "first_failure_s_in_run": 21.941,
+      "found": true,
       "fuzzer": "leadership",
       "kinds": null,
       "options": null,
       "other_findings": [],
-      "outcome": null,
-      "reason": null,
+      "outcome": "violation",
+      "reason": "round 1: writer log: [{'two_writers': True, 'order': 863, 'epoch': 2, 'after_epoch': 3, 'run': 'run18-040b86'}, {'two_writers': True, 'order': 864, 'epoch': 2, 'after_epoch': 3, 'run': 'run18-040b86'}, {'two_writers': True, 'order': 865, 'epoch': 2, 'after_epoch': 3, 'run': 'run18-040b86'}]",
       "required_signal": "writer log",
       "row": "no_fence",
-      "seconds_until_found": null,
+      "seconds_until_found": 112.3,
       "seeds_run": [
-        3,
-        4,
-        5
+        6,
+        7,
+        8
       ],
-      "seeds_until_found": null,
+      "seeds_until_found": 3,
       "self_report_ignored": false,
-      "signal": null,
+      "signal": "writer log",
       "variant": "no_fence",
-      "wall_s": 254.9
+      "wall_s": 248.3
     },
     {
       "bound_seeds": 6,
