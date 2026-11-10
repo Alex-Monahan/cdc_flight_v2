@@ -216,11 +216,11 @@ once (`offset.flush.interval.ms=0`) and the task sets a commit flag; the next `p
 calls `commitOffset`, which flushes the LSN to the walsender. Delay from `Engine.durable(p)` to the slot's
 `confirmed_flush_lsn` showing p (`evidence/p3/engine/ack_invariant.json`):
 
-- busy (50 transactions/s): p50 0.061 s, max 0.142 s;
-- idle: 2.0 s; the bound is `heartbeat.interval.ms` (5 s) plus one poll, because when idle `handleBatch` is called
+- busy (50 transactions/s): p50 0.062 s, max 0.151 s;
+- idle: 2.2 s; the bound is `heartbeat.interval.ms` (5 s) plus one poll, because when idle `handleBatch` is called
   only for a heartbeat record.
 
-Invariant probe (same test, 692 samples every 50 ms, 817 transactions, 76 DURABLE): `confirmed_flush_lsn` was never
+Invariant probe (same test, 704 samples every 50 ms, 842 transactions, 76 DURABLE): `confirmed_flush_lsn` was never
 beyond the newest DURABLE sent before the sample; with no DURABLE for 6 s under load it did not move at all.
 
 `ack_position` mapped to the replication protocol (`test_positions_map_to_pgoutput_begin_and_commit`, against a
@@ -234,7 +234,7 @@ Heartbeat records carry the current offset; with only unpublished tables written
 through a heartbeat table that is in the publication (package P).
 
 **Restart.** Without stored offsets Debezium starts at the slot's `confirmed_flush_lsn`. Test
-`test_restart_after_random_kills_and_java_crash_points`: a miniature pipeline applied 4,161 rows in 1,387
+`test_restart_after_random_kills_and_java_crash_points`: a miniature pipeline applied 3,921 rows in 1,307
 transactions across 10 engine lives (3 SIGKILLs at random moments, 6 deaths at the Java crash points
 `engine.ack_marking` and `engine.acked` with 3 seeds each, a final clean run): after every restart the first
 transaction delivered had an END `ack_position` above the slot's position at start; no row was missing and none was
@@ -266,10 +266,10 @@ the PlanetScale version.
   `test_hello_names_the_backend_that_holds_the_slot` shows they equal `pg_replication_slots.active_pid` and
   `pg_stat_activity.backend_start`, and that the name on the server is `Debezium Streaming`. Contract note below.
 - **No second attach.** `errors.max.retries=0`, `slot.max.retries=0`. Terminating the walsender ends the engine with
-  FATAL in 0.52 s, exit 1, and 5 s later the slot is still inactive. Through the TCP proxy: `reset` → FATAL after
-  0.47 s, `close` → FATAL after 5.5 s; the slot was not taken again.
+  FATAL in 0.46 s, exit 1, and 5 s later the slot is still inactive. Through the TCP proxy: `reset` → FATAL after
+  0.52 s, `close` → FATAL after 5.5 s; the slot was not taken again.
 - **Slot still active at start** (another engine holds it): Debezium fails `START_REPLICATION` with "replication slot
-  … is active for PID …" and, with no retries, the engine ends with FATAL after 1.5 s without sending HELLO; the
+  … is active for PID …" and, with no retries, the engine ends with FATAL after 1.46 s without sending HELLO; the
   holder keeps the slot. The pipeline terminates the holder and starts a new engine.
 - **Black hole** (proxy drops everything both ways): the engine did **not** end within 150 s. The proxy's kernel
   acknowledges TCP, so neither TCP keepalives nor any timeout of pgjdbc or Debezium fires; the walsender on the
@@ -287,7 +287,7 @@ the PlanetScale version.
   database name replaced, longest first; `password=…` and JDBC URLs removed; 2,000 characters at most); exit 1.
   Python scrubs the password from FATAL messages again before it raises `EngineFatal`. Our own messages never
   contain values (table, column position and `seq` only).
-- Parent killed with SIGKILL: the JVM was gone after 0.06 s and the slot inactive after 0.07 s
+- Parent killed with SIGKILL: the JVM was gone after 0.05 s and the slot inactive after 0.06 s
   (`parent_death.json`).
 - Frame pipe closed: halt with 5. `engine.kill()` from Python: SIGKILL, reap, close every pipe; after that every
   read raises `EngineBroken` (the closed descriptor is never read again). A HELLO protocol error (no HELLO first, a
@@ -300,9 +300,9 @@ Nothing between the slot and file descriptor 3 is unbounded: Debezium's queue ha
 frame (target 8 MiB, at most 65,536 rows, in practice one engine batch). When the pipeline stops reading, the write
 blocks, the queue fills, the slot read stops; Debezium's keepalive thread keeps the walsender alive.
 
-- 1M-row transaction, heap 512 MB: JVM peak resident 354 MB (`large_transaction.json`).
-- Frozen reader for 75 s (> `wal_sender_timeout` 60 s) after a 300,000-row insert: resident memory 304 → 298 MB,
-  flat; the walsender kept the same pid; then all rows arrived (`frozen_reader.json`). The 180 s variant runs with
+- 1M-row transaction, heap 512 MB: JVM peak resident 350 MB (`large_transaction.json`).
+- Frozen reader for 75 s (> `wal_sender_timeout` 60 s) after a 300,000-row insert: resident memory 322.5 → 322.6 MB,
+  flat (an earlier run went down from 315 to 246 MB as the GC gave memory back); the walsender kept the same pid; then all rows arrived (`frozen_reader.json`). The 180 s variant runs with
   `CDC_V2_E_LONG=1`.
 
 Limits: a single value larger than `cdc_v2.max.value.bytes` (default 256 MiB, settable up to the frame maximum minus
