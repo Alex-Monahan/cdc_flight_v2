@@ -310,6 +310,14 @@ class NetProxy:
             except OSError:
                 pass
         await asyncio.sleep(0)
+        # every task still pending (connection pumps, their gathers) is cancelled and awaited, so that closing the
+        # loop leaves no "Task was destroyed but it is pending" and no unretrieved CancelledError on standard error
+        me = asyncio.current_task()
+        pending = [t for t in asyncio.all_tasks() if t is not me and not t.done()]
+        for t in pending:
+            t.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
         if self.lease is not None:
             self.lease.release()
 

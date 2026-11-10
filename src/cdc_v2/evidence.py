@@ -41,6 +41,9 @@ MIN_WORD = 3               # shorter values (down to this length) are removed as
 PLACEHOLDER = "<redacted>"
 _LOOPBACK = {"127.0.0.1", "0.0.0.0", "::1", "::"}
 
+# Patterns that start with a run of a character class begin only where such a run begins (a lookbehind on that same
+# class): a match that would start inside a run extends to the run's start, so nothing is lost, and a long run (a
+# 20 kB hex value) is scanned once instead of once per position (it was quadratic: minutes for a 200 kB bundle).
 PATTERNS = [
     ("jwt", re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"), PLACEHOLDER),
     ("planetscale", re.compile(r"\bpscale_(?:tkn|pw|oauth|api)_[A-Za-z0-9_.-]{8,}"), PLACEHOLDER),
@@ -50,10 +53,10 @@ PATTERNS = [
     ("conninfo", re.compile(r"(?i)\b(host|hostaddr|user|password|passfile|sslpassword|motherduck_token|token|"
                             r"sslkey|sslcert)\s*=\s*('[^']*'|\"[^\"]*\"|[^\s&;,'\"]+)"), r"\1=" + PLACEHOLDER),
     ("bearer", re.compile(r"(?i)\b(bearer)\s+[A-Za-z0-9._~+/=-]{8,}"), r"\1 " + PLACEHOLDER),
-    ("assignment", re.compile(r"(?i)([\"']?[\w.-]*(?:password|passwd|secret|token|api[_-]?key|salt)[\w.-]*[\"']?"
+    ("assignment", re.compile(r"(?i)(?<![\w.-])([\"']?[\w.-]*(?:password|passwd|secret|token|api[_-]?key|salt)[\w.-]*[\"']?"
                               r"\s*[:=]\s*)([\"'])(?!<redacted>)[^\"']{4,}\2"), r"\1\2" + PLACEHOLDER + r"\2"),
-    ("email", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"), PLACEHOLDER),
-    ("provider-host", re.compile(r"(?i)\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:internal|local|lan|localdomain|"
+    ("email", re.compile(r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"), PLACEHOLDER),
+    ("provider-host", re.compile(r"(?i)(?<![a-z0-9.-])[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:internal|local|lan|localdomain|"
                                  r"amazonaws\.com|psdb\.cloud|rds\.amazonaws\.com|compute|motherduck\.com)\b"),
      PLACEHOLDER),
 ]
