@@ -236,8 +236,10 @@ def check_reader(w: Standby, k0: int, ks: int, k1: int) -> set[str]:
       inside   E <= R0 => the snapshot sees the transaction
       outside  E > E1 => it does not (E1: first stream transaction with E > R1)
       xmin     xid < xmin => it sees it;   xmax  xid >= xmax => it does not
-      sharp    the commit record starts after R1 (page headers allowed for) => it does not
-      library  ``StandbyCut.classify`` is never wrong (it combines all of the above)
+      sharp    the commit record starts after R1 (page headers allowed for) => it does not; and the library's
+               answer narrowed by that is never wrong.  Test only: the pipeline's stream does not deliver the
+               start of the commit record (cdc_v2.testing.cutnarrow)
+      library  ``StandbyCut.classify`` is never wrong (positions and transaction id; what the pipeline uses)
       passed   once the stream has applied a transaction with E > R1, it has applied all the snapshot sees
       usable   R0 >= P0 => the snapshot sees every transaction with E <= P0 (P0: any stream position)
     The wrong rules:
@@ -249,13 +251,14 @@ def check_reader(w: Standby, k0: int, ks: int, k1: int) -> set[str]:
       xmax_inside  xid < xmax => inside;   xmin_outside  xid >= xmin => outside
     """
     from cdc_v2.pg.cut import INSIDE, OUTSIDE, StandbyCut
+    from cdc_v2.testing.cutnarrow import classify_with_start, starts_after_r1
 
     r0, r1 = w.states[k0].position, w.states[k1].position
     snap = w.states[ks]
     stream = w.stream()
     es = [w.e[t] for t in stream]
     e1 = next((e for e in es if e > r1), None)
-    cut = StandbyCut(r0=r0, r1=r1, bounds=SnapshotBounds(snap.xmin, snap.xmax), e1=e1, wal_block_size=PAGE)
+    cut = StandbyCut(r0=r0, r1=r1, bounds=SnapshotBounds(snap.xmin, snap.xmax), e1=e1)
     bad: set[str] = set()
     seen_max = max((w.e[t] for t in stream if t in snap.visible), default=0)
     for a in es:  # a: an applied position of the stream
@@ -275,9 +278,12 @@ def check_reader(w: Standby, k0: int, ks: int, k1: int) -> set[str]:
             bad.add("xmin")
         if xid >= snap.xmax and vis:
             bad.add("xmax")
-        if cut.starts_after_r1(s) and vis:
+        if starts_after_r1(cut, s, PAGE) and vis:
             bad.add("sharp")
-        v = cut.classify(e, xid, s=s)
+        v = classify_with_start(cut, e, xid, s, PAGE)
+        if (v is INSIDE and not vis) or (v is OUTSIDE and vis):
+            bad.add("sharp")
+        v = cut.classify(e, xid)
         if (v is INSIDE and not vis) or (v is OUTSIDE and vis):
             bad.add("library")
         if e <= r1 and not vis:

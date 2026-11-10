@@ -19,6 +19,8 @@ from typing import Callable, Optional
 
 import psycopg
 
+from cdc_v2 import lsn as L
+from cdc_v2.deadline import Deadline
 from cdc_v2.pg import cut as C
 from cdc_v2.testing import cutstress as S
 from cdc_v2.testing import pgoutput as P
@@ -36,7 +38,7 @@ STATUS_CHECK = ("SELECT coalesce(bool_or(pg_xact_status(x) = 'committed'), false
 
 
 def _lsn(conn, sql: str) -> int:
-    return C.parse_lsn(conn.execute(sql).fetchone()[0])
+    return L.parse(conn.execute(sql).fetchone()[0])
 
 
 def _flush_and_replay(cl: S.Cluster, primary_conn) -> int:
@@ -90,6 +92,7 @@ def export_defect(cl: S.Cluster) -> dict:
             out["server_version_num"] = _version_num(x)
             out["library_expects_defect"] = C.export_defect(out["server_version_num"])
             out["wal_level"] = a.execute("SHOW wal_level").fetchone()[0]
+            floor = C.settle_floor(x)
             for i, (name, statements) in enumerate(EXPORT_CASES.items()):
                 res: dict = {}
                 for part, key in (("late", 2 + 2 * i), ("early", 3 + 2 * i)):
@@ -98,7 +101,7 @@ def export_defect(cl: S.Cluster) -> dict:
                         a.execute(sql, (key,) if "%s" in sql else None)
                     b.execute(INC, (1,))         # a younger transaction commits: xmax moves past the open one
                     _flush_and_replay(cl, a)
-                    cut = C.take_standby_cut_exported(x, accept_export_defect=True)
+                    cut = C.take_standby_cut_exported(x, floor, accept_export_defect=True)
                     res["snapshot_" + part] = str(cut.bounds)
                     res["snapshot_%s_is_quiet" % part] = cut.is_quiet
                     if part == "early":          # import and read while the transaction is still running
@@ -119,6 +122,83 @@ def export_defect(cl: S.Cluster) -> dict:
                 out["cases"][name] = res
         out["correct_answers"] = EXPORT_CORRECT
         out["defect_shown"] = any(c["wrong"] for c in out["cases"].values())
+    finally:
+        out["slot_dropped"] = S.drop_slot(cl, "replica")
+    return out
+
+
+# --------------------------------------------------------------------------------------------------------------
+# Tables without a key on a standby: quiet exported snapshot within a bounded wait, else one reader
+# --------------------------------------------------------------------------------------------------------------
+
+
+def keyless(cl: S.Cluster, quiet_wait_s: float = 1.0) -> dict:
+    """The rule for tables without a key (docs/design/cut.md), on whatever server this is.
+
+    While a write transaction is open on the primary no snapshot of the standby is quiet: the wait for a quiet
+    exported snapshot ends with a result (not an error) and the library's entry point falls back to one reader
+    with its own snapshot.  After the transaction has ended, the same entry point returns a quiet exported
+    snapshot, which a second session imports.  On a server without the export defect the entry point returns an
+    exported snapshot in both situations."""
+    open_key, other_key = 2, 3
+    S.setup(cl, [1, open_key, other_key], "replica")
+    out: dict = {"quiet_wait_s": quiet_wait_s}
+    try:
+        with cl.connect("primary") as a, cl.connect("primary") as b, cl.connect("replica") as x, \
+                cl.connect("replica") as y:
+            out["server_version_num"] = C.server_version_num(x)
+            defect = out["server_has_the_export_defect"] = C.export_defect(out["server_version_num"])
+            floor = C.settle_floor(x)
+            a.execute("BEGIN")
+            a.execute(INC, (open_key,))               # stays open: the standby knows it as running
+            open_xid = int(a.execute("SELECT pg_current_xact_id()::text").fetchone()[0])
+            b.execute(INC, (other_key,))
+            p0 = _flush_and_replay(cl, a)
+            t = time.monotonic()
+            got = C.take_standby_cut_after(x, p0, Deadline.after(quiet_wait_s), floor, exported=True,
+                                           quiet_only=True)
+            out["while_a_transaction_is_open"] = {
+                "quiet_only_wait_returned": type(got).__name__, "is_false_in_a_condition": not got,
+                "seconds": round(time.monotonic() - t, 2),
+                "attempts": getattr(got, "attempts", None),
+                "oldest_running_is_the_open_transaction": getattr(got, "oldest_running", None) == open_xid,
+                "text": str(got) if isinstance(got, C.NoQuietSnapshot) else None}
+            if isinstance(got, C.StandbyCut):
+                C.end_transaction(x)
+            cut = C.take_keyless_standby_cut(x, p0, Deadline.after(60), floor, quiet_wait_s=quiet_wait_s)
+            fallback = cut.extra.get("quiet_wait")
+            out["keyless_cut_while_open"] = {
+                "way": cut.way, "usable_after_p0": cut.usable_after(p0), "snapshot": str(cut.bounds),
+                "quiet_wait_result_kept": type(fallback).__name__ if fallback is not None else None,
+                "the_one_reader_sees_the_open_transaction": x.execute(GET, (open_key,)).fetchone()[0] != 0,
+                "the_one_reader_sees_the_committed_one": x.execute(GET, (other_key,)).fetchone()[0] == 1}
+            C.end_transaction(x)
+            a.execute("COMMIT")
+            p1 = _flush_and_replay(cl, a)
+            cut = C.take_keyless_standby_cut(x, p1, Deadline.after(60), floor, quiet_wait_s=30.0)
+            reader = x
+            if cut.way == "exported":
+                C.import_snapshot(y, cut.snapshot_id)
+                reader = y
+            out["keyless_cut_after_the_commit"] = {
+                "way": cut.way, "is_quiet": cut.is_quiet, "usable_after_p0": cut.usable_after(p1),
+                "snapshot": str(cut.bounds),
+                "a_reader_that_imports_it_sees_both": [reader.execute(GET, (k,)).fetchone()[0]
+                                                       for k in (open_key, other_key)] == [1, 1]}
+            if cut.way == "exported":
+                C.end_transaction(y)
+            C.end_transaction(x)
+        first, second, third = (out[k] for k in ("while_a_transaction_is_open", "keyless_cut_while_open",
+                                                 "keyless_cut_after_the_commit"))
+        out["ok"] = bool(
+            first["quiet_only_wait_returned"] == "NoQuietSnapshot" and first["is_false_in_a_condition"]
+            and first["oldest_running_is_the_open_transaction"]
+            and second["way"] == ("own" if defect else "exported") and second["usable_after_p0"]
+            and (second["quiet_wait_result_kept"] == "NoQuietSnapshot") == defect
+            and not second["the_one_reader_sees_the_open_transaction"]
+            and second["the_one_reader_sees_the_committed_one"]
+            and third["way"] == "exported" and (third["is_quiet"] or not defect) and third["usable_after_p0"]
+            and third["a_reader_that_imports_it_sees_both"])
     finally:
         out["slot_dropped"] = S.drop_slot(cl, "replica")
     return out
@@ -359,7 +439,7 @@ def _ptaker(cl: S.Cluster, stream: S.Stream, out: list, stop: threading.Event, s
                     vis = dict(conn.execute(S.READ_COUNTERS).fetchall())
                 finally:
                     C.end_transaction(conn)
-                out.append(PCut(t0, t, head, cut.bounds, bool(fired), C.parse_lsn(a), C.parse_lsn(b), vis))
+                out.append(PCut(t0, t, head, cut.bounds, bool(fired), L.parse(a), L.parse(b), vis))
                 if sleep_s:
                     stop.wait(sleep_s)
     except Exception as exc:
@@ -445,9 +525,9 @@ def check_primary(stream: S.Stream, cuts: list, markers: list, ref_xid: int) -> 
             if v:
                 e = stream.e[ix[v - 1]]           # the last transaction of this key the snapshot sees
                 if e > c.insert:
-                    note(violations, "passed_insert", c, {"key": k, "e": C.format_lsn(e)})
+                    note(violations, "passed_insert", c, {"key": k, "e": L.format(e)})
                 if e > c.flush:
-                    note(wrong, "passed_flush", c, {"key": k, "e": C.format_lsn(e), "flush": C.format_lsn(c.flush)})
+                    note(wrong, "passed_flush", c, {"key": k, "e": L.format(e), "flush": L.format(c.flush)})
         bad = missing(c, c.head)
         if all_inside(c, c.head):
             stats["cuts_the_exact_rule_accepts"] += 1
@@ -724,7 +804,7 @@ def positions(cl: S.Cluster) -> dict:
         rows, previous_after, ok = [], 0, True
         for (key, what, before, after), (got_key, txn) in zip(order, seen["primary"]):
             facts = {"key_in_commit_order": key, "key_in_stream_order": got_key, "what": what,
-                     "S_begin_final_lsn": C.format_lsn(txn.s), "E_commit_end_lsn": C.format_lsn(txn.e),
+                     "S_begin_final_lsn": L.format(txn.s), "E_commit_end_lsn": L.format(txn.e),
                      "commit_record_bytes": txn.e - txn.s,
                      "insert_position_before_commit <= S": before <= txn.s,
                      "E <= insert_position_after_commit": txn.e <= after,
@@ -754,7 +834,8 @@ PROMO_NODE = "cutpromo"
 
 def promotion(cl: S.Cluster) -> dict:
     """A second standby is added, a cut is taken on it and left open, the standby is promoted.  Then: what the
-    open cut still reads, what the library says to a new cut, and what the replay position does."""
+    open cut still reads, what the timeline rule says about it, what the library says to a new cut, and what the
+    replay position does."""
     out: dict = {}
     S.setup(cl, [1, 2], "primary")
     S.drop_slot(cl, "primary")
@@ -764,40 +845,68 @@ def promotion(cl: S.Cluster) -> dict:
         with cl.connect("primary") as a:
             a.execute(INC, (1,))
             target = _lsn(a, INSERT_LSN)
+            source_timeline = C.timeline(a)           # exact: the source is a primary
         with cl.connect(PROMO_NODE) as held, cl.connect(PROMO_NODE) as other:
-            C.wait_replay_reached(other, target, deadline_s=60)
-            cut = C.take_standby_cut_own(held)
-            out["open_cut"] = {"r0": C.format_lsn(cut.r0), "r1": C.format_lsn(cut.r1),
+            C.wait_replay_reached(other, target, Deadline.after(60))
+            floor_held, floor_other = C.settle_floor(held), C.settle_floor(other)
+            cut = C.take_standby_cut_own(held, floor_held)
+            out["open_cut"] = {"r0": L.format(cut.r0), "r1": L.format(cut.r1), "timeline": cut.timeline,
+                               "timeline_of_the_source": source_timeline,
+                               "valid_on_the_timeline_of_the_source": cut.valid_on(source_timeline),
+                               "valid_without_a_timeline": cut.valid_on(None),
                                "reads_before_promotion": held.execute(GET, (1,)).fetchone()[0]}
             cl.localpg("promote", PROMO_NODE)
             deadline = time.monotonic() + 60
             while other.execute("SELECT pg_is_in_recovery()").fetchone()[0] and time.monotonic() < deadline:
                 time.sleep(0.1)
+            control_timeline = int(other.execute(C.SQL_TIMELINE).fetchone()[0])
+            new_timeline = C.timeline(other)          # exact now: the node is a primary
             frozen = other.execute(C.SQL_REPLAY_LSN).fetchone()[0]
             other.execute(INC, (1,))                  # a commit of the promoted node: not in the source's stream
             end = _lsn(other, INSERT_LSN)
             out["after_promotion"] = {
                 "in_recovery": other.execute("SELECT pg_is_in_recovery()").fetchone()[0],
+                "timeline": new_timeline,
+                "timeline_in_the_control_file_right_after": control_timeline,
+                "the_open_cut_is_valid_on_the_new_timeline": cut.valid_on(new_timeline),
                 "replay_position_before_a_local_commit": frozen,
                 "replay_position_after_a_local_commit": other.execute(C.SQL_REPLAY_LSN).fetchone()[0],
-                "local_commit_record_ends_after_that_position": end > C.parse_lsn(frozen),
+                "local_commit_record_ends_after_that_position": end > L.parse(frozen),
                 "a_new_snapshot_reads": other.execute(GET, (1,)).fetchone()[0],
                 "the_open_cut_still_reads": held.execute(GET, (1,)).fetchone()[0]}
             C.end_transaction(held)
             try:
-                C.take_standby_cut_own(other)
+                C.take_standby_cut_own(other, floor_other)
                 out["library_on_a_new_cut"] = "accepted"
             except C.CutError as exc:
                 out["library_on_a_new_cut"] = "refused: " + str(exc)
             try:
-                C.take_standby_cut_exported(other, accept_export_defect=True)
+                C.take_standby_cut_exported(other, floor_other, accept_export_defect=True)
                 out["library_on_a_new_exported_cut"] = "accepted"
             except C.CutError as exc:
                 out["library_on_a_new_exported_cut"] = "refused: " + str(exc)
+            try:
+                C.settle_floor(other)
+                out["library_on_a_new_settle_floor"] = "accepted"
+            except C.CutError as exc:
+                out["library_on_a_new_settle_floor"] = "refused: " + str(exc)
+            primary_cut = C.take_primary_cut(other)   # the promoted node is a primary of its own timeline
+            C.end_transaction(other)
+            out["primary_cut_on_the_promoted_node"] = {
+                "timeline": primary_cut.timeline,
+                "valid_on_the_new_timeline": primary_cut.valid_on(new_timeline),
+                "valid_on_the_timeline_of_the_source": primary_cut.valid_on(source_timeline)}
             out["ok"] = (out["after_promotion"]["the_open_cut_still_reads"] == 1
                          and out["after_promotion"]["a_new_snapshot_reads"] == 2
                          and out["library_on_a_new_cut"].startswith("refused")
-                         and out["library_on_a_new_exported_cut"].startswith("refused"))
+                         and out["library_on_a_new_exported_cut"].startswith("refused")
+                         and out["library_on_a_new_settle_floor"].startswith("refused")
+                         and cut.timeline == source_timeline and out["open_cut"]["valid_on_the_timeline_of_the_source"]
+                         and not out["open_cut"]["valid_without_a_timeline"]
+                         and new_timeline > source_timeline
+                         and not out["after_promotion"]["the_open_cut_is_valid_on_the_new_timeline"]
+                         and primary_cut.timeline == new_timeline
+                         and not out["primary_cut_on_the_promoted_node"]["valid_on_the_timeline_of_the_source"])
     finally:
         cl.localpg("remove", PROMO_NODE, check=False)
         cl.info(refresh=True)
@@ -831,18 +940,21 @@ def _connect_when_up(cl: S.Cluster, name: str, timeout_s: float = 60):
             time.sleep(0.2)
 
 
-def _standby_view(conn, txn: P.Transaction, key: int) -> dict:
-    """One cut on the standby and what its snapshot reads, next to what the rule says about the transaction."""
-    cut = C.take_standby_cut_own(conn)
+def _standby_view(conn, floor: C.SettleFloor, txn: P.Transaction, key: int) -> dict:
+    """One cut on the standby and what its snapshot reads, next to what the rule says about the transaction.
+
+    ``floor`` is the settle floor of ``conn``, read once when the connection was made, as the pipeline does.
+    The first cut is taken with the test switch ``accept_unsettled``, to show what an unsettled cut reads; the
+    second one the way the pipeline takes it."""
+    cut = C.take_standby_cut_own(conn, floor, accept_unsettled=True)
     try:
         seen = conn.execute(GET, (key,)).fetchone()[0]
         redo, next_xid = conn.execute(CONTROL).fetchone()
     finally:
         C.end_transaction(conn)
     full = C.widen_xid(txn.xid, cut.bounds.xmax)
-    floor = C.parse_epoch_xid(next_xid)
-    try:                                    # the library as an engine uses it: floor first, then the cut
-        C.take_standby_cut_own(conn, settle_floor=C.settle_floor(conn))
+    try:
+        C.take_standby_cut_own(conn, floor)
         C.end_transaction(conn)
         refused = False
     except C.StandbyNotSettled:
@@ -852,9 +964,11 @@ def _standby_view(conn, txn: P.Transaction, key: int) -> dict:
             "rule_by_position": cut.classify_by_position(txn.e).name,
             "xid_at_or_above_xmax": full >= cut.bounds.xmax,
             "control_file_redo": redo,
-            "restart_point_redo_at_or_after_the_end_of_the_commit_record": C.parse_lsn(redo) >= txn.e,
-            "control_file_next_xid": floor,
-            "snapshot_xmax_at_or_above_control_file_next_xid": cut.is_settled(floor),
+            "restart_point_redo_at_or_after_the_end_of_the_commit_record": L.parse(redo) >= txn.e,
+            "control_file_next_xid": C.parse_epoch_xid(next_xid),
+            "settle_floor_of_the_connection": floor.value,
+            "snapshot_xmax_at_or_above_control_file_next_xid": cut.is_settled(C.parse_epoch_xid(next_xid)),
+            "snapshot_xmax_at_or_above_the_settle_floor": cut.is_settled(floor.value),
             "library_refuses_a_cut_taken_now": refused}
 
 
@@ -889,16 +1003,16 @@ def standby_start(cl: S.Cluster) -> dict:
             if len(txns) != 1 or _key_of(txns[0], dec) != key:
                 return {**out, "error": "the slot delivered %d transactions; %s" % (len(txns), errors)}
             txn = txns[0]
-            out["commit_record_end"] = C.format_lsn(txn.e)
+            out["commit_record_end"] = L.format(txn.e)
             out["commit_returned_when_delivered"] = done.is_set()
             S.wait_replay(cl, txn.e, timeout=30)
             with cl.connect("replica") as r:
-                out["before_the_restart"] = _standby_view(r, txn, key)
+                out["before_the_restart"] = _standby_view(r, C.settle_floor(r), txn, key)
             cl.boot_sql("primary", "CHECKPOINT")
             redo, next_xid = o.execute(CONTROL).fetchone()
             out["primary_checkpoint"] = {"redo": redo,
                                          "redo_at_or_after_the_end_of_the_commit_record":
-                                             C.parse_lsn(redo) >= txn.e,
+                                             L.parse(redo) >= txn.e,
                                          "next_xid": _control_xid(next_xid),
                                          "commit_returned": done.is_set()}
             _flush_and_replay(cl, o)
@@ -906,20 +1020,22 @@ def standby_start(cl: S.Cluster) -> dict:
             cl.localpg("kill", "replica")
             cl.localpg("up")
             with _connect_when_up(cl, "replica") as r:
-                out["after_the_restart"] = _standby_view(r, txn, key)
+                floor = C.settle_floor(r)             # once, for all three views on this connection
+                out["after_the_restart"] = _standby_view(r, floor, txn, key)
                 out["commit_returned_while_the_standby_restarted"] = done.is_set()
                 cl.localpg("unset", "primary", "synchronous_standby_names")
                 t.join(120)
                 out["commit_returned_after_release"] = done.is_set() and not errors
                 _flush_and_replay(cl, o)
-                out["after_the_commit_returned"] = _standby_view(r, txn, key)
+                out["after_the_commit_returned"] = _standby_view(r, floor, txn, key)
                 o.execute(INC, (later_key,))
                 _flush_and_replay(cl, o)
-                out["after_a_later_commit"] = _standby_view(r, txn, key)
+                out["after_a_later_commit"] = _standby_view(r, floor, txn, key)
         views = [out[k] for k in ("before_the_restart", "after_the_restart", "after_the_commit_returned",
                                   "after_a_later_commit")]
         out["rule_violated"] = any(v["rule_by_position"] == "INSIDE" and v["snapshot_reads"] != 1 for v in views)
         out["guard_accepts_a_wrong_cut"] = any((v["snapshot_xmax_at_or_above_control_file_next_xid"]
+                                                or v["snapshot_xmax_at_or_above_the_settle_floor"]
                                                 or not v["library_refuses_a_cut_taken_now"])
                                                and v["rule_by_position"] == "INSIDE" and v["snapshot_reads"] != 1
                                                for v in views)
@@ -960,6 +1076,9 @@ def add_commands(sub) -> None:
         "--out")
     sub.add_parser("standby-start", help="a standby restarted from a checkpoint taken while a commit waited"
                    ).add_argument("--out")
+    k = sub.add_parser("keyless", help="tables without a key: quiet exported snapshot within a wait, else one reader")
+    k.add_argument("--quiet-wait", type=float, default=1.0)
+    k.add_argument("--out")
 
 
 def primary_summary(r: dict) -> str:
@@ -997,6 +1116,9 @@ def dispatch(cl: S.Cluster, args) -> int:
         ok = result.get("ok", False)
     elif args.cmd == "standby-start":
         result = standby_start(cl)
+        ok = result.get("ok", False)
+    elif args.cmd == "keyless":
+        result = keyless(cl, quiet_wait_s=args.quiet_wait)
         ok = result.get("ok", False)
     else:
         raise SystemExit("unknown command %s" % args.cmd)

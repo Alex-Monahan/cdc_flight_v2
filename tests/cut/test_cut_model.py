@@ -5,26 +5,45 @@ during the redo of its commit record, and the replay position moves afterwards. 
 snapshot and reads R1 at arbitrary moments between these steps.
 
 Here: every reader interleaving of every small world, and random larger worlds.  The sound rules are never
-violated; every plausible wrong rule is.  `tools/cutstress model` explores larger sizes (evidence/p3/cut/).
+violated; every plausible wrong rule is.
+
+Sizes.  The default run uses the smallest sizes that still refute every wrong rule (about half a second for
+this file).  The sizes of the first version of this file, and one step more, run with the marker `localpg`
+(`uv run pytest -m localpg tests/cut/test_cut_model.py`; they need no Postgres, the marker only keeps them out
+of the default run), and `tools/cutstress model` explores them too and writes the evidence
+(evidence/p3/cut/model.json).
 """
+import pytest
 from hypothesis import given, settings, strategies as st
 
 from cdc_v2.testing import cutmodel as M
 
-SMALL = ((1, 4), (2, 2))   # (transactions, WAL records at most); about one second together
+# (transactions, WAL records at most)
+SMALL = ((1, 2), (2, 2))                     # default run: 1,416 worlds, 91,860 reader interleavings
+FULL = ((1, 4), (2, 3))                      # opt-in: 13,704 worlds, 1,390,340 reader interleavings
+# (transactions, markers)
+PRIMARY_SMALL = ((1, 1), (2, 1), (2, 2))     # default run: 687 histories
+PRIMARY_FULL = ((3, 1),)                     # opt-in: 6,265 histories
+RANDOM_WORLDS, RANDOM_WORLDS_FULL = 60, 600
 
 
-def explored():
-    if not hasattr(explored, "cache"):
-        explored.cache = [M.explore(n, max_len) for n, max_len in SMALL]
-    return explored.cache
+def explored(sizes=SMALL):
+    cache = explored.__dict__.setdefault("cache", {})
+    if sizes not in cache:
+        cache[sizes] = [M.explore(n, max_len) for n, max_len in sizes]
+    return cache[sizes]
+
+
+def assert_sound(results):
+    for r in results:
+        broken = set(r["violations"]) & set(M.SOUND)
+        assert not broken, {rule: r["witness"][rule] for rule in broken}
 
 
 def test_sound_rules_hold_in_every_small_world():
-    for r in explored():
-        assert r["worlds"] > 500 and r["interleavings"] > 20_000
-        broken = set(r["violations"]) & set(M.SOUND)
-        assert not broken, {rule: r["witness"][rule] for rule in broken}
+    results = explored()
+    assert sum(r["worlds"] for r in results) > 1_000 and sum(r["interleavings"] for r in results) > 80_000
+    assert_sound(results)
 
 
 def test_every_wrong_rule_is_refuted():
@@ -32,6 +51,14 @@ def test_every_wrong_rule_is_refuted():
     for r in explored():
         refuted |= set(r["violations"])
     assert refuted == set(M.WRONG)
+
+
+@pytest.mark.localpg
+def test_sound_rules_hold_in_every_world_of_the_full_sizes():
+    results = explored(FULL)
+    assert sum(r["worlds"] for r in results) > 13_000 and sum(r["interleavings"] for r in results) > 1_300_000
+    assert_sound(results)
+    assert set().union(*(set(r["violations"]) for r in results)) == set(M.WRONG)
 
 
 def test_smallest_witnesses_are_the_ones_the_document_quotes():
@@ -83,9 +110,17 @@ def random_world(draw):
     return M.Standby(tuple(txs), tuple(wal), start=start).run()
 
 
-@settings(max_examples=300, deadline=None, derandomize=True)
+@settings(max_examples=RANDOM_WORLDS, deadline=None, derandomize=True)
 @given(random_world())
 def test_sound_rules_hold_in_random_larger_worlds(w):
+    broken = set(M.check_world(w)) & set(M.SOUND)
+    assert not broken, broken
+
+
+@pytest.mark.localpg
+@settings(max_examples=RANDOM_WORLDS_FULL, deadline=None, derandomize=True)
+@given(random_world())
+def test_sound_rules_hold_in_many_random_larger_worlds(w):
     broken = set(M.check_world(w)) & set(M.SOUND)
     assert not broken, broken
 
@@ -100,15 +135,26 @@ def test_well_formed_rejects_broken_worlds():
 
 # --- the primary ---------------------------------------------------------------------------------------------
 
-def test_primary_rules_in_every_small_history():
-    refuted = set()
-    for n, markers in ((1, 1), (2, 1), (3, 1), (2, 2)):
+def check_primary_sizes(sizes):
+    refuted, histories = set(), 0
+    for n, markers in sizes:
         r = M.explore_primary(n, markers)
         assert r["histories"] > 5
+        histories += r["histories"]
         broken = set(r["violations"]) & set(M.PRIMARY_SOUND)
         assert not broken, {rule: r["witness"][rule] for rule in broken}
         refuted |= set(r["violations"])
     assert refuted == set(M.PRIMARY_WRONG)
+    return histories
+
+
+def test_primary_rules_in_every_small_history():
+    assert check_primary_sizes(PRIMARY_SMALL) > 600
+
+
+@pytest.mark.localpg
+def test_primary_rules_in_every_history_of_the_full_size():
+    assert check_primary_sizes(PRIMARY_FULL) > 6_000
 
 
 def test_primary_gap_smallest_witness():

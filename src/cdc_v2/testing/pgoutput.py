@@ -23,7 +23,20 @@ import struct
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Iterator, Optional
 
-from cdc_v2.pg.cut import to_lsn
+from cdc_v2 import lsn as _lsn
+
+
+def to_lsn(value: Any) -> int:
+    """Accept an integer, ``X/Y`` text, or an object whose ``str()`` is ``X/Y`` (a driver's LSN type)."""
+    if isinstance(value, bool):
+        raise TypeError("LSN expected, got bool")
+    if isinstance(value, int):
+        if not 0 <= value <= _lsn.MAX:
+            raise ValueError(f"LSN out of range: {value}")
+        return value
+    if value is None:
+        raise ValueError("LSN is NULL")
+    return _lsn.parse(str(value))
 
 #: Microseconds between the Unix epoch and the Postgres epoch (2000-01-01).
 PG_EPOCH_UNIX_US = 946_684_800_000_000

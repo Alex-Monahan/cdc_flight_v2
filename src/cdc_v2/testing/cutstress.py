@@ -27,12 +27,18 @@ from typing import Optional
 
 import psycopg
 
+from cdc_v2 import lsn as L
+from cdc_v2.deadline import Deadline
 from cdc_v2.pg import cut as C
+from cdc_v2.testing import cutnarrow as N
 from cdc_v2.testing import pgoutput as P
 
 REPO = Path(__file__).resolve().parents[3]
 HOME_DEFAULT = "~/.cache/cdc_flight_v2/pg-cut"
 PORT_BASE_DEFAULT = 55600
+#: The directory of the Postgres binaries.  tools/localpg reads this variable; everything here reaches Postgres
+#: through tools/localpg, so setting it is all it takes to run the scenarios on another major version.
+PG_BIN_ENV = "CDC_V2_PG_BIN"
 SCHEMA, PUB, SLOT = "cdc_v2_cut", "cdc_v2_cut_pub", "cdc_v2_cut_slot"
 COUNTER = SCHEMA + ".counter"
 FORBIDDEN_PORT = 5432
@@ -58,10 +64,17 @@ class Cluster:
             raise StressError("refusing a port range that contains 5432")
         self._info: Optional[dict] = None
 
+    @staticmethod
+    def localpg_env(environ=None) -> dict:
+        """The environment tools/localpg runs in: the caller's, without the libpq variables (``PG...``), so that
+        nothing falls back to a default port or host.  ``CDC_V2_PG_BIN`` passes through: it selects the
+        Postgres binaries, exactly as it does for tools/localpg on the command line."""
+        environ = os.environ if environ is None else environ
+        return {k: v for k, v in environ.items() if not k.startswith("PG")}
+
     def localpg(self, *args: str, timeout: float = 300, check: bool = True) -> str:
-        env = {k: v for k, v in os.environ.items() if not k.startswith("PG")}
         cmd = [str(REPO / "tools" / "localpg"), "--home", self.home, "--port-base", str(self.port_base), *args]
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=self.localpg_env())
         if check and r.returncode != 0:
             raise StressError("localpg %s failed (%d): %s" % (" ".join(args[:2]), r.returncode,
                                                                self.redact(r.stderr.strip() or r.stdout.strip())))
@@ -107,6 +120,13 @@ class Cluster:
         with self.connect("primary") as conn:
             return conn.execute("SHOW server_version").fetchone()[0]
 
+    def server_facts(self) -> dict:
+        """What an evidence file says about the server, so that a run on another major version shows it."""
+        with self.connect("primary") as conn:
+            return {"server_version": conn.execute("SHOW server_version").fetchone()[0],
+                    "server_version_num": C.server_version_num(conn),
+                    "binaries_from_" + PG_BIN_ENV: bool(os.environ.get(PG_BIN_ENV))}
+
 
 # --------------------------------------------------------------------------------------------------------------
 # Setup and teardown
@@ -135,13 +155,13 @@ def setup(cl: Cluster, keys: list[int], slot_node: str = "replica", slot: str = 
         conn.execute("ALTER TABLE %s SET (autovacuum_vacuum_scale_factor = 0, autovacuum_vacuum_threshold = 2000)" % COUNTER)
         conn.execute("CREATE PUBLICATION %s FOR TABLE %s" % (PUB, COUNTER))
         target = conn.execute("SELECT pg_current_wal_lsn()::text").fetchone()[0]
-    wait_replay(cl, C.parse_lsn(target))
+    wait_replay(cl, L.parse(target))
     create_slot(cl, slot_node, slot)
 
 
 def wait_replay(cl: Cluster, target: int, timeout: float = 60) -> None:
     with cl.connect("replica") as conn:
-        C.wait_replay_reached(conn, target, deadline_s=timeout)
+        C.wait_replay_reached(conn, target, Deadline.after(timeout))
 
 
 def create_slot(cl: Cluster, node: str, slot: str = SLOT) -> None:
@@ -302,7 +322,7 @@ class Stream:
         if len(self.e) and txn.e <= self.e[-1]:
             i = bisect_right(self.e, txn.e) - 1   # delivered again after a restart of the slot's node
             if i < 0 or self.e[i] != txn.e or self.xid[i] != txn.xid:
-                self.errors.append("redelivered transaction differs: E=%s xid=%d" % (C.format_lsn(txn.e), txn.xid))
+                self.errors.append("redelivered transaction differs: E=%s xid=%d" % (L.format(txn.e), txn.xid))
             self.stats["redelivered"] += 1
             return
         found = None
@@ -385,19 +405,24 @@ READ_COUNTERS = "SELECT k, n FROM " + COUNTER
 
 
 def taker_loop(cl: Cluster, way: str, stream: Stream, out: deque, stop: threading.Event, stats: Counter,
-               sleep_s: float, block_size: int) -> None:
+               sleep_s: float) -> None:
+    """Takes cuts the way the pipeline does: the settle floor is read once per connection, a snapshot of a
+    standby that has not settled is dropped by the library, and the ``quiet`` way is the library's
+    ``quiet_only``.  Only the ``exported`` way uses a test switch (``accept_export_defect``): it exists to show
+    the server defect."""
     while not stop.is_set():
         try:
             with cl.connect("replica") as conn, cl.connect("replica") as reader:
+                floor = C.settle_floor(conn)
                 while not stop.is_set():
                     head = stream.head
                     try:
                         if way == "own":
-                            cut = C.take_standby_cut_own(conn, block_size=block_size)
+                            cut = C.take_standby_cut_own(conn, floor)
                             vis = dict(conn.execute(READ_COUNTERS).fetchall())
                         else:
                             try:
-                                cut = C.take_standby_cut_exported(conn, block_size=block_size,
+                                cut = C.take_standby_cut_exported(conn, floor,
                                                                   accept_export_defect=(way == "exported"),
                                                                   quiet_only=(way == "quiet"))
                             except C.SnapshotNotQuiet:
@@ -407,6 +432,10 @@ def taker_loop(cl: Cluster, way: str, stream: Stream, out: deque, stop: threadin
                             vis = dict(reader.execute(READ_COUNTERS).fetchall())
                             C.end_transaction(reader)
                         C.end_transaction(conn)
+                    except C.StandbyNotSettled:
+                        stats["unsettled_snapshots_dropped"] += 1
+                        stop.wait(0.005)
+                        continue
                     except psycopg.errors.QueryCanceled:
                         stats["taker_query_canceled"] += 1   # conflict with recovery; the cut is dropped
                         for c in (conn, reader):
@@ -430,8 +459,12 @@ def taker_loop(cl: Cluster, way: str, stream: Stream, out: deque, stop: threadin
 # The checker
 # --------------------------------------------------------------------------------------------------------------
 
-SOUND_RULES = ("inside", "outside", "library", "evidence")
+SOUND_RULES = ("inside", "outside", "library", "sharp", "evidence")   # sharp: test-only narrowing
 WRONG_RULES = ("stmt_as_r0", "r1_inside", "r1_outside", "naive_sharp", "xmax_inside", "xmin_outside")
+#: Written into every result, so that an evidence file says which checks it had.  A result without
+#: "missing_rows" is from before that step existed: a row that a snapshot lost was then skipped, not reported.
+CHECKER_STEPS = ("unknown_window", "per_key_boundary", "missing_rows")
+TAKER_RULES = "settle floor read once per connection; unsettled snapshots dropped by the library"
 
 
 @dataclass
@@ -470,7 +503,7 @@ class Checker:
                 examples.append(self._describe(rule, rec, e1, j, ""))
 
     def _describe(self, rule: str, rec: CutRecord, e1: int, j: Optional[int], note: str) -> dict:
-        st, f = self.stream, C.format_lsn
+        st, f = self.stream, L.format
         d = {"rule": rule, "way": rec.way, "R0": f(rec.r0), "in_statement": f(rec.r_stmt), "R1": f(rec.r1),
              "E1": f(e1), "xmin": rec.xmin, "xmax": rec.xmax, "note": note}
         if j is not None:
@@ -484,13 +517,14 @@ class Checker:
         e_all = st.e
         i1 = bisect_right(e_all, rec.r1, 0, n)
         e1 = e_all[i1]
-        cut = C.StandbyCut(r0=rec.r0, r1=rec.r1, bounds=C.SnapshotBounds(rec.xmin, rec.xmax), e1=e1,
-                           wal_block_size=self.block_size, way=rec.way)
+        cut = C.StandbyCut(r0=rec.r0, r1=rec.r1, bounds=C.SnapshotBounds(rec.xmin, rec.xmax), e1=e1, way=rec.way)
+        block = self.block_size
         self.cuts += 1
         self.stats["cuts_" + rec.way] += 1
         hits: set = set()
-        # 1. The transactions the position rule calls unknown: R0 < E <= E1.  Each verdict of the library
-        #    (with the transaction id, and with the start of the commit record) against the evidence.
+        # 1. The transactions the position rule calls unknown: R0 < E <= E1.  Each verdict of the library (with
+        #    the transaction id) against the evidence; and, as a measurement only, the verdict with the start
+        #    of the commit record on top (cdc_v2.testing.cutnarrow: the pipeline's stream does not deliver it).
         lo = bisect_right(e_all, rec.r0, 0, n)
         hi = i1 + 1
         base = hi - lo
@@ -501,13 +535,15 @@ class Checker:
             visible = st.n[j] <= rec.vis.get(st.key[j], 0)
             really_visible += visible
             v_xid = cut.classify(e, xid)
-            v_both = cut.classify(e, xid, s=s)
-            sharp_out = cut.starts_after_r1(s)
-            for v, how in ((v_xid, "transaction id"), (v_both, "transaction id and record start")):
-                if (v is C.INSIDE and not visible) or (v is C.OUTSIDE and visible):
-                    self._violation("library", rec, e1, j, "verdict %s by %s" % (v.name, how))
+            v_both = N.classify_with_start(cut, e, xid, s, block)
+            sharp_out = N.starts_after_r1(cut, s, block)
+            if (v_xid is C.INSIDE and not visible) or (v_xid is C.OUTSIDE and visible):
+                self._violation("library", rec, e1, j, "verdict %s by transaction id" % v_xid.name)
+            if (v_both is C.INSIDE and not visible) or (v_both is C.OUTSIDE and visible):
+                self._violation("sharp", rec, e1, j, "verdict %s by transaction id and record start"
+                                % v_both.name)
             if sharp_out and visible:
-                self._violation("library", rec, e1, j, "record starts after R1 but the snapshot sees it")
+                self._violation("sharp", rec, e1, j, "record starts after R1 but the snapshot sees it")
             after_xid += v_xid is C.UNKNOWN
             after_sharp += not sharp_out
             after_both += v_both is C.UNKNOWN
@@ -534,8 +570,10 @@ class Checker:
                 s = e - st.slen[j]
                 if e > e1:
                     self._violation("outside", rec, e1, j, "the snapshot sees a transaction with E > E1")
-                if cut.classify(e, xid, s=s) is C.OUTSIDE:
+                if cut.classify(e, xid) is C.OUTSIDE:
                     self._violation("library", rec, e1, j, "library says outside, the snapshot sees it")
+                elif N.classify_with_start(cut, e, xid, s, block) is C.OUTSIDE:
+                    self._violation("sharp", rec, e1, j, "record starts after R1 but the snapshot sees it")
                 if e > rec.r1:
                     self._wrong("r1_outside", hits, rec, e1, j)
                 if s > rec.r1:
@@ -547,7 +585,7 @@ class Checker:
                 e, xid = e_all[j], st.xid[j]
                 if e <= rec.r0:
                     self._violation("inside", rec, e1, j, "E <= R0 but the snapshot does not see it")
-                if cut.classify(e, xid, s=e - st.slen[j]) is C.INSIDE:
+                if cut.classify(e, xid) is C.INSIDE:     # the record start never makes an answer "inside"
                     self._violation("library", rec, e1, j, "library says inside, the snapshot does not see it")
                 if e <= rec.r1:
                     self._wrong("r1_inside", hits, rec, e1, j)
@@ -683,20 +721,20 @@ def run(cl: Cluster, cfg: RunConfig, log=lambda text: None) -> dict:
     cl.info(refresh=True)
     keys_of = [s.keys(i) for i, s in enumerate(specs)]
     keys = [CLOSER_KEY] + [k for ks in keys_of for k in ks]
+    facts = cl.server_facts()
     with cl.connect("primary") as conn:
-        version = conn.execute("SHOW server_version").fetchone()[0]
         prepared = int(conn.execute("SHOW max_prepared_transactions").fetchone()[0])
     if any(s.kind == "twophase" for s in specs) and prepared < 8:
         raise StressError("two-phase writers need max_prepared_transactions >= 8 on every node")
     setup(cl, keys, cfg.slot_node)
     with cl.connect("replica") as conn:
-        block = C.wal_block_size(conn)
+        block = N.wal_block_size(conn)
     stream, stats, cuts, pending = Stream(), Counter(), deque(), deque()
     checker = Checker(stream, block)
     stop_w, stop_t, stop_s, stop_c = (threading.Event() for _ in range(4))
     writers = [threading.Thread(target=writer_loop, args=(cl, s, ks, stop_w, stats), daemon=True)
                for s, ks in zip(specs, keys_of)]
-    takers = [threading.Thread(target=taker_loop, args=(cl, way, stream, cuts, stop_t, stats, cfg.taker_sleep, block),
+    takers = [threading.Thread(target=taker_loop, args=(cl, way, stream, cuts, stop_t, stats, cfg.taker_sleep),
                                daemon=True)
               for way in ["own"] * cfg.takers_own + ["exported"] * cfg.takers_exported
               + ["quiet"] * cfg.takers_quiet]
@@ -705,7 +743,9 @@ def run(cl: Cluster, cfg: RunConfig, log=lambda text: None) -> dict:
                              daemon=True)
     result: dict = {"label": cfg.label, "config": {k: (list(v) if isinstance(v, tuple) else v)
                                                    for k, v in vars(cfg).items()},
-                    "server_version": version, "wal_block_size": block,
+                    **facts, "wal_block_size": block, "checker_steps": list(CHECKER_STEPS),
+                    "taker_rules": TAKER_RULES,
+                    "load_average_start": [round(x, 2) for x in os.getloadavg()],
                     "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     t0 = time.monotonic()
     problems: list[str] = []
@@ -740,7 +780,7 @@ def run(cl: Cluster, cfg: RunConfig, log=lambda text: None) -> dict:
         with cl.connect("primary") as conn:
             conn.execute(INC.format(key=CLOSER_KEY))
             final = dict(conn.execute(READ_COUNTERS).fetchall())
-            end = C.parse_lsn(conn.execute("SELECT pg_current_wal_flush_lsn()::text").fetchone()[0])
+            end = L.parse(conn.execute("SELECT pg_current_wal_flush_lsn()::text").fetchone()[0])
         deadline = time.monotonic() + 180
         while time.monotonic() < deadline and not stream.errors and any(
                 len(stream.idx.get(k, ())) < v for k, v in final.items()):
@@ -775,6 +815,7 @@ def run(cl: Cluster, cfg: RunConfig, log=lambda text: None) -> dict:
     writer_errors = {k: v for k, v in stats.items() if k.startswith(("writer_error", "chaos_error"))}
     result.update(
         seconds=round(time.monotonic() - t0, 1),
+        load_average_end=[round(x, 2) for x in os.getloadavg()],
         cuts_checked=checker.cuts,
         cuts_not_checked=len(pending) + len(cuts),
         transactions_delivered=stream.count,
@@ -823,6 +864,12 @@ def summary(result: dict) -> str:
                          % (way, n, q, 100.0 * q / n, result["checker"].get("cuts_with_a_violation_" + way, 0)))
     if result["activity"].get("quiet_snapshots_dropped"):
         lines.append("  snapshots dropped by the quiet takers: %d" % result["activity"]["quiet_snapshots_dropped"])
+    lines.append("  snapshots dropped because the standby had not settled: %d"
+                 % result["activity"].get("unsettled_snapshots_dropped", 0))
+    lines.append("  checker steps: %s; rows missing from a cut: %d" % (
+        ", ".join(result.get("checker_steps", ())), result["checker"].get("rows_missing_from_a_cut", 0)))
+    lines.append("  load average at start %s, at end %s" % (result.get("load_average_start"),
+                                                          result.get("load_average_end")))
     for p in result["problems"]:
         lines.append("  PROBLEM: " + p)
     return "\n".join(lines)
