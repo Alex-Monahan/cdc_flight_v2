@@ -1,0 +1,31 @@
+{"epoch": 1, "kind": "took_over", "pid": 34294, "previous_age_ms": 847635604174, "previous_state": "released", "run": "i1-34294", "t": 1794320404.177688, "tag": "i1"}
+{"epoch": 1, "kind": "started", "pid": 34294, "run": "i1-34294", "t": 1794320404.179948, "tag": "i1", "variant": "skip_on_reconnect"}
+{"kind": "resync_start", "pid": 34294, "run": "i1-34294", "t": 1794320404.203294, "tag": "i1", "why": "pending"}
+{"kind": "resync_done", "pid": 34294, "position": "0/30516E48", "rows": 24, "run": "i1-34294", "t": 1794320404.448412, "tag": "i1"}
+{"kind": "source_lost", "pid": 34294, "run": "i1-34294", "t": 1794320407.474965, "tag": "i1", "why": "connection"}
+{"error": "OperationalError", "kind": "source_error", "pid": 34294, "run": "i1-34294", "t": 1794320407.475148, "tag": "i1"}
+{"error": "OperationalError", "kind": "source_error", "pid": 34294, "run": "i1-34294", "t": 1794320407.563956, "tag": "i1"}
+{"error": "OperationalError", "kind": "source_error", "pid": 34294, "run": "i1-34294", "t": 1794320407.691783, "tag": "i1"}
+{"error": "OperationalError", "kind": "source_error", "pid": 34294, "run": "i1-34294", "t": 1794320407.923683, "tag": "i1"}
+{"error": "OperationalError", "kind": "source_error", "pid": 34294, "run": "i1-34294", "t": 1794320408.354425, "tag": "i1"}
+{"error": "OperationalError", "kind": "source_error", "pid": 34294, "run": "i1-34294", "t": 1794320409.201976, "tag": "i1"}
+{"kind": "source_reconnected", "pid": 34294, "run": "i1-34294", "t": 1794320410.253672, "tag": "i1"}
+{"kind": "skipped_to_newest", "pid": 34294, "position": "0/30779330", "run": "i1-34294", "t": 1794320410.256567, "tag": "i1"}
+{"detail": "keyless public.w_dk found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 34294, "run": "i1-34294", "t": 1794320410.496314, "tag": "i1"}
+{"detail": "keyless public.w_dk found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 34294, "run": "i1-34294", "t": 1794320410.599487, "tag": "i1"}
+{"detail": "keyless public.w_dk found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 34294, "run": "i1-34294", "t": 1794320410.886037, "tag": "i1"}
+{"kind": "quarantined", "pid": 34294, "run": "i1-34294", "t": 1794320410.905349, "table": "public.w_dk", "tag": "i1"}
+{"kind": "source_lost", "pid": 34294, "run": "i1-34294", "t": 1794320411.141248, "tag": "i1", "why": "connection"}
+{"error": "AdminShutdown", "kind": "source_error", "pid": 34294, "run": "i1-34294", "t": 1794320411.141451, "tag": "i1"}
+{"kind": "source_reconnected", "pid": 34294, "run": "i1-34294", "t": 1794320411.572124, "tag": "i1"}
+{"kind": "skipped_to_newest", "pid": 34294, "position": "0/30804FA0", "run": "i1-34294", "t": 1794320411.575875, "tag": "i1"}
+{"detail": "keyless public.w_nkt found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 34294, "run": "i1-34294", "t": 1794320411.593924, "tag": "i1"}
+{"detail": "keyless public.w_nkt found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 34294, "run": "i1-34294", "t": 1794320412.477113, "tag": "i1"}
+{"detail": "keyless public.w_nkt found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 34294, "run": "i1-34294", "t": 1794320413.56424, "tag": "i1"}
+{"kind": "quarantined", "pid": 34294, "run": "i1-34294", "t": 1794320413.582028, "table": "public.w_nkt", "tag": "i1"}
+{"detail": "keyless public.w_nk found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 34294, "run": "i1-34294", "t": 1794320414.683422, "tag": "i1"}
+{"detail": "keyless public.w_nk found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 34294, "run": "i1-34294", "t": 1794320415.812379, "tag": "i1"}
+{"detail": "keyless public.w_nk found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 34294, "run": "i1-34294", "t": 1794320416.935524, "tag": "i1"}
+{"kind": "quarantined", "pid": 34294, "run": "i1-34294", "t": 1794320416.952276, "table": "public.w_nk", "tag": "i1"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 34294, "run": "i1-34294", "t": 1794320418.407421, "tag": "i1"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 34294, "run": "i1-34294", "t": 1794320418.615383, "tag": "i1"}

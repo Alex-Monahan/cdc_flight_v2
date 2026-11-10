@@ -1,0 +1,275 @@
+{
+ "campaign": "20261110T142003-1b13",
+ "checkpoints": [],
+ "clean": true,
+ "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+ "config": {
+  "budget_s": 60.0,
+  "catch_up_s": 90.0,
+  "episode_s": 10.0,
+  "fuzzer": "fault",
+  "ignore_self_report": false,
+  "keep_workdir": false,
+  "observer_interval_s": 0.005,
+  "pace_s": 0.25,
+  "schedule": {
+   "not_attacked": [
+    "dest_delay",
+    "dest_error",
+    "dest_hang",
+    "freeze",
+    "hang_point",
+    "kill_group",
+    "kill_point",
+    "kill_point_later",
+    "net_latency",
+    "replica_promote",
+    "replica_restart",
+    "slot_drop",
+    "slot_invalidate",
+    "spill_full",
+    "src_cancel",
+    "src_lock",
+    "src_long_txn",
+    "src_restart_primary",
+    "src_wal_switch"
+   ],
+   "per_episode": [
+    1,
+    3
+   ],
+   "weights": {
+    "net_blackhole": 5,
+    "net_drop": 4,
+    "net_reset": 5,
+    "src_terminate": 5
+   }
+  },
+  "start_timeout_s": 120.0
+ },
+ "counts": {
+  "checkpoints": 0,
+  "final_rows": null,
+  "observations": 3805,
+  "rolled_back": 48,
+  "rounds": 36,
+  "transactions": 720
+ },
+ "duration_s": 15.484,
+ "failure_id": "fault-toy-skip_on_reconnect-replica-s2-b09e06a",
+ "faults": {
+  "net_drop": 1,
+  "src_terminate": 1
+ },
+ "faults_without_effect": [
+  {
+   "error": null,
+   "kind": "net_blackhole",
+   "params": {
+    "seconds": 0.089
+   },
+   "proof": {
+    "skipped": "another network fault held the link"
+   }
+  }
+ ],
+ "first_failure_s": 15.223,
+ "fuzzer": "fault",
+ "instances": {
+  "exits": {},
+  "started": 1
+ },
+ "no_effect": {
+  "net_blackhole": 1
+ },
+ "observers": [
+  {
+   "check": "transfers",
+   "errors": [],
+   "first_violations": [
+    {
+     "expected": 24000,
+     "observation": 919,
+     "sum": 23931,
+     "t": 13.793
+    },
+    {
+     "expected": 24000,
+     "observation": 920,
+     "sum": 23931,
+     "t": 13.81
+    },
+    {
+     "expected": 24000,
+     "observation": 921,
+     "sum": 23931,
+     "t": 13.824
+    }
+   ],
+   "last": {
+    "expected": 24000,
+    "sum": 23931
+   },
+   "longest_gap_s": 0.369,
+   "observations": 952,
+   "seconds": 14.275,
+   "unavailable": 0,
+   "violations": 34
+  },
+  {
+   "check": "parent_child",
+   "errors": [],
+   "first_violations": [
+    {
+     "observation": 916,
+     "orphan_parent_ids": 0,
+     "parents": 9,
+     "parents_with_wrong_count": 2,
+     "sample_orphans": [],
+     "sample_parent_id_count_children": [
+      [
+       19,
+       5,
+       3
+      ],
+      [
+       128,
+       7,
+       5
+      ]
+     ],
+     "t": 13.796
+    },
+    {
+     "observation": 917,
+     "orphan_parent_ids": 0,
+     "parents": 9,
+     "parents_with_wrong_count": 2,
+     "sample_orphans": [],
+     "sample_parent_id_count_children": [
+      [
+       19,
+       5,
+       3
+      ],
+      [
+       128,
+       7,
+       5
+      ]
+     ],
+     "t": 13.811
+    },
+    {
+     "observation": 918,
+     "orphan_parent_ids": 0,
+     "parents": 9,
+     "parents_with_wrong_count": 2,
+     "sample_orphans": [],
+     "sample_parent_id_count_children": [
+      [
+       19,
+       5,
+       3
+      ],
+      [
+       128,
+       7,
+       5
+      ]
+     ],
+     "t": 13.826
+    }
+   ],
+   "last": {
+    "orphan_parent_ids": 0,
+    "parents": 9,
+    "parents_with_wrong_count": 2,
+    "sample_orphans": [],
+    "sample_parent_id_count_children": [
+     [
+      19,
+      5,
+      3
+     ],
+     [
+      128,
+      7,
+      5
+     ]
+    ]
+   },
+   "longest_gap_s": 0.368,
+   "observations": 949,
+   "seconds": 14.275,
+   "unavailable": 0,
+   "violations": 34
+  },
+  {
+   "check": "debit_credit",
+   "errors": [],
+   "first_violations": [
+    {
+     "credit_rows": 23,
+     "credits": 68718,
+     "debit_rows": 19,
+     "debits": 71546,
+     "observation": 919,
+     "t": 13.793
+    },
+    {
+     "credit_rows": 23,
+     "credits": 68718,
+     "debit_rows": 19,
+     "debits": 71546,
+     "observation": 920,
+     "t": 13.809
+    },
+    {
+     "credit_rows": 23,
+     "credits": 68718,
+     "debit_rows": 19,
+     "debits": 71546,
+     "observation": 921,
+     "t": 13.824
+    }
+   ],
+   "last": {
+    "credit_rows": 23,
+    "credits": 68718,
+    "debit_rows": 19,
+    "debits": 71546
+   },
+   "longest_gap_s": 0.369,
+   "observations": 952,
+   "seconds": 14.275,
+   "unavailable": 0,
+   "violations": 34
+  },
+  {
+   "check": "large_marked",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "batches": 1,
+    "batches_partial_or_unmarked": 0,
+    "sample_batch_rows_marked": []
+   },
+   "longest_gap_s": 0.367,
+   "observations": 952,
+   "seconds": 14.275,
+   "unavailable": 0,
+   "violations": 0
+  }
+ ],
+ "options": {},
+ "outcome": "violation",
+ "reason": "consumer loop: transfers 32 of 950 ([{\"sum\": 23931, \"expected\": 24000, \"observation\": 919, \"t\": 13.793}]); parent_child 32 of 947 ([{\"parents_with_wrong_count\": 2, \"orphan_parent_ids\": 0, \"sample_parent_id_count_children\": [[19, 5, 3], [128, 7, 5]], \"sample_orphans\": [], \"parents\": 9, \"observation\": 916, \"t\": 13.796}]); debit_credit 32 of 950 ([{\"debits\": 71546, \"credits\": 68718, \"debit_rows\": 19, \"credit_rows\": 23, \"observation\": 919, \"t\": 13.793}])",
+ "seed": 2,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T14:20:03Z",
+ "system": "toy-skip_on_reconnect",
+ "system_spec": "toy:skip_on_reconnect",
+ "tier": "local"
+}

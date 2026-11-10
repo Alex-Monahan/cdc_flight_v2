@@ -120,6 +120,21 @@ sslrootcert=<home>/tls/ca.crt passfile=<home>/secrets/pgpass
   localpg never matches process names (no `pkill`, no `killall`). On a timeout, localpg also kills its own direct
   subprocess.
 
+## Shared memory
+
+Every running Postgres server holds one System V shared-memory segment, and the kernel allows few
+(`kern.sysv.shmmni`, 32 on this machine). A clean stop removes the segment; a killed server leaves it, and only the
+next start in the same data directory removes it. So before localpg deletes a data directory (`remove`, `reset`,
+the rebuild of a node) and after every `down`, it releases the segment that the directory's `postmaster.pid` names
+— only if the postmaster named there is dead, a segment with that id has that key, no process is attached (it waits
+up to 10 s for backends to notice the postmaster's death, then refuses to delete the directory and says why) and its
+creator is that postmaster; then `ipcrm -m <id>`. It never lists segments to remove what looks like its own: the pid
+file of one of this home's data directories is the only way to a segment. A start that fails with "could not create
+shared memory segment" reports how many segments exist and the limit. `tests/localpg/test_localpg_segments.py`
+kills and removes a pair and checks that both segments are gone; its negative control
+(`CDC_V2_LOCALPG_KEEP_SEGMENTS=1`, the old behaviour) leaves two. A home that a test deletes with `rmtree` (the leased
+private clusters of `cdc_v2.testing.pg`) runs `localpg down` first, which releases the segments of killed nodes.
+
 ## Known behaviour (handle it in tests)
 
 - **Creating a logical slot on a standby waits** for a running-transactions record from the primary. An idle primary

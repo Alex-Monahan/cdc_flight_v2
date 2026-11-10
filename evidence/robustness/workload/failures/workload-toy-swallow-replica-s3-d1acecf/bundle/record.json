@@ -1,0 +1,131 @@
+{
+ "campaign": "20261110T190041-0702",
+ "checkpoints": [],
+ "clean": true,
+ "commit": "d1acecfb2f0696a8a4a6701242d459d4c75e301a",
+ "config": {
+  "budget_s": 40.0,
+  "catch_up_s": 90.0,
+  "episode_s": 10.0,
+  "fuzzer": "workload",
+  "ignore_self_report": false,
+  "keep_workdir": false,
+  "observer_interval_s": 0.005,
+  "observers": true,
+  "pace_s": 0.25,
+  "schedule": null,
+  "start_timeout_s": 120.0
+ },
+ "counts": {
+  "checkpoints": 0,
+  "final_rows": null,
+  "observations": 564,
+  "rolled_back": 14,
+  "rounds": 15,
+  "transactions": 300
+ },
+ "duration_s": 5.358,
+ "failure_id": "workload-toy-swallow-replica-s3-d1acecf",
+ "faults": {},
+ "faults_without_effect": [],
+ "first_failure_s": 5.012,
+ "fuzzer": "workload",
+ "instances": {
+  "exits": {},
+  "started": 1
+ },
+ "no_effect": {},
+ "observers": [
+  {
+   "check": "transfers",
+   "errors": [],
+   "first_violations": [
+    {
+     "expected": 24000,
+     "observation": 131,
+     "sum": 24035,
+     "t": 4.101
+    },
+    {
+     "expected": 24000,
+     "observation": 132,
+     "sum": 24035,
+     "t": 4.12
+    },
+    {
+     "expected": 24000,
+     "observation": 133,
+     "sum": 24035,
+     "t": 4.134
+    }
+   ],
+   "last": {
+    "expected": 24000,
+    "sum": 24035
+   },
+   "longest_gap_s": 0.537,
+   "observations": 141,
+   "seconds": 4.24,
+   "unavailable": 0,
+   "violations": 11
+  },
+  {
+   "check": "parent_child",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "orphan_parent_ids": 0,
+    "parents": 6,
+    "parents_with_wrong_count": 0,
+    "sample_orphans": [],
+    "sample_parent_id_count_children": []
+   },
+   "longest_gap_s": 0.537,
+   "observations": 141,
+   "seconds": 4.242,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "debit_credit",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "credit_rows": 11,
+    "credits": 34460,
+    "debit_rows": 7,
+    "debits": 34460
+   },
+   "longest_gap_s": 0.537,
+   "observations": 141,
+   "seconds": 4.242,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "large_marked",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "batches": 1,
+    "batches_partial_or_unmarked": 0,
+    "sample_batch_rows_marked": []
+   },
+   "longest_gap_s": 0.537,
+   "observations": 141,
+   "seconds": 4.242,
+   "unavailable": 0,
+   "violations": 0
+  }
+ ],
+ "options": {},
+ "outcome": "violation",
+ "reason": "consumer loop: transfers 2 of 132 ([{\"sum\": 24035, \"expected\": 24000, \"observation\": 131, \"t\": 4.101}])",
+ "seed": 3,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T19:00:41Z",
+ "system": "toy-swallow",
+ "system_spec": "toy:swallow",
+ "tier": "local"
+}

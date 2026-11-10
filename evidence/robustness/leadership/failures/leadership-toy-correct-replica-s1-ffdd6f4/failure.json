@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "ffdd6f4d03642758ebcff34819b9decba821113e",
+  "first_failure_s": 21.567,
+  "fixed_commit": null,
+  "fuzzer": "leadership",
+  "id": "leadership-toy-correct-replica-s1-ffdd6f4",
+  "local_bundle": {
+    "campaign": "20261110T120858-07f4",
+    "dir": "bundle-leadership-toy-correct-replica-s1-ffdd6f4"
+  },
+  "outcome": "error",
+  "reason": "PermissionError: [Errno 1] Operation not permitted |  line 254, in _round /     run.proc.stop_group() /     ~~~~~~~~~~~~~~~~~~~^^ /   File \"<repo>/src/cdc_v2/testing/procs.py\", line 178, in stop_group /     return self.signal_group(signal.SIGSTOP) /            ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^ /   File \"<repo>/src/cdc_v2/testing/procs.py\", line 161, in signal_group /     os.killpg(self.pgid, sig) /     ~~~~~~~~~^^^^^^^^^^^^^^^^ / PermissionError: [Errno 1] Operation not permitted / ",
+  "regression_test": null,
+  "seed": 1,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-correct",
+  "system_spec": "toy:correct"
+}

@@ -1,0 +1,1103 @@
+{
+  "entries": [
+    {
+      "end": "commit",
+      "round": 98,
+      "seq": 984,
+      "shape": "family",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_parent\" (id, w, n_children) VALUES (7898, 1, 4)",
+        "INSERT INTO \"public\".\"w_child\" (id, parent_id, w, v) VALUES (7900, 7898, 1, 'c7900'), (7902, 7898, 1, 'c7902'), (7904, 7898, 1, 'c7904'), (7906, 7898, 1, 'c7906')",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 98,
+      "seq": 985,
+      "shape": "ledger",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_credit\" (id, entry, amount) VALUES (7912, 7908, 3528)",
+        "INSERT INTO \"public\".\"w_debit\" (id, entry, amount) VALUES (7910, 7908, 3528)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 98,
+      "seq": 986,
+      "shape": "ledger",
+      "statements": [
+        "BEGIN",
+        "DELETE FROM \"public\".\"w_credit\" WHERE entry = 5704",
+        "DELETE FROM \"public\".\"w_debit\" WHERE entry = 5704",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 98,
+      "seq": 985,
+      "shape": "large",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_k1\" (id) SELECT g * 2 + 1 FROM generate_series(3919, 4218) AS g",
+        "UPDATE \"public\".\"w_k1\" SET \"a\" = 7 WHERE id BETWEEN 7839 AND 8437 AND id % 2 = 1",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 98,
+      "seq": 987,
+      "shape": "nkt",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_nkt\" SET n = n + 1 WHERE ctid = (SELECT ctid FROM \"public\".\"w_nkt\" WHERE w = 1 AND tag = 7864 LIMIT 1)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 101,
+      "seq": 1013,
+      "shape": "pk_update",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_k0\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (8501, -73572, 'hy''bl\u00e9sgBn_\u2713pwdjA''ze''bx', -1598400.67, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 6584956023970 * INTERVAL '1 microsecond'), NULL)",
+        "INSERT INTO \"public\".\"w_k0\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (8503, -28779, 'k''a_pfj', 8074693.37, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 138311600877064 * INTERVAL '1 microsecond'), NULL)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 101,
+      "seq": 1013,
+      "shape": "savepoint",
+      "statements": [
+        "BEGIN",
+        "DELETE FROM \"public\".\"w_nk\" WHERE ctid = (SELECT ctid FROM \"public\".\"w_nk\" WHERE w = 1 AND a IS NOT DISTINCT FROM 1 AND b IS NOT DISTINCT FROM NULL LIMIT 1)",
+        "SAVEPOINT s1",
+        "INSERT INTO \"public\".\"w_k1\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (7972, 19932, NULL, NULL, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 432413255953933 * INTERVAL '1 microsecond'), true)",
+        "DELETE FROM \"public\".\"w_k1\" WHERE id = 7964",
+        "ROLLBACK TO SAVEPOINT s1",
+        "UPDATE \"public\".\"w_toast\" SET n = n + 1 WHERE id = 7966",
+        "DELETE FROM \"public\".\"w_k1\" WHERE id = 7970",
+        "DELETE FROM \"public\".\"w_k0\" WHERE id = 7332",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 101,
+      "seq": 1014,
+      "shape": "large_marked",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_bulk\" (id, batch, v) SELECT g * 2 + 1, 8505, g % 97 FROM generate_series(4253, 4552) AS g",
+        "INSERT INTO \"public\".\"w_bulk_mark\" (batch, n) VALUES (8505, 300)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 101,
+      "seq": 1014,
+      "shape": "family",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_child\" (id, parent_id, w, v) VALUES (7974, 7898, 1, 'c7974'), (7976, 7898, 1, 'c7976')",
+        "UPDATE \"public\".\"w_parent\" SET n_children = n_children + 2 WHERE id = 7898",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 101,
+      "seq": 1015,
+      "shape": "transfer",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_xfer_0\" SET balance = balance + (-61) WHERE id = 3",
+        "UPDATE \"public\".\"w_xfer_0\" SET balance = balance + (13) WHERE id = 6",
+        "UPDATE \"public\".\"w_xfer_1\" SET balance = balance + (8) WHERE id = 2",
+        "UPDATE \"public\".\"w_xfer_2\" SET balance = balance + (40) WHERE id = 5",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 101,
+      "seq": 1015,
+      "shape": "dk",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_dk\" SET id = CASE id WHEN 24 THEN 5718 ELSE 24 END WHERE id IN (24, 5718)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 101,
+      "seq": 1016,
+      "shape": "single",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_k1\" SET \"e\" = false, \"a\" = -93119, \"b\" = NULL WHERE id = 7968",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "rollback",
+      "round": 101,
+      "seq": 1016,
+      "shape": "rollback",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_toast\" (id, n, big) VALUES (9107, 0, (SELECT string_agg(md5('103/9107' || g::text), '') FROM generate_series(1, 625) AS g))",
+        "INSERT INTO \"public\".\"w_k0\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (9109, NULL, 'l', 3281947.27, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 433871414455399 * INTERVAL '1 microsecond'), false)",
+        "DELETE FROM \"public\".\"w_nk\" WHERE ctid = (SELECT ctid FROM \"public\".\"w_nk\" WHERE w = 0 AND a IS NOT DISTINCT FROM 2 AND b IS NOT DISTINCT FROM '' LIMIT 1)",
+        "INSERT INTO \"public\".\"w_nk\" (w, a, b) VALUES (0, 2, NULL), (0, 2, NULL)",
+        "ROLLBACK"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 101,
+      "seq": 1017,
+      "shape": "family",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_parent\" SET n_children = n_children + 1 WHERE id = 7898",
+        "INSERT INTO \"public\".\"w_child\" (id, parent_id, w, v) VALUES (7978, 7898, 1, 'c7978')",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 101,
+      "seq": 1017,
+      "shape": "transfer",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_xfer_1\" SET balance = balance + (-68) WHERE id = 1",
+        "UPDATE \"public\".\"w_xfer_1\" SET balance = balance + (10) WHERE id = 3",
+        "UPDATE \"public\".\"w_xfer_2\" SET balance = balance + (33) WHERE id = 4",
+        "UPDATE \"public\".\"w_xfer_2\" SET balance = balance + (25) WHERE id = 5",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 101,
+      "seq": 1020,
+      "shape": "dk",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_dk\" (id, w, v) VALUES (9107, 0, 'v9109')",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 101,
+      "seq": 1019,
+      "shape": "multi_table",
+      "statements": [
+        "BEGIN",
+        "DELETE FROM \"public\".\"w_k1\" WHERE id = 7964",
+        "UPDATE \"public\".\"w_k1\" SET \"b\" = ' Bsq\u00e9', \"a\" = 45804 WHERE id = 7968",
+        "INSERT INTO \"public\".\"w_toast\" (id, n, big) VALUES (7982, 0, (SELECT string_agg(md5('103/7982' || g::text), '') FROM generate_series(1, 625) AS g))",
+        "INSERT INTO \"public\".\"w_k1\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (7984, 25023, 'kn tjjhad', 9787606.96, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 950352655168478 * INTERVAL '1 microsecond'), false)",
+        "UPDATE \"public\".\"w_toast\" SET n = n + 1 WHERE id = 7966",
+        "UPDATE \"public\".\"w_k0\" SET \"c\" = -2547488.24, \"b\" = ' -c' WHERE id = 7980",
+        "UPDATE \"public\".\"w_toast\" SET n = n + 1 WHERE id = 7202",
+        "INSERT INTO \"public\".\"w_k1\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (7986, -11328, 'z\u2713cd', 760731.92, NULL, false)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 101,
+      "seq": 1020,
+      "shape": "transfer",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_xfer_1\" SET balance = balance + (-77) WHERE id = 0",
+        "UPDATE \"public\".\"w_xfer_1\" SET balance = balance + (40) WHERE id = 3",
+        "UPDATE \"public\".\"w_xfer_1\" SET balance = balance + (37) WHERE id = 5",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 102,
+      "seq": 1021,
+      "shape": "dk",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_dk\" (id, w, v) VALUES (9111, 0, 'v9113')",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 102,
+      "seq": 1021,
+      "shape": "transfer",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_xfer_0\" SET balance = balance + (-78) WHERE id = 2",
+        "UPDATE \"public\".\"w_xfer_0\" SET balance = balance + (31) WHERE id = 3",
+        "UPDATE \"public\".\"w_xfer_2\" SET balance = balance + (47) WHERE id = 3",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 102,
+      "seq": 1022,
+      "shape": "family",
+      "statements": [
+        "BEGIN",
+        "DELETE FROM \"public\".\"w_child\" WHERE parent_id = 7898",
+        "DELETE FROM \"public\".\"w_parent\" WHERE id = 7898",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 102,
+      "seq": 1023,
+      "shape": "nkt",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_nkt\" SET n = n + 1 WHERE ctid = (SELECT ctid FROM \"public\".\"w_nkt\" WHERE w = 1 AND tag = 4306 LIMIT 1)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 102,
+      "seq": 1024,
+      "shape": "transfer",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_xfer_0\" SET balance = balance + (-61) WHERE id = 2",
+        "UPDATE \"public\".\"w_xfer_0\" SET balance = balance + (4) WHERE id = 7",
+        "UPDATE \"public\".\"w_xfer_1\" SET balance = balance + (39) WHERE id = 7",
+        "UPDATE \"public\".\"w_xfer_2\" SET balance = balance + (18) WHERE id = 0",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 102,
+      "seq": 1025,
+      "shape": "pk_update",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_k1\" SET id = 7988 WHERE id = 7984",
+        "UPDATE \"public\".\"w_k1\" SET id = 7984 WHERE id = 7986",
+        "UPDATE \"public\".\"w_k1\" SET id = 7986 WHERE id = 7988",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 102,
+      "seq": 1022,
+      "shape": "savepoint",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_toast\" (id, n, big) VALUES (9115, 0, (SELECT string_agg(md5('103/9115' || g::text), '') FROM generate_series(1, 625) AS g))",
+        "UPDATE \"public\".\"w_k1\" SET \"c\" = -7615664.75, \"e\" = false, \"a\" = 49504 WHERE id = 8271",
+        "DELETE FROM \"public\".\"w_k0\" WHERE id = 8503",
+        "SAVEPOINT s1",
+        "INSERT INTO \"public\".\"w_k0\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (9117, 7590, 'klatq-_bexl', 5064982.76, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 736755179194171 * INTERVAL '1 microsecond'), true)",
+        "ROLLBACK TO SAVEPOINT s1",
+        "UPDATE \"public\".\"w_k0\" SET \"c\" = 2106252.53, \"b\" = 'Ba- qwabjgiwiotu-dcx' WHERE id = 8501",
+        "UPDATE \"public\".\"w_k1\" SET \"b\" = '\u00e9h_A\u2713-aAfn\u2713' WHERE id = 8015",
+        "UPDATE \"public\".\"w_toast\" SET n = n + 1 WHERE id = 7793",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 102,
+      "seq": 1023,
+      "shape": "dk",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_dk\" (id, w, v) VALUES (557, 0, 'v9119')",
+        "DELETE FROM \"public\".\"w_dk\" WHERE id = 557 AND v = 'v2597'",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 102,
+      "seq": 1026,
+      "shape": "multi_table",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_k1\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (7990, 17005, 'cBudktvyua', -5679880.64, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 647763033016571 * INTERVAL '1 microsecond'), false)",
+        "UPDATE \"public\".\"w_toast\" SET n = n + 1 WHERE id = 7966",
+        "UPDATE \"public\".\"w_k0\" SET \"d\" = (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 139217900309124 * INTERVAL '1 microsecond'), \"a\" = 75182 WHERE id = 7312",
+        "DELETE FROM \"public\".\"w_k1\" WHERE id = 7984",
+        "UPDATE \"public\".\"w_toast\" SET n = n + 1 WHERE id = 7202",
+        "UPDATE \"public\".\"w_k0\" SET \"e\" = false, \"c\" = -6987581.73, \"b\" = 'rtnxAlll''\u00e9qopp''s\u00e9' WHERE id = 7480",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 102,
+      "seq": 1024,
+      "shape": "ledger",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_debit\" (id, entry, amount) VALUES (9123, 9121, 8509)",
+        "INSERT INTO \"public\".\"w_credit\" (id, entry, amount) VALUES (9125, 9121, 8509)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 102,
+      "seq": 1027,
+      "shape": "transfer",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_xfer_1\" SET balance = balance + (-54) WHERE id = 3",
+        "UPDATE \"public\".\"w_xfer_1\" SET balance = balance + (33) WHERE id = 4",
+        "UPDATE \"public\".\"w_xfer_2\" SET balance = balance + (21) WHERE id = 5",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 102,
+      "seq": 1025,
+      "shape": "ledger",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_debit\" SET amount = amount + 294 WHERE id = 7745",
+        "UPDATE \"public\".\"w_credit\" SET amount = amount + 294 WHERE id = 7747",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 102,
+      "seq": 1026,
+      "shape": "dk",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_dk\" SET id = CASE id WHEN 437 THEN 87 ELSE 437 END WHERE id IN (437, 87)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 102,
+      "seq": 1028,
+      "shape": "multi_row",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_k1\" SET \"e\" = true WHERE id = 7990",
+        "UPDATE \"public\".\"w_k1\" SET \"e\" = false, \"a\" = -80818 WHERE id = 7986",
+        "INSERT INTO \"public\".\"w_k1\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (7992, 33009, 'rbbf ps-ky h\u00e9\u00e9\u2713', 2886323.26, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 300219194588259 * INTERVAL '1 microsecond'), true)",
+        "INSERT INTO \"public\".\"w_k1\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (7994, 78985, 'xjfxkm\u00e9r-d\u2713-cl\u00e9', NULL, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 659638450998455 * INTERVAL '1 microsecond'), false)",
+        "DELETE FROM \"public\".\"w_k1\" WHERE id = 7992",
+        "UPDATE \"public\".\"w_k1\" SET \"a\" = -42311 WHERE id = 7968",
+        "INSERT INTO \"public\".\"w_k1\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (7996, -96795, 'nsojox''xrzitkuu\u00e9Asx\u2713i', -7385258.91, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 314526284553161 * INTERVAL '1 microsecond'), true)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 102,
+      "seq": 1029,
+      "shape": "nkt",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_nkt\" SET n = n + 1 WHERE ctid = (SELECT ctid FROM \"public\".\"w_nkt\" WHERE w = 1 AND tag = 5174 LIMIT 1)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 102,
+      "seq": 1027,
+      "shape": "large_marked",
+      "statements": [
+        "BEGIN",
+        "DELETE FROM \"public\".\"w_bulk\" WHERE batch = 8505",
+        "DELETE FROM \"public\".\"w_bulk_mark\" WHERE batch = 8505",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 102,
+      "seq": 1030,
+      "shape": "family",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_parent\" (id, w, n_children) VALUES (7998, 1, 0)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 102,
+      "seq": 1028,
+      "shape": "family",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_parent\" SET n_children = n_children + 2 WHERE id = 7813",
+        "INSERT INTO \"public\".\"w_child\" (id, parent_id, w, v) VALUES (9127, 7813, 0, 'c9127'), (9129, 7813, 0, 'c9129')",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 102,
+      "seq": 1029,
+      "shape": "savepoint",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_toast\" SET n = n + 1 WHERE id = 7799",
+        "SAVEPOINT s1",
+        "DELETE FROM \"public\".\"w_k1\" WHERE id = 7901",
+        "ROLLBACK TO SAVEPOINT s1",
+        "DELETE FROM \"public\".\"w_k1\" WHERE id = 7965",
+        "UPDATE \"public\".\"w_toast\" SET n = n + 1 WHERE id = 7821",
+        "INSERT INTO \"public\".\"w_k0\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (9131, -9849, 'yuzipjwcpmCy-A', -3989721.52, NULL, false)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 102,
+      "seq": 1030,
+      "shape": "ledger",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_debit\" SET amount = amount + 100 WHERE id = 4169",
+        "UPDATE \"public\".\"w_credit\" SET amount = amount + 100 WHERE id = 4171",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 106,
+      "seq": 1061,
+      "shape": "pk_update",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_k0\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (8042, 1777, 'y', 4202077.06, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 550446039892398 * INTERVAL '1 microsecond'), true)",
+        "INSERT INTO \"public\".\"w_k0\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (8044, NULL, 'xsC\u00e9_g\u2713i-CCy-luo', -8821147.78, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 652331268639516 * INTERVAL '1 microsecond'), true)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 106,
+      "seq": 1061,
+      "shape": "nkt",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_nkt\" SET n = n + 1 WHERE ctid = (SELECT ctid FROM \"public\".\"w_nkt\" WHERE w = 0 AND tag = 1223 LIMIT 1)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 106,
+      "seq": 1062,
+      "shape": "pk_update",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_k1\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (8046, 60832, 'rl\u00e9Cps-yosa''', 3057549.77, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 38769363314159 * INTERVAL '1 microsecond'), false)",
+        "INSERT INTO \"public\".\"w_k1\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (8048, -6680, 'Anwrnx', -4305621.87, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 108420089233696 * INTERVAL '1 microsecond'), false)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 106,
+      "seq": 1062,
+      "shape": "single",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_k1\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (9191, 92994, 'po jjge--bv_uuv-q_bkp\u00e9j', 6835528.26, NULL, false)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 106,
+      "seq": 1063,
+      "shape": "single",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_k1\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (9193, -66391, 'cdwj\u00e9up-oghhaCvg''dukb_zn', -5307949.30, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 36769806853897 * INTERVAL '1 microsecond'), true)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 106,
+      "seq": 1063,
+      "shape": "pk_update",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_k0\" SET id = 8050 WHERE id = 8042",
+        "UPDATE \"public\".\"w_k0\" SET id = 8042 WHERE id = 8044",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 106,
+      "seq": 1064,
+      "shape": "dk",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_dk\" SET id = CASE id WHEN 5830 THEN 5660 ELSE 5830 END WHERE id IN (5830, 5660)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 106,
+      "seq": 1064,
+      "shape": "transfer",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_xfer_0\" SET balance = balance + (-52) WHERE id = 0",
+        "UPDATE \"public\".\"w_xfer_1\" SET balance = balance + (10) WHERE id = 4",
+        "UPDATE \"public\".\"w_xfer_1\" SET balance = balance + (11) WHERE id = 6",
+        "UPDATE \"public\".\"w_xfer_2\" SET balance = balance + (31) WHERE id = 1",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 106,
+      "seq": 1065,
+      "shape": "family",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_parent\" SET n_children = n_children + 3 WHERE id = 8006",
+        "INSERT INTO \"public\".\"w_child\" (id, parent_id, w, v) VALUES (8052, 8006, 1, 'c8052'), (8054, 8006, 1, 'c8054'), (8056, 8006, 1, 'c8056')",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 106,
+      "seq": 1065,
+      "shape": "nkt",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_nkt\" SET n = n + 1 WHERE ctid = (SELECT ctid FROM \"public\".\"w_nkt\" WHERE w = 0 AND tag = 7769 LIMIT 1)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 106,
+      "seq": 1066,
+      "shape": "ledger",
+      "statements": [
+        "BEGIN",
+        "DELETE FROM \"public\".\"w_credit\" WHERE entry = 8471",
+        "DELETE FROM \"public\".\"w_debit\" WHERE entry = 8471",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 106,
+      "seq": 1067,
+      "shape": "dk",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_dk\" SET id = CASE id WHEN 505 THEN 163 ELSE 505 END WHERE id IN (505, 163)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 106,
+      "seq": 1066,
+      "shape": "nkt",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_nkt\" (w, tag, n, big) VALUES (1, 8058, 0, (SELECT string_agg(md5('nkt/103/8058' || g::text), '') FROM generate_series(1, 625) AS g))",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 106,
+      "seq": 1067,
+      "shape": "pk_update",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_k0\" SET id = 8060 WHERE id = 8050",
+        "UPDATE \"public\".\"w_k0\" SET id = 8050 WHERE id = 8042",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 106,
+      "seq": 1068,
+      "shape": "transfer",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_xfer_0\" SET balance = balance + (-14) WHERE id = 2",
+        "UPDATE \"public\".\"w_xfer_1\" SET balance = balance + (14) WHERE id = 0",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 106,
+      "seq": 1068,
+      "shape": "ledger",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_debit\" (id, entry, amount) VALUES (8064, 8062, 4938)",
+        "INSERT INTO \"public\".\"w_credit\" (id, entry, amount) VALUES (8066, 8062, 4938)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 106,
+      "seq": 1069,
+      "shape": "multi_table",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_toast\" SET n = n + 1 WHERE id = 9159",
+        "DELETE FROM \"public\".\"w_k1\" WHERE id = 9191",
+        "UPDATE \"public\".\"w_nk\" SET a = 2 WHERE ctid = (SELECT ctid FROM \"public\".\"w_nk\" WHERE w = 0 AND a IS NOT DISTINCT FROM 3 AND b IS NOT DISTINCT FROM 'x' LIMIT 1)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 106,
+      "seq": 1069,
+      "shape": "ledger",
+      "statements": [
+        "BEGIN",
+        "DELETE FROM \"public\".\"w_credit\" WHERE entry = 5834",
+        "DELETE FROM \"public\".\"w_debit\" WHERE entry = 5834",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 106,
+      "seq": 1070,
+      "shape": "family",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_parent\" SET n_children = n_children + 2 WHERE id = 7813",
+        "INSERT INTO \"public\".\"w_child\" (id, parent_id, w, v) VALUES (9195, 7813, 0, 'c9195'), (9197, 7813, 0, 'c9197')",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 106,
+      "seq": 1070,
+      "shape": "family",
+      "statements": [
+        "BEGIN",
+        "DELETE FROM \"public\".\"w_child\" WHERE parent_id = 8006",
+        "DELETE FROM \"public\".\"w_parent\" WHERE id = 8006",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 107,
+      "seq": 1071,
+      "shape": "ledger",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_debit\" SET amount = amount + 274 WHERE id = 4438",
+        "UPDATE \"public\".\"w_credit\" SET amount = amount + 274 WHERE id = 4440",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 107,
+      "seq": 1071,
+      "shape": "multi_row",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_k1\" SET \"d\" = (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 25576007038955 * INTERVAL '1 microsecond'), \"a\" = 45746 WHERE id = 9171",
+        "INSERT INTO \"public\".\"w_k1\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (9199, -37089, '\u2713rwx', 7741335.12, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 938402669567763 * INTERVAL '1 microsecond'), false)",
+        "INSERT INTO \"public\".\"w_k1\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (9201, NULL, NULL, -6486617.31, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 384528726116711 * INTERVAL '1 microsecond'), false)",
+        "UPDATE \"public\".\"w_k1\" SET \"a\" = -76460, \"d\" = (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 918631607702345 * INTERVAL '1 microsecond') WHERE id = 9173",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 107,
+      "seq": 1072,
+      "shape": "nkt",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_nkt\" SET n = n + 1 WHERE ctid = (SELECT ctid FROM \"public\".\"w_nkt\" WHERE w = 0 AND tag = 7011 LIMIT 1)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 107,
+      "seq": 1072,
+      "shape": "multi_table",
+      "statements": [
+        "BEGIN",
+        "DELETE FROM \"public\".\"w_k1\" WHERE id = 8048",
+        "DELETE FROM \"public\".\"w_k1\" WHERE id = 8046",
+        "INSERT INTO \"public\".\"w_k1\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (8068, 77505, 'f', -1262759.78, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 611549347015456 * INTERVAL '1 microsecond'), false)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 107,
+      "seq": 1073,
+      "shape": "ledger",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_debit\" SET amount = amount + 48 WHERE id = 2784",
+        "UPDATE \"public\".\"w_credit\" SET amount = amount + 48 WHERE id = 2786",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 107,
+      "seq": 1073,
+      "shape": "family",
+      "statements": [
+        "BEGIN",
+        "DELETE FROM \"public\".\"w_child\" WHERE id IN (7817, 7819, 9129, 9195, 9197)",
+        "UPDATE \"public\".\"w_parent\" SET n_children = n_children - 5 WHERE id = 7813",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 107,
+      "seq": 1074,
+      "shape": "nkt",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_nkt\" SET n = n + 1 WHERE ctid = (SELECT ctid FROM \"public\".\"w_nkt\" WHERE w = 1 AND tag = 5204 LIMIT 1)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 107,
+      "seq": 1074,
+      "shape": "transfer",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_xfer_1\" SET balance = balance + (-32) WHERE id = 2",
+        "UPDATE \"public\".\"w_xfer_1\" SET balance = balance + (32) WHERE id = 6",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 107,
+      "seq": 1075,
+      "shape": "dk",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_dk\" (id, w, v) VALUES (9203, 0, 'v9205')",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 107,
+      "seq": 1075,
+      "shape": "transfer",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_xfer_0\" SET balance = balance + (-57) WHERE id = 0",
+        "UPDATE \"public\".\"w_xfer_0\" SET balance = balance + (33) WHERE id = 2",
+        "UPDATE \"public\".\"w_xfer_0\" SET balance = balance + (21) WHERE id = 7",
+        "UPDATE \"public\".\"w_xfer_1\" SET balance = balance + (3) WHERE id = 3",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 107,
+      "seq": 1076,
+      "shape": "single",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_k0\" SET \"e\" = false, \"b\" = 'ry-jx-''Apbakvsihm\u2713ubbrm' WHERE id = 9189",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 107,
+      "seq": 1077,
+      "shape": "pk_update",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_k0\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (9207, -49705, 'ni-oiuqiCc\u00e9o \u2713ec\u2713 C', -9882758.66, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 851006569992393 * INTERVAL '1 microsecond'), false)",
+        "INSERT INTO \"public\".\"w_k0\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (9209, -17151, 'ebbo', -1168207.28, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 791545356827741 * INTERVAL '1 microsecond'), NULL)",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 107,
+      "seq": 1078,
+      "shape": "ledger",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_debit\" SET amount = amount + 167 WHERE id = 7673",
+        "UPDATE \"public\".\"w_credit\" SET amount = amount + 167 WHERE id = 7675",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 107,
+      "seq": 1079,
+      "shape": "ledger",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_debit\" SET amount = amount + 203 WHERE id = 7745",
+        "UPDATE \"public\".\"w_credit\" SET amount = amount + 203 WHERE id = 7747",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    },
+    {
+      "end": "commit",
+      "round": 107,
+      "seq": 1076,
+      "shape": "savepoint",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_toast\" (id, n, big) VALUES (8070, 0, (SELECT string_agg(md5('103/8070' || g::text), '') FROM generate_series(1, 625) AS g))",
+        "INSERT INTO \"public\".\"w_k1\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (8072, 21232, '\u2713eb vyvAxhqc \u00e9\u2713vfpBui', -8757759.20, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 145955840234336 * INTERVAL '1 microsecond'), NULL)",
+        "SAVEPOINT s1",
+        "DELETE FROM \"public\".\"w_k0\" WHERE id = 8050",
+        "UPDATE \"public\".\"w_k0\" SET \"e\" = false, \"a\" = -55703, \"b\" = 'h CAsttdjviznwBu kjzC\u00e9y-' WHERE id = 8060",
+        "UPDATE \"public\".\"w_toast\" SET n = n + 1 WHERE id = 8070",
+        "ROLLBACK TO SAVEPOINT s1",
+        "INSERT INTO \"public\".\"w_k1\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (8074, 17508, 't''c-uxh\u2713k__BgB\u2713ulv ksxx', -5873543.81, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 657163090281738 * INTERVAL '1 microsecond'), true)",
+        "DELETE FROM \"public\".\"w_k0\" WHERE id = 8050",
+        "UPDATE \"public\".\"w_k0\" SET \"a\" = 95740 WHERE id = 8060",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    },
+    {
+      "end": "commit",
+      "round": 107,
+      "seq": 1080,
+      "shape": "savepoint",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO \"public\".\"w_nk\" (w, a, b) VALUES (0, 2, ''), (0, 2, '')",
+        "INSERT INTO \"public\".\"w_k0\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (9211, NULL, 'tlv_w\u00e9\u2713bw\u2713b\u00e9\u2713domohja-\u00e9tz', 2459490.61, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 429750232107617 * INTERVAL '1 microsecond'), NULL)",
+        "SAVEPOINT s1",
+        "INSERT INTO \"public\".\"w_k0\" (\"id\", \"a\", \"b\", \"c\", \"d\", \"e\") VALUES (9213, NULL, NULL, 1632210.55, (TIMESTAMPTZ '2000-01-01 00:00:00+00' + 7938943165398 * INTERVAL '1 microsecond'), false)",
+        "ROLLBACK TO SAVEPOINT s1",
+        "UPDATE \"public\".\"w_nk\" SET a = 3 WHERE ctid = (SELECT ctid FROM \"public\".\"w_nk\" WHERE w = 0 AND a IS NOT DISTINCT FROM 2 AND b IS NOT DISTINCT FROM 'x' LIMIT 1)",
+        "UPDATE \"public\".\"w_toast\" SET n = n + 1 WHERE id = 9159",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 0
+    }
+  ],
+  "faults": [
+    {
+      "duration": 2.115,
+      "kind": "kill_point_later",
+      "params": {
+        "delay_ms": 0,
+        "hit": "seed:259642711663809:3",
+        "point": "toyrep.commit_sent"
+      }
+    }
+  ],
+  "fuzzer": "fault",
+  "options": {},
+  "outcome": "diverged",
+  "seed": 103,
+  "source_mode": "replica",
+  "system": "toy:ack_early"
+}

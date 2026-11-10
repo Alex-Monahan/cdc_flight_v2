@@ -1,0 +1,191 @@
+{
+ "actions": [
+  {
+   "action": "pause",
+   "round": 0,
+   "run": "r1",
+   "seconds": 2.96,
+   "t": 1.343
+  },
+  {
+   "action": "kill",
+   "round": 0,
+   "run": "r1",
+   "t": 2.173
+  },
+  {
+   "action": "start",
+   "round": 0,
+   "runs": [
+    "r4"
+   ],
+   "t": 3.058
+  },
+  {
+   "action": "fault",
+   "fault": "spill_full",
+   "round": 0,
+   "t": 3.656
+  },
+  {
+   "action": "fault",
+   "fault": "dest_delay",
+   "round": 0,
+   "t": 4.884
+  },
+  {
+   "action": "start",
+   "round": 1,
+   "runs": [
+    "r13"
+   ],
+   "t": 11.33
+  },
+  {
+   "action": "cancel",
+   "round": 1,
+   "run": "r4",
+   "t": 12.196
+  },
+  {
+   "action": "kill",
+   "round": 1,
+   "skipped": "no run alive",
+   "t": 13.456
+  },
+  {
+   "action": "pause",
+   "round": 1,
+   "skipped": "no run alive",
+   "t": 14.253
+  },
+  {
+   "action": "start",
+   "round": 1,
+   "runs": [
+    "r17"
+   ],
+   "t": 14.492
+  },
+  {
+   "action": "pause",
+   "round": 2,
+   "run": "r17",
+   "seconds": 2.91,
+   "t": 20.294
+  },
+  {
+   "action": "pause",
+   "round": 2,
+   "run": "r17",
+   "seconds": 3.27,
+   "t": 21.412
+  },
+  {
+   "action": "kill",
+   "round": 2,
+   "run": "r17",
+   "t": 21.502
+  }
+ ],
+ "campaign": "20261110T120858-07f4",
+ "clean": false,
+ "commit": "ffdd6f4d03642758ebcff34819b9decba821113e",
+ "config": {
+  "catch_up_s": 60.0,
+  "newcomer_exit_s": 10.0,
+  "round_s": 6.0,
+  "rounds": 4,
+  "tick_s": 1.0
+ },
+ "counts": {
+  "actions": 13,
+  "rounds": 2,
+  "runs_started": 24,
+  "transactions": 1320,
+  "workload_rounds": 66
+ },
+ "duration_s": 22.907,
+ "failure_id": "leadership-toy-correct-replica-s1-ffdd6f4",
+ "faults": {
+  "dest_delay": 1,
+  "spill_full": 1
+ },
+ "first_failure_s": 21.567,
+ "fuzzer": "leadership",
+ "no_effect": {},
+ "observers": [
+  {
+   "check": "transfers",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "expected": 24000,
+    "sum": 24000
+   },
+   "longest_gap_s": 0.963,
+   "observations": 876,
+   "seconds": 21.009,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "parent_child",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "orphan_parent_ids": 0,
+    "parents": 6,
+    "parents_with_wrong_count": 0,
+    "sample_orphans": [],
+    "sample_parent_id_count_children": []
+   },
+   "longest_gap_s": 0.963,
+   "observations": 871,
+   "seconds": 21.01,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "debit_credit",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "credit_rows": 75,
+    "credits": 239085,
+    "debit_rows": 50,
+    "debits": 239085
+   },
+   "longest_gap_s": 0.962,
+   "observations": 876,
+   "seconds": 21.01,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "large_marked",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "batches": 4,
+    "batches_partial_or_unmarked": 0,
+    "sample_batch_rows_marked": []
+   },
+   "longest_gap_s": 0.961,
+   "observations": 876,
+   "seconds": 21.01,
+   "unavailable": 0,
+   "violations": 0
+  }
+ ],
+ "options": {},
+ "outcome": "error",
+ "reason": "PermissionError: [Errno 1] Operation not permitted |  line 254, in _round /     run.proc.stop_group() /     ~~~~~~~~~~~~~~~~~~~^^ /   File \"<repo>/src/cdc_v2/testing/procs.py\", line 178, in stop_group /     return self.signal_group(signal.SIGSTOP) /            ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^ /   File \"<repo>/src/cdc_v2/testing/procs.py\", line 161, in signal_group /     os.killpg(self.pgid, sig) /     ~~~~~~~~~^^^^^^^^^^^^^^^^ / PermissionError: [Errno 1] Operation not permitted / ",
+ "seed": 1,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T12:08:58Z",
+ "system": "toy-correct",
+ "system_spec": "toy:correct",
+ "tier": "local"
+}

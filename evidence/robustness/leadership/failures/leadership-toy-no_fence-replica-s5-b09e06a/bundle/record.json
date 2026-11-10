@@ -1,0 +1,173 @@
+{
+ "actions": [
+  {
+   "action": "fault",
+   "fault": "net_reset",
+   "round": 0,
+   "t": 1.015
+  },
+  {
+   "action": "fault",
+   "fault": "src_terminate",
+   "round": 0,
+   "t": 1.93
+  },
+  {
+   "action": "start",
+   "round": 0,
+   "runs": [
+    "r4",
+    "r5",
+    "r6"
+   ],
+   "t": 3.082
+  },
+  {
+   "action": "cancel",
+   "round": 0,
+   "run": "r6",
+   "t": 3.284
+  },
+  {
+   "action": "pause",
+   "round": 0,
+   "run": "r1",
+   "seconds": 0.87,
+   "t": 5.374
+  },
+  {
+   "action": "handover",
+   "round": 1,
+   "runs": [
+    "r17"
+   ],
+   "t": 13.863
+  },
+  {
+   "action": "cancel",
+   "round": 1,
+   "run": "r1",
+   "t": 13.9
+  },
+  {
+   "action": "cancel",
+   "round": 1,
+   "run": "r17",
+   "t": 14.494
+  },
+  {
+   "action": "fault",
+   "fault": "dest_delay",
+   "round": 1,
+   "t": 15.293
+  },
+  {
+   "action": "fault",
+   "fault": "net_reset",
+   "round": 1,
+   "t": 16.071
+  }
+ ],
+ "campaign": "20261110T141548-5a03",
+ "clean": true,
+ "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+ "config": {
+  "catch_up_s": 60.0,
+  "newcomer_exit_s": 10.0,
+  "round_s": 6.0,
+  "rounds": 4,
+  "tick_s": 1.0
+ },
+ "counts": {
+  "actions": 10,
+  "rounds": 1,
+  "runs_started": 21,
+  "transactions": 760,
+  "workload_rounds": 38
+ },
+ "duration_s": 17.448,
+ "failure_id": "leadership-toy-no_fence-replica-s5-b09e06a",
+ "faults": {
+  "net_reset": 1
+ },
+ "first_failure_s": 16.154,
+ "fuzzer": "leadership",
+ "no_effect": {
+  "net_reset": 1,
+  "src_terminate": 1
+ },
+ "observers": [
+  {
+   "check": "transfers",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "expected": 24000,
+    "sum": 24000
+   },
+   "longest_gap_s": 1.43,
+   "observations": 541,
+   "seconds": 15.294,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "parent_child",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "orphan_parent_ids": 0,
+    "parents": 1,
+    "parents_with_wrong_count": 0,
+    "sample_orphans": [],
+    "sample_parent_id_count_children": []
+   },
+   "longest_gap_s": 1.431,
+   "observations": 532,
+   "seconds": 15.299,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "debit_credit",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "credit_rows": 18,
+    "credits": 57518,
+    "debit_rows": 13,
+    "debits": 57518
+   },
+   "longest_gap_s": 1.43,
+   "observations": 544,
+   "seconds": 15.3,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "large_marked",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "batches": 2,
+    "batches_partial_or_unmarked": 0,
+    "sample_batch_rows_marked": []
+   },
+   "longest_gap_s": 1.43,
+   "observations": 540,
+   "seconds": 15.3,
+   "unavailable": 0,
+   "violations": 0
+  }
+ ],
+ "options": {},
+ "outcome": "error",
+ "reason": "FileNotFoundError: [Errno 2] No such file or directory: '~/.cache/cdc_flight_v2/fuzz/locks/pg-f1.tmp' -> '~/.cache/cdc_flight_v2/fuzz/locks/pg-f1.json' | e \"<repo>/tests/fuzz/toy/system.py\", line 127, in start_run /     p = self.system.start(\"r%d\" % n, env or {}, extra_args=args) /   File \"<repo>/tests/fuzz/toy/system.py\", line 248, in start /     self.lease.note_proc(p.pid) /     ~~~~~~~~~~~~~~~~~~~~^^^^^^^ / FileNotFoundError: [Errno 2] No such file or directory: '~/.cache/cdc_flight_v2/fuzz/locks/pg-f1.tmp' -> '~/.cache/cdc_flight_v2/fuzz/locks/pg-f1.json' / ",
+ "seed": 5,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T14:17:23Z",
+ "system": "toy-no_fence",
+ "system_spec": "toy:no_fence",
+ "tier": "local"
+}

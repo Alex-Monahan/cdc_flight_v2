@@ -306,7 +306,12 @@ class PrivateCluster(Cluster):
     def _cleanup(self, home: Path) -> None:
         try:
             if home.exists():
-                localpg("down", home=home, port_base=self.lease.base, check=False)
+                p = localpg("down", home=home, port_base=self.lease.base, check=False)
+                if p.returncode != 0:
+                    # down refused (for example a process still attached to a segment): keep the directory, so that
+                    # the pid files still lead to the segments, and say so
+                    raise HarnessError("localpg down failed (%d), the home is kept: %s"
+                                       % (p.returncode, (p.stderr or p.stdout).strip()[-500:]))
                 if (home / ".localpg-home").exists():
                     shutil.rmtree(home)
         finally:

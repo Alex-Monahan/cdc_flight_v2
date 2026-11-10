@@ -1,0 +1,131 @@
+{
+ "actions": [
+  {
+   "action": "drill",
+   "hit": 2,
+   "inside_transaction": true,
+   "interrupt_earlier_epochs": "not applicable: a file destination has no server connections to interrupt",
+   "point": "toyrep.fenced",
+   "run": "r2",
+   "t": 0.873,
+   "taken_over_while_held_by": null
+  },
+  {
+   "action": "drill",
+   "hit": 3,
+   "inside_transaction": true,
+   "interrupt_earlier_epochs": "not applicable: a file destination has no server connections to interrupt",
+   "point": "toyrep.commit_sent",
+   "run": "r10",
+   "t": 12.471,
+   "taken_over_while_held_by": null
+  },
+  {
+   "action": "drill",
+   "hit": 2,
+   "inside_transaction": false,
+   "interrupt_earlier_epochs": "not applicable: a file destination has no server connections to interrupt",
+   "point": "toyrep.slot_advanced",
+   "run": "r18",
+   "t": 24.719,
+   "taken_over_while_held_by": "r20"
+  }
+ ],
+ "campaign": "20261110T184717-a6f1",
+ "clean": true,
+ "commit": "4af40069e63bf7fa81f84110703429cfa468c0e3",
+ "config": {
+  "catch_up_s": 60.0,
+  "newcomer_exit_s": 10.0,
+  "round_s": 6.0,
+  "rounds": 1,
+  "tick_s": 1.0
+ },
+ "counts": {
+  "actions": 3,
+  "rounds": 0,
+  "runs_started": 23,
+  "transactions": 2860,
+  "workload_rounds": 143
+ },
+ "duration_s": 35.906,
+ "failure_id": "leadership-toy-no_fence-replica-s102-4af4006",
+ "faults": {},
+ "first_failure_s": 34.533,
+ "fuzzer": "leadership",
+ "no_effect": {},
+ "observers": [
+  {
+   "check": "transfers",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "expected": 24000,
+    "sum": 24000
+   },
+   "longest_gap_s": 4.906,
+   "observations": 1033,
+   "seconds": 33.745,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "parent_child",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "orphan_parent_ids": 0,
+    "parents": 7,
+    "parents_with_wrong_count": 0,
+    "sample_orphans": [],
+    "sample_parent_id_count_children": []
+   },
+   "longest_gap_s": 4.906,
+   "observations": 1033,
+   "seconds": 33.754,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "debit_credit",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "credit_rows": 29,
+    "credits": 80326,
+    "debit_rows": 18,
+    "debits": 80326
+   },
+   "longest_gap_s": 4.906,
+   "observations": 1035,
+   "seconds": 33.754,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "large_marked",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "batches": 4,
+    "batches_partial_or_unmarked": 0,
+    "sample_batch_rows_marked": []
+   },
+   "longest_gap_s": 4.906,
+   "observations": 1034,
+   "seconds": 33.754,
+   "unavailable": 0,
+   "violations": 0
+  }
+ ],
+ "options": {},
+ "outcome": "violation",
+ "reason": "drill toyrep.slot_advanced: writer log: [{'two_writers': True, 'order': 799, 'epoch': 4, 'after_epoch': 5, 'run': 'run18-6f8bc5'}, {'two_writers': True, 'order': 800, 'epoch': 4, 'after_epoch': 5, 'run': 'run18-6f8bc5'}, {'two_writers': True, 'order': 801, 'epoch': 4, 'after_epoch': 5, 'run': 'run18-6f8bc5'}]",
+ "seed": 102,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T18:47:17Z",
+ "system": "toy-no_fence",
+ "system_spec": "toy:no_fence",
+ "tier": "local"
+}

@@ -1,0 +1,7 @@
+{"epoch": 1, "kind": "took_over", "pid": 17464, "previous_age_ms": 847627690414, "previous_state": "released", "run": "i1-17464", "t": 1794312490.417048, "tag": "i1"}
+{"epoch": 1, "kind": "started", "pid": 17464, "run": "i1-17464", "t": 1794312490.419063, "tag": "i1", "variant": "reorder"}
+{"kind": "resync_start", "pid": 17464, "run": "i1-17464", "t": 1794312490.441828, "tag": "i1", "why": "pending"}
+{"kind": "resync_done", "pid": 17464, "position": "0/6F8D948", "rows": 24, "run": "i1-17464", "t": 1794312490.607684, "tag": "i1"}
+{"detail": "write-write conflict on public.w_xfer_0", "error": "ToyConflict", "kind": "retry", "pid": 17464, "run": "i1-17464", "t": 1794312490.732188, "tag": "i1"}
+{"detail": "keyless public.w_nk found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 17464, "run": "i1-17464", "t": 1794312491.016807, "tag": "i1"}
+{"detail": "keyless public.w_nk found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 17464, "run": "i1-17464", "t": 1794312491.12437, "tag": "i1"}

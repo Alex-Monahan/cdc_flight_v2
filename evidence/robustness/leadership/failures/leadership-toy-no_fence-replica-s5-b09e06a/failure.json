@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+  "first_failure_s": 16.154,
+  "fixed_commit": null,
+  "fuzzer": "leadership",
+  "id": "leadership-toy-no_fence-replica-s5-b09e06a",
+  "local_bundle": {
+    "campaign": "20261110T141548-5a03",
+    "dir": "bundle-leadership-toy-no_fence-replica-s5-b09e06a"
+  },
+  "outcome": "error",
+  "reason": "FileNotFoundError: [Errno 2] No such file or directory: '~/.cache/cdc_flight_v2/fuzz/locks/pg-f1.tmp' -> '~/.cache/cdc_flight_v2/fuzz/locks/pg-f1.json' | e \"<repo>/tests/fuzz/toy/system.py\", line 127, in start_run /     p = self.system.start(\"r%d\" % n, env or {}, extra_args=args) /   File \"<repo>/tests/fuzz/toy/system.py\", line 248, in start /     self.lease.note_proc(p.pid) /     ~~~~~~~~~~~~~~~~~~~~^^^^^^^ / FileNotFoundError: [Errno 2] No such file or directory: '~/.cache/cdc_flight_v2/fuzz/locks/pg-f1.tmp' -> '~/.cache/cdc_flight_v2/fuzz/locks/pg-f1.json' / ",
+  "regression_test": null,
+  "seed": 5,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-no_fence",
+  "system_spec": "toy:no_fence"
+}

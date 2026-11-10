@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "4af40069e63bf7fa81f84110703429cfa468c0e3",
+  "first_failure_s": 11.888,
+  "fixed_commit": null,
+  "fuzzer": "leadership",
+  "id": "leadership-toy-no_fence-replica-s114-4af4006",
+  "local_bundle": {
+    "campaign": "20261110T184717-a6f1",
+    "dir": "bundle-leadership-toy-no_fence-replica-s114-4af4006"
+  },
+  "outcome": "error",
+  "reason": "PermissionError: [Errno 1] Operation not permitted | ip.py\", line 251, in _drill /     r.proc.kill_tree() /     ~~~~~~~~~~~~~~~~^^ /   File \"<repo>/src/cdc_v2/testing/procs.py\", line 198, in kill_tree /     self.signal_group(signal.SIGKILL, table) /     ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^ /   File \"<repo>/src/cdc_v2/testing/procs.py\", line 161, in signal_group /     os.killpg(self.pgid, sig) /     ~~~~~~~~~^^^^^^^^^^^^^^^^ / PermissionError: [Errno 1] Operation not permitted / ",
+  "regression_test": null,
+  "seed": 114,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-no_fence",
+  "system_spec": "toy:no_fence"
+}

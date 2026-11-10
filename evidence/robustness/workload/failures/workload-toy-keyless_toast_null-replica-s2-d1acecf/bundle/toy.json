@@ -1,0 +1,50 @@
+{
+ "batch_changes": 400,
+ "client_timeout_s": 8,
+ "conflict_rate": 0.1,
+ "dest_lock_s": 30,
+ "dest_path": "<run>/dest.duckdb",
+ "events": "<run>/events.jsonl",
+ "guard": "wait",
+ "hb_interval_s": 0.5,
+ "max_runtime_s": 0,
+ "nudge": {
+  "host": "localhost",
+  "port": 55700
+ },
+ "poll_s": 0.05,
+ "seed": 2,
+ "slot": "cdc_v2_toy_slot",
+ "source": {
+  "dbname": "cdc_v2_t_f0d36063ae",
+  "host": "localhost",
+  "passfile": "~/.cache/cdc_flight_v2/pg-f0/secrets/pgpass",
+  "port": 55705,
+  "sslrootcert": "~/.cache/cdc_flight_v2/pg-f0/tls/ca.crt",
+  "user": "cdc_v2_runtime"
+ },
+ "spill_dir": "<run>/spill",
+ "spill_quota": 8388608,
+ "split_gap_s": 0.02,
+ "stale_s": 2.0,
+ "statement_timeout_s": 10,
+ "stream_fault_rate": 0.0,
+ "tables": [
+  "public.w_k0",
+  "public.w_k1",
+  "public.w_nk",
+  "public.w_toast",
+  "public.w_xfer_0",
+  "public.w_xfer_1",
+  "public.w_xfer_2",
+  "public.w_parent",
+  "public.w_child",
+  "public.w_debit",
+  "public.w_credit",
+  "public.w_bulk",
+  "public.w_bulk_mark",
+  "public.w_nkt",
+  "public.w_dk"
+ ],
+ "variant": "keyless_toast_null"
+}

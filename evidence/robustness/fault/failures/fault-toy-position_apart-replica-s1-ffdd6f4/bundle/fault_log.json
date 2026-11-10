@@ -1,0 +1,106 @@
+[
+ {
+  "effect": true,
+  "error": null,
+  "kind": "kill_point",
+  "params": {
+   "hang_s": 1.2333898142318427,
+   "hit": "seed:279389605584609:3",
+   "point": "toyrep.begun"
+  },
+  "proof": {
+   "exit": {
+    "code": null,
+    "signal": 9,
+    "signal_name": "SIGKILL"
+   },
+   "fired": "toyrep.begun",
+   "hit": 1,
+   "instance": "i2"
+  },
+  "t_heal": 2.591,
+  "t_inject": 0.632
+ },
+ {
+  "effect": true,
+  "error": null,
+  "kind": "kill_point_later",
+  "params": {
+   "delay_ms": 0,
+   "hit": "seed:135827908034516:3",
+   "point": "toyrep.commit_sent"
+  },
+  "proof": {
+   "exit": {
+    "code": null,
+    "signal": 9,
+    "signal_name": "SIGKILL"
+   },
+   "fired": "toyrep.commit_sent",
+   "hit": 1,
+   "instance": "i4"
+  },
+  "t_heal": 5.513,
+  "t_inject": 3.36
+ },
+ {
+  "effect": true,
+  "error": null,
+  "kind": "kill_point_later",
+  "params": {
+   "delay_ms": 5,
+   "hit": "seed:14405568741410:3",
+   "point": "toyrep.commit_sent"
+  },
+  "proof": {
+   "exit": {
+    "code": null,
+    "signal": 9,
+    "signal_name": "SIGKILL"
+   },
+   "fired": "toyrep.commit_sent",
+   "hit": 2,
+   "instance": "i6"
+  },
+  "t_heal": 6.381,
+  "t_inject": 3.659
+ },
+ {
+  "effect": true,
+  "error": null,
+  "kind": "kill_point",
+  "params": {
+   "hang_s": 2.052236076896043,
+   "hit": "seed:77335544349711:3",
+   "point": "toyrep.commit_sent"
+  },
+  "proof": {
+   "exit": {
+    "code": null,
+    "signal": 9,
+    "signal_name": "SIGKILL"
+   },
+   "fired": "toyrep.commit_sent",
+   "hit": 1,
+   "instance": "i8"
+  },
+  "t_heal": 5.484,
+  "t_inject": 3.365
+ },
+ {
+  "effect": false,
+  "error": null,
+  "kind": "kill_point",
+  "params": {
+   "hang_s": 1.6353827410158233,
+   "hit": "seed:5328606798344:3",
+   "point": "toyrep.slot_advanced"
+  },
+  "proof": {
+   "instance": "i9",
+   "reached": false
+  },
+  "t_heal": 16.07,
+  "t_inject": 3.458
+ }
+]

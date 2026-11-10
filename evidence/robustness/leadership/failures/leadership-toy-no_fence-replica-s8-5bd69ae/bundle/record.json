@@ -1,0 +1,180 @@
+{
+ "actions": [
+  {
+   "action": "handover",
+   "round": 0,
+   "runs": [
+    "r2"
+   ],
+   "t": 1.16
+  },
+  {
+   "action": "start",
+   "round": 0,
+   "runs": [
+    "r5",
+    "r6"
+   ],
+   "t": 2.653
+  },
+  {
+   "action": "start",
+   "round": 0,
+   "runs": [
+    "r7"
+   ],
+   "t": 3.394
+  },
+  {
+   "action": "start",
+   "round": 0,
+   "runs": [
+    "r10"
+   ],
+   "t": 5.485
+  },
+  {
+   "action": "handover",
+   "round": 1,
+   "runs": [
+    "r15"
+   ],
+   "t": 9.148
+  },
+  {
+   "action": "kill",
+   "round": 1,
+   "run": "r1",
+   "t": 10.215
+  },
+  {
+   "action": "pause",
+   "round": 1,
+   "run": "r18",
+   "seconds": 4.75,
+   "t": 12.022
+  },
+  {
+   "action": "start",
+   "round": 1,
+   "runs": [
+    "r19",
+    "r20"
+   ],
+   "t": 12.333
+  },
+  {
+   "action": "start",
+   "round": 1,
+   "runs": [
+    "r21"
+   ],
+   "t": 12.47
+  },
+  {
+   "action": "fault",
+   "fault": "spill_full",
+   "round": 1,
+   "t": 13.085
+  }
+ ],
+ "campaign": "20261110T142928-0afb",
+ "clean": true,
+ "commit": "5bd69ae9a5eb143c7a566369e4d20b47160c67f5",
+ "config": {
+  "catch_up_s": 60.0,
+  "newcomer_exit_s": 10.0,
+  "round_s": 6.0,
+  "rounds": 4,
+  "tick_s": 1.0
+ },
+ "counts": {
+  "actions": 10,
+  "rounds": 1,
+  "runs_started": 30,
+  "transactions": 1180,
+  "workload_rounds": 59
+ },
+ "duration_s": 23.052,
+ "failure_id": "leadership-toy-no_fence-replica-s8-5bd69ae",
+ "faults": {
+  "spill_full": 1
+ },
+ "first_failure_s": 21.941,
+ "fuzzer": "leadership",
+ "no_effect": {},
+ "observers": [
+  {
+   "check": "transfers",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "expected": 24000,
+    "sum": 24000
+   },
+   "longest_gap_s": 0.637,
+   "observations": 714,
+   "seconds": 21.168,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "parent_child",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "orphan_parent_ids": 0,
+    "parents": 6,
+    "parents_with_wrong_count": 0,
+    "sample_orphans": [],
+    "sample_parent_id_count_children": []
+   },
+   "longest_gap_s": 0.637,
+   "observations": 711,
+   "seconds": 21.177,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "debit_credit",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "credit_rows": 48,
+    "credits": 159810,
+    "debit_rows": 32,
+    "debits": 159810
+   },
+   "longest_gap_s": 0.637,
+   "observations": 714,
+   "seconds": 21.176,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "large_marked",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "batches": 6,
+    "batches_partial_or_unmarked": 0,
+    "sample_batch_rows_marked": []
+   },
+   "longest_gap_s": 0.638,
+   "observations": 713,
+   "seconds": 21.176,
+   "unavailable": 0,
+   "violations": 0
+  }
+ ],
+ "options": {},
+ "outcome": "violation",
+ "reason": "round 1: writer log: [{'two_writers': True, 'order': 863, 'epoch': 2, 'after_epoch': 3, 'run': 'run18-040b86'}, {'two_writers': True, 'order': 864, 'epoch': 2, 'after_epoch': 3, 'run': 'run18-040b86'}, {'two_writers': True, 'order': 865, 'epoch': 2, 'after_epoch': 3, 'run': 'run18-040b86'}]",
+ "seed": 8,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T14:30:58Z",
+ "system": "toy-no_fence",
+ "system_spec": "toy:no_fence",
+ "tier": "local"
+}

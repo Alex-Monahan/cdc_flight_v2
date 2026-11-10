@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "ffdd6f4d03642758ebcff34819b9decba821113e",
+  "first_failure_s": 12.143,
+  "fixed_commit": null,
+  "fuzzer": "fault",
+  "id": "fault-toy-skip_on_reconnect-replica-s1-ffdd6f4",
+  "local_bundle": {
+    "campaign": "20261110T120921-24d2",
+    "dir": "bundle-fault-toy-skip_on_reconnect-replica-s1-ffdd6f4"
+  },
+  "outcome": "diverged",
+  "reason": "oracle: public.w_bulk missing 600 extra 300 different 0; public.w_bulk_mark missing 2 extra 1 different 0; public.w_child missing 11 extra 10 different 0; public.w_credit missing 37 extra 7 different 4; public.w_debit missing 24 extra 5 different 4; public.w_k0 missing 633 extra 27 different 18",
+  "regression_test": null,
+  "seed": 1,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-skip_on_reconnect",
+  "system_spec": "toy:skip_on_reconnect"
+}

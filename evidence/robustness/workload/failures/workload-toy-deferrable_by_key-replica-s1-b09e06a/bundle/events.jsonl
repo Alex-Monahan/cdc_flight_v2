@@ -1,0 +1,8 @@
+{"epoch": 1, "kind": "took_over", "pid": 37070, "previous_age_ms": 847635774687, "previous_state": "released", "run": "i1-37070", "t": 1794320574.689682, "tag": "i1"}
+{"epoch": 1, "kind": "started", "pid": 37070, "run": "i1-37070", "t": 1794320574.69209, "tag": "i1", "variant": "deferrable_by_key"}
+{"kind": "resync_start", "pid": 37070, "run": "i1-37070", "t": 1794320574.726301, "tag": "i1", "why": "pending"}
+{"kind": "resync_done", "pid": 37070, "position": "0/35DE9AC0", "rows": 24, "run": "i1-37070", "t": 1794320574.978973, "tag": "i1"}
+{"detail": "write-write conflict on public.w_nkt", "error": "ToyConflict", "kind": "retry", "pid": 37070, "run": "i1-37070", "t": 1794320576.558408, "tag": "i1"}
+{"detail": "write-write conflict on public.w_k0", "error": "ToyConflict", "kind": "retry", "pid": 37070, "run": "i1-37070", "t": 1794320578.508158, "tag": "i1"}
+{"detail": "write-write conflict on public.w_k1", "error": "ToyConflict", "kind": "retry", "pid": 37070, "run": "i1-37070", "t": 1794320581.143405, "tag": "i1"}
+{"detail": "write-write conflict on public.w_nk", "error": "ToyConflict", "kind": "retry", "pid": 37070, "run": "i1-37070", "t": 1794320582.7936, "tag": "i1"}

@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+  "first_failure_s": 15.458,
+  "fixed_commit": null,
+  "fuzzer": "fault",
+  "id": "fault-toy-position_apart-replica-s2-b09e06a",
+  "local_bundle": {
+    "campaign": "20261110T141058-3644",
+    "dir": "bundle-fault-toy-position_apart-replica-s2-b09e06a"
+  },
+  "outcome": "diverged",
+  "reason": "the system reports that the destination diverged from the source (3 times ApplyInvariantError, last: keyless public.w_dk found 0 rows to remove), stopped short of 0/24C580F8",
+  "regression_test": null,
+  "seed": 2,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-position_apart",
+  "system_spec": "toy:position_apart"
+}

@@ -1,0 +1,210 @@
+{
+ "campaign": "20261110T185732-b400",
+ "checkpoints": [
+  {
+   "catch_up_s": 1.782,
+   "compare_s": 0.029,
+   "equal": true,
+   "final": false,
+   "q": "0/4C6954B8",
+   "t": 10.948
+  },
+  {
+   "catch_up_s": 6.814,
+   "compare_s": 0.034,
+   "equal": true,
+   "final": false,
+   "q": "0/4CACE040",
+   "t": 22.853
+  },
+  {
+   "catch_up_s": 11.914,
+   "compare_s": 0.05,
+   "equal": false,
+   "final": false,
+   "q": "0/4D08E1C8",
+   "t": 43.845
+  }
+ ],
+ "clean": true,
+ "commit": "d1acecfb2f0696a8a4a6701242d459d4c75e301a",
+ "config": {
+  "budget_s": 60.0,
+  "catch_up_s": 90.0,
+  "episode_s": 10.0,
+  "fuzzer": "fault",
+  "ignore_self_report": true,
+  "keep_workdir": false,
+  "observer_interval_s": 0.005,
+  "observers": false,
+  "pace_s": 0.25,
+  "schedule": {
+   "not_attacked": [
+    "dest_delay",
+    "dest_error",
+    "dest_hang",
+    "freeze",
+    "hang_point",
+    "net_blackhole",
+    "net_drop",
+    "net_latency",
+    "net_reset",
+    "replica_promote",
+    "replica_restart",
+    "slot_drop",
+    "slot_invalidate",
+    "spill_full",
+    "src_cancel",
+    "src_lock",
+    "src_long_txn",
+    "src_restart_primary",
+    "src_terminate",
+    "src_wal_switch"
+   ],
+   "per_episode": [
+    1,
+    3
+   ],
+   "weights": {
+    "kill_group": 6,
+    "kill_point": 10,
+    "kill_point_later": 4
+   }
+  },
+  "start_timeout_s": 120.0
+ },
+ "counts": {
+  "checkpoints": 3,
+  "final_rows": 3375,
+  "observations": 0,
+  "rolled_back": 163,
+  "rounds": 121,
+  "transactions": 2420
+ },
+ "duration_s": 56.897,
+ "failure_id": "fault-toy-position_apart-replica-s13-d1acecf",
+ "faults": {
+  "kill_group": 1,
+  "kill_point": 2,
+  "kill_point_later": 1
+ },
+ "faults_without_effect": [
+  {
+   "error": null,
+   "kind": "kill_point",
+   "params": {
+    "hang_s": 2.0058622773547716,
+    "hit": "seed:202591628833680:3",
+    "point": "toyrep.fenced"
+   },
+   "proof": {
+    "exit": {
+     "code": null,
+     "signal": 9,
+     "signal_name": "SIGKILL"
+    },
+    "fired": null,
+    "hit": null,
+    "instance": "i2"
+   }
+  },
+  {
+   "error": null,
+   "kind": "kill_point",
+   "params": {
+    "hang_s": 2.5424710661948504,
+    "hit": "seed:241967854148248:3",
+    "point": "toyrep.committed"
+   },
+   "proof": {
+    "exit": {
+     "code": null,
+     "signal": 9,
+     "signal_name": "SIGKILL"
+    },
+    "fired": null,
+    "hit": null,
+    "instance": "i4"
+   }
+  },
+  {
+   "error": null,
+   "kind": "kill_point",
+   "params": {
+    "hang_s": 2.486803399255521,
+    "hit": "seed:215450134970450:3",
+    "point": "toyrep.data_committed"
+   },
+   "proof": {
+    "instance": "i10",
+    "reached": false
+   }
+  }
+ ],
+ "first_failure_s": 56.122,
+ "fuzzer": "fault",
+ "instances": {
+  "exits": {
+   "SIGKILL": 10
+  },
+  "started": 11
+ },
+ "no_effect": {
+  "kill_point": 3
+ },
+ "options": {},
+ "oracle": {
+  "equal": false,
+  "tables": [
+   {
+    "destination_rows": 56,
+    "different_rows": 50,
+    "equal": false,
+    "extra_rows": 0,
+    "missing_on_destination": false,
+    "missing_rows": 18,
+    "source": "public.w_dk",
+    "source_rows": 74
+   },
+   {
+    "destination_rows": 56,
+    "different_rows": 0,
+    "equal": false,
+    "extra_rows": 51,
+    "missing_on_destination": false,
+    "missing_rows": 5,
+    "source": "public.w_nk",
+    "source_rows": 10
+   },
+   {
+    "destination_rows": 35,
+    "different_rows": 0,
+    "equal": false,
+    "extra_rows": 25,
+    "missing_on_destination": false,
+    "missing_rows": 41,
+    "source": "public.w_nkt",
+    "source_rows": 51
+   },
+   {
+    "destination_rows": 3,
+    "different_rows": 0,
+    "equal": false,
+    "extra_rows": 3,
+    "missing_on_destination": false,
+    "missing_rows": 0,
+    "source": "public.w_toast",
+    "source_rows": 0
+   }
+  ]
+ },
+ "outcome": "diverged",
+ "reason": "oracle: public.w_dk missing 18 extra 0 different 50; public.w_nk missing 5 extra 51 different 0; public.w_nkt missing 41 extra 25 different 0; public.w_toast missing 0 extra 3 different 0",
+ "seed": 13,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T18:58:36Z",
+ "system": "toy-position_apart",
+ "system_spec": "toy:position_apart",
+ "tier": "local"
+}

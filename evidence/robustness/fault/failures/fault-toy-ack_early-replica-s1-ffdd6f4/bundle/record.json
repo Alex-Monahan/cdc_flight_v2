@@ -1,0 +1,169 @@
+{
+ "campaign": "20261110T120510-36e1",
+ "checkpoints": [
+  {
+   "catch_up_s": 2.006,
+   "final": false,
+   "q": "0/3868D90",
+   "t": 16.737
+  }
+ ],
+ "clean": false,
+ "commit": "ffdd6f4d03642758ebcff34819b9decba821113e",
+ "config": {
+  "budget_s": 60.0,
+  "catch_up_s": 90.0,
+  "episode_s": 10.0,
+  "fuzzer": "fault",
+  "keep_workdir": false,
+  "observer_interval_s": 0.005,
+  "pace_s": 0.25,
+  "schedule": {
+   "not_attacked": [
+    "dest_delay",
+    "dest_error",
+    "dest_hang",
+    "freeze",
+    "hang_point",
+    "net_blackhole",
+    "net_drop",
+    "net_latency",
+    "net_reset",
+    "replica_promote",
+    "replica_restart",
+    "slot_drop",
+    "slot_invalidate",
+    "spill_full",
+    "src_cancel",
+    "src_lock",
+    "src_long_txn",
+    "src_restart_primary",
+    "src_terminate",
+    "src_wal_switch"
+   ],
+   "per_episode": [
+    1,
+    3
+   ],
+   "weights": {
+    "kill_group": 6,
+    "kill_point": 10,
+    "kill_point_later": 4
+   }
+  },
+  "start_timeout_s": 120.0
+ },
+ "counts": {
+  "checkpoints": 1,
+  "final_rows": null,
+  "observations": 4437,
+  "rolled_back": 108,
+  "rounds": 57,
+  "transactions": 1140
+ },
+ "duration_s": 19.432,
+ "failure_id": "fault-toy-ack_early-replica-s1-ffdd6f4",
+ "faults": {
+  "kill_point": 1
+ },
+ "faults_without_effect": [
+  {
+   "error": null,
+   "kind": "kill_point_later",
+   "params": {
+    "delay_ms": 0,
+    "hit": "seed:135827908034516:3",
+    "point": "toyrep.commit_sent"
+   },
+   "proof": {
+    "instance": "i4",
+    "reached": false
+   }
+  }
+ ],
+ "first_failure_s": 18.922,
+ "fuzzer": "fault",
+ "instances": {
+  "exits": {
+   "SIGKILL": 4
+  },
+  "started": 5
+ },
+ "no_effect": {
+  "kill_point_later": 1
+ },
+ "observers": [
+  {
+   "check": "transfers",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "expected": 24000,
+    "sum": 24000
+   },
+   "longest_gap_s": 0.259,
+   "observations": 1110,
+   "seconds": 18.237,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "parent_child",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "orphan_parent_ids": 0,
+    "parents": 2,
+    "parents_with_wrong_count": 0,
+    "sample_orphans": [],
+    "sample_parent_id_count_children": []
+   },
+   "longest_gap_s": 0.141,
+   "observations": 1106,
+   "seconds": 18.238,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "debit_credit",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "credit_rows": 3,
+    "credits": 8681,
+    "debit_rows": 2,
+    "debits": 8681
+   },
+   "longest_gap_s": 0.259,
+   "observations": 1111,
+   "seconds": 18.238,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "large_marked",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "batches": 0,
+    "batches_partial_or_unmarked": 0,
+    "sample_batch_rows_marked": []
+   },
+   "longest_gap_s": 0.259,
+   "observations": 1110,
+   "seconds": 18.237,
+   "unavailable": 0,
+   "violations": 0
+  }
+ ],
+ "options": {},
+ "outcome": "diverged",
+ "reason": "the system reports that the destination diverged from the source (3 times ApplyInvariantError, last: unchanged value of public.w_toast has no earlier row), stopped short of 0/3868D90",
+ "seed": 1,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T12:05:15Z",
+ "system": "toy-ack_early",
+ "system_spec": "toy:ack_early",
+ "tier": "local"
+}

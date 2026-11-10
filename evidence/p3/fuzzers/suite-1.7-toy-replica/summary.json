@@ -1,0 +1,153 @@
+{
+  "all_passed": true,
+  "clean": true,
+  "commit": "b6d45f0ae15661e314152234c1bcbe3a0597398b",
+  "failed_parts": [],
+  "label": "SELF-TEST of the fuzzers on the toy (15-minute soak allowed; never counts for SPEC 1.7)",
+  "parts": {
+    "crash_points": {
+      "all_passed": true,
+      "coverage": "13/13",
+      "missing_points": [],
+      "outcomes": {
+        "pass": 42
+      },
+      "runs": 42
+    },
+    "destination": {
+      "faults": {
+        "dest_delay": 3,
+        "dest_error": 1,
+        "dest_hang": 1
+      },
+      "kinds_without_effect": [],
+      "no_effect": {
+        "dest_delay": 1,
+        "dest_error": 3,
+        "dest_hang": 2
+      },
+      "outcome": "pass",
+      "passed": true,
+      "reason": ""
+    },
+    "network": {
+      "faults": {
+        "net_blackhole": 2,
+        "net_drop": 2,
+        "net_latency": 1,
+        "net_reset": 1
+      },
+      "kinds_without_effect": [],
+      "no_effect": {
+        "net_blackhole": 2,
+        "net_drop": 1,
+        "net_latency": 2,
+        "net_reset": 3
+      },
+      "outcome": "pass",
+      "passed": true,
+      "reason": ""
+    },
+    "slot_loss": {
+      "faults": {
+        "slot_drop": 7,
+        "slot_invalidate": 4
+      },
+      "kinds_without_effect": [],
+      "no_effect": {},
+      "outcome": "pass",
+      "passed": true,
+      "reason": ""
+    },
+    "soak": {
+      "faults_with_effect": 206,
+      "faults_without_effect": 58,
+      "minimum_faults": 200,
+      "minimum_seconds": 900.0,
+      "no_effect": {
+        "dest_delay": 1,
+        "dest_error": 4,
+        "dest_hang": 3,
+        "freeze": 3,
+        "hang_point": 3,
+        "kill_group": 2,
+        "kill_point": 11,
+        "kill_point_later": 1,
+        "net_drop": 4,
+        "net_latency": 5,
+        "net_reset": 1,
+        "replica_restart": 7,
+        "spill_full": 4,
+        "src_cancel": 2,
+        "src_restart_primary": 1,
+        "src_terminate": 6
+      },
+      "not_attacked": [],
+      "outcome": "pass",
+      "passed": true,
+      "per_kind": {
+        "dest_delay": 6,
+        "dest_error": 7,
+        "dest_hang": 6,
+        "freeze": 21,
+        "hang_point": 8,
+        "kill_group": 20,
+        "kill_point": 19,
+        "kill_point_later": 10,
+        "net_blackhole": 7,
+        "net_drop": 7,
+        "net_latency": 9,
+        "net_reset": 12,
+        "replica_promote": 2,
+        "replica_restart": 5,
+        "slot_drop": 12,
+        "slot_invalidate": 2,
+        "spill_full": 14,
+        "src_cancel": 1,
+        "src_lock": 4,
+        "src_long_txn": 6,
+        "src_restart_primary": 3,
+        "src_terminate": 14,
+        "src_wal_switch": 11
+      },
+      "reason": "",
+      "seconds": 959.097,
+      "soak_s": 900.0
+    },
+    "source_backends": {
+      "faults": {
+        "src_cancel": 4,
+        "src_terminate": 4
+      },
+      "kinds_without_effect": [],
+      "no_effect": {
+        "src_cancel": 1
+      },
+      "outcome": "pass",
+      "passed": true,
+      "reason": ""
+    },
+    "spill": {
+      "faults": {
+        "spill_full": 5
+      },
+      "kinds_without_effect": [],
+      "no_effect": {
+        "spill_full": 2
+      },
+      "outcome": "pass",
+      "passed": true,
+      "reason": ""
+    }
+  },
+  "seconds": 1296.1,
+  "seeds": [
+    1,
+    2,
+    3
+  ],
+  "self_test": true,
+  "smoke": false,
+  "source_node": "replica",
+  "system": "toy"
+}

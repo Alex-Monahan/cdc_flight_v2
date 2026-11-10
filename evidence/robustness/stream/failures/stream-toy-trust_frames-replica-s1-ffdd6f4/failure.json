@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "ffdd6f4d03642758ebcff34819b9decba821113e",
+  "first_failure_s": 14.394,
+  "fixed_commit": null,
+  "fuzzer": "stream",
+  "id": "stream-toy-trust_frames-replica-s1-ffdd6f4",
+  "local_bundle": {
+    "campaign": "20261110T121249-2159",
+    "dir": "bundle-stream-toy-trust_frames-replica-s1-ffdd6f4"
+  },
+  "outcome": "diverged",
+  "reason": "oracle: public.w_bulk missing 1 extra 0 different 0; public.w_k0 missing 0 extra 0 different 77",
+  "regression_test": null,
+  "seed": 1,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-trust_frames",
+  "system_spec": "toy:trust_frames"
+}

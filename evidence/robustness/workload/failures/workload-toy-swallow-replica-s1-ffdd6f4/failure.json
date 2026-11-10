@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "ffdd6f4d03642758ebcff34819b9decba821113e",
+  "first_failure_s": 9.53,
+  "fixed_commit": null,
+  "fuzzer": "workload",
+  "id": "workload-toy-swallow-replica-s1-ffdd6f4",
+  "local_bundle": {
+    "campaign": "20261110T121239-6f64",
+    "dir": "bundle-workload-toy-swallow-replica-s1-ffdd6f4"
+  },
+  "outcome": "violation",
+  "reason": "consumer loop: debit_credit 9 of 352 ([{\"debits\": 123937, \"credits\": 131376, \"debit_rows\": 21, \"credit_rows\": 33, \"observation\": 344, \"t\": 8.501}])",
+  "regression_test": null,
+  "seed": 1,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-swallow",
+  "system_spec": "toy:swallow"
+}

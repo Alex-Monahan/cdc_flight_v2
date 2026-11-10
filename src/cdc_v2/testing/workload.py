@@ -50,6 +50,15 @@ class Features:
     truncate: bool = False           # driver TRUNCATE between rounds (single and multi-table)
     ddl: bool = False                # driver DDL group between rounds
     transfers: bool = False          # transfer transactions with a constant global sum
+    # Shapes for the consumer loops of SPEC 1.3 (package F). Each keeps an invariant across two tables that holds
+    # in every committed source state, so an observer of the destination sees a split transaction.
+    parent_child: bool = False       # w_parent.n_children = number of its rows in w_child, changed together
+    ledger: bool = False             # sum(w_debit.amount) = sum(w_credit.amount): entries booked on both sides
+    large_marked: bool = False       # a large insert into w_bulk plus its marker row in w_bulk_mark, one transaction
+    large_rollback: bool = False     # the same large insert, rolled back (it must never be visible)
+    keyless_toast: bool = False      # w_nkt: no key, REPLICA IDENTITY FULL, a TOASTed column left unchanged by updates
+    deferrable_key: bool = False     # w_dk: deferrable primary key + FULL (rule K: a table without a key); key swaps
+                                     # in one statement, a duplicate key that lives until the old row is deleted
 
     @classmethod
     def only(cls, **on) -> "Features":
@@ -127,6 +136,11 @@ class Model:
     next_key: dict = field(default_factory=dict)       # writer -> counter
     keyless: dict = field(default_factory=dict)        # writer -> Counter of (a, b)
     toast: dict = field(default_factory=dict)          # writer -> set of keys
+    parents: dict = field(default_factory=dict)        # writer -> {parent id: list of child ids}
+    entries: dict = field(default_factory=dict)        # writer -> {entry id: (debit ids, credit ids)}
+    batches: dict = field(default_factory=dict)        # writer -> {batch id: (first index, rows)}
+    nkt: dict = field(default_factory=dict)            # writer -> set of tags of w_nkt rows
+    dk: dict = field(default_factory=dict)             # writer -> {id: v} of w_dk rows
     ddl_seq: int = 0
 
 
@@ -194,11 +208,49 @@ class Workload:
                 s.append("CREATE TABLE %s (id integer PRIMARY KEY, balance bigint NOT NULL)" % self.q(t))
                 s.append("INSERT INTO %s SELECT g, %d FROM generate_series(0, %d) AS g" % (
                     self.q(t), self.cfg.transfer_balance, self.cfg.transfer_accounts - 1))
+        if f.parent_child:
+            s.append("CREATE TABLE %s (id bigint PRIMARY KEY, w integer NOT NULL, n_children integer NOT NULL)"
+                     % self.q("w_parent"))
+            s.append("CREATE TABLE %s (id bigint PRIMARY KEY, parent_id bigint NOT NULL, w integer NOT NULL, v text)"
+                     % self.q("w_child"))
+        if f.ledger:
+            for t in ("w_debit", "w_credit"):
+                s.append("CREATE TABLE %s (id bigint PRIMARY KEY, entry bigint NOT NULL, amount bigint NOT NULL)"
+                         % self.q(t))
+        if f.large_marked or f.large_rollback:
+            s.append("CREATE TABLE %s (id bigint PRIMARY KEY, batch bigint NOT NULL, v integer)" % self.q("w_bulk"))
+            s.append("CREATE TABLE %s (batch bigint PRIMARY KEY, n integer NOT NULL)" % self.q("w_bulk_mark"))
+        if f.keyless_toast:
+            s.append("CREATE TABLE %s (w integer NOT NULL, tag bigint NOT NULL, n integer NOT NULL, big text NOT NULL)"
+                     % self.q("w_nkt"))
+            s.append("ALTER TABLE %s REPLICA IDENTITY FULL" % self.q("w_nkt"))
+        if f.deferrable_key:
+            s.append("CREATE TABLE %s (id bigint PRIMARY KEY DEFERRABLE INITIALLY DEFERRED, w integer NOT NULL, "
+                     "v text NOT NULL)" % self.q("w_dk"))
+            s.append("ALTER TABLE %s REPLICA IDENTITY FULL" % self.q("w_dk"))
         for w in range(self.cfg.writers):
+            self.model.nkt[w] = set()
+            self.model.dk[w] = {}
             self.model.next_key[w] = 0
             self.model.keyless[w] = Counter()
             self.model.toast[w] = set()
+            self.model.parents[w] = {}
+            self.model.entries[w] = {}
+            self.model.batches[w] = {}
         return s
+
+    def table_names(self) -> list:
+        """The tables the workload creates at setup (DDL may add and drop more), as `schema.table`."""
+        f, out = self.cfg.features, ["w_k%d" % i for i in range(self.cfg.keyed_tables)]
+        out += ["w_nk"] if f.keyless else []
+        out += ["w_toast"] if f.toast_unchanged else []
+        out += self.transfer_table_names if f.transfers else []
+        out += ["w_parent", "w_child"] if f.parent_child else []
+        out += ["w_debit", "w_credit"] if f.ledger else []
+        out += ["w_bulk", "w_bulk_mark"] if f.large_marked or f.large_rollback else []
+        out += ["w_nkt"] if f.keyless_toast else []
+        out += ["w_dk"] if f.deferrable_key else []
+        return ["%s.%s" % (self.cfg.schema, t) for t in out]
 
     # ---------------------------------------------------------------- value generation
 
@@ -366,6 +418,126 @@ class Workload:
         self.stats["large_txn"] += 1
         return stmts
 
+    def _op_family(self, r, w, st) -> list:
+        """Parent and children: children are inserted and deleted only together with the update of the parent's
+        n_children, in one transaction (SPEC 1.3 consumer loop)."""
+        fam = st.setdefault("parents", copy.deepcopy(self.model.parents[w]))
+        P, C = self.q("w_parent"), self.q("w_child")
+        kind = r.choice(["new", "grow", "grow", "shrink", "remove"]) if fam else "new"
+        self.stats["family_" + kind] += 1
+        if kind == "new":
+            pid = self._new_key(w)
+            kids = [self._new_key(w) for _ in range(r.randint(0, 4))]
+            fam[pid] = kids
+            out = ["INSERT INTO %s (id, w, n_children) VALUES (%d, %d, %d)" % (P, pid, w, len(kids))]
+            if kids:
+                out.append("INSERT INTO %s (id, parent_id, w, v) VALUES %s" % (C, ", ".join(
+                    "(%d, %d, %d, %s)" % (k, pid, w, lit("c%d" % k)) for k in kids)))
+            return out
+        pid = r.choice(sorted(fam))
+        kids = fam[pid]
+        if kind == "remove":
+            del fam[pid]
+            return ["DELETE FROM %s WHERE parent_id = %d" % (C, pid), "DELETE FROM %s WHERE id = %d" % (P, pid)]
+        if kind == "shrink" and kids:
+            gone = sorted(r.sample(kids, r.randint(1, len(kids))))
+            fam[pid] = [k for k in kids if k not in gone]
+            return ["DELETE FROM %s WHERE id IN (%s)" % (C, ", ".join(str(k) for k in gone)),
+                    "UPDATE %s SET n_children = n_children - %d WHERE id = %d" % (P, len(gone), pid)]
+        new = [self._new_key(w) for _ in range(r.randint(1, 3))]
+        fam[pid] = kids + new
+        ins = "INSERT INTO %s (id, parent_id, w, v) VALUES %s" % (C, ", ".join(
+            "(%d, %d, %d, %s)" % (k, pid, w, lit("c%d" % k)) for k in new))
+        upd = "UPDATE %s SET n_children = n_children + %d WHERE id = %d" % (P, len(new), pid)
+        return [upd, ins] if r.random() < 0.5 else [ins, upd]       # both orders of the two tables occur
+
+    def _op_ledger(self, r, w, st) -> list:
+        """Debits and credits: every entry is booked on both sides with equal totals, in one transaction."""
+        ent = st.setdefault("entries", copy.deepcopy(self.model.entries[w]))
+        D, K = self.q("w_debit"), self.q("w_credit")
+        kind = r.choice(["book", "book", "rebook", "cancel"]) if ent else "book"
+        self.stats["ledger_" + kind] += 1
+        if kind == "cancel":
+            e = r.choice(sorted(ent))
+            del ent[e]
+            return ["DELETE FROM %s WHERE entry = %d" % (K, e), "DELETE FROM %s WHERE entry = %d" % (D, e)]
+        if kind == "rebook":
+            e = r.choice(sorted(ent))
+            d_ids, c_ids = ent[e]
+            delta = r.randint(1, 500)
+            return ["UPDATE %s SET amount = amount + %d WHERE id = %d" % (D, delta, d_ids[0]),
+                    "UPDATE %s SET amount = amount + %d WHERE id = %d" % (K, delta, r.choice(c_ids))]
+        e = self._new_key(w)
+        total = r.randint(1, 10_000)
+        parts = [total] if r.random() < 0.5 else [total // 2, total - total // 2]
+        d_id = self._new_key(w)
+        c_ids = [self._new_key(w) for _ in parts]
+        ent[e] = ([d_id], c_ids)
+        out = ["INSERT INTO %s (id, entry, amount) VALUES (%d, %d, %d)" % (D, d_id, e, total)]
+        out += ["INSERT INTO %s (id, entry, amount) VALUES (%d, %d, %d)" % (K, c, e, a) for c, a in zip(c_ids, parts)]
+        return out if r.random() < 0.5 else out[1:] + out[:1]
+
+    def _op_bulk(self, r, w, st, rollback: bool) -> list:
+        """A large insert into w_bulk and its marker row: visible not at all or completely. Committed batches are
+        deleted again later (also a large transaction), so the table stays bounded."""
+        bat = st.setdefault("batches", dict(self.model.batches[w]))
+        B, M = self.q("w_bulk"), self.q("w_bulk_mark")
+        if bat and not rollback and r.random() < 0.3:
+            b = r.choice(sorted(bat))
+            del bat[b]
+            self.stats["bulk_delete"] += 1
+            return ["DELETE FROM %s WHERE batch = %d" % (B, b), "DELETE FROM %s WHERE batch = %d" % (M, b)]
+        n = self.cfg.large_txn_rows
+        b = self._new_key(w)
+        first = self.model.next_key[w]
+        self.model.next_key[w] += n
+        W = self.cfg.writers
+        bat[b] = (first, n)
+        self.stats["bulk_rollback" if rollback else "bulk_insert"] += 1
+        return ["INSERT INTO %s (id, batch, v) SELECT g * %d + %d, %d, g %% 97 FROM generate_series(%d, %d) AS g" % (
+            B, W, w + 1, b, first, first + n - 1),
+            "INSERT INTO %s (batch, n) VALUES (%d, %d)" % (M, b, n)]
+
+    def _op_nkt(self, r, w, st) -> list:
+        """A table without a key and with a TOASTed column: updates that leave the large value unchanged."""
+        tags = st.setdefault("nkt", set(self.model.nkt[w]))
+        q = self.q("w_nkt")
+        if not tags or r.random() < 0.3:
+            t = self._new_key(w)
+            tags.add(t)
+            self.stats["nkt_insert"] += 1
+            return ["INSERT INTO %s (w, tag, n, big) VALUES (%d, %d, 0, (SELECT string_agg(md5(%s || g::text), '') "
+                    "FROM generate_series(1, %d) AS g))" % (q, w, t, lit("nkt/%d/%d" % (self.cfg.seed, t)),
+                                                             max(1, self.cfg.toast_bytes // 32))]
+        t = r.choice(sorted(tags))
+        one = "ctid = (SELECT ctid FROM %s WHERE w = %d AND tag = %d LIMIT 1)" % (q, w, t)
+        if r.random() < 0.15:
+            tags.discard(t)
+            self.stats["nkt_delete"] += 1
+            return ["DELETE FROM %s WHERE %s" % (q, one)]
+        self.stats["nkt_unchanged_update"] += 1
+        return ["UPDATE %s SET n = n + 1 WHERE %s" % (q, one)]
+
+    def _op_dk(self, r, w, st) -> list:
+        """A deferrable key with FULL: swaps of two keys in one statement, and a duplicate key inserted and the old
+        row deleted before the commit (tests/pg_source/test_pg_keys.py shows both)."""
+        rows = st.setdefault("dk", dict(self.model.dk[w]))
+        q = self.q("w_dk")
+        kind = r.choice(["insert", "swap", "swap", "dup"]) if len(rows) >= 2 else "insert"
+        self.stats["dk_" + kind] += 1
+        if kind == "insert":
+            k = self._new_key(w)
+            rows[k] = "v%d" % self._new_key(w)
+            return ["INSERT INTO %s (id, w, v) VALUES (%d, %d, %s)" % (q, k, w, lit(rows[k]))]
+        a, b = r.sample(sorted(rows), 2)
+        if kind == "swap":
+            rows[a], rows[b] = rows[b], rows[a]
+            return ["UPDATE %s SET id = CASE id WHEN %d THEN %d ELSE %d END WHERE id IN (%d, %d)" % (q, a, b, a, a, b)]
+        old, new = rows[a], "v%d" % self._new_key(w)
+        rows[a] = new
+        return ["INSERT INTO %s (id, w, v) VALUES (%d, %d, %s)" % (q, a, w, lit(new)),
+                "DELETE FROM %s WHERE id = %d AND v = %s" % (q, a, lit(old))]
+
     # ---------------------------------------------------------------- transactions
 
     def _row_ops(self, r, w, st, n: int, table: Optional[str] = None) -> list:
@@ -399,6 +571,9 @@ class Workload:
             self.model.keyless[w] = st["keyless"]
         if "toast" in st:
             self.model.toast[w] = st["toast"]
+        for name in ("parents", "entries", "batches", "nkt", "dk"):
+            if name in st:
+                getattr(self.model, name)[w] = st[name]
 
     def plan_txn(self, w: int) -> Optional[Txn]:
         f, r = self.cfg.features, self.rngs[w]
@@ -412,10 +587,21 @@ class Workload:
             shapes.append("pk_update")
         if f.transfers:
             shapes += ["transfer", "transfer"]
-        if not shapes:
+        if f.parent_child:
+            shapes += ["family", "family"]
+        if f.ledger:
+            shapes += ["ledger", "ledger"]
+        if f.keyless_toast:
+            shapes += ["nkt", "nkt"]
+        if f.deferrable_key:
+            shapes += ["dk", "dk"]
+        bulk = [k for k, on in (("large_marked", f.large_marked), ("large_rollback", f.large_rollback)) if on]
+        if not shapes and not bulk:
             return None
         if f.large_txn and self.model.keyed and r.random() < self.cfg.large_txn_prob:
             shape = "large"
+        elif bulk and (not shapes or r.random() < self.cfg.large_txn_prob):
+            shape = r.choice(bulk)
         else:
             shape = r.choice(shapes)
         st: dict = {"keys": {}}
@@ -448,6 +634,22 @@ class Workload:
             body = self._op_transfer(r, w, st)
         elif shape == "large":
             body = self._op_large(r, w, st)
+        elif shape == "family":
+            body = self._op_family(r, w, st)
+        elif shape == "ledger":
+            body = self._op_ledger(r, w, st)
+        elif shape == "nkt":
+            body = self._op_nkt(r, w, st)
+        elif shape == "dk":
+            body = self._op_dk(r, w, st)
+        elif shape == "large_marked":
+            body = self._op_bulk(r, w, st, rollback=False)
+        elif shape == "large_rollback":
+            saved_next = self.model.next_key[w]
+            body = self._op_bulk(r, w, st, rollback=True)
+            end = "rollback"
+            st = {"keys": {}}
+            self.model.next_key[w] = saved_next
         if not [s for s in body if not s.startswith(("SAVEPOINT", "ROLLBACK TO"))]:
             return None
         if end == "commit":
