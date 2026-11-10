@@ -1,9 +1,9 @@
 # The cut: where a snapshot lies in the stream
 
-Status: result of the P3 cut work, revised after the coordinator's review and after a second review of that
-revision. This document states the rule,
-argues it from the Postgres source, reports what was measured, and proposes text for `docs/design/core.md` 7.2
-and its open points 1 and 12.
+Status: result of the P3 cut work, revised after the coordinator's review, after a second review of that
+revision, and in a second short fix round (the takers read the cut's node themselves; two runs repeated). This
+document states the rule, argues it from the Postgres source, reports what was measured, and proposes text for
+`docs/design/core.md` 7.2 and its open points 1 and 12.
 
 Code: `src/cdc_v2/pg/cut.py` (the only code that takes or judges a cut), `src/cdc_v2/testing/pgoutput.py`
 (decoder for tests), `src/cdc_v2/testing/cutnarrow.py` (a narrowing that only the tests can use, section 2),
@@ -33,17 +33,19 @@ exception: two load averages of the machine were read by hand and are in no file
 - **The unknown set is small.** With the snapshot's bounds, about two of three cuts under load (66.93% in the
   main campaign) and every cut on an idle source have no `unknown` transaction at all. The start of the commit
   record would narrow it further, but the pipeline's stream does not deliver it (sections 2 and 5.2).
-- **A cut belongs to the timeline and to the server life it was taken in.** After a promotion or a slot
-  finding, open cuts are abandoned and their backfills start again. The library decides it at the swap from
-  three readings (section 9.2).
+- **A cut belongs to the timeline and to the server life it was taken in.** After a promotion of the node the
+  stream reads from, or a slot finding, open cuts are abandoned and their backfills start again. The function
+  that takes a cut reads the cut's own node right after the cut and keeps that reading on the cut; at the swap
+  the library decides from it and from one reading of the stream's node, made then (section 9.2). The caller
+  reads nothing about the cut's node.
 - **On a primary** the gap between "commit record written" and "visible to snapshots" is real and can last as
   long as a synchronous standby is away. The answer by 64-bit transaction id is exact (296,814 cuts, 159 million
   answers, none wrong). `R0 ≥ P0` is replaced by a rule that needs no wait in the normal case. The
   `pg_xact_status` check proposed in review does not work (sections 10 and 11).
 - **A primary cut does not outlive a crash of its server.** With `synchronous_commit = off` a snapshot sees a
   commit whose record is not on disk. A crash loses it, and the same timeline then carries other records at
-  the same positions. Positions and timeline alone say "passed"; the server's start time says the cut is void
-  (section 10.5).
+  the same positions. Positions and timeline alone say "passed". So the taker gives a primary cut out only once
+  its server has flushed the WAL up to the cut's insert position, in the same server life (section 10.5).
 - **Proposed text** for core 7.2, its open points 1 and 12, and small changes to 7.1, 7.3 and 7.4: section 13.
   What is refuted and what stays open: section 12.
 
@@ -131,8 +133,10 @@ Four rules of use:
 - A cut is taken only on a server that is in recovery (`pg_is_in_recovery()`), and only when the standby is
   **settled** (section 8). The library checks both. The settle floor is not optional: every taker needs it.
 - A cut is valid only on the **timeline** and in the **server life** it was taken in (section 9.2). After a
-  promotion or a slot finding (core design, section 8), open cuts are abandoned and their backfills start
-  again (`StandbyCut.valid_on(stream, reader, reader_start)`).
+  promotion of the node the stream reads from, or a slot finding (core design, section 8), open cuts are
+  abandoned and their backfills start again. The taker reads the cut's node right after the cut and keeps the
+  reading on the cut (`StandbyCut.sealed`); at the swap `StandbyCut.valid_on(stream)` needs only the stream's
+  reading.
 
 ## 3. Why the rule holds
 
@@ -747,17 +751,19 @@ This holds on every version.
 - `take_standby_cut_exported` refuses on a server with the defect. With `quiet_only=True` it keeps a snapshot
   only if it is quiet and raises `SnapshotNotQuiet` otherwise. `accept_export_defect=True` exists for tests
   only.
-- `take_standby_cut_after(conn, p0, deadline, settle_floor, exported=True, quiet_only=True)` takes snapshots
-  until one is quiet or the `Deadline` has passed. It ends with a cut, or with the result `NoQuietSnapshot`
+- `take_standby_cut_after(conn, replication, p0, deadline, settle_floor, exported=True, quiet_only=True)` takes
+  snapshots until one is quiet or the `Deadline` has passed (`replication` is a replication connection to the
+  same standby, section 9.2). It ends with a cut, or with the result `NoQuietSnapshot`
   (the number of attempts and the oldest id still running at the last one). That result is not an error and is
   not raised: it is false in a condition, so the caller can tell it from a cut and from a failure. A deadline
   that passes while replay has not reached `P0`, or while the standby has not settled, is still an error
   (`DeadlineExceeded`). With `report=` the caller is told during the wait: the function is called after every
   snapshot that was dropped because it was not quiet, with a `NoQuietSnapshot` (attempts so far, oldest running
   id).
-- `take_keyless_standby_cut(conn, p0, deadline, settle_floor, quiet_wait_s=60, report=)` is the rule below in
-  one call. If the standby does not settle within the quiet wait, that is no error here: the fallback goes on
-  waiting to the full deadline, and the `NoQuietSnapshot` it keeps says so (`not_settled`).
+- `take_keyless_standby_cut(conn, replication, p0, deadline, settle_floor, quiet_wait_s=60, report=)` is the
+  rule below in one call. If no cut can be given out within the quiet wait (the standby does not settle, or the
+  timeline of its cuts cannot be proven yet, section 9.2), that is no error here: the fallback goes on waiting
+  to the full deadline, and the `NoQuietSnapshot` it keeps says so (`not_settled`, with what the wait last saw).
 
 ### 7.1 Tables without a key: the rule (decided)
 
@@ -799,9 +805,9 @@ has the defect). A transaction that wrote inside a subtransaction is held open o
 
 | Step | Result |
 |---|---|
-| quiet-only wait of 1 s while the transaction is open | `NoQuietSnapshot` after 1.01 s and 18 attempts; false in a condition; its oldest running id is the open transaction |
-| `take_keyless_standby_cut` while it is open | a cut of the own way, `R0 ≥ P0`, snapshot `44654627:44654629:`; the one reader does not see the open transaction and sees the committed one; the `NoQuietSnapshot` is kept in the cut for the log |
-| `take_keyless_standby_cut` after the commit | a cut of the exported way, quiet (`44654629:44654629:`); a reader that imports it sees both transactions |
+| quiet-only wait of 1 s while the transaction is open | `NoQuietSnapshot` after 1.0 s and 18 attempts; false in a condition; its oldest running id is the open transaction |
+| `take_keyless_standby_cut` while it is open | a cut of the own way, `R0 ≥ P0`, snapshot `57032527:57032529:`, sealed; the one reader does not see the open transaction and sees the committed one; the `NoQuietSnapshot` is kept in the cut for the log |
+| `take_keyless_standby_cut` after the commit | a cut of the exported way, quiet (`57032529:57032529:`), sealed; a reader that imports it sees both transactions |
 
 Tests: `tests/cut/test_cut_logic.py` (hermetic: the result object, the deadline, the order of the three
 cases), `tests/cut/test_cut_live.py` `test_keyless_table_gets_a_quiet_exported_snapshot_or_one_reader`. The
@@ -940,14 +946,13 @@ passed `R1`.
   snapshot is lost too: its file is deleted at startup (`xlog.c` `StartupXLOG` calls
   `DeleteAllExportedSnapshotFiles`, line 5374 / 5724 / 5808). What was being read under the cut has to be read
   again under a new cut: one chunk of a keyed table, the whole table for a table without a key (core 7.4).
-- **A cut whose read is complete stays valid, if its timeline was established before the restart.** Its
-  positions and bounds are numbers the engine holds. They describe a snapshot that existed and WAL that does
-  not change on its timeline. The rows read under it can be used, and "has passed" is judged as before when
-  the stream goes on. Which timeline the cut was taken on can be established only in the server life it was
-  taken in (section 9.2): a backfill makes the reader's two readings when its read under the cut is complete
-  and keeps them. With them the cut outlives a restart of the reader's node. Without them it is abandoned at
-  the swap, because a reading made after the restart says nothing about the cut. This is what keeps the
-  chunks of a keyed table restartable one by one (core 7.4).
+- **A cut whose read is complete stays valid.** Its positions and bounds are numbers the engine holds. They
+  describe a snapshot that existed and WAL that does not change on its timeline. The rows read under it can be
+  used, and "has passed" is judged as before when the stream goes on. Which timeline the cut was taken on can
+  be established only in the server life it was taken in (section 9.2), and the taker establishes it right
+  after the cut, before it gives the cut out. So every cut that is given out outlives a later restart of the
+  reader's node. A restart before that reading ends the cut's transaction, and the taker gives nothing out.
+  This is what keeps the chunks of a keyed table restartable one by one (core 7.4).
 - Variant 5 and its two repeats (section 5.6) check the answers across restarts, not the timeline rule (no
   timeline changes there): cuts taken before a restart are judged after it, when the stream has passed them.
   235,812 cuts, 42 restarts or kills of the standby, no violation.
@@ -962,72 +967,87 @@ passed `R1`.
 ### 9.2 Promotion, and the rule about timelines
 
 Scenario `tools/cutstress promotion`, evidence `promotion.json` (Postgres 18.6): a second standby is added and
-a cut is taken on it and held open. The stream, which reads from the primary, passes the cut, and the readings
-of the swap are made. Then the standby is promoted, and a row is written on it.
+a cut is taken on it with `take_standby_cut_after`, which reads the node right after the cut (below), and held
+open. The stream, which reads from the primary, passes the cut, and the stream's reading of the swap is made.
+Then the standby is promoted, and a row is written on it.
 
 | Observation | Value |
 |---|---|
-| The open cut, `R0` = `R1` | 2/DC001028; recorded timeline 1; its snapshot reads 1 |
+| The open cut, `R0` = `R1` | 3/1A005830; recorded timeline 1; its snapshot reads 1 |
+| The reading on the cut, made by the taker right after the cut | timeline 1 at 3/1A005830, start time that of the cut: sealed |
 | The stream has passed the cut | true |
-| Readings at the swap: the stream's node; the reader's node | timeline 1 at 2/DC0010B0; timeline 1 at 2/DC0010B0 |
-| `valid_on` with the three readings; with any one of them missing | true; false |
+| The stream's reading at the swap | timeline 1 at 3/1A0058B8 |
+| `valid_on` with it; with none (`None`) | true; false |
+| A cut of the one-attempt function `take_standby_cut_own`, which reads nothing after the cut | not sealed; `valid_on` false with the same reading |
 | `pg_is_in_recovery()` after promotion | false |
 | Timeline of the promoted node (from its WAL insert position) | 2 |
 | Timeline in its control file right after the promotion | still 1 |
 | Server start of the promoted node | unchanged: a promotion is no restart |
-| Readings after the promotion, the stream still on the old primary | stream: timeline 1 at 2/DC0010B0; reader: timeline 2 at 2/DC002E70 |
-| The open cut's `valid_on` with them | false |
-| Readings after the promotion, the stream on the promoted node | both: timeline 2 at 2/DC002E70 |
-| The open cut's `valid_on` with them | false |
-| `pg_last_wal_replay_lsn()` after promotion, before and after a local commit | 2/DC0010B0 both times |
+| The stream's reading after the promotion, the stream still on the old primary | timeline 1 at 3/1A0058B8 |
+| The open cut's `valid_on` with it | **true**: the cut was taken on timeline 1, which the old primary continues |
+| The stream's reading after the promotion, the stream on the promoted node | timeline 2 at 3/1A005A90 |
+| The open cut's `valid_on` with it | false |
+| `pg_last_wal_replay_lsn()` after promotion, before and after a local commit | 3/1A0058B8 both times |
 | The local commit record | ends after that position |
 | A new snapshot after the local commit | reads 2 |
 | The open cut's snapshot after the local commit | still reads 1 |
-| The library on a new cut, own way and exported way | refuses: "not a standby: pg_is_in_recovery() is false; use take_primary_cut" |
+| The library on a new cut: own way, exported way, and `take_standby_cut_after` | refuses: "not a standby: pg_is_in_recovery() is false; use take_primary_cut" |
 | The library on a new settle floor | refuses: "not a standby: pg_is_in_recovery() is false" |
-| A primary cut on the promoted node | timeline 2, insert position 2/DC002E70; has not passed before the next commit, has passed after it; valid with the readings of its own node (timeline 2 at 2/DC002EF8); not valid with the readings of the old primary |
+| A primary cut on the promoted node, by `take_primary_cut_after` | timeline 2, insert position 3/1A005AC0, sealed (flushed up to 3/1A005AC0); has not passed before the next commit, has passed after it; valid with the stream on its own node (timeline 2 at 3/1A005B48); not valid with the stream on the old primary |
 
-**The rule: a cut belongs to the timeline and to the server life it was taken in.** After a promotion or a slot
-finding (core design, section 8), open cuts are abandoned and their backfills start again.
+**The rule: a cut belongs to the timeline and to the server life it was taken in.** After a promotion of the
+node the stream reads from, or a slot finding (core design, section 8), open cuts are abandoned and their
+backfills start again.
 
-The library decides it with one function, asked **at the swap**, after "has passed":
-`StandbyCut.valid_on(stream, reader, reader_start)`, and `PrimaryCut.valid_on` with the same arguments (section
-10.5). The cut records two values with the statement that reads `R0`: the timeline in the control file and the
-start time of the server. The function takes three readings.
+The library decides it from two readings, and the caller supplies only the second.
 
-| Reading | What it is | When it is made |
+| Reading | What it is | Who makes it, and when |
 |---|---|---|
-| `stream` | what `IDENTIFY_SYSTEM` over a replication connection says on the node the stream reads from: its timeline and its position | at the swap, not earlier |
-| `reader` | the same reading on the node the cut was taken on | after the cut, while the server it was taken on still runs: at the swap, or earlier and then kept |
-| `reader_start` | the start time of that server (`server_start(conn)`, which reads `pg_postmaster_start_time()`) | right after `reader`, on the same node |
+| the reading on the cut (`cut.reader`, `cut.reader_start`) | on a standby: what `IDENTIFY_SYSTEM` says on the node the cut was taken on (its replay timeline and a position), then that server's start time (`pg_postmaster_start_time()`); on a primary: its flush position once it has reached the cut's insert position, the timeline of the WAL file it lies in, and the start time | the taker, right after the cut, before it gives the cut out |
+| `stream` | what `IDENTIFY_SYSTEM` says on the node the stream reads from: its timeline and its position (`cdc_v2.pg.slot.timeline_history` makes it; `TimelineReading` is the plain form) | the caller, at the swap, not earlier |
 
-`valid_on` is true only if
+The cut records two values with the statement that reads `R0`: the timeline in the control file and the start
+time of the server. A cut is **sealed** (`StandbyCut.sealed`) when the reading on it shows the recorded timeline,
+a position at or beyond `R1`, and the recorded start time. Then, at the swap and after "has passed",
+`StandbyCut.valid_on(stream)` is true only if the stream's node is on the recorded timeline at a position beyond
+`R1`. A cut that is not sealed is valid nowhere; so is a call without a reading (`None`: it could not be made).
+`PrimaryCut.valid_on(stream)` works the same way (section 10.5).
 
-- the stream's node is on the recorded timeline, at a position beyond `R1`;
-- the reader's node was on the recorded timeline, at or beyond `R1`;
-- `reader_start` equals the start time the cut recorded.
+The takers that give a cut out for use make the reading: `take_standby_cut_after` and `take_keyless_standby_cut`
+on a standby, `take_primary_cut_after` (or `seal_primary_cut` after `take_primary_cut`) on a primary. The
+one-attempt functions (`take_standby_cut_own`, `take_standby_cut_exported`, `take_primary_cut`) do not, and their
+cuts are valid nowhere until sealed. If the reading of a standby names another timeline than the control file,
+the standby has followed a timeline switch and has made no restart point since: the taker drops the cut
+(`TimelineNotProven`) and takes another, within its deadline. A reading of another server (another start time,
+or a position before `R1`) is an error (`CutError`).
 
-A cut without the two recorded values gives false. So does a call in which a reading is missing (`None`: it
-could not be made). No argument has a default. `cdc_v2.pg.slot.timeline_history` makes such a reading (its
-result has `timeline` and `position`); `TimelineReading` is the plain form. When the stream reads from the node
-the cuts are taken on, one reading at the swap serves as `stream` and as `reader`.
+**Why a replication connection on a standby.** No SQL function gives the timeline that replay is on:
+`pg_last_wal_replay_lsn()` drops the timeline, `pg_control_checkpoint()` has the one of the last restart point,
+`pg_stat_wal_receiver` the one of the receiver (and no row without a receiver), and `pg_walfile_name()` is refused
+during recovery. `IDENTIFY_SYSTEM` over a `replication=database` connection gives the replay timeline
+(`walsender.c` `IdentifySystem` through `GetStandbyFlushRecPtr`); the core design (section 8) decides by it for
+the same reason. So the standby takers take a second connection to the same standby, opened with
+`replication=database`, as their second argument, and **the backfill needs a replication connection to every
+standby it reads**; every such standby must accept one from the runtime role. The start time is plain SQL, which
+such a connection also accepts. On a primary plain SQL is exact: a primary writes on one timeline for its whole
+server life, the one in the name of its current WAL file, and `pg_current_wal_flush_lsn()` is the position
+`IDENTIFY_SYSTEM` would give. `seal_primary_cut` therefore reads on the cut's own connection and needs no
+replication connection.
 
-**Why this is enough.** No SQL function gives the timeline that replay is on. The exact value needs
-`IDENTIFY_SYSTEM` over a replication connection; the core design (section 8) decides by that and not by the
-control file, for this reason. What the cut can record is the timeline of the checkpoint named in the control
-file (`pg_control_checkpoint()`). That is the replay timeline or, between a timeline switch and the standby's
-next restart point, the one before it: the table shows the lag (the control file still says 1 on a node that
-is on timeline 2). The recorded value never runs ahead. And while a server runs, the timeline its replay is on
-never goes back. So, within one server life,
+**Why this is enough.** What the cut can record before its snapshot is the timeline of the checkpoint named in
+the control file. That is the replay timeline or, between a timeline switch and the standby's next restart
+point, the one before it: the table shows the lag (the control file still says 1 on a node that is on timeline
+2). The recorded value never runs ahead. And while a server runs, the timeline its replay is on never goes back.
+So, within one server life,
 
-    recorded timeline  ≤  timeline the cut was taken on  ≤  timeline of the same node, read later
+    recorded timeline  ≤  timeline the cut was taken on  ≤  timeline of the same node, read right after
 
-`reader_start` shows that the later reading is of the same server life. If the first and the last are equal,
-the cut was taken on that timeline: its snapshot holds that timeline's WAL, up to `R1` at most. The stream's
-node is on the same timeline and has its WAL beyond `R1`. One timeline has one content, so the positions of the
-cut and the `E` values of the stream name the same records. One thing `valid_on` does not show: that what the
-stream has applied is the history of its node. The slot check of the stream lane shows that (core design,
-section 8).
+The equal start time shows that the reading on the cut is of the same server life. If the first and the last are
+equal, the cut was taken on that timeline: its snapshot holds that timeline's WAL, up to `R1` at most. That is a
+fact about the past and stays true when the reader's node restarts or is promoted later. The stream's node is on
+the same timeline and has its WAL beyond `R1`. One timeline has one content, so the positions of the cut and the
+`E` values of the stream name the same records. One thing `valid_on` does not show: that what the stream has
+applied is the history of its node. The slot check of the stream lane shows that (core design, section 8).
 
 **When each reading is made, and why.**
 
@@ -1036,21 +1056,19 @@ section 8).
   fork, and the stream's node is behind it. While the cut is open, both say timeline 1. Then the stream's node
   follows timeline 2 and passes `R1` there. The cut holds a dead branch of timeline 1. At the swap the stream's
   reading says 2, and the cut is abandoned.
-- **The reader's two readings state a fact about the cut:** the timeline it was taken on. A fact about the
-  past stays true. So they can be made at any time after the cut, as long as the server it was taken on still
-  runs, and then be kept. A backfill that makes them when its read under the cut is complete keeps the cut
-  through a later restart of the reader's node (section 9.1). One that makes them only at the swap abandons
-  the cut if that node was restarted in between.
-- **Not in a later server life.** A standby that starts replays again from its last restart point. It can then
-  be on an earlier timeline than before, or follow another history. A reading made after a restart says
-  nothing about the cut, and the comparison of the start times refuses it.
-- **Not before the cut.** An equal timeline read before the cut proves nothing: the standby may have followed
-  a switch in between, and the control file would not show it yet. The library cannot see when a reading was
-  made. This order is the caller's duty.
+- **The reading of the cut's node is made by the taker, right after the cut.** It must be made after the cut:
+  an equal timeline read before the cut proves nothing, because the standby may have followed a switch in
+  between, and the control file would not show it yet. It must be made in the cut's server life: a standby that
+  starts replays again from its last restart point, can then be on an earlier timeline than before or follow
+  another history, and a reading made after a restart says nothing about the cut. The taker makes it while the
+  cut's transaction is open. A restart before it ends that transaction and the taker fails, so the rule costs
+  no good cut. Earlier, the caller made this reading, and nothing could check that it was made after the cut
+  and before a restart; that duty is gone.
 
 **Abandoned** means: the answers the cut gave, and everything read under its snapshot, are dropped; the table
-is requested again with a new `P0`, as section 8 of the core design does for every table after a finding. The
-stream lane also abandons every open cut when its slot check has a finding, without asking `valid_on`.
+is requested again with a new `P0`, as section 8 of the core design does for every table after a finding. After
+a slot finding the stream lane requests every table again (core design, section 8), so the open cuts are
+abandoned with their backfills, whatever `valid_on` would say.
 
 **Why not keep the cut.** A position means something only together with its timeline (section 1). WAL that the
 old primary wrote after the point of promotion is not part of the new history; an `E` of the old timeline and
@@ -1060,26 +1078,30 @@ position is set anew, so `R0 ≥ P0` no longer says what it said when the cut wa
 **What the rule costs.** It says "no" to some good cuts. Each costs one repeated read and never a wrong row.
 
 - A cut taken on a standby that has followed a timeline switch and has not yet made a restart point records
-  the old timeline and is refused. The backfill tries again and succeeds after the next restart point.
-- A cut taken before a promotion, whose reader readings are made after it, is refused also when the fork lies
-  beyond `R1` (the table: the stream on the old primary, the reader on the promoted node). Readings made
-  before the promotion would have kept it.
-- A cut whose reader's node was restarted before the readings were made is refused.
+  the old timeline. The taker drops it and takes another until the next restart point, within its deadline (a
+  declared wait of core 4.3).
+- A cut on the old timeline whose stream follows a promotion is abandoned also when the fork lies beyond `R1`,
+  where the cut would still be right on the new timeline. A promotion is rare, and the rule stays simple.
+
+Readings made by the caller cost two more kinds of refused cuts in the earlier version of this rule (a cut read
+before a promotion of its node and judged after it; a cut whose node restarted before the caller's readings).
+Both are gone: the table above shows the first case kept (`valid_on` true with the stream on the old primary).
 
 **When backfill reads use another replica than the slot** (core design 7.2), the two nodes can be on different
-histories, in which equal positions name different records. That is why `valid_on` takes a reading of each
-node and wants both on the recorded timeline.
+histories, in which equal positions name different records. That is why the cut keeps a reading of its own node,
+and `valid_on` takes a reading of the stream's node, and wants both on the recorded timeline.
 
 **On a primary** the recorded timeline is exact (`timeline(conn)`; the first eight digits of the WAL file name
-of the insert position), and `IDENTIFY_SYSTEM` gives the flush position. Section 10.5 says what the rule means
-there, and shows a case in which the timeline and the positions agree and only the start time tells.
+of the insert position). Section 10.5 says what the rule means there, and shows a case in which the timeline and
+the positions agree and only the server life tells.
 
 What else the measurement shows:
 
 - **The session and its snapshot survive a promotion.** The open cut keeps reading the same rows. Its answers
   stay right for transactions of the WAL the node has replayed. Local transactions after the promotion commit
-  after the snapshot and have `E` beyond the frozen replay position. The rule abandons the cut all the same:
-  it is simple, and a promotion is rare.
+  after the snapshot and have `E` beyond the frozen replay position. With the stream on the old primary the cut
+  stays valid; with the stream on the promoted node the rule abandons it all the same: it is simple, and a
+  promotion is rare.
 - **The standby rule must not be used on a promoted node.** The replay position no longer moves, while commits
   go on becoming visible. A cut made from it would call every later commit `outside` once one of them is `E1`,
   and later snapshots see them all. The library therefore reads `pg_is_in_recovery()` in the statement that
@@ -1090,17 +1112,21 @@ What else the measurement shows:
   `R0 ≥ P0`. The engine's stream lane starts blind there, as after an engine start.
 
 Tests. Hermetic, in `tests/cut/test_cut_logic.py`: `test_a_cut_is_valid_only_on_the_timeline_it_was_taken_on`,
-`test_a_reading_made_while_the_cut_is_open_proves_nothing` (the counterexample above),
-`test_the_readers_readings_are_about_the_cut_and_can_be_kept`,
-`test_a_primary_cut_is_valid_only_in_its_server_life_and_on_its_timeline` and
+`test_a_stream_reading_made_while_the_cut_is_open_proves_nothing` (the counterexample above),
+`test_the_reading_on_the_cut_is_about_the_cut_and_outlives_the_readers_node`,
+`test_the_takers_read_the_cuts_node_on_a_replication_connection`,
+`test_a_cut_is_not_given_out_while_its_timeline_is_not_proven`, `test_the_reading_must_come_from_the_cuts_own_server`,
+`test_a_primary_cut_is_valid_only_sealed_and_on_its_timeline`,
+`test_a_primary_cut_is_sealed_when_its_insert_position_is_flushed` and
 `test_timeline_of_a_primary_is_exact_and_of_a_standby_is_the_control_file`. Live, in
 `tests/cut/test_cut_live.py`: `test_a_cut_is_valid_only_on_the_timeline_it_was_taken_on` (the promotion
 scenario) and, for a primary, `test_a_primary_cut_does_not_outlive_a_crash_of_its_server` (section 10.5).
 
-Not run live: a standby that follows a new primary onto a new timeline (a cascade); the stream on one standby
-and the reads on another, with a fork between them; a restart of the reader's standby between a cut and its
-readings. For these the lag of the control file is measured on the promoted node only, and the rule is argued
-and tested hermetically. Section 12.3 lists what stays open.
+Not run live: a standby that follows a new primary onto a new timeline (a cascade), and with it the drop of cuts
+whose timeline is not proven yet (tested hermetically); the stream on one standby and the reads on another, with
+a fork between them; a restart of the reader's standby after a sealed cut (the crash of a primary in section 10.5
+shows the same for a primary). For these the lag of the control file is measured on the promoted node only, and
+the rule is argued and tested hermetically. Section 12.3 lists what stays open.
 
 ## 10. The cut on a primary
 
@@ -1338,49 +1364,56 @@ has on disk: other records now stand at the positions the cut recorded. A transa
 restart ends at or above `I`. So `has_passed` says true, the timeline is the same, and a swap decided by
 positions and timeline alone would put a change that no longer exists into the destination.
 
+**What the library does.** The taker gives a primary cut out only when it is **sealed**: `seal_primary_cut`
+waits, on the cut's own connection and with the cut's transaction open, until the server has flushed its WAL up
+to `I`, and keeps that reading on the cut (the flush position, the timeline of the WAL file it lies in, and the
+server's start time). `take_primary_cut_after` calls it; a caller that takes `take_primary_cut` until a gap mark
+admits the cut (section 10.4) calls it then. A start time other than the cut's is an error: the cut can no
+longer be sealed. The wait is short wherever anything commits with `synchronous_commit` on (the heartbeat write
+does, every 10 s); the WAL writer flushes an asynchronous commit within three of its cycles (`wal_writer_delay`,
+200 ms by default). Its deadline is the one of the taker.
+
+At the swap, after `has_passed`, `PrimaryCut.valid_on(stream)` is true only if the cut is sealed and the
+stream's node is on the cut's timeline with WAL up to `I`. The seal is the fact about the cut here: everything
+the snapshot saw is on disk. It was made in the cut's server life, and what was flushed survives a crash, so a
+sealed cut outlives a restart of the primary. A cut whose server stopped before the seal is never given out:
+one repeated read, also after a clean shutdown, which loses nothing.
+
 Scenario `tools/cutstress primary-crash`, evidence `primary_crash.json` (Postgres 18.6). The WAL writer is
 slowed (`wal_writer_delay = 10s`). A session with `synchronous_commit = off` commits twice to one counter row.
-A cut is taken and reads the row. The primary is killed and started again, and one transaction is committed to
-another row.
+A cut is taken with the one-attempt function and reads the row; the library's seal is given 0.2 s. The primary
+is killed and started again, and one transaction is committed to another row. In a second part the same writes
+are made, the cut is taken by `take_primary_cut_after`, another session commits with `synchronous_commit` on
+after one second, and the primary is killed again.
 
 | Observation | Value |
 |---|---|
 | The row before the two commits; read under the cut | 0; 2 |
-| The cut | timeline 1, insert position 2/DC04E710 |
-| Flush position read under the cut | 2/DC04E600: below the insert position |
+| The cut | timeline 1, insert position 3/1A04BC70; not sealed as taken |
+| Flush position read under the cut | 3/1A04BB28: below the insert position |
+| The seal within 0.2 s | does not come: "the primary has flushed its WAL up to 3/1A04BB28; the cut's insert position is 3/1A04BC70" |
 | The row after the restart | 0: both commits were lost |
 | The row on the standby, which gets flushed WAL only | 0 |
-| Readings after the restart, stream's node and reader's node | both timeline 1 at 2/DC056488 |
+| The stream's reading after the restart | timeline 1 at 3/1A055858 |
 | Same timeline; the positions of the cut reached again | true; true |
 | `has_passed` after the restart | true |
-| Start time of the server | differs from the one the cut recorded |
-| `valid_on` with the readings | false |
-| `valid_on` with the same readings and the start time the cut recorded (the negative control) | true |
+| The seal after the restart | refused: "this connection is not to the server the cut was taken on: its start time is another one" |
+| `valid_on` with the stream's reading | false: the cut was never sealed |
+| `valid_on` with a reading of the new server life taken as the seal, the start time not compared (the negative control) | true |
+| Second part: `take_primary_cut_after` | waited 1.05 s, until the other session's commit flushed the WAL; sealed (flushed up to 3/1A055A20, insert position 3/1A055998) |
+| Second part, after the kill and restart | the row reads 2: the commits the cut saw survived; start time differs; `has_passed` true; `valid_on` true |
 
-**What the library does.** `PrimaryCut.valid_on(stream, reader, reader_start)` is asked at the swap, after
-`has_passed`, with the readings of section 9.2. On a primary the cut's timeline is exact, and `IDENTIFY_SYSTEM`
-gives the flush position. It is true only if
-
-- the stream's node is on the cut's timeline and has WAL up to `I`;
-- the reader's node was on that timeline and had flushed its WAL up to `I`;
-- `reader_start` equals the start time the cut recorded.
-
-The second condition is the fact about the cut here: everything the snapshot saw is on disk. A reading that
-is still behind `I` can be made again; a good one is kept, as on a standby. With a kept reading the cut
-outlives a restart of the primary, because what was flushed survives a crash. No reading of a later server
-life is accepted. So a cut whose server stopped before such a reading was made is abandoned, also after a
-clean shutdown, which loses nothing: one repeated read.
-
-On a primary the stream's node and the reader's node are normally the same one, and one reading serves as
-both. The order "the reader's readings are made after the cut" is the caller's duty here too (section 9.2).
+On a primary the stream's node and the cut's node are normally the same one; the cut keeps the seal and the
+stream's reading is made at the swap. Nothing is the caller's duty.
 
 Tests. Live: `test_a_primary_cut_does_not_outlive_a_crash_of_its_server` in `tests/cut/test_cut_live.py`. The
 commit is lost only if nothing flushes the WAL in the half second before the kill, so the scenario makes up
-to three attempts. The assertions about the start time hold in every attempt. If no attempt loses its commit,
-the test ends as an expected failure with a message and does not pass silently. Hermetic:
-`test_a_primary_cut_is_valid_only_in_its_server_life_and_on_its_timeline` in `tests/cut/test_cut_logic.py`.
-The live test of the primary rules (`test_primary_rules_under_a_held_back_synchronous_standby`) checks
-`has_passed` with the library's position as the two campaigns do.
+to three attempts. The assertions about the start time and the seal hold in every attempt. If no attempt loses
+its commit, the test ends as an expected failure with a message and does not pass silently. Hermetic:
+`test_a_primary_cut_is_valid_only_sealed_and_on_its_timeline` and
+`test_a_primary_cut_is_sealed_when_its_insert_position_is_flushed` in `tests/cut/test_cut_logic.py`. The live
+test of the primary rules (`test_primary_rules_under_a_held_back_synchronous_standby`) checks `has_passed` with
+the library's position as the two campaigns do.
 
 ## 11. The reviewer's proposal for the primary: `pg_xact_status`
 
@@ -1467,7 +1500,7 @@ from this work: on a primary the repair snapshot needs the rule of section 10.4 
 | 5 | Both ways of taking the cut are valid; the in-statement position is an upper bound only | Own way: valid. Exported way: valid only for quiet snapshots or on a fixed server; what a table without a key does is decided (section 7.1). In-statement position as `R0`: violated 15,291 times in the main campaign | 5.4, 5.5, 7 |
 | 6 | "Has passed" when the applied position is above `R1`; `R0 ≥ P0` | Both hold. `R0 ≥ P0` is not implied by where the slot is and must always be checked | 3, 5.6, 6 |
 | 7 | The rules survive the listed conditions | Yes, every one of them, no violation. Seven runs recorded the complete checker; two more had it but do not record it; seven others had its first two steps only | 5.1, 5.6, 9 |
-| | Timelines | A cut belongs to the timeline and to the server life it was taken in. Shown live for a promotion and for a crash of a primary; the other cases are argued and tested without a server | 9.2, 10.5 |
+| | Timelines | A cut belongs to the timeline and to the server life it was taken in. The taker reads the cut's node right after the cut and keeps the reading on the cut; at the swap only the stream's reading is needed. Shown live for a promotion and for a crash of a primary; the other cases are argued and tested without a server | 9.2, 10.5 |
 | | The primary (open point 12) | Gap shown. Answer by 64-bit id is exact. A rule without the `xmin ≥ X` wait is proposed and tested. "Has passed" by the insert position read with the snapshot holds | 10, 11 |
 
 ### 12.2 Refuted
@@ -1514,20 +1547,24 @@ from this work: on a primary the repair snapshot needs the rule of section 10.4 
 - **Stream options.** The rule is stated for a stream of whole transactions with `two_phase` off (section 6).
   Streaming of open transactions and `two_phase` on were not examined.
 - **Timelines and server lives** (sections 9.2 and 10.5). The rule is tested live for a promotion and for a
-  crash of a primary. Not run live: a standby that follows a new primary onto a new timeline, a standby of a
-  standby, the stream on one standby and the reads on another, and a restart of the reader's standby between a
-  cut and its readings. For these the rule is argued and tested without a server; so is the comparison of the
-  start times for a standby cut. What stays open:
-  - *The order of the readings.* The reader's readings must be made after the cut. The library cannot check
-    that. On a standby `IDENTIFY_SYSTEM` gives the replay timeline with a position that can lie beyond what is
-    replayed (WAL received and flushed), so "at or beyond `R1`" does not show that the reading is the later
-    one. The order is the caller's duty, and the backfill that calls it does not exist yet.
+  crash of a primary, both through the readings the takers make. Not run live: a standby that follows a new
+  primary onto a new timeline (and with it a cut dropped because its timeline is not proven yet), a standby of
+  a standby, the stream on one standby and the reads on another, and a restart of the reader's standby after a
+  sealed cut. For these the rule is argued and tested without a server. What stays open:
+  - *A replication connection to every standby we read.* The standby takers read `IDENTIFY_SYSTEM`, which only
+    a `replication=database` connection accepts (section 9.2 says why no SQL reading is as exact). So the
+    backfill needs one such connection to every standby it reads, and the runtime role must be allowed it
+    there (the `REPLICATION` attribute and a `pg_hba` entry for replication connections; also one walsender of
+    `max_wal_senders` per taker that holds it). The local cluster allows it. Whether PlanetScale allows a
+    replication connection to every replica it offers for reads is to verify in stage 2.
   - *Two nodes with the same timeline number.* Two nodes promoted independently both take the next number,
     with different content. `valid_on` compares numbers. For the stream's node the slot check compares the
     history (core design, section 8). Nothing compares the histories of two nodes when backfill reads use
     another replica than the slot.
-  - *Good cuts that are refused.* The three cases of section 9.2, and on a primary a clean restart before the
-    reader's reading. Each costs a repeated read. How often they occur was not measured.
+  - *Good cuts that are refused.* The two cases of section 9.2. Each costs a repeated read. How often they
+    occur was not measured. The wait for an unproven timeline lasts until the standby's next restart point,
+    which it makes once it has replayed a checkpoint of the new timeline, up to about `checkpoint_timeout` (5
+    minutes by default) later; it was not measured.
   - *The crash of a primary* was shown once, on 18.6. It needs the WAL to stay unflushed until the kill; the
     live test says so when it cannot show it. A crash of more than one node in the same window was not
     examined.
@@ -1542,8 +1579,8 @@ The text below replaces section 7.2 of `docs/design/core.md` as it stands on `ma
 section 7.2 and the rows 1 and 12 of its open points are those of `95ab8ee`), and those two rows. Changes
 against the present text are marked **[new]** or **[changed]**; the marks are not part of the text. After it
 come the changes outside 7.2. Since that commit `main` has added the rule about which tables have a key (rule K)
-to section 6 of the core design and nothing else (checked at `3140887`): section 7 and the open points are as
-they were.
+to section 6 of the core design and nothing else (checked at `3140887`, and again at `ca5cc7c`, the head of
+`main` at the second short fix round): section 7 and the open points are as they were.
 
 Nothing in this text uses the start of the commit record: the pipeline does not have it (section 2).
 
@@ -1626,24 +1663,14 @@ Nothing in this text uses the start of the commit record: the pipeline does not 
 > cannot be used for this: it answers `in progress` for as long as snapshots do not see the transaction.
 > `synchronized_standby_slots` does not close the gap either.
 >
-> **[new]** A cut belongs to the timeline it was taken on. After a promotion or a slot finding, open cuts are
-> abandoned and their backfills start again. A cut also belongs to the server life it was taken in. The
-> library decides both at the swap, after "has passed", from three readings (`valid_on`):
->
-> - what `IDENTIFY_SYSTEM` says on the node the stream reads from (section 8; never the control file), read at
->   the swap and not earlier: a timeline read while the cut is open says nothing about what the stream
->   delivers afterwards;
-> - what it says on the node the cut was taken on, read after the cut while that server still runs: at the
->   swap, or earlier and then kept;
-> - the start time of that server (`pg_postmaster_start_time()`), read with the second.
->
-> The stream's node must be on the cut's timeline beyond `R1`; the reader's node must have been on it at or
-> beyond `R1`; the start time must be the one the cut recorded. On a primary the insert position of the cut
-> stands for `R1`, and the reader's node must have flushed its WAL up to it: with `synchronous_commit = off` a
-> snapshot sees a transaction whose commit record a crash can lose, and after the restart the same timeline
-> carries other records at the same positions. A backfill that makes the reader's readings when its read under
-> the cut is complete keeps the cut through a later restart of that node (7.4: chunks stay restartable one by
-> one). Making them after the cut and not before is the backfill's duty; the library cannot see it.
+> **[new]** A cut belongs to the timeline it was taken on. After a promotion of the node the stream reads from,
+> or a slot finding, open cuts are abandoned and their backfills start again. A cut also belongs to the server
+> life it was taken in: the function that takes it reads the cut's node right after the cut, before it gives
+> the cut out, and keeps that reading on the cut (on a standby `IDENTIFY_SYSTEM`, over a replication
+> connection, and the server's start time; on a primary the start time and the flush position, once that has
+> reached the insert position of the cut). At the swap, after "has passed", the cut is used only if that reading
+> shows the cut's timeline and start time, and `IDENTIFY_SYSTEM` on the node the stream reads from, read then
+> and not earlier, shows the same timeline beyond `R1` (on a primary: at or beyond the insert position).
 >
 > **[changed]** **[test]** P3 has tested 7.2 (`docs/design/cut.md`, `evidence/p3/cut/`). On a standby: a model
 > check over every interleaving of small histories, and stress runs that compare the rows visible in each
@@ -1659,9 +1686,10 @@ Nothing in this text uses the start of the commit record: the pipeline does not 
 > slot on the primary, an idle source), with no violation; a row that a snapshot lost would not have been
 > counted in them. On a primary: 296,814 cuts and 159 million answers, none wrong; in 99,602 of these cuts
 > "has passed" was judged with the position the library reads (397,985 checks, none wrong). A promotion and a
-> crash of a primary with asynchronous commits were run as single scenarios; the other timeline cases are
-> argued and tested without a server. The tests stay in the repository: `tests/cut/` (hermetic, in the default
-> run) and `tests/cut/test_cut_live.py` (marker `localpg`), and `tools/cutstress` repeats every campaign.
+> crash of a primary with asynchronous commits were run as single scenarios, through the readings the takers
+> make; the other timeline cases are argued and tested without a server. The tests stay in the repository:
+> `tests/cut/` (hermetic, in the default run) and `tests/cut/test_cut_live.py` (marker `localpg`), and
+> `tools/cutstress` repeats every campaign.
 
 ### 13.2 Open points
 
@@ -1691,6 +1719,12 @@ The second needs a decision of the owner.
   > on the standby we read: on a server with the defect an importer leaves wrong hint bits, which every later
   > reader of those rows inherits (runbook, P5).
 
+- **7.1, "Read"**, after the rules for the source side. Add:
+
+  > Every standby the backfill reads must accept a replication connection from the runtime role: the function
+  > that takes a cut there reads `IDENTIFY_SYSTEM` on it right after the cut (7.2). So the backfill needs a
+  > replication connection to every node it reads, next to its SQL connections; on a primary none is needed.
+
 - **7.3, repair read** ("The repair snapshot must have `R0 ≥ caught_up_lsn`"). Add: "On a primary: the rule of
   7.2 that stands in for `R0 ≥ P0`, with the set taken at `caught_up_lsn`."
 - **7.4** ("one snapshot whose cut has no `unknown` transaction that touches the table"). Add: "A quiet
@@ -1699,3 +1733,40 @@ The second needs a decision of the owner.
   5.2)."
 - **7.5** needs no change. Its `xmin ≥ X` is sound on a standby and on a primary (cut.md sections 3 and 10.4).
   On a standby the snapshot must also be settled, which 7.2 now demands of every cut.
+
+### 13.4 Contract C9
+
+The coordinator's paragraph for `docs/design/p3_plan.md`, adjusted to the library as it is after the takers began
+to read the cut's node themselves. Ready to paste:
+
+> `cdc_v2.pg.cut` is the only code that takes or judges a cut (`docs/design/cut.md`). Standby: on each
+> connection that takes cuts, read `floor = settle_floor(conn)` once; it serves that connection only. Every taker
+> also needs `repl`, a second connection to the same standby opened with `replication=database`
+> (`connect(target, deadline, replication=True).raw`): B needs a replication connection to every node it reads,
+> and every standby we read must accept one from the runtime role. Keyed tables:
+> `take_standby_cut_after(conn, repl, p0, deadline, floor)` returns a settled and sealed `StandbyCut` with
+> `R0 ≥ P0`, its read-only REPEATABLE READ transaction left open. Tables without a key (rule K):
+> `take_keyless_standby_cut(conn, repl, p0, deadline, floor)`; if `cut.way == "exported"` readers call
+> `import_snapshot(c, cut.snapshot_id)`, if `"own"` this connection is the one reader. For every `END`, in
+> stream order: `cut.observe(E)`, then `cut.classify(E, xid32)`. Primary: `take_primary_cut_after(conn, X,
+> deadline)`, or `take_primary_cut` until `mark.admits(cut)` and then `cut = seal_primary_cut(conn, cut,
+> deadline)`; either way the cut is sealed (its server has flushed the WAL up to the cut's insert position) and
+> its transaction is left open; `classify(xid32)`. The stream lane (package S) starts a
+> `GapTracker(unknown_below=next_xid_marker(primary))` at each engine start, calls `delivered_xid32(txId)` for
+> each applied `END` and `probe(probe_snapshot(conn))` once per group, and hands `mark()` to B at every `P0` and
+> `caught_up_lsn`. At the swap, for every cut the table used: `has_passed(applied)`, then `valid_on(stream)`; if
+> false, the backfill starts again. `stream` is `slot.timeline_history` of the stream's node, read at the swap.
+> The caller reads nothing about the cut's own node: the taker read it right after the cut and keeps it on the
+> cut (`cut.sealed`). A cut from a one-attempt function (`take_standby_cut_own`, `take_standby_cut_exported`,
+> `take_primary_cut` without `seal_primary_cut`) is valid nowhere.
+
+What changed against the coordinator's version: the second argument `repl` of both standby takers and the
+sentence that requires it; "settled and sealed"; `seal_primary_cut` after `take_primary_cut`; `valid_on(stream)`
+in place of `valid_on(stream, reader, reader_start)`; the last two sentences in place of "`reader` and
+`reader_start` are read on the cut's node after the cut, while that server still runs".
+
+Sentences for the task files that change with this (only what differs from the coordinator's list after the
+first round): **B**: "the takers need a replication connection to the standby they read (`repl`); B reads
+nothing about the cut's node for `valid_on`"; **V**: unchanged ("V does nothing for open cuts; `valid_on` at the
+swap rejects them"); **P**: every standby we read must accept a replication connection from the runtime role
+(pre-flight check).
