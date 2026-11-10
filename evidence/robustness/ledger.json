@@ -178,6 +178,15 @@
         },
         {
           "fixed_commit": null,
+          "id": "fault-toy-ack_early-replica-s11-cd4c032",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 11,
+          "self_test": true,
+          "system": "toy-ack_early"
+        },
+        {
+          "fixed_commit": null,
           "id": "fault-toy-ack_early-replica-s2-b09e06a",
           "outcome": "violation",
           "regression_test": null,
@@ -191,6 +200,15 @@
           "outcome": "diverged",
           "regression_test": null,
           "seed": 3,
+          "self_test": true,
+          "system": "toy-ack_early"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-ack_early-replica-s5-d1acecf",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 5,
           "self_test": true,
           "system": "toy-ack_early"
         },
@@ -214,6 +232,15 @@
         },
         {
           "fixed_commit": null,
+          "id": "fault-toy-position_apart-replica-s13-d1acecf",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 13,
+          "self_test": true,
+          "system": "toy-position_apart"
+        },
+        {
+          "fixed_commit": null,
           "id": "fault-toy-position_apart-replica-s2-b09e06a",
           "outcome": "diverged",
           "regression_test": null,
@@ -227,6 +254,15 @@
           "outcome": "diverged",
           "regression_test": null,
           "seed": 3,
+          "self_test": true,
+          "system": "toy-position_apart"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-position_apart-replica-s5-d1acecf",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 5,
           "self_test": true,
           "system": "toy-position_apart"
         },
@@ -259,10 +295,28 @@
         },
         {
           "fixed_commit": null,
+          "id": "fault-toy-skip_on_reconnect-replica-s3-d1acecf",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 3,
+          "self_test": true,
+          "system": "toy-skip_on_reconnect"
+        },
+        {
+          "fixed_commit": null,
           "id": "fault-toy-swallow-replica-s2-b09e06a",
           "outcome": "violation",
           "regression_test": null,
           "seed": 2,
+          "self_test": true,
+          "system": "toy-swallow"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-swallow-replica-s3-d1acecf",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 3,
           "self_test": true,
           "system": "toy-swallow"
         }
@@ -272,31 +326,32 @@
       "groups": [
         {
           "all_runs": {
-            "divergences": 5,
-            "faults": 23,
+            "divergences": 7,
+            "faults": 40,
             "faults_per_kind": {
               "dest_error": 1,
               "hang_point": 1,
-              "kill_group": 7,
-              "kill_point": 9,
-              "kill_point_later": 3,
+              "kill_group": 14,
+              "kill_point": 17,
+              "kill_point_later": 5,
               "net_drop": 1,
               "spill_full": 1
             },
-            "hours": 0.0637,
+            "hours": 0.1073,
             "no_effect_per_kind": {
-              "kill_point": 1,
-              "kill_point_later": 1,
+              "kill_group": 1,
+              "kill_point": 6,
+              "kill_point_later": 3,
               "spill_full": 1
             },
             "outcomes": {
-              "diverged": 3,
-              "pass": 2,
+              "diverged": 5,
+              "pass": 3,
               "violation": 2
             },
-            "rounds": 466,
-            "runs": 7,
-            "seeds": 7
+            "rounds": 897,
+            "runs": 10,
+            "seeds": 10
           },
           "counted": {
             "divergences": 0,
@@ -347,23 +402,24 @@
         {
           "all_runs": {
             "divergences": 0,
-            "faults": 36,
+            "faults": 76,
             "faults_per_kind": {
-              "kill_group": 11,
-              "kill_point": 14,
-              "kill_point_later": 11
+              "kill_group": 26,
+              "kill_point": 32,
+              "kill_point_later": 18
             },
-            "hours": 0.0959,
+            "hours": 0.1904,
             "no_effect_per_kind": {
-              "kill_point": 7,
-              "kill_point_later": 3
+              "kill_group": 1,
+              "kill_point": 15,
+              "kill_point_later": 6
             },
             "outcomes": {
-              "pass": 5
+              "pass": 10
             },
-            "rounds": 816,
-            "runs": 5,
-            "seeds": 5
+            "rounds": 1707,
+            "runs": 10,
+            "seeds": 10
           },
           "counted": {
             "divergences": 0,
@@ -413,24 +469,25 @@
         },
         {
           "all_runs": {
-            "divergences": 4,
-            "faults": 27,
+            "divergences": 6,
+            "faults": 50,
             "faults_per_kind": {
-              "kill_group": 11,
-              "kill_point": 9,
-              "kill_point_later": 7
+              "kill_group": 22,
+              "kill_point": 18,
+              "kill_point_later": 10
             },
-            "hours": 0.0643,
+            "hours": 0.1293,
             "no_effect_per_kind": {
-              "kill_point": 3
+              "kill_point": 10,
+              "kill_point_later": 2
             },
             "outcomes": {
-              "diverged": 4,
-              "pass": 1
+              "diverged": 6,
+              "pass": 3
             },
-            "rounds": 527,
-            "runs": 5,
-            "seeds": 5
+            "rounds": 1113,
+            "runs": 9,
+            "seeds": 9
           },
           "counted": {
             "divergences": 0,
@@ -480,24 +537,24 @@
         },
         {
           "all_runs": {
-            "divergences": 2,
-            "faults": 4,
+            "divergences": 3,
+            "faults": 7,
             "faults_per_kind": {
               "net_drop": 1,
               "net_reset": 1,
-              "src_terminate": 2
+              "src_terminate": 5
             },
-            "hours": 0.0077,
+            "hours": 0.0117,
             "no_effect_per_kind": {
               "net_blackhole": 1
             },
             "outcomes": {
               "diverged": 1,
-              "violation": 1
+              "violation": 2
             },
-            "rounds": 72,
-            "runs": 2,
-            "seeds": 2
+            "rounds": 118,
+            "runs": 3,
+            "seeds": 3
           },
           "counted": {
             "divergences": 0,
@@ -547,22 +604,22 @@
         },
         {
           "all_runs": {
-            "divergences": 1,
+            "divergences": 2,
             "faults": 13,
             "faults_per_kind": {
               "dest_error": 13
             },
-            "hours": 0.0216,
+            "hours": 0.0224,
             "no_effect_per_kind": {
               "dest_error": 2
             },
             "outcomes": {
               "pass": 1,
-              "violation": 1
+              "violation": 2
             },
-            "rounds": 249,
-            "runs": 2,
-            "seeds": 2
+            "rounds": 254,
+            "runs": 3,
+            "seeds": 3
           },
           "counted": {
             "divergences": 0,
@@ -612,9 +669,9 @@
         }
       ],
       "restart": {
-        "commit": "5bd69ae9a5eb143c7a566369e4d20b47160c67f5",
-        "subject": "Replay of a reduced case: consumer loops only when a consumer loop found it; the oracle decides the others",
-        "why": "touches src/cdc_v2/testing/fuzz/reduce.py"
+        "commit": "b6d45f0ae15661e314152234c1bcbe3a0597398b",
+        "subject": "src_cancel looks for a running statement of the system for up to 3 s (an idle session cannot be cancelled)",
+        "why": "touches src/cdc_v2/testing/fuzz/faultkinds.py"
       }
     },
     "leadership": {
@@ -677,6 +734,231 @@
         },
         {
           "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s101-1d9a3d9",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 101,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s102-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 102,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s103-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 103,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s104-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 104,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s105-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 105,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s106-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 106,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s107-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 107,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s108-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 108,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s109-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 109,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s110-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 110,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s111-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 111,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s112-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 112,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s113-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 113,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s114-4af4006",
+          "outcome": "error",
+          "regression_test": null,
+          "seed": 114,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s115-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 115,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s116-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 116,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s117-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 117,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s118-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 118,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s119-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 119,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s120-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 120,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s121-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 121,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s122-d24ed79",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 122,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s123-d24ed79",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 123,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s124-d24ed79",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 124,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s125-d24ed79",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 125,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
           "id": "leadership-toy-no_fence-replica-s2-4dffb64",
           "outcome": "violation",
           "regression_test": null,
@@ -701,6 +983,15 @@
           "seed": 8,
           "self_test": true,
           "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s9-d1acecf",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 9,
+          "self_test": true,
+          "system": "toy-no_fence"
         }
       ],
       "failures_fixed": 0,
@@ -709,17 +1000,17 @@
         {
           "all_runs": {
             "divergences": 0,
-            "faults": 14,
+            "faults": 15,
             "faults_per_kind": {
               "dest_delay": 4,
               "dest_error": 2,
               "net_blackhole": 1,
-              "net_latency": 1,
+              "net_latency": 2,
               "net_reset": 3,
               "spill_full": 1,
               "src_terminate": 2
             },
-            "hours": 0.0967,
+            "hours": 0.124,
             "no_effect_per_kind": {
               "dest_delay": 1,
               "spill_full": 1,
@@ -727,11 +1018,11 @@
             },
             "outcomes": {
               "error": 1,
-              "pass": 7
+              "pass": 8
             },
-            "rounds": 30,
-            "runs": 8,
-            "seeds": 8
+            "rounds": 34,
+            "runs": 9,
+            "seeds": 9
           },
           "counted": {
             "divergences": 0,
@@ -753,7 +1044,7 @@
         },
         {
           "all_runs": {
-            "divergences": 3,
+            "divergences": 28,
             "faults": 11,
             "faults_per_kind": {
               "dest_error": 2,
@@ -764,7 +1055,7 @@
               "spill_full": 2,
               "src_terminate": 1
             },
-            "hours": 0.0819,
+            "hours": 0.2637,
             "no_effect_per_kind": {
               "dest_delay": 1,
               "net_blackhole": 1,
@@ -772,13 +1063,13 @@
               "src_terminate": 1
             },
             "outcomes": {
-              "error": 1,
+              "error": 2,
               "pass": 4,
-              "violation": 3
+              "violation": 28
             },
             "rounds": 22,
-            "runs": 8,
-            "seeds": 8
+            "runs": 34,
+            "seeds": 34
           },
           "counted": {
             "divergences": 0,
@@ -800,9 +1091,9 @@
         }
       ],
       "restart": {
-        "commit": "5bd69ae9a5eb143c7a566369e4d20b47160c67f5",
-        "subject": "Replay of a reduced case: consumer loops only when a consumer loop found it; the oracle decides the others",
-        "why": "touches src/cdc_v2/testing/fuzz/reduce.py"
+        "commit": "b6d45f0ae15661e314152234c1bcbe3a0597398b",
+        "subject": "src_cancel looks for a running statement of the system for up to 3 s (an idle session cannot be cancelled)",
+        "why": "touches src/cdc_v2/testing/fuzz/faultkinds.py"
       }
     },
     "stream": {
@@ -852,6 +1143,15 @@
           "seed": 2,
           "self_test": true,
           "system": "toy-trust_frames"
+        },
+        {
+          "fixed_commit": null,
+          "id": "stream-toy-trust_frames-replica-s3-d1acecf",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 3,
+          "self_test": true,
+          "system": "toy-trust_frames"
         }
       ],
       "failures_fixed": 0,
@@ -861,37 +1161,37 @@
           "against_minimum": {},
           "all_runs": {
             "divergences": 0,
-            "faults": 200000,
+            "faults": 220000,
             "faults_per_kind": {
-              "ack_regress": 10414,
-              "content_replaced_same_shape": 10358,
-              "cut_at_boundary": 10334,
-              "drop_begin": 10162,
-              "drop_end": 10196,
-              "dup_txn_same_life": 10248,
-              "end_count": 10304,
-              "flip_header_length": 10214,
-              "flip_header_seq": 10180,
-              "flip_header_type": 10299,
-              "flip_payload": 10202,
-              "foreign_rows": 10408,
-              "heartbeat_ahead": 10302,
-              "huge_length": 4939,
-              "new_life_replay": 10417,
-              "pipefault": 10217,
-              "raw_drop_frame": 10333,
-              "raw_dup_run": 10260,
-              "raw_swap": 10147,
-              "swap_records": 10066
+              "ack_regress": 11414,
+              "content_replaced_same_shape": 11326,
+              "cut_at_boundary": 11346,
+              "drop_begin": 11171,
+              "drop_end": 11192,
+              "dup_txn_same_life": 11245,
+              "end_count": 11276,
+              "flip_header_length": 11206,
+              "flip_header_seq": 11166,
+              "flip_header_type": 11301,
+              "flip_payload": 11202,
+              "foreign_rows": 11387,
+              "heartbeat_ahead": 11280,
+              "huge_length": 5981,
+              "new_life_replay": 11401,
+              "pipefault": 11253,
+              "raw_drop_frame": 11360,
+              "raw_dup_run": 11267,
+              "raw_swap": 11153,
+              "swap_records": 11073
             },
-            "hours": 0.173,
+            "hours": 0.1894,
             "no_effect_per_kind": {},
             "outcomes": {
-              "pass": 2
+              "pass": 3
             },
             "rounds": 0,
-            "runs": 2,
-            "seeds": 2
+            "runs": 3,
+            "seeds": 3
           },
           "counted": {
             "divergences": 0,
@@ -913,18 +1213,18 @@
         {
           "all_runs": {
             "divergences": 0,
-            "faults": 102,
+            "faults": 154,
             "faults_per_kind": {
-              "stream_bytes": 102
+              "stream_bytes": 154
             },
-            "hours": 0.0235,
+            "hours": 0.0351,
             "no_effect_per_kind": {},
             "outcomes": {
-              "pass": 2
+              "pass": 3
             },
-            "rounds": 258,
-            "runs": 2,
-            "seeds": 2
+            "rounds": 398,
+            "runs": 3,
+            "seeds": 3
           },
           "counted": {
             "divergences": 0,
@@ -946,20 +1246,20 @@
         },
         {
           "all_runs": {
-            "divergences": 2,
-            "faults": 14,
+            "divergences": 3,
+            "faults": 26,
             "faults_per_kind": {
-              "stream_bytes": 14
+              "stream_bytes": 26
             },
-            "hours": 0.0054,
+            "hours": 0.0094,
             "no_effect_per_kind": {},
             "outcomes": {
-              "diverged": 1,
+              "diverged": 2,
               "violation": 1
             },
-            "rounds": 47,
-            "runs": 2,
-            "seeds": 2
+            "rounds": 82,
+            "runs": 3,
+            "seeds": 3
           },
           "counted": {
             "divergences": 0,
@@ -981,9 +1281,9 @@
         }
       ],
       "restart": {
-        "commit": "5bd69ae9a5eb143c7a566369e4d20b47160c67f5",
-        "subject": "Replay of a reduced case: consumer loops only when a consumer loop found it; the oracle decides the others",
-        "why": "touches src/cdc_v2/testing/fuzz/reduce.py"
+        "commit": "b6d45f0ae15661e314152234c1bcbe3a0597398b",
+        "subject": "src_cancel looks for a running statement of the system for up to 3 s (an idle session cannot be cancelled)",
+        "why": "touches src/cdc_v2/testing/fuzz/faultkinds.py"
       }
     },
     "value": {
@@ -1028,9 +1328,9 @@
       "groups": [],
       "note": "not built yet: the value fuzzer belongs to the P4 type wave (task of package F)",
       "restart": {
-        "commit": "5bd69ae9a5eb143c7a566369e4d20b47160c67f5",
-        "subject": "Replay of a reduced case: consumer loops only when a consumer loop found it; the oracle decides the others",
-        "why": "touches src/cdc_v2/testing/fuzz/reduce.py"
+        "commit": "b6d45f0ae15661e314152234c1bcbe3a0597398b",
+        "subject": "src_cancel looks for a running statement of the system for up to 3 s (an idle session cannot be cancelled)",
+        "why": "touches src/cdc_v2/testing/fuzz/faultkinds.py"
       }
     },
     "workload": {
@@ -1164,10 +1464,28 @@
         },
         {
           "fixed_commit": null,
+          "id": "workload-toy-deferrable_by_key-replica-s2-d1acecf",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 2,
+          "self_test": true,
+          "system": "toy-deferrable_by_key"
+        },
+        {
+          "fixed_commit": null,
           "id": "workload-toy-keyless_toast_null-replica-s1-b09e06a",
           "outcome": "diverged",
           "regression_test": null,
           "seed": 1,
+          "self_test": true,
+          "system": "toy-keyless_toast_null"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-keyless_toast_null-replica-s2-d1acecf",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 2,
           "self_test": true,
           "system": "toy-keyless_toast_null"
         },
@@ -1186,6 +1504,15 @@
           "outcome": "diverged",
           "regression_test": null,
           "seed": 2,
+          "self_test": true,
+          "system": "toy-reorder"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-reorder-replica-s3-d1acecf",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 3,
           "self_test": true,
           "system": "toy-reorder"
         },
@@ -1218,6 +1545,15 @@
         },
         {
           "fixed_commit": null,
+          "id": "workload-toy-split-replica-s3-d1acecf",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 3,
+          "self_test": true,
+          "system": "toy-split"
+        },
+        {
+          "fixed_commit": null,
           "id": "workload-toy-swallow-replica-s1-ffdd6f4",
           "outcome": "violation",
           "regression_test": null,
@@ -1233,6 +1569,15 @@
           "seed": 2,
           "self_test": true,
           "system": "toy-swallow"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-swallow-replica-s3-d1acecf",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 3,
+          "self_test": true,
+          "system": "toy-swallow"
         }
       ],
       "failures_fixed": 0,
@@ -1243,14 +1588,14 @@
             "divergences": 0,
             "faults": 0,
             "faults_per_kind": {},
-            "hours": 0.0231,
+            "hours": 0.0347,
             "no_effect_per_kind": {},
             "outcomes": {
-              "pass": 2
+              "pass": 3
             },
-            "rounds": 254,
-            "runs": 2,
-            "seeds": 2
+            "rounds": 394,
+            "runs": 3,
+            "seeds": 3
           },
           "counted": {
             "divergences": 0,
@@ -1272,17 +1617,17 @@
         },
         {
           "all_runs": {
-            "divergences": 1,
+            "divergences": 2,
             "faults": 0,
             "faults_per_kind": {},
-            "hours": 0.0032,
+            "hours": 0.0064,
             "no_effect_per_kind": {},
             "outcomes": {
-              "diverged": 1
+              "diverged": 2
             },
-            "rounds": 36,
-            "runs": 1,
-            "seeds": 1
+            "rounds": 71,
+            "runs": 2,
+            "seeds": 2
           },
           "counted": {
             "divergences": 0,
@@ -1304,17 +1649,17 @@
         },
         {
           "all_runs": {
-            "divergences": 1,
+            "divergences": 2,
             "faults": 0,
             "faults_per_kind": {},
-            "hours": 0.0032,
+            "hours": 0.0064,
             "no_effect_per_kind": {},
             "outcomes": {
-              "diverged": 1
+              "diverged": 2
             },
-            "rounds": 36,
-            "runs": 1,
-            "seeds": 1
+            "rounds": 71,
+            "runs": 2,
+            "seeds": 2
           },
           "counted": {
             "divergences": 0,
@@ -1336,18 +1681,18 @@
         },
         {
           "all_runs": {
-            "divergences": 2,
+            "divergences": 3,
             "faults": 0,
             "faults_per_kind": {},
-            "hours": 0.0049,
+            "hours": 0.0055,
             "no_effect_per_kind": {},
             "outcomes": {
               "diverged": 1,
-              "violation": 1
+              "violation": 2
             },
-            "rounds": 35,
-            "runs": 2,
-            "seeds": 2
+            "rounds": 38,
+            "runs": 3,
+            "seeds": 3
           },
           "counted": {
             "divergences": 0,
@@ -1369,17 +1714,17 @@
         },
         {
           "all_runs": {
-            "divergences": 3,
+            "divergences": 4,
             "faults": 0,
             "faults_per_kind": {},
-            "hours": 0.0014,
+            "hours": 0.0018,
             "no_effect_per_kind": {},
             "outcomes": {
-              "violation": 3
+              "violation": 4
             },
-            "rounds": 3,
-            "runs": 3,
-            "seeds": 3
+            "rounds": 4,
+            "runs": 4,
+            "seeds": 4
           },
           "counted": {
             "divergences": 0,
@@ -1401,17 +1746,17 @@
         },
         {
           "all_runs": {
-            "divergences": 2,
+            "divergences": 3,
             "faults": 0,
             "faults_per_kind": {},
-            "hours": 0.007,
+            "hours": 0.0085,
             "no_effect_per_kind": {},
             "outcomes": {
-              "violation": 2
+              "violation": 3
             },
-            "rounds": 78,
-            "runs": 2,
-            "seeds": 2
+            "rounds": 93,
+            "runs": 3,
+            "seeds": 3
           },
           "counted": {
             "divergences": 0,
@@ -1433,9 +1778,9 @@
         }
       ],
       "restart": {
-        "commit": "5bd69ae9a5eb143c7a566369e4d20b47160c67f5",
-        "subject": "Replay of a reduced case: consumer loops only when a consumer loop found it; the oracle decides the others",
-        "why": "touches src/cdc_v2/testing/fuzz/reduce.py"
+        "commit": "b6d45f0ae15661e314152234c1bcbe3a0597398b",
+        "subject": "src_cancel looks for a running statement of the system for up to 3 s (an idle session cannot be cancelled)",
+        "why": "touches src/cdc_v2/testing/fuzz/faultkinds.py"
       }
     }
   },

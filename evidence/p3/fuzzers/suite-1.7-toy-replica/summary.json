@@ -1,10 +1,8 @@
 {
-  "all_passed": false,
+  "all_passed": true,
   "clean": true,
-  "commit": "ca3d5924fe11658c7effaac44fd9c328066d3f6b",
-  "failed_parts": [
-    "source_backends: not passed"
-  ],
+  "commit": "b6d45f0ae15661e314152234c1bcbe3a0597398b",
+  "failed_parts": [],
   "label": "SELF-TEST of the fuzzers on the toy (15-minute soak allowed; never counts for SPEC 1.7)",
   "parts": {
     "crash_points": {
@@ -18,15 +16,15 @@
     },
     "destination": {
       "faults": {
-        "dest_delay": 2,
+        "dest_delay": 3,
         "dest_error": 1,
-        "dest_hang": 2
+        "dest_hang": 1
       },
       "kinds_without_effect": [],
       "no_effect": {
-        "dest_delay": 2,
+        "dest_delay": 1,
         "dest_error": 3,
-        "dest_hang": 1
+        "dest_hang": 2
       },
       "outcome": "pass",
       "passed": true,
@@ -62,25 +60,25 @@
       "reason": ""
     },
     "soak": {
-      "faults_with_effect": 207,
-      "faults_without_effect": 57,
+      "faults_with_effect": 206,
+      "faults_without_effect": 58,
       "minimum_faults": 200,
       "minimum_seconds": 900.0,
       "no_effect": {
         "dest_delay": 1,
-        "dest_error": 3,
+        "dest_error": 4,
         "dest_hang": 3,
         "freeze": 3,
-        "hang_point": 2,
-        "kill_group": 3,
-        "kill_point": 10,
+        "hang_point": 3,
+        "kill_group": 2,
+        "kill_point": 11,
         "kill_point_later": 1,
         "net_drop": 4,
         "net_latency": 5,
         "net_reset": 1,
         "replica_restart": 7,
         "spill_full": 4,
-        "src_cancel": 3,
+        "src_cancel": 2,
         "src_restart_primary": 1,
         "src_terminate": 6
       },
@@ -89,12 +87,12 @@
       "passed": true,
       "per_kind": {
         "dest_delay": 6,
-        "dest_error": 8,
+        "dest_error": 7,
         "dest_hang": 6,
         "freeze": 21,
-        "hang_point": 9,
-        "kill_group": 19,
-        "kill_point": 20,
+        "hang_point": 8,
+        "kill_group": 20,
+        "kill_point": 19,
         "kill_point_later": 10,
         "net_blackhole": 7,
         "net_drop": 7,
@@ -105,6 +103,7 @@
         "slot_drop": 12,
         "slot_invalidate": 2,
         "spill_full": 14,
+        "src_cancel": 1,
         "src_lock": 4,
         "src_long_txn": 6,
         "src_restart_primary": 3,
@@ -112,37 +111,36 @@
         "src_wal_switch": 11
       },
       "reason": "",
-      "seconds": 952.774,
+      "seconds": 959.097,
       "soak_s": 900.0
     },
     "source_backends": {
       "faults": {
+        "src_cancel": 4,
         "src_terminate": 4
       },
-      "kinds_without_effect": [
-        "src_cancel"
-      ],
+      "kinds_without_effect": [],
       "no_effect": {
-        "src_cancel": 5
+        "src_cancel": 1
       },
       "outcome": "pass",
-      "passed": false,
+      "passed": true,
       "reason": ""
     },
     "spill": {
       "faults": {
-        "spill_full": 4
+        "spill_full": 5
       },
       "kinds_without_effect": [],
       "no_effect": {
-        "spill_full": 3
+        "spill_full": 2
       },
       "outcome": "pass",
       "passed": true,
       "reason": ""
     }
   },
-  "seconds": 1276.6,
+  "seconds": 1296.1,
   "seeds": [
     1,
     2,

@@ -374,7 +374,10 @@ suite whose summary is labelled a smoke run and whose soak never passes (`all_pa
 names the commit and whether the tree was clean. Pass = oracle equality after every run. `summary.json`, `crash_summary.json`, `crash_ledger.jsonl` and
 `runs.jsonl` are the format of the evidence of SPEC 1.7.
 
-**Result on the toy** (`evidence/p3/fuzzers/suite-1.7-toy-replica/`, commit a6bc667, clean tree, labelled a
+**Result on the toy** (fix round 2: commit b6d45f0, clean tree, all passed: 42/42 crash scenarios, 13/13 points,
+every kind of every group with effect, soak 959 s with 206 faults with effect of all 23 kinds and 58 without; an
+earlier run at ca3d592 failed because `src_cancel` met only idle sessions — the injection now waits for a running
+statement. Fix round 1, below, at commit a6bc667, clean tree, labelled a
 self-test, 1,325 s): all passed. 42 of 42 crash-point scenarios passed and all 13 declared points were reached
 (3 seeds each, plus `toyrep.commit_sent` under `kill_later`). Every kind of every group had at least one injection
 with a proven effect: network (blackhole 2, drop 2, latency 1, reset 1), destination (delay 2, error 1, hang 1),

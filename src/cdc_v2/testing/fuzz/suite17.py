@@ -140,6 +140,8 @@ def run_suite(system_name: str, out_dir: Path, repo: Path, source_node: str = "r
     work.mkdir(parents=True, exist_ok=True)
     register_root(work, "<run>")
     register_root(repo, "<repo>")
+    for name in ("crash_ledger.jsonl", "runs.jsonl"):        # one suite run per output directory, never appended
+        (out_dir / name).unlink(missing_ok=True)
     leases = _Leases(max(1, workers))
     from .run import git_state
     self_test = bool(make_system(system_name, None, source_node).is_self_test)
