@@ -3,7 +3,8 @@
 - Contract C5: "No other code writes a state column." Searched with `cdc_v2.testing.machines.find_state_writes`.
 - Contract C4: "No other module issues BEGIN, COMMIT or the fence statement." At run time the layer refuses a
   transaction statement from a caller (`test_lane.py::test_misuse_is_refused`). Here: only the layer opens a DuckDB
-  connection, and only the layer holds text that writes the fence table.
+  connection to the destination (another module may open a database in the memory of its process, and then holds
+  no text that could reach the destination), and only the layer holds text that writes the fence table.
 - Design 4.1: the rows of the leader tables are only ever updated; times come from MotherDuck's clock.
 
 What a search of source text cannot see is said in `find_state_writes`: SQL whose table or column name is built
@@ -24,6 +25,12 @@ SRC = os.path.join(ROOT, "src", "cdc_v2")
 #: must not read through the pipeline's own layer; it is allowed because it only reads
 #: (`test_the_oracle_only_reads`).
 MAY_CONNECT = ("md/", "testing/", "flightctl.py", "oracle/")
+#: A DuckDB database in the memory of the process. It is a tool for computing, not the destination: the plan names
+#: "the transform connection" and "apply's planning database" (`docs/design/p3_plan.md`). Any module may open one,
+#: written exactly as `duckdb.connect(":memory:", ...)`.
+LOCAL = ":memory:"
+#: SQL text with which a local database could reach the destination after all.
+_REACHES_OUT = re.compile(r"^\s*attach\b|\bmd:|^\s*(?:install|load)\s+['\"]?motherduck", re.IGNORECASE)
 #: Places of `MAY_CONNECT` whose SQL text must hold no statement that writes and no COMMIT.
 READ_ONLY = ("oracle/",)
 #: Where text that writes `_cdc.fence` may stand: the layer (fence statement, initialisation) and the take-over of
@@ -121,27 +128,76 @@ def test_the_search_walks_a_tree_and_honours_the_exclusions(tmp_path):
 
 
 # ------------------------------------------------------------------------------------------ the layer is the door
-def connect_calls(source):
-    """Lines that open a DuckDB connection: `duckdb.connect(...)`, or `connect` imported from `duckdb`."""
+def connect_calls(source, local=None):
+    """Lines that open a DuckDB connection: `duckdb.connect(...)`, or `connect` imported from `duckdb`.
+
+    A call is local when its first argument is the literal ``":memory:"``. ``local=True`` gives only the local
+    calls, ``local=False`` everything else (an import of `connect` is never local), ``None`` all of them."""
     lines = []
     for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "connect" \
                 and isinstance(node.func.value, ast.Name) and node.func.value.id in ("duckdb", "_duckdb"):
-            lines.append(node.lineno)
+            is_local = bool(node.args) and isinstance(node.args[0], ast.Constant) and node.args[0].value == LOCAL
+            if local is None or local == is_local:
+                lines.append(node.lineno)
         if isinstance(node, ast.ImportFrom) and node.module in ("duckdb", "_duckdb") \
-                and any(a.name in ("connect", "*") for a in node.names):
+                and any(a.name in ("connect", "*") for a in node.names) and not local:
             lines.append(node.lineno)
-    return lines
+    return sorted(lines)
+
+
+#: Every way of writing a connection that is not the one local form; each line must be found.
+SEEDED_CONNECTS = "\n".join((
+    "import duckdb",
+    "a = duckdb.connect('md:')",
+    "b = duckdb.connect(name)",
+    "c = duckdb.connect()",
+    "d = duckdb.connect(database=':memory:')",
+    "e = duckdb.connect('local.duckdb')",
+    "f = duckdb.connect(':memory:' if test else name)",
+    "from duckdb import connect",
+    "g = duckdb.connect(':memory:', config={'threads': 1})",
+    "h = duckdb.connect(':memory:')",
+)) + "\n"
 
 
 def test_only_the_layer_opens_a_duckdb_connection():
+    """Outside the places of `MAY_CONNECT` a module opens no DuckDB connection but a database in the memory of its
+    own process, written as the literal ``":memory:"``.
+
+    Seeded by the merge of package Y (the transform): until then this test refused every `duckdb.connect` outside
+    the layer, and `transform/convert.py` opens a local database to convert values. C4 is about the destination,
+    and the plan itself names the transform's connection and apply's planning database. What the rule protects is
+    kept: `test_no_code_outside_the_layer_holds_text_that_reaches_the_destination`."""
     assert connect_calls("import duckdb\nc = duckdb.connect('md:')\n") == [2]
     assert connect_calls("from duckdb import connect\n") == [1]
     assert connect_calls("from cdc_v2 import md\nc = md.connect('stream')\n") == []
-    found = [(rel, line) for rel, text in sources() for line in connect_calls(text) if not allowed(rel, MAY_CONNECT)]
-    assert found == [], ("a DuckDB connection is opened outside cdc_v2.md (use md.connect; contract C4): %r"
-                         % (found,))
+    assert connect_calls(SEEDED_CONNECTS) == [2, 3, 4, 5, 6, 7, 8, 9, 10]
+    assert connect_calls(SEEDED_CONNECTS, local=False) == [2, 3, 4, 5, 6, 7, 8]
+    assert connect_calls(SEEDED_CONNECTS, local=True) == [9, 10]
+    found = [(rel, line) for rel, text in sources() for line in connect_calls(text, local=False)
+             if not allowed(rel, MAY_CONNECT)]
+    assert found == [], ("a DuckDB connection that is not a database in memory is opened outside cdc_v2.md (use "
+                         "md.connect; contract C4): %r" % (found,))
     assert [rel for rel, text in sources() if rel.startswith("md/") and connect_calls(text)] == ["md/connection.py"]
+
+
+def test_no_code_outside_the_layer_holds_text_that_reaches_the_destination():
+    """A database in memory can attach another database. So outside the places of `MAY_CONNECT` no SQL text
+    attaches a database, names `md:` or loads the MotherDuck extension. Documentation is not searched; text that
+    is built at run time is not seen (`find_state_writes`)."""
+    for s in ("ATTACH 'md:'", "attach 'md:x' AS dest", " ATTACH DATABASE 'x.duckdb'", "LOAD motherduck",
+              "INSTALL 'motherduck'", "SELECT * FROM read_parquet('md:x')", "md:"):
+        assert _REACHES_OUT.search(s), s
+    for s in ("SELECT 1", "cannot attach the listener", "SET TimeZone = 'UTC'", "cmd: %s", "LOAD spatial",
+              "the attachment", "CREATE TABLE t (cmd VARCHAR)"):
+        assert not _REACHES_OUT.search(s), s
+    found = [(rel, line, s[:60]) for rel, text in sources() if not allowed(rel, MAY_CONNECT)
+             for line, s in statements(text) if _REACHES_OUT.search(s)]
+    assert found == [], "text that can reach the destination outside cdc_v2.md (contract C4): %r" % (found,)
+    # the search is not empty by accident: the layer itself holds such text
+    assert any(_REACHES_OUT.search(s) for rel, text in sources() if rel.startswith("md/")
+               for line, s in statements(text))
 
 
 _FENCE_WRITE = re.compile(r"\b(?:UPDATE|INSERT\s+(?:OR\s+\w+\s+)?INTO|DELETE\s+FROM|MERGE\s+INTO)\s+\"?_cdc\"?\s*\.\s*"

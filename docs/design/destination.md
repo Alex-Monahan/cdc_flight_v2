@@ -928,7 +928,8 @@ transaction. `docs/spike/md_semantics.md` measured 8 ms per round trip from a Fl
 | `test_no_code_outside_the_state_module_writes_a_state_column` | no `UPDATE`, `INSERT` or `MERGE` text outside `cdc_v2.state` names the state column of a declared machine | it sees SQL text in string literals of Python files; a statement built from parts at run time is seen only as far as its literals show it |
 | `test_the_search_finds_seeded_writes_and_nothing_else` | the search finds seeded writes of each kind and no false ones | |
 | `test_the_search_walks_a_tree_and_honours_the_exclusions` | the search reads every Python file of a tree and leaves out only what it is told to | |
-| `test_only_the_layer_opens_a_duckdb_connection` | `duckdb.connect` is called only in `cdc_v2/md`, `cdc_v2/testing`, `flightctl.py` and `cdc_v2/oracle` | a call through another name is not seen |
+| `test_only_the_layer_opens_a_duckdb_connection` | outside `cdc_v2/md`, `cdc_v2/testing`, `flightctl.py` and `cdc_v2/oracle`, `duckdb.connect` is called only for a database in the memory of the process, written as the literal `":memory:"` (contract note 37) | a call through another name is not seen |
+| `test_no_code_outside_the_layer_holds_text_that_reaches_the_destination` | outside the same places no SQL text attaches a database, names `md:` or loads the MotherDuck extension, so a database in memory stays one | as the first |
 | `test_the_oracle_only_reads` | no SQL text of `cdc_v2/oracle` writes or commits; that is why the oracle may open a connection of its own | as the first |
 | `test_only_the_layer_holds_the_fence_statement` | the fence statement exists once | |
 | `test_no_text_deletes_or_inserts_leader_rows` | no SQL text deletes or inserts rows of the three leader tables | as the first |
@@ -1078,6 +1079,17 @@ the test that holds it. Tests without a file name are in `tests/destination/test
 36. **The bound of a lane call that fails** is `rollback_deadline_s` plus the grace period after the failed
     step, for the whole clean-up (section 4). C4 says only that the roll-back has a short deadline.
 
+**Added with the merge of the transform (package Y)**
+
+37. **"Only the layer opens a DuckDB connection" is read as "only the layer opens a connection to the
+    destination".** C4 names `md.connect` as the way to the destination. It does not speak of a DuckDB database
+    that a module uses to compute, and the plan names two of them: "the transform connection" and "apply's
+    planning database" (`docs/design/p3_plan.md`, section 6.2, "From the review of F"). Built in the static
+    tests (section 12): outside the layer, its test helpers, `flightctl.py` and the oracle, a module may open a
+    database in the memory of its process, written as `duckdb.connect(":memory:", …)` with that literal, and no
+    SQL text there attaches a database, names `md:` or loads the MotherDuck extension. Until the transform was
+    merged the test refused every `duckdb.connect` outside those places (finding 23).
+
 ## 14. Findings that differ from the design or the spike reports
 
 Each finding names what the design (`docs/design/core.md`) or the spike report (`docs/spike/md_semantics.md`)
@@ -1163,6 +1175,17 @@ says, what was measured, and where the evidence is.
     branch); those are not connections of the layer and not connections to the destination.
 22. **`MERGE INTO` reports no count through the layer, and `TRUNCATE` reports the rows it removed**
     (`from_apply.json`, key `merge_and_truncate`: `None`, and 3 for a table of 3 rows).
+23. **A static test of this package refused the transform.**
+    `test_static.py::test_only_the_layer_opens_a_duckdb_connection` refused every `duckdb.connect` outside the
+    layer. `src/cdc_v2/transform/convert.py` (package Y) opens a database in memory to convert values. The test
+    failed in the default run when `origin/main` with the transform was merged into this branch on 2026-11-10
+    (1 failed: `('transform/convert.py', 79)`). The rule of the test was wider than C4, and the plan names such
+    databases; the transform is not wrong (contract note 37). The test now refuses every connection outside
+    the layer but the literal `":memory:"`, with seeded cases for every other way of writing one. A second test,
+    `test_no_code_outside_the_layer_holds_text_that_reaches_the_destination`, refuses the SQL text with which
+    such a database could reach MotherDuck. The two rules were also run by hand over the files of package A on
+    its branch (commit `68df804`, read only): 3 connections in `apply/backend.py` and `apply/core.py`, all in
+    that form, and no such text. The test run itself reads only this branch.
 
 **Agreement with the spike report**
 
@@ -1252,6 +1275,10 @@ For packages A, L, S, V, B and the integrator. Each line is backed by the sectio
 **Every caller**
 
 - A deadline is a `cdc_v2.deadline.Deadline`, not a number (contract note 1).
+- A DuckDB database that you need to compute with is opened as `duckdb.connect(":memory:", …)`, with that
+  literal. Any other `duckdb.connect` outside the layer, and any SQL text there that attaches a database or
+  names `md:`, fails the static tests (contract note 37, finding 23). The destination is reached with
+  `md.connect` only.
 - **Write the columns your condition reads** when the statement must conflict with another writer (section 6).
 - Follow the run-again rule of C4: read what the transaction depends on inside the transaction, and move it
   with `execute_one` and a condition on what was read. Section 8.5 shows what happens without it.
