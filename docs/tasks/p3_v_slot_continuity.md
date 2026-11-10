@@ -120,8 +120,8 @@ decides. A read that fails is not a finding.
 
 Declare it with `state.declare` (C5) as design section 9 lists it — `unverified → verified → streaming ⇄
 stalled`, `broken → rebuilding → verified` — together with package S, which already enacts some of its states:
-one declaration, in one module, extended by you. Every transition goes through `state.transition` in the transaction
-that does the work. Run package D's enumeration helper for it.
+one declaration, in one module, extended by you. Every transition goes through `state.transition` in the
+transaction that does the work. Run package D's enumeration helper for it.
 
 ## Tests
 
