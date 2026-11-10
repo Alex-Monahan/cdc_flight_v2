@@ -4,54 +4,57 @@ platform darwin -- Python 3.13.1, pytest-9.2.0, pluggy-1.7.0
 rootdir: ~/Documents/claude_auto/cdc_flight_v2/.claude/worktrees/agent-a2e6fbe4207b30836
 configfile: pyproject.toml
 plugins: hypothesis-6.170.15, timeout-2.4.0
-collected 66 items / 6 deselected / 60 selected
+collected 75 items / 6 deselected / 69 selected
 
-tests/harness/test_harness_crash_runner.py ......s                       [ 11%]
-tests/harness/test_harness_crashpoints.py ..................             [ 41%]
-tests/harness/test_harness_faultsites.py ..........                      [ 58%]
+tests/harness/test_harness_crash_runner.py .......s                      [ 11%]
+tests/harness/test_harness_crashpoints.py ...................            [ 39%]
+tests/harness/test_harness_evidence.py ...                               [ 43%]
+tests/harness/test_harness_faultsites.py ............                    [ 60%]
 tests/harness/test_harness_netproxy.py ............                      [ 78%]
-tests/harness/test_harness_pipefaults.py .......                         [ 90%]
-tests/harness/test_harness_procs.py ......                               [100%]
+tests/harness/test_harness_pipefaults.py ........                        [ 89%]
+tests/harness/test_harness_procs.py .......                              [100%]
 
 ============================== slowest durations ===============================
-3.79s call     tests/harness/test_harness_crash_runner.py::test_freeze_and_continue_with_a_second_instance
-3.01s call     tests/harness/test_harness_crash_runner.py::test_wrong_toy_is_caught
-2.90s call     tests/harness/test_harness_crash_runner.py::test_a_hung_instance_that_blocks_progress_is_caught
-2.73s call     tests/harness/test_harness_crash_runner.py::test_correct_toy_passes_at_every_point_with_three_seeds
-2.45s call     tests/harness/test_harness_crash_runner.py::test_random_kills
-2.33s call     tests/harness/test_harness_crash_runner.py::test_a_point_that_is_never_reached_is_a_failure
-1.70s call     tests/harness/test_harness_faultsites.py::test_a_running_process_obeys_changes_of_the_control_file
-1.44s call     tests/harness/test_harness_pipefaults.py::test_relay_between_two_processes
-0.92s call     tests/harness/test_harness_netproxy.py::test_control_from_other_processes_and_concurrent_allocation
-0.91s call     tests/harness/test_harness_netproxy.py::test_blackhole_one_direction
+3.77s call     tests/harness/test_harness_crash_runner.py::test_freeze_and_continue_with_a_second_instance
+3.06s call     tests/harness/test_harness_crash_runner.py::test_wrong_toy_is_caught
+2.81s call     tests/harness/test_harness_crash_runner.py::test_correct_toy_passes_at_every_point_with_three_seeds
+2.76s call     tests/harness/test_harness_crash_runner.py::test_a_hung_instance_that_blocks_progress_is_caught
+2.42s call     tests/harness/test_harness_crash_runner.py::test_random_kills
+2.21s call     tests/harness/test_harness_crash_runner.py::test_a_point_that_is_never_reached_is_a_failure
+1.65s call     tests/harness/test_harness_faultsites.py::test_a_running_process_obeys_changes_of_the_control_file
+1.14s call     tests/harness/test_harness_pipefaults.py::test_relay_between_two_processes
+0.98s call     tests/harness/test_harness_crash_runner.py::test_kill_while_the_commit_is_in_flight
+0.92s call     tests/harness/test_harness_netproxy.py::test_blackhole_one_direction
+0.77s call     tests/harness/test_harness_netproxy.py::test_control_from_other_processes_and_concurrent_allocation
 0.72s call     tests/harness/test_harness_faultsites.py::test_window_and_glob
-0.66s call     tests/harness/test_harness_crashpoints.py::test_hang_action_blocks_until_killed
-0.59s call     tests/harness/test_harness_procs.py::test_group_stop_and_kill_reach_children_and_escapees_are_tracked
+0.63s call     tests/harness/test_harness_crashpoints.py::test_hang_action_blocks_until_killed
 0.51s call     tests/harness/test_harness_netproxy.py::test_delay
 0.50s call     tests/harness/test_harness_netproxy.py::test_blackhole_both_holds_and_releases
-0.48s call     tests/harness/test_harness_procs.py::test_survivor_check_fails_while_something_lives
-0.48s call     tests/harness/test_harness_procs.py::test_own_session_group_and_signals
-0.47s call     tests/harness/test_harness_netproxy.py::test_throttle
-0.45s call     tests/harness/test_harness_pipefaults.py::test_reproducible_and_independent_of_chunking
-0.41s call     tests/harness/test_harness_faultsites.py::test_block_until_rule_removed
-0.37s call     tests/harness/test_harness_procs.py::test_three_competing_instances
-0.34s call     tests/harness/test_harness_pipefaults.py::test_every_corrupting_fault_is_detected_and_contained
-0.31s call     tests/harness/test_harness_netproxy.py::test_per_connection_fault
-0.30s call     tests/harness/test_harness_crashpoints.py::test_stop_action_freezes_and_continues
+0.46s call     tests/harness/test_harness_netproxy.py::test_throttle
+0.46s call     tests/harness/test_harness_faultsites.py::test_block_until_rule_removed
+0.41s call     tests/harness/test_harness_procs.py::test_survivor_check_fails_while_something_lives
+0.37s call     tests/harness/test_harness_pipefaults.py::test_reproducible_and_independent_of_chunking
+0.37s call     tests/harness/test_harness_procs.py::test_own_session_group_and_signals
+0.33s call     tests/harness/test_harness_procs.py::test_group_stop_and_kill_reach_children_and_escapees_are_tracked
+0.33s call     tests/harness/test_harness_crashpoints.py::test_kill_later_kills_while_the_next_call_is_in_flight
+0.33s teardown tests/harness/test_harness_netproxy.py::test_control_from_other_processes_and_concurrent_allocation
+0.30s call     tests/harness/test_harness_netproxy.py::test_per_connection_fault
+0.27s call     tests/harness/test_harness_pipefaults.py::test_every_corrupting_fault_is_detected_and_contained
 0.24s call     tests/harness/test_harness_faultsites.py::test_block_with_time_limit
-0.23s teardown tests/harness/test_harness_netproxy.py::test_control_from_other_processes_and_concurrent_allocation
+0.21s call     tests/harness/test_harness_procs.py::test_three_competing_instances
 0.21s call     tests/harness/test_harness_faultsites.py::test_delay
-0.11s call     tests/harness/test_harness_procs.py::test_exit_status_of_normal_exit
-0.10s call     tests/harness/test_harness_crashpoints.py::test_cli_lists_points
-0.08s call     tests/harness/test_harness_crashpoints.py::test_no_switch_no_crash_and_log_only_mode
+0.21s call     tests/harness/test_harness_crashpoints.py::test_stop_action_freezes_and_continues
+0.09s call     tests/harness/test_harness_crashpoints.py::test_cli_lists_points
+0.08s call     tests/harness/test_harness_procs.py::test_exit_status_of_normal_exit
+0.07s call     tests/harness/test_harness_crashpoints.py::test_no_switch_no_crash_and_log_only_mode
 0.05s call     tests/harness/test_harness_pipefaults.py::test_module_runs_as_a_process
-0.05s call     tests/harness/test_harness_faultsites.py::test_off_is_a_noop_and_cheap
-0.04s call     tests/harness/test_harness_crashpoints.py::test_cost_when_off
+0.05s call     tests/harness/test_harness_procs.py::test_a_reaped_and_empty_group_is_never_signalled
+0.04s call     tests/harness/test_harness_faultsites.py::test_off_is_a_noop_and_cheap
 0.04s call     tests/harness/test_harness_crashpoints.py::test_seeded_hit_matches_the_contract
-0.04s call     tests/harness/test_harness_crashpoints.py::test_kill_action_kills_the_process_at_the_point
+0.04s call     tests/harness/test_harness_crashpoints.py::test_cost_when_off
 0.03s call     tests/harness/test_harness_netproxy.py::test_port_range_and_pass
+0.03s call     tests/harness/test_harness_crashpoints.py::test_kill_action_kills_the_process_at_the_point
 0.01s call     tests/harness/test_harness_netproxy.py::test_two_proxies_get_distinct_ports_and_leases
-0.01s call     tests/harness/test_harness_crashpoints.py::test_every_crash_point_called_in_product_code_is_declared
 
-(141 durations < 0.005s hidden.  Use -vv to show these durations.)
-================= 59 passed, 1 skipped, 6 deselected in 30.64s =================
+(166 durations < 0.005s hidden.  Use -vv to show these durations.)
+================= 68 passed, 1 skipped, 6 deselected in 30.32s =================

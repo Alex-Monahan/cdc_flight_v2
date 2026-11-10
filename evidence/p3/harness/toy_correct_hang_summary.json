@@ -32,6 +32,7 @@
     "toy.batch_read",
     "toy.data_written",
     "toy.position_written",
+    "toy.commit_sent",
     "toy.committed"
   ],
   "failures": [

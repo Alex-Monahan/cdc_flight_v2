@@ -8,10 +8,10 @@
   },
   "results": {
     "blackhole": {
-      "both_directions_s": 2.01,
+      "both_directions_s": 2.003,
       "both_error": "OperationalError",
       "reply_lost_error": "OperationalError",
-      "reply_lost_s": 2.01
+      "reply_lost_s": 2.002
     },
     "blackhole_keepalive_only": {
       "detected": false,
@@ -32,7 +32,7 @@
     "reset": {
       "idle_error": "OperationalError",
       "idle_then_statement_s": 0.0,
-      "in_flight_after_reset_s": 0.006,
+      "in_flight_after_reset_s": 0.01,
       "in_flight_error": "OperationalError"
     },
     "tls_through_proxy": {

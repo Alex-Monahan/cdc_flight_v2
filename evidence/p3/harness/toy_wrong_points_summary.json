@@ -8,6 +8,9 @@
     "toy.begun": {
       "pass": 3
     },
+    "toy.commit_sent": {
+      "diverged": 3
+    },
     "toy.committed": {
       "pass": 3
     },
@@ -47,7 +50,7 @@
     "workers": 4,
     "workload_interval": 0.05
   },
-  "coverage": "7/7",
+  "coverage": "8/8",
   "declared_points": [
     "toy.schema_ready",
     "toy.begun",
@@ -55,6 +58,7 @@
     "toy.data_written",
     "toy.data_committed",
     "toy.position_written",
+    "toy.commit_sent",
     "toy.committed"
   ],
   "failures": [
@@ -62,15 +66,15 @@
       "mode": "crash_point",
       "outcome": "diverged",
       "point": "toy.data_committed",
-      "reason": "missing 0, duplicated 5, extra 0, wrong 0, position 15 of 15",
-      "seed": 1
+      "reason": "missing 0, duplicated 7, extra 0, wrong 0, position 15 of 15",
+      "seed": 2
     },
     {
       "mode": "crash_point",
       "outcome": "diverged",
       "point": "toy.data_committed",
-      "reason": "missing 0, duplicated 7, extra 0, wrong 0, position 15 of 15",
-      "seed": 2
+      "reason": "missing 0, duplicated 5, extra 0, wrong 0, position 15 of 15",
+      "seed": 1
     },
     {
       "mode": "crash_point",
@@ -90,33 +94,55 @@
       "mode": "crash_point",
       "outcome": "diverged",
       "point": "toy.position_written",
+      "reason": "missing 0, duplicated 5, extra 0, wrong 0, position 16 of 16",
+      "seed": 3
+    },
+    {
+      "mode": "crash_point",
+      "outcome": "diverged",
+      "point": "toy.commit_sent",
+      "reason": "missing 0, duplicated 5, extra 0, wrong 0, position 15 of 15",
+      "seed": 1
+    },
+    {
+      "mode": "crash_point",
+      "outcome": "diverged",
+      "point": "toy.position_written",
       "reason": "missing 0, duplicated 5, extra 0, wrong 0, position 15 of 15",
       "seed": 2
     },
     {
       "mode": "crash_point",
       "outcome": "diverged",
-      "point": "toy.position_written",
-      "reason": "missing 0, duplicated 5, extra 0, wrong 0, position 16 of 16",
+      "point": "toy.commit_sent",
+      "reason": "missing 0, duplicated 3, extra 0, wrong 0, position 19 of 19",
+      "seed": 2
+    },
+    {
+      "mode": "crash_point",
+      "outcome": "diverged",
+      "point": "toy.commit_sent",
+      "reason": "missing 0, duplicated 6, extra 0, wrong 0, position 16 of 16",
       "seed": 3
     }
   ],
   "missing_points": [],
   "outcomes": {
-    "diverged": 6,
+    "diverged": 9,
     "pass": 15
   },
   "reached_points": [
     "toy.batch_read",
     "toy.begun",
+    "toy.commit_sent",
     "toy.committed",
     "toy.data_committed",
     "toy.data_written",
     "toy.position_written",
     "toy.schema_ready"
   ],
-  "runs": 21,
+  "runs": 24,
   "runs_by_mode": {
-    "crash_point": 21
+    "crash_point": 24
   }
 }

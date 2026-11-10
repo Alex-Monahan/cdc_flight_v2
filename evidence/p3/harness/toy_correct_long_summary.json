@@ -8,6 +8,9 @@
     "toy.begun": {
       "pass": 20
     },
+    "toy.commit_sent": {
+      "pass": 20
+    },
     "toy.committed": {
       "pass": 20
     },
@@ -44,31 +47,33 @@
     "workers": 4,
     "workload_interval": 0.05
   },
-  "coverage": "6/6",
+  "coverage": "7/7",
   "declared_points": [
     "toy.schema_ready",
     "toy.begun",
     "toy.batch_read",
     "toy.data_written",
     "toy.position_written",
+    "toy.commit_sent",
     "toy.committed"
   ],
   "failures": [],
   "missing_points": [],
   "outcomes": {
-    "pass": 160
+    "pass": 180
   },
   "reached_points": [
     "toy.batch_read",
     "toy.begun",
+    "toy.commit_sent",
     "toy.committed",
     "toy.data_written",
     "toy.position_written",
     "toy.schema_ready"
   ],
-  "runs": 160,
+  "runs": 180,
   "runs_by_mode": {
-    "crash_point": 120,
+    "crash_point": 140,
     "freeze": 20,
     "random_kill": 20
   }

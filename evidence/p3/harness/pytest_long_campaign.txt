@@ -4,8 +4,8 @@ platform darwin -- Python 3.13.1, pytest-9.2.0, pluggy-1.7.0
 rootdir: ~/Documents/claude_auto/cdc_flight_v2/.claude/worktrees/agent-a2e6fbe4207b30836
 configfile: pyproject.toml
 plugins: hypothesis-6.170.15, timeout-2.4.0
-collected 7 items / 6 deselected / 1 selected
+collected 8 items / 7 deselected / 1 selected
 
 tests/harness/test_harness_crash_runner.py .                             [100%]
 
-======================= 1 passed, 6 deselected in 42.41s =======================
+======================= 1 passed, 7 deselected in 45.65s =======================

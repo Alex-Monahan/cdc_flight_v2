@@ -321,7 +321,7 @@ chunked. Pass the relay's ends to child processes with `pass_fds` and close the 
 ## 9. Self-tests and evidence
 
 ```sh
-uv run -q pytest -q tests/harness                                     # hermetic, about 25 s
+uv run -q pytest -q tests/harness                                     # hermetic, about 30 s
 tools/with-env uv run -q pytest -q -m t1 tests/harness/test_harness_pg_proxy.py    # shared local cluster, about 10 s
 CDC_V2_HARNESS_LONG=1 uv run -q pytest -q tests/harness/test_harness_crash_runner.py -k long   # opt-in campaign
 CDC_V2_HARNESS_EVIDENCE=evidence/p3/harness uv run -q pytest -q tests/harness    # also writes the evidence files
