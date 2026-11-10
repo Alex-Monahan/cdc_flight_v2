@@ -14,13 +14,14 @@ import threading
 import time
 from bisect import bisect_left, bisect_right
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 from typing import Callable, Optional
 
 import psycopg
 
 from cdc_v2 import lsn as L
-from cdc_v2.deadline import Deadline
+from cdc_v2.deadline import Deadline, DeadlineExceeded
 from cdc_v2.pg import cut as C
 from cdc_v2.testing import cutstress as S
 from cdc_v2.testing import pgoutput as P
@@ -139,13 +140,14 @@ def keyless(cl: S.Cluster, quiet_wait_s: float = 1.0) -> dict:
     exported snapshot ends with a result (not an error) and the library's entry point falls back to one reader
     with its own snapshot.  After the transaction has ended, the same entry point returns a quiet exported
     snapshot, which a second session imports.  On a server without the export defect the entry point returns an
-    exported snapshot in both situations."""
+    exported snapshot in both situations.  Every cut the entry point gives out is sealed: it read the standby's
+    ``IDENTIFY_SYSTEM`` and start time on a replication connection right after the cut."""
     open_key, other_key = 2, 3
     S.setup(cl, [1, open_key, other_key], "replica")
     out: dict = {"quiet_wait_s": quiet_wait_s}
     try:
         with cl.connect("primary") as a, cl.connect("primary") as b, cl.connect("replica") as x, \
-                cl.connect("replica") as y:
+                cl.connect("replica") as y, cl.connect("replica", replication="database") as xr:
             out["server_version_num"] = C.server_version_num(x)
             defect = out["server_has_the_export_defect"] = C.export_defect(out["server_version_num"])
             floor = C.settle_floor(x)
@@ -155,7 +157,7 @@ def keyless(cl: S.Cluster, quiet_wait_s: float = 1.0) -> dict:
             b.execute(INC, (other_key,))
             p0 = _flush_and_replay(cl, a)
             t = time.monotonic()
-            got = C.take_standby_cut_after(x, p0, Deadline.after(quiet_wait_s), floor, exported=True,
+            got = C.take_standby_cut_after(x, xr, p0, Deadline.after(quiet_wait_s), floor, exported=True,
                                            quiet_only=True)
             out["while_a_transaction_is_open"] = {
                 "quiet_only_wait_returned": type(got).__name__, "is_false_in_a_condition": not got,
@@ -165,24 +167,25 @@ def keyless(cl: S.Cluster, quiet_wait_s: float = 1.0) -> dict:
                 "text": str(got) if isinstance(got, C.NoQuietSnapshot) else None}
             if isinstance(got, C.StandbyCut):
                 C.end_transaction(x)
-            cut = C.take_keyless_standby_cut(x, p0, Deadline.after(60), floor, quiet_wait_s=quiet_wait_s)
+            cut = C.take_keyless_standby_cut(x, xr, p0, Deadline.after(60), floor, quiet_wait_s=quiet_wait_s)
             fallback = cut.extra.get("quiet_wait")
             out["keyless_cut_while_open"] = {
                 "way": cut.way, "usable_after_p0": cut.usable_after(p0), "snapshot": str(cut.bounds),
+                "sealed": cut.sealed,
                 "quiet_wait_result_kept": type(fallback).__name__ if fallback is not None else None,
                 "the_one_reader_sees_the_open_transaction": x.execute(GET, (open_key,)).fetchone()[0] != 0,
                 "the_one_reader_sees_the_committed_one": x.execute(GET, (other_key,)).fetchone()[0] == 1}
             C.end_transaction(x)
             a.execute("COMMIT")
             p1 = _flush_and_replay(cl, a)
-            cut = C.take_keyless_standby_cut(x, p1, Deadline.after(60), floor, quiet_wait_s=30.0)
+            cut = C.take_keyless_standby_cut(x, xr, p1, Deadline.after(60), floor, quiet_wait_s=30.0)
             reader = x
             if cut.way == "exported":
                 C.import_snapshot(y, cut.snapshot_id)
                 reader = y
             out["keyless_cut_after_the_commit"] = {
                 "way": cut.way, "is_quiet": cut.is_quiet, "usable_after_p0": cut.usable_after(p1),
-                "snapshot": str(cut.bounds),
+                "snapshot": str(cut.bounds), "sealed": cut.sealed,
                 "a_reader_that_imports_it_sees_both": [reader.execute(GET, (k,)).fetchone()[0]
                                                        for k in (open_key, other_key)] == [1, 1]}
             if cut.way == "exported":
@@ -194,6 +197,7 @@ def keyless(cl: S.Cluster, quiet_wait_s: float = 1.0) -> dict:
             first["quiet_only_wait_returned"] == "NoQuietSnapshot" and first["is_false_in_a_condition"]
             and first["oldest_running_is_the_open_transaction"]
             and second["way"] == ("own" if defect else "exported") and second["usable_after_p0"]
+            and second["sealed"] and third["sealed"]
             and (second["quiet_wait_result_kept"] == "NoQuietSnapshot") == defect
             and not second["the_one_reader_sees_the_open_transaction"]
             and second["the_one_reader_sees_the_committed_one"]
@@ -845,29 +849,27 @@ def identify(conn) -> C.TimelineReading:
     return C.TimelineReading(int(tli), L.parse(pos))
 
 
-def swap_readings(cl: S.Cluster, stream_node: str, reader_node: str) -> tuple:
-    """What ``valid_on`` of a cut asks for at the swap, read in its order: the stream's node, the reader's node
-    (one reading serves both when they are one node), then the start time of the reader's node."""
-    with cl.connect(reader_node, replication="database") as r:
-        if stream_node == reader_node:
-            stream = reader = identify(r)
-        else:
-            with cl.connect(stream_node, replication="database") as s:
-                stream = identify(s)
-            reader = identify(r)
-        return stream, reader, int(r.execute(C.SQL_SERVER_START).fetchone()[0])
+def stream_reading(cl: S.Cluster, stream_node: str) -> C.TimelineReading:
+    """What ``valid_on`` of a cut asks for at the swap: ``IDENTIFY_SYSTEM`` on the node the stream reads from,
+    read then.  Nothing about the cut's own node is read here: the taker read it right after the cut."""
+    with cl.connect(stream_node, replication="database") as s:
+        return identify(s)
 
 
-def _reading_facts(stream, reader, start) -> dict:
-    return {"stream": {"timeline": stream.timeline, "position": L.format(stream.position)},
-            "reader": {"timeline": reader.timeline, "position": L.format(reader.position)}}
+def _reading_fact(reading) -> Optional[dict]:
+    if reading is None:
+        return None
+    return {"timeline": reading.timeline, "position": L.format(reading.position)}
 
 
 def promotion(cl: S.Cluster) -> dict:
-    """A second standby is added and a cut is taken on it and left open.  The stream, on the source, passes the
-    cut; the three readings of the swap are made, and the cut is valid.  Then the standby is promoted.  What
-    the open cut still reads, what the timeline rule says with the readings made now, what the library says to
-    a new cut, and what the replay position does."""
+    """A second standby is added and a cut is taken on it with the library's taker, which reads the node's
+    ``IDENTIFY_SYSTEM`` and start time on a replication connection right after the cut and keeps them on the cut
+    (the cut is sealed).  The cut is left open.  The stream, on the source, passes it, and with the stream's
+    reading made then the cut is valid.  Then the standby is promoted.  What the open cut still reads, what the
+    timeline rule says with the stream's reading made now (the stream on the source, or on the promoted node), what
+    the library says to a new cut, and what the replay position does.  A cut taken by the one-attempt function,
+    which reads nothing after the cut, is the negative control: it is valid nowhere."""
     out: dict = {}
     S.setup(cl, [1, 2], "primary")
     S.drop_slot(cl, "primary")
@@ -879,24 +881,30 @@ def promotion(cl: S.Cluster) -> dict:
             a.execute(INC, (1,))
             target = _lsn(a, INSERT_LSN)
             source_timeline = C.timeline(a)           # exact: the source is a primary
-        with cl.connect(PROMO_NODE) as held, cl.connect(PROMO_NODE) as other:
-            C.wait_replay_reached(other, target, Deadline.after(60))
+        with cl.connect(PROMO_NODE) as held, cl.connect(PROMO_NODE) as other, \
+                cl.connect(PROMO_NODE, replication="database") as held_node, cl.connect(PROMO_NODE) as bare_conn:
             floor_held, floor_other = C.settle_floor(held), C.settle_floor(other)
-            cut = C.take_standby_cut_own(held, floor_held)
+            cut = C.take_standby_cut_after(held, held_node, target, Deadline.after(60), floor_held)
+            # one attempt, which reads nothing after the cut (settled or not does not matter for this control)
+            bare = C.take_standby_cut_own(bare_conn, C.settle_floor(bare_conn), accept_unsettled=True)
+            C.end_transaction(bare_conn)
             with cl.connect("primary") as a:
                 a.execute(INC, (2,))                  # the stream goes on: a transaction that ends after R1
                 applied = _lsn(a, FLUSH_LSN)
             C.wait_replay_reached(other, applied, Deadline.after(60))
-            swap = swap_readings(cl, "primary", PROMO_NODE)
+            at_swap = stream_reading(cl, "primary")
             out["open_cut"] = {"r0": L.format(cut.r0), "r1": L.format(cut.r1), "timeline": cut.timeline,
                                "timeline_of_the_source": source_timeline,
                                "server_start_is_the_one_of_its_node": cut.server_start == C.server_start(other),
+                               "sealed": cut.sealed,
+                               "reading_on_the_cut": _reading_fact(cut.reader),
+                               "reading_on_the_cut_is_of_its_server_life": cut.reader_start == cut.server_start,
                                "has_passed": cut.has_passed(applied),
-                               "readings_at_the_swap": _reading_facts(*swap),
-                               "valid_at_the_swap": cut.valid_on(*swap),
-                               "valid_without_a_reading": (cut.valid_on(None, swap[1], swap[2])
-                                                           or cut.valid_on(swap[0], None, swap[2])
-                                                           or cut.valid_on(swap[0], swap[1], None)),
+                               "stream_reading_at_the_swap": _reading_fact(at_swap),
+                               "valid_at_the_swap": cut.valid_on(at_swap),
+                               "valid_without_the_stream_reading": cut.valid_on(None),
+                               "one_attempt_cut_sealed": bare.sealed,
+                               "one_attempt_cut_valid_at_the_swap": bare.valid_on(at_swap),
                                "reads_before_promotion": held.execute(GET, (1,)).fetchone()[0]}
             cl.localpg("promote", PROMO_NODE)
             deadline = time.monotonic() + 60
@@ -907,69 +915,74 @@ def promotion(cl: S.Cluster) -> dict:
             frozen = other.execute(C.SQL_REPLAY_LSN).fetchone()[0]
             other.execute(INC, (1,))                  # a commit of the promoted node: not in the source's stream
             end = _lsn(other, INSERT_LSN)
-            on_source = swap_readings(cl, "primary", PROMO_NODE)       # the stream stays on the source
-            on_promoted = swap_readings(cl, PROMO_NODE, PROMO_NODE)    # the stream is on the promoted node
+            on_source = stream_reading(cl, "primary")          # the stream stays on the source
+            on_promoted = stream_reading(cl, PROMO_NODE)       # the stream follows the promotion
             out["after_promotion"] = {
                 "in_recovery": other.execute("SELECT pg_is_in_recovery()").fetchone()[0],
                 "timeline": new_timeline,
                 "timeline_in_the_control_file_right_after": control_timeline,
-                "server_start_unchanged": on_source[2] == cut.server_start,
-                "readings_with_the_stream_on_the_source": _reading_facts(*on_source),
-                "the_open_cut_is_valid_with_the_stream_on_the_source": cut.valid_on(*on_source),
-                "readings_with_the_stream_on_the_promoted_node": _reading_facts(*on_promoted),
-                "the_open_cut_is_valid_with_the_stream_on_the_promoted_node": cut.valid_on(*on_promoted),
+                "server_start_unchanged": C.server_start(other) == cut.server_start,
+                "the_promoted_node_now": _reading_fact(on_promoted),
+                "stream_reading_on_the_source": _reading_fact(on_source),
+                "the_open_cut_is_valid_with_the_stream_on_the_source": cut.valid_on(on_source),
+                "stream_reading_on_the_promoted_node": _reading_fact(on_promoted),
+                "the_open_cut_is_valid_with_the_stream_on_the_promoted_node": cut.valid_on(on_promoted),
                 "replay_position_before_a_local_commit": frozen,
                 "replay_position_after_a_local_commit": other.execute(C.SQL_REPLAY_LSN).fetchone()[0],
                 "local_commit_record_ends_after_that_position": end > L.parse(frozen),
                 "a_new_snapshot_reads": other.execute(GET, (1,)).fetchone()[0],
                 "the_open_cut_still_reads": held.execute(GET, (1,)).fetchone()[0]}
             C.end_transaction(held)
-            try:
-                C.take_standby_cut_own(other, floor_other)
-                out["library_on_a_new_cut"] = "accepted"
-            except C.CutError as exc:
-                out["library_on_a_new_cut"] = "refused: " + str(exc)
-            try:
-                C.take_standby_cut_exported(other, floor_other, accept_export_defect=True)
-                out["library_on_a_new_exported_cut"] = "accepted"
-            except C.CutError as exc:
-                out["library_on_a_new_exported_cut"] = "refused: " + str(exc)
-            try:
-                C.settle_floor(other)
-                out["library_on_a_new_settle_floor"] = "accepted"
-            except C.CutError as exc:
-                out["library_on_a_new_settle_floor"] = "refused: " + str(exc)
-            primary_cut = C.take_primary_cut(other)   # the promoted node is a primary of its own timeline
+            for key, take in (
+                    ("library_on_a_new_cut", lambda: C.take_standby_cut_own(other, floor_other)),
+                    ("library_on_a_new_exported_cut",
+                     lambda: C.take_standby_cut_exported(other, floor_other, accept_export_defect=True)),
+                    ("library_on_a_new_sealed_cut",
+                     lambda: C.take_standby_cut_after(other, held_node, cut.r1, Deadline.after(5), floor_other)),
+                    ("library_on_a_new_settle_floor", lambda: C.settle_floor(other))):
+                try:
+                    take()
+                    out[key] = "accepted"
+                except C.CutError as exc:
+                    out[key] = "refused: " + str(exc)
+            # the promoted node is a primary of its own timeline: the primary taker waits for the flush and seals
+            primary_cut = C.take_primary_cut_after(other, C.next_xid_marker(other), Deadline.after(30))
             C.end_transaction(other)
             other.execute(INC, (1,))                  # its own stream passes the cut
             passed = _lsn(other, FLUSH_LSN)
-            own = swap_readings(cl, PROMO_NODE, PROMO_NODE)
-            source = swap_readings(cl, "primary", "primary")
+            own = stream_reading(cl, PROMO_NODE)
+            source = stream_reading(cl, "primary")
             out["primary_cut_on_the_promoted_node"] = {
                 "timeline": primary_cut.timeline,
                 "insert_position": L.format(primary_cut.insert_lsn),
+                "sealed": primary_cut.sealed,
+                "reading_on_the_cut": _reading_fact(primary_cut.reader),
                 "has_passed_before_the_next_commit": primary_cut.has_passed(primary_cut.insert_lsn - 1),
                 "has_passed": primary_cut.has_passed(passed),
-                "readings_at_the_swap": _reading_facts(*own),
-                "valid_at_the_swap": primary_cut.valid_on(*own),
-                "valid_with_the_readings_of_the_source": primary_cut.valid_on(*source)}
+                "stream_reading_at_the_swap": _reading_fact(own),
+                "valid_at_the_swap": primary_cut.valid_on(own),
+                "valid_with_the_stream_on_the_source": primary_cut.valid_on(source)}
             promoted = out["primary_cut_on_the_promoted_node"]
-            out["ok"] = (out["after_promotion"]["the_open_cut_still_reads"] == 1
-                         and out["after_promotion"]["a_new_snapshot_reads"] == 2
-                         and out["library_on_a_new_cut"].startswith("refused")
-                         and out["library_on_a_new_exported_cut"].startswith("refused")
-                         and out["library_on_a_new_settle_floor"].startswith("refused")
+            first = out["open_cut"]
+            after = out["after_promotion"]
+            out["ok"] = (after["the_open_cut_still_reads"] == 1
+                         and after["a_new_snapshot_reads"] == 2
+                         and all(out[k].startswith("refused") for k in (
+                             "library_on_a_new_cut", "library_on_a_new_exported_cut",
+                             "library_on_a_new_sealed_cut", "library_on_a_new_settle_floor"))
                          and cut.timeline == source_timeline
-                         and out["open_cut"]["has_passed"] and out["open_cut"]["valid_at_the_swap"]
-                         and not out["open_cut"]["valid_without_a_reading"]
+                         and first["sealed"] and first["reading_on_the_cut_is_of_its_server_life"]
+                         and first["has_passed"] and first["valid_at_the_swap"]
+                         and not first["valid_without_the_stream_reading"]
+                         and not first["one_attempt_cut_sealed"] and not first["one_attempt_cut_valid_at_the_swap"]
                          and new_timeline > source_timeline
-                         and out["after_promotion"]["server_start_unchanged"]
-                         and not out["after_promotion"]["the_open_cut_is_valid_with_the_stream_on_the_source"]
-                         and not out["after_promotion"]["the_open_cut_is_valid_with_the_stream_on_the_promoted_node"]
-                         and primary_cut.timeline == new_timeline
+                         and after["server_start_unchanged"]
+                         and after["the_open_cut_is_valid_with_the_stream_on_the_source"]
+                         and not after["the_open_cut_is_valid_with_the_stream_on_the_promoted_node"]
+                         and primary_cut.timeline == new_timeline and promoted["sealed"]
                          and promoted["has_passed"] and not promoted["has_passed_before_the_next_commit"]
                          and promoted["valid_at_the_swap"]
-                         and not promoted["valid_with_the_readings_of_the_source"])
+                         and not promoted["valid_with_the_stream_on_the_source"])
     finally:
         cl.localpg("remove", PROMO_NODE, check=False)
         cl.info(refresh=True)
@@ -984,6 +997,9 @@ def promotion(cl: S.Cluster) -> dict:
 # --------------------------------------------------------------------------------------------------------------
 
 WAL_WRITER_SLOW = "wal_writer_delay=10s"
+#: How long a lost-commit attempt lets the library's seal wait before the kill: short, so that the WAL writer,
+#: which sleeps 10 s, does not flush the commit in the meantime.
+SEAL_TRY_S = 0.2
 
 
 def _close_quietly(*conns) -> None:
@@ -996,11 +1012,15 @@ def _close_quietly(*conns) -> None:
 
 def _lost_commit(cl: S.Cluster, key: int) -> dict:
     """One attempt.  The WAL writer is slow.  A session commits with ``synchronous_commit = off``, a cut is taken
-    that reads the committed row, and the primary is killed before the WAL writer flushes the commit record."""
+    with the one-attempt function and reads the committed row; the library's seal (it waits until the WAL is
+    flushed up to the cut's insert position) is given a short wait; the primary is killed before the WAL writer
+    flushes the commit record.  After the restart: what the row reads, whether the cut can still be sealed, and
+    what ``valid_on`` says with the stream's reading."""
     case: dict = {}
     cl.localpg("set", "primary", WAL_WRITER_SLOW)
     time.sleep(0.5)
     w, held = cl.connect("primary"), cl.connect("primary")
+    sealed = None
     try:
         w.execute("SET synchronous_commit = off")
         case["row_before"] = w.execute(GET, (key,)).fetchone()[0]
@@ -1010,9 +1030,16 @@ def _lost_commit(cl: S.Cluster, key: int) -> dict:
         cut = C.take_primary_cut(held)
         case["the_cut_reads"] = held.execute(GET, (key,)).fetchone()[0]
         flushed = _lsn(held, FLUSH_LSN)
+        try:
+            sealed = C.seal_primary_cut(held, cut, Deadline.after(SEAL_TRY_S))
+            seal_before = "sealed"
+        except DeadlineExceeded as exc:
+            seal_before = "not within %.1f s: %s" % (SEAL_TRY_S, exc.what)
         case["cut"] = {"timeline": cut.timeline, "insert_position": L.format(cut.insert_lsn),
                        "flush_position_read_under_the_cut": L.format(flushed),
-                       "wal_not_flushed_when_the_cut_was_taken": flushed < cut.insert_lsn}
+                       "wal_not_flushed_when_the_cut_was_taken": flushed < cut.insert_lsn,
+                       "sealed_as_taken": cut.sealed,
+                       "seal_before_the_kill": seal_before}
         cl.localpg("kill", "primary")
     finally:
         _close_quietly(w, held)
@@ -1022,6 +1049,7 @@ def _lost_commit(cl: S.Cluster, key: int) -> dict:
     try:
         case["after_the_restart_the_row_reads"] = a.execute(GET, (key,)).fetchone()[0]
         timeline_now = C.timeline(a)
+        started_now = C.server_start(a)
         committed = 0
         while True:                   # other transactions: their records take the place of the lost ones
             a.execute(INC, (key + 1,))
@@ -1029,35 +1057,111 @@ def _lost_commit(cl: S.Cluster, key: int) -> dict:
             applied = _lsn(a, FLUSH_LSN)
             if applied >= cut.insert_lsn or committed >= 1000:
                 break
+        try:
+            C.seal_primary_cut(a, cut, Deadline.after(5))
+            seal_after = "sealed"
+        except C.CutError as exc:
+            seal_after = "refused: " + str(exc)
     finally:
         _close_quietly(a)
-    stream, reader, start = swap_readings(cl, "primary", "primary")
+    stream = stream_reading(cl, "primary")
     case["the_commit_was_lost"] = case["after_the_restart_the_row_reads"] < case["the_cut_reads"]
     case["after_the_restart"] = {
         "timeline": timeline_now,
         "transactions_committed": committed,
-        "readings_at_the_swap": _reading_facts(stream, reader, start),
+        "stream_reading_at_the_swap": _reading_fact(stream),
         "same_timeline": stream.timeline == cut.timeline,
         "positions_of_the_cut_reached_again": stream.position >= cut.insert_lsn,
-        "server_start_differs": start != cut.server_start,
+        "server_start_differs": started_now != cut.server_start,
         "has_passed": cut.has_passed(applied),
-        "valid_at_the_swap": cut.valid_on(stream, reader, start),
-        "valid_if_the_server_start_were_not_compared": cut.valid_on(stream, reader, cut.server_start)}
+        "seal_after_the_restart": seal_after,
+        "valid_at_the_swap": (sealed or cut).valid_on(stream),
+        # the negative control: a reading of the new server life taken as the seal, the start time not compared
+        "valid_if_the_server_start_were_not_compared": replace(
+            cut, reader=stream, reader_start=cut.server_start).valid_on(stream)}
     with cl.connect("replica") as r:  # the standby receives flushed WAL only: it never had the lost commit
         C.wait_replay_reached(r, applied, Deadline.after(60))
         case["the_standby_reads"] = r.execute(GET, (key,)).fetchone()[0]
     return case
 
 
+def _attempt_ok(c: dict) -> bool:
+    after = c["after_the_restart"]
+    if not (after["server_start_differs"] and c["the_standby_reads"] == c["after_the_restart_the_row_reads"]):
+        return False
+    if c["cut"]["seal_before_the_kill"] == "sealed":     # the WAL was flushed in time: nothing was lost
+        return after["valid_at_the_swap"] and c["after_the_restart_the_row_reads"] == c["the_cut_reads"]
+    return not after["valid_at_the_swap"] and after["seal_after_the_restart"].startswith("refused")
+
+
+def _sealed_survives(cl: S.Cluster, key: int) -> dict:
+    """The WAL writer is slow.  A session commits twice with ``synchronous_commit = off``.  The library's primary
+    taker takes a cut and waits until the WAL is flushed up to the cut's insert position; another session commits
+    with ``synchronous_commit = on`` after one second, which flushes it (the heartbeat write does that in the
+    pipeline).  Then the primary is killed.  The commits the cut saw were on disk and survive the crash, and the
+    sealed cut is valid with the stream's reading after the restart."""
+    case: dict = {}
+    cl.localpg("set", "primary", WAL_WRITER_SLOW)
+    time.sleep(0.5)
+    w, held, other = cl.connect("primary"), cl.connect("primary"), cl.connect("primary")
+    try:
+        x = C.next_xid_marker(other)  # before the writes: this commit flushes, the two below do not
+        w.execute("SET synchronous_commit = off")
+        case["row_before"] = w.execute(GET, (key,)).fetchone()[0]
+        w.execute(INC, (key,))
+        time.sleep(0.5)
+        w.execute(INC, (key,))
+        flushed_before = _lsn(other, FLUSH_LSN)
+        timer = threading.Timer(1.0, lambda: other.execute(INC, (key + 1,)))
+        t = time.monotonic()
+        timer.start()
+        try:
+            cut = C.take_primary_cut_after(held, x, Deadline.after(30))
+        finally:
+            timer.join()
+        case["taker_waited_s"] = round(time.monotonic() - t, 2)
+        case["the_cut_reads"] = held.execute(GET, (key,)).fetchone()[0]
+        case["cut"] = {"timeline": cut.timeline, "insert_position": L.format(cut.insert_lsn),
+                       "flush_position_before_the_cut": L.format(flushed_before),
+                       "wal_not_flushed_before_the_cut": flushed_before < cut.insert_lsn,
+                       "sealed": cut.sealed, "reading_on_the_cut": _reading_fact(cut.reader)}
+        cl.localpg("kill", "primary")
+    finally:
+        _close_quietly(w, held, other)
+    cl.localpg("up")
+    cl.info(refresh=True)
+    a = _connect_when_up(cl, "primary")
+    try:
+        case["after_the_restart_the_row_reads"] = a.execute(GET, (key,)).fetchone()[0]
+        started_now = C.server_start(a)
+        a.execute(INC, (key + 1,))
+        applied = _lsn(a, FLUSH_LSN)
+    finally:
+        _close_quietly(a)
+    stream = stream_reading(cl, "primary")
+    case["after_the_restart"] = {"stream_reading_at_the_swap": _reading_fact(stream),
+                                 "server_start_differs": started_now != cut.server_start,
+                                 "has_passed": cut.has_passed(applied),
+                                 "valid_at_the_swap": cut.valid_on(stream)}
+    after = case["after_the_restart"]
+    # whether the taker had to wait depends on what else flushed the WAL meanwhile: recorded, not required
+    case["ok"] = bool(case["cut"]["sealed"]
+                      and case["after_the_restart_the_row_reads"] == case["the_cut_reads"] == case["row_before"] + 2
+                      and after["server_start_differs"] and after["has_passed"] and after["valid_at_the_swap"])
+    return case
+
+
 def primary_crash(cl: S.Cluster, attempts: int = 3) -> dict:
     """A snapshot on a primary sees a transaction whose commit record is not flushed, and the primary crashes.
     After the restart the transaction does not exist, the timeline is the same, and other records stand at the
-    positions the cut recorded.  A stream that applies one of them has "passed" the cut; what ``valid_on`` says.
+    positions the cut recorded.  A stream that applies one of them has "passed" the cut.  The library never gave
+    the cut out for use: its seal waits for the flush and is refused in the new server life, so ``valid_on``
+    says no.  A cut that the taker sealed before a crash stays valid (``sealed_before_the_crash``).
 
     The commit is lost only if nothing flushed the WAL in the half second before the kill, so up to ``attempts``
     attempts are made; ``shown`` says whether one lost its commit."""
     out: dict = {"attempts": []}
-    S.setup(cl, list(range(1, 2 * attempts + 2)), "primary")
+    S.setup(cl, list(range(1, 2 * attempts + 4)), "primary")
     S.drop_slot(cl, "primary")
     try:
         with cl.connect("primary") as a:
@@ -1067,13 +1171,13 @@ def primary_crash(cl: S.Cluster, attempts: int = 3) -> dict:
             out["attempts"].append(case)
             if case["the_commit_was_lost"]:
                 break
+        out["sealed_before_the_crash"] = _sealed_survives(cl, 1 + 2 * attempts)
     finally:
         cl.localpg("up", check=False)
         cl.localpg("unset", "primary", "wal_writer_delay", check=False)
     out["shown"] = bool(out["attempts"]) and out["attempts"][-1]["the_commit_was_lost"]
-    out["ok"] = bool(out["attempts"]) and all(
-        c["after_the_restart"]["server_start_differs"] and not c["after_the_restart"]["valid_at_the_swap"]
-        and c["the_standby_reads"] == c["after_the_restart_the_row_reads"] for c in out["attempts"])
+    out["ok"] = (bool(out["attempts"]) and all(_attempt_ok(c) for c in out["attempts"])
+                 and out["sealed_before_the_crash"]["ok"])
     if out["shown"]:
         after = out["attempts"][-1]["after_the_restart"]
         out["ok"] = (out["ok"] and after["same_timeline"] and after["positions_of_the_cut_reached_again"]

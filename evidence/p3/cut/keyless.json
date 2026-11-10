@@ -5,15 +5,16 @@
  "while_a_transaction_is_open": {
   "quiet_only_wait_returned": "NoQuietSnapshot",
   "is_false_in_a_condition": true,
-  "seconds": 1.01,
+  "seconds": 1.0,
   "attempts": 18,
   "oldest_running_is_the_open_transaction": true,
-  "text": "no quiet snapshot within the deadline: a transaction was running at each of 18 attempts (oldest running id at the last one: 44654627)"
+  "text": "no quiet snapshot within the wait: a transaction was running at each of 18 attempts (oldest running id at the last one: 57032527)"
  },
  "keyless_cut_while_open": {
   "way": "own",
   "usable_after_p0": true,
-  "snapshot": "44654627:44654629:",
+  "snapshot": "57032527:57032529:",
+  "sealed": true,
   "quiet_wait_result_kept": "NoQuietSnapshot",
   "the_one_reader_sees_the_open_transaction": false,
   "the_one_reader_sees_the_committed_one": true
@@ -22,7 +23,8 @@
   "way": "exported",
   "is_quiet": true,
   "usable_after_p0": true,
-  "snapshot": "44654629:44654629:",
+  "snapshot": "57032529:57032529:",
+  "sealed": true,
   "a_reader_that_imports_it_sees_both": true
  },
  "ok": true,

@@ -33,9 +33,13 @@ Rules of use that this module enforces:
 * **Export defect.**  On the server versions that :func:`export_defect` names, an exported snapshot of a standby
   is given out only if it is quiet.
 * **Timeline.**  A cut records the timeline it was taken on and the start time of its server, and is valid only
-  there (``valid_on``).  The question is asked at the swap, after the stream has passed the cut, with readings
-  made then; a reading made earlier proves nothing.  On a standby SQL shows a lower bound of the cut's
-  timeline only; ``valid_on`` says what the caller has to read so that the answer is exact.
+  there (``valid_on``).  The functions that give out a cut for use (``take_*_cut_after``,
+  :func:`take_keyless_standby_cut`, :func:`seal_primary_cut`) read the cut's own node right after the cut was
+  taken and keep that reading on the cut; a cut without it is valid nowhere.  On a standby the reading needs a
+  replication connection to the same node (SQL shows a lower bound of the replay timeline only); on a primary
+  it is plain SQL, and the cut is given out only when the WAL is flushed up to its insert position.  At the
+  swap, after the stream has passed the cut, ``valid_on`` takes one reading, the stream's, made then; one made
+  earlier proves nothing.
 * **Passed.**  A table swaps only when the stream has passed its cut (``has_passed``): beyond ``R1`` on a
   standby, up to the WAL insert position read after the snapshot on a primary.
 
@@ -51,7 +55,7 @@ use of ``raw``.  Positions are integers (``cdc_v2.lsn``).  Every loop that waits
 from __future__ import annotations
 
 import enum
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Optional, Sequence, Union
 
 from cdc_v2 import lsn
@@ -187,19 +191,24 @@ class NoQuietSnapshot:
 
     Normally a write transaction stayed open on the primary for the whole wait, which a source is free to do:
     ``attempts`` snapshots were taken and dropped, and ``oldest_running`` is the 64-bit id of the oldest
-    transaction the standby still saw running at the last one.  With ``not_settled`` the standby did not even
-    settle within the wait (:class:`StandbyNotSettled`), and no snapshot was judged for quiet.  The caller
-    goes on with the other way to read (docs/design/cut.md, "Tables without a key").
+    transaction the standby still saw running at the last one.  With ``not_settled`` no cut could be given
+    out at all within the wait, and no snapshot was judged for quiet: the standby did not settle
+    (:class:`StandbyNotSettled`), or its timeline could not be proven (:class:`TimelineNotProven`);
+    ``detail`` is what the wait last saw.  The caller goes on with the other way to read
+    (docs/design/cut.md, "Tables without a key").
     """
 
     attempts: int
     oldest_running: Optional[int] = None
     not_settled: bool = False
+    detail: Optional[str] = None
 
     def __bool__(self) -> bool:
         return False
 
     def __str__(self) -> str:
+        if self.not_settled and self.detail:
+            return "no quiet snapshot within the wait: no cut could be given out (%s)" % self.detail
         if self.not_settled:
             return ("no quiet snapshot within the wait: the standby had not settled after its start "
                     "(no commit or abort was replayed)")
@@ -243,8 +252,11 @@ class StandbyCut:
 
     ``timeline`` is a lower bound of the timeline the cut was taken on (see :func:`timeline` for what a standby
     can tell) and ``server_start`` is the start time of the server it was taken on (:func:`server_start`), both
-    read by the statement that reads ``R0``.  :meth:`valid_on` needs both; a cut made without them is valid
-    nowhere.
+    read by the statement that reads ``R0``.  ``reader`` and ``reader_start`` are what the same node said right
+    after the cut was taken: ``IDENTIFY_SYSTEM`` and the start time, read on a replication connection by the
+    function that gave the cut out (:func:`take_standby_cut_after`, :func:`take_keyless_standby_cut`).
+    :meth:`valid_on` needs all four; a cut made without them (by hand, or by one of the one-attempt functions)
+    is valid nowhere.
     """
 
     r0: int
@@ -257,6 +269,8 @@ class StandbyCut:
     e1: Optional[int] = None
     extra: dict = field(default_factory=dict)
     server_start: Optional[int] = None
+    reader: Optional[TimelineReading] = None
+    reader_start: Optional[int] = None
 
     def __post_init__(self) -> None:
         if not 0 <= self.r0 <= self.r1 <= lsn.MAX:
@@ -336,56 +350,56 @@ class StandbyCut:
         """``R0 >= P0``: every transaction the stream delivered up to ``P0`` is inside this snapshot."""
         return self.r0 >= p0
 
-    def valid_on(self, stream: Any, reader: Any, reader_start: Optional[int]) -> bool:
+    @property
+    def sealed(self) -> bool:
+        """The reading of the cut's own node, made right after the cut, shows the timeline it was taken on:
+        the node was then on the recorded timeline, at or beyond ``R1``, in the server life of the cut."""
+        r = _reading(self.reader)
+        if r is None or self.timeline is None or self.server_start is None or self.reader_start is None:
+            return False
+        if isinstance(self.reader_start, bool) or int(self.reader_start) != self.server_start:
+            return False
+        return r[0] == self.timeline and r[1] >= self.r1
+
+    def valid_on(self, stream: Any) -> bool:
         """The cut belongs to the timeline it was taken on.  Ask **at the swap**, after :meth:`has_passed`.
 
-        Three readings:
+        ``stream`` is what ``IDENTIFY_SYSTEM`` says on the node the stream reads from: an object with
+        ``timeline`` and ``position`` (``cdc_v2.pg.slot.timeline_history`` returns one; a
+        :class:`TimelineReading` is one).  It is read at the swap, not earlier.  Nothing else is asked of the
+        caller: the reading of the cut's own node is on the cut (:attr:`sealed`), made by the function that
+        gave the cut out.
 
-        * ``stream``: what ``IDENTIFY_SYSTEM`` says on the node the stream reads from: an object with
-          ``timeline`` and ``position`` (``cdc_v2.pg.slot.timeline_history`` returns one; a
-          :class:`TimelineReading` is one).  It is read at the swap, not earlier;
-        * ``reader``: the same reading of the node this cut was taken on;
-        * ``reader_start``: :func:`server_start` of the node this cut was taken on, read after ``reader``.
-
-        The reader's two readings state a fact about the cut itself (the timeline it was taken on), and a
-        fact about the past stays true.  They are made after the cut was taken, while the server it was taken
-        on still runs: at the swap (one reading serves as ``stream`` and as ``reader`` if the stream reads
-        from the same node), or earlier, and are then kept.  A backfill that makes them when its read under
-        the cut is complete keeps the cut through a later restart of the reader's node; one that makes them
-        only at the swap abandons the cut then.
-
-        True only if the stream's node is on the recorded timeline at a position beyond ``R1``, and the
-        reader's node was on the recorded timeline, at or beyond ``R1``, in the server life the cut was taken
-        in.  If it is false at the swap (a promotion, a restart of the reader's node before its readings were
-        made, a reading that could not be made: pass ``None``), the cut is abandoned, with every answer it
-        gave and everything read under its snapshot, and the table's backfill starts again.  The stream lane
-        also abandons every open cut when its slot check has a finding.
+        True only if the cut is sealed and the stream's node is on the recorded timeline at a position beyond
+        ``R1``.  If it is false at the swap (a promotion of the stream's node, a reading that could not be
+        made: pass ``None``), the cut is abandoned, with every answer it gave and everything read under its
+        snapshot, and the table's backfill starts again.  The stream lane also abandons every open cut when
+        its slot check has a finding.
 
         Why this is enough.  The recorded timeline is the one in the control file (:func:`timeline`), which
         is at or below the timeline replay was on when the cut was taken; and while a server runs, the
         timeline its replay is on never goes back.  So, within one server life: recorded <= timeline of the
-        cut <= timeline read later.  ``reader_start`` shows that the later reading is of the same server life,
-        and if the outer two are equal the cut was taken on that timeline: the snapshot holds that timeline's
-        WAL up to ``R1`` at most.  The stream's node is on the same timeline and has its WAL beyond ``R1``,
-        and one timeline has one content.  (That what the stream has applied is the history of its node is
-        not shown here: it is what the slot check of the stream lane shows, core design section 8.)
+        cut <= timeline read later.  The reading on the cut was made later in the same server life (its start
+        time is equal), and if the outer two are equal the cut was taken on that timeline: the snapshot holds
+        that timeline's WAL up to ``R1`` at most.  That is a fact about the cut, and it stays true when the
+        reader's node restarts or is promoted afterwards.  The stream's node is on the same timeline and has
+        its WAL beyond ``R1``, and one timeline has one content.  (That what the stream has applied is the
+        history of its node is not shown here: it is what the slot check of the stream lane shows, core
+        design section 8.)
 
         Why the stream's reading is made at the swap.  One made while the cut is open says nothing about what
         the stream delivers afterwards: the stream's node can still leave the timeline before it reaches
         ``R1`` (a reader that is ahead of the fork has then read a dead branch).
 
-        Why the reader's readings are made in the cut's server life.  After a restart a standby replays again
-        from its last restart point and can be on an earlier timeline than before, or follow another history:
-        a reading of a later server life says nothing about the cut.
+        Why the reader's reading is made by the taker.  It must be made after the cut and in the cut's server
+        life: after a restart a standby replays again from its last restart point and can be on an earlier
+        timeline than before, or follow another history.  A caller could make it too early or too late; the
+        taker makes it at once, and a restart before it ends the cut's transaction anyway.
         """
-        if self.timeline is None or self.server_start is None or reader_start is None:
+        s = _reading(stream)
+        if s is None or not self.sealed:
             return False
-        if isinstance(reader_start, bool) or int(reader_start) != self.server_start:
-            return False
-        s, r = _reading(stream), _reading(reader)
-        if s is None or r is None:
-            return False
-        return s[0] == self.timeline and s[1] > self.r1 and r[0] == self.timeline and r[1] >= self.r1
+        return s[0] == self.timeline and s[1] > self.r1
 
     def unknown_window(self) -> tuple[int, Optional[int]]:
         """``(R0, E1]``: the positions whose transactions the position rule leaves unknown (E1 None = open)."""
@@ -403,7 +417,9 @@ class PrimaryCut:
     insert position read by the statement that took the snapshot, after it was taken: the commit record of
     every transaction the snapshot sees ends at or before it.  ``server_start`` is the start time of the
     server (:func:`server_start`).  A cut made by hand without them classifies, but has not passed and is valid
-    nowhere.
+    nowhere.  ``reader`` and ``reader_start`` are what the same server said once it had flushed its WAL up to
+    ``insert_lsn``: its timeline, its flush position and its start time (:func:`seal_primary_cut`, which
+    :func:`take_primary_cut_after` calls).  A cut without them is valid nowhere.
     """
 
     bounds: SnapshotBounds
@@ -411,6 +427,8 @@ class PrimaryCut:
     timeline: Optional[int] = None
     insert_lsn: Optional[int] = None
     server_start: Optional[int] = None
+    reader: Optional[TimelineReading] = None
+    reader_start: Optional[int] = None
 
     def __post_init__(self) -> None:
         if self.insert_lsn is not None and not 0 <= self.insert_lsn <= lsn.MAX:
@@ -467,30 +485,34 @@ class PrimaryCut:
         """
         return self.insert_lsn is not None and applied_position >= self.insert_lsn
 
-    def valid_on(self, stream: Any, reader: Any, reader_start: Optional[int]) -> bool:
-        """As :meth:`StandbyCut.valid_on`: asked at the swap after :meth:`has_passed`, with the stream's reading
-        made then and the reader's two readings made after the cut in its server life, then or earlier (on a
-        primary the stream's node and the reader's node are normally the same one).
+    @property
+    def sealed(self) -> bool:
+        """The server the cut was taken on, in the same server life and on the cut's timeline, had flushed its
+        WAL up to the cut's insert position: everything the snapshot saw is on disk."""
+        r = _reading(self.reader)
+        if (r is None or self.timeline is None or self.insert_lsn is None or self.server_start is None
+                or self.reader_start is None):
+            return False
+        if isinstance(self.reader_start, bool) or int(self.reader_start) != self.server_start:
+            return False
+        return r[0] == self.timeline and r[1] >= self.insert_lsn
 
-        True only if the stream's node is on the cut's timeline with WAL up to the cut's insert position, and
-        the reader's node, in the server life the cut was taken in, was on that timeline and had flushed its
-        WAL up to that position (``IDENTIFY_SYSTEM`` on a primary gives the flush position).  That is the
-        fact about the cut here: everything the snapshot saw is on disk.  A snapshot can see a transaction
-        whose commit record is not flushed (``synchronous_commit = off``).  A crash loses that record, and
-        the server then writes other records at the same positions of the same timeline: a transaction
-        applied after the restart would say "passed" for a snapshot that saw a transaction which no longer
-        exists.  No reading of a later server life is accepted, so such a cut is never valid.  A reading that
-        is still behind the insert position can be made again; one that was good is kept.
+    def valid_on(self, stream: Any) -> bool:
+        """As :meth:`StandbyCut.valid_on`: asked at the swap after :meth:`has_passed`, with the stream's reading
+        made then (on a primary the stream's node and the reader's node are normally the same one).
+
+        True only if the cut is sealed and the stream's node is on the cut's timeline with WAL up to the
+        cut's insert position.  The seal is the fact about the cut here (:attr:`sealed`): a snapshot can see a
+        transaction whose commit record is not flushed (``synchronous_commit = off``).  A crash loses that
+        record, and the server then writes other records at the same positions of the same timeline: a
+        transaction applied after the restart would say "passed" for a snapshot that saw a transaction which
+        no longer exists.  :func:`seal_primary_cut` therefore waits, in the cut's own server life, until the
+        flush position has reached the insert position, and no cut is given out for use before that.
         """
-        if self.timeline is None or self.insert_lsn is None or self.server_start is None or reader_start is None:
+        s = _reading(stream)
+        if s is None or not self.sealed:
             return False
-        if isinstance(reader_start, bool) or int(reader_start) != self.server_start:
-            return False
-        s, r = _reading(stream), _reading(reader)
-        if s is None or r is None:
-            return False
-        return (s[0] == self.timeline and s[1] >= self.insert_lsn
-                and r[0] == self.timeline and r[1] >= self.insert_lsn)
+        return s[0] == self.timeline and s[1] >= self.insert_lsn
 
 
 @dataclass(frozen=True)
@@ -631,6 +653,14 @@ SQL_NEXT_XID = "SELECT pg_current_xact_id()::text, pg_is_in_recovery()"
 #: The next transaction id of the checkpoint that the standby's control file names (text ``epoch:xid``).
 SQL_SETTLE_FLOOR = "SELECT next_xid, pg_is_in_recovery() FROM pg_control_checkpoint()"
 SQL_TIMELINE = "SELECT (SELECT timeline_id FROM pg_control_checkpoint()), " + _SQL_INSERT_WALFILE
+#: A replication command, for a ``replication=database`` connection: system id, timeline, position, database.
+#: On a standby the timeline is the one replay is on, and the position is at or beyond the replay position.
+SQL_IDENTIFY = "IDENTIFY_SYSTEM"
+#: A primary's flush position, the WAL file it lies in (the name starts with the timeline) and its start time.
+SQL_PRIMARY_FLUSH = ("SELECT pg_is_in_recovery(), "
+                     "CASE WHEN pg_is_in_recovery() THEN NULL ELSE pg_current_wal_flush_lsn()::text END, "
+                     "CASE WHEN pg_is_in_recovery() THEN NULL ELSE pg_walfile_name(pg_current_wal_flush_lsn()) END, "
+                     + _SQL_SERVER_START)
 
 
 def _one(conn, sql: str) -> tuple:
@@ -689,11 +719,11 @@ def timeline(conn) -> int:
     timeline that replay is on; the value is the timeline of the checkpoint named in the control file, which is
     the replay timeline or, between a timeline switch and the standby's next restart point, the one before it.
     It never runs ahead.  A standby cut records this value, read before its snapshot is taken.  Compared with
-    an exact timeline of the same node read later in the same server life (:meth:`StandbyCut.valid_on`), the
-    lag can only make the answer no for a cut that was good (the backfill then starts again once more).
-    Compared with a value read before the cut, in another server life, or on another node only, it could say
-    yes to a cut taken after a switch; ``valid_on`` therefore says what to read.  The exact timeline of a
-    standby comes from ``IDENTIFY_SYSTEM`` (``cdc_v2.pg.slot.timeline_history``), not from this function.
+    an exact timeline of the same node read later in the same server life (:func:`read_node`, which the
+    takers call right after the cut), the lag can only keep a good cut from being given out until the
+    standby's next restart point.  Compared with a value read before the cut, in another server life, or on
+    another node only, it could say yes to a cut taken after a switch; the takers therefore make the reading
+    themselves.  The exact timeline of a standby comes from ``IDENTIFY_SYSTEM``, not from this function.
     """
     _require_autocommit(conn)
     control, walfile = _one(conn, SQL_TIMELINE)
@@ -704,12 +734,61 @@ def server_start(conn) -> int:
     """The start time of the server behind ``conn``, in microseconds since 1970: it names one server life.
 
     A cut records it (the statement that reads ``R0``, or the one that takes a primary's snapshot, reads it),
-    and ``valid_on`` compares it with the value read later on the same node, right after that node's
-    ``IDENTIFY_SYSTEM`` reading (:meth:`StandbyCut.valid_on` says when).  On a ``replication=database`` connection,
-    where only the simple query protocol works, send :data:`SQL_SERVER_START` itself
-    (``PgConnection.simple``) and pass ``int()`` of the one value.
+    and the reading made right after the cut must show the same value (:func:`read_node`,
+    :func:`seal_primary_cut`).
     """
     return int(_one(conn, SQL_SERVER_START)[0])
+
+
+def read_node(replication) -> tuple[TimelineReading, int]:
+    """``IDENTIFY_SYSTEM`` and then the server's start time, on a replication connection.
+
+    ``replication`` is a psycopg connection in autocommit mode that was opened with ``replication=database``
+    (with the source package: ``connect(target, deadline, replication=True).raw``).  The reading is exact
+    where SQL is not: on a standby ``IDENTIFY_SYSTEM`` names the timeline replay is on.  No SQL function of
+    Postgres 16 to 18 does: ``pg_last_wal_replay_lsn()`` drops the timeline, ``pg_control_checkpoint()`` has
+    the one of the last restart point, ``pg_stat_wal_receiver`` the one of the receiver (and no row without a
+    receiver), and ``pg_walfile_name()`` is refused during recovery.  The start time is plain SQL, which such
+    a connection also accepts when it is sent without parameters.
+    """
+    _require_autocommit(replication)
+    try:
+        row = _one(replication, SQL_IDENTIFY)
+    except CutError:
+        raise
+    except Exception as exc:
+        if getattr(exc, "sqlstate", None) == "42601":   # a syntax error: this is not a walsender
+            raise CutError("the reading of the cut's node needs a replication connection "
+                           "(replication=database): IDENTIFY_SYSTEM was refused") from exc
+        raise
+    try:
+        reading = TimelineReading(int(row[1]), lsn.parse(row[2]))
+    except (IndexError, TypeError, ValueError):
+        raise CutError(f"not an answer to IDENTIFY_SYSTEM: {row!r}") from None
+    return reading, int(_one(replication, SQL_SERVER_START)[0])
+
+
+class TimelineNotProven(CutError):
+    """A standby cut was dropped because the reading made after it names another timeline than the standby's
+    control file: the standby has followed a timeline switch and has had no restart point since.  Take
+    another one later."""
+
+
+def _seal_standby(cut: StandbyCut, replication) -> None:
+    """Read the cut's node right after the cut and keep the reading on the cut."""
+    reading, started = read_node(replication)
+    if cut.server_start is None or started != cut.server_start:
+        raise CutError("the replication connection is not to the server the cut was taken on: its start time "
+                       "is another one")
+    if reading.position < cut.r1:     # cannot happen in one server life: the position never moves back
+        raise CutError("the replication connection is not to the node the cut was taken on: it is at %s, "
+                       "before R1 %s" % (lsn.format(reading.position), lsn.format(cut.r1)))
+    cut.reader, cut.reader_start = reading, started
+    if not cut.sealed:
+        raise TimelineNotProven(
+            "the timeline of the cut is not proven: the standby replays timeline %d and its last restart point "
+            "is on timeline %s (after a timeline switch, until the standby's next restart point)"
+            % (reading.timeline, cut.timeline))
 
 
 _READ_ON_THE_STANDBY = object()     # what settle_floor() hands to SettleFloor; nothing else has it by accident
@@ -1001,15 +1080,23 @@ def wait_replay_reached(conn, target: int, deadline: Deadline, *, poll_s: float 
             lsn.format(seen), lsn.format(target), target - seen))
 
 
-def take_standby_cut_after(conn, p0: int, deadline: Deadline, settle_floor: SettleFloor, *,
+def take_standby_cut_after(conn, replication, p0: int, deadline: Deadline, settle_floor: SettleFloor, *,
                            exported: bool = False, quiet_only: bool = False, poll_s: float = 0.05,
                            report: Optional[Callable[[NoQuietSnapshot], None]] = None,
                            ) -> Union[StandbyCut, NoQuietSnapshot]:
-    """Wait for replay to reach ``P0``, then take a cut that may be used: ``R0 >= P0`` and settled.
+    """Wait for replay to reach ``P0``, then take a cut that may be used: ``R0 >= P0``, settled and sealed.
 
     The cut's transaction is left open.  ``settle_floor`` is what :func:`settle_floor` returned for this
     connection.  One deadline covers all waits; ``DeadlineExceeded`` says what was last seen (replay behind
-    ``P0``, or a standby that did not settle).
+    ``P0``, a standby that did not settle, or a timeline that could not be proven).
+
+    ``replication`` is a second connection **to the same standby**, opened with ``replication=database``
+    (:func:`read_node` says why SQL does not do).  Right after each cut the node's ``IDENTIFY_SYSTEM`` and
+    start time are read on it and kept on the cut (``cut.reader``, ``cut.reader_start``); the caller reads
+    nothing about the reader's node for :meth:`StandbyCut.valid_on`.  A start time other than the cut's is
+    a :class:`CutError` (the two connections are not to one server).  If the reading names another timeline
+    than the cut recorded (the standby followed a timeline switch and has had no restart point since), the
+    cut is dropped and another one is taken, until the deadline.
 
     ``exported`` takes an exported snapshot; on a server with the export defect that is refused
     (:class:`CutError`) unless ``quiet_only`` is set.  With ``quiet_only`` a snapshot that is not quiet is
@@ -1026,6 +1113,7 @@ def take_standby_cut_after(conn, p0: int, deadline: Deadline, settle_floor: Sett
     if quiet_only and not exported:
         raise ValueError("quiet_only is a rule for exported snapshots")
     _floor_value(conn, settle_floor)
+    _require_autocommit(replication)
     wait_replay_reached(conn, p0, deadline, poll_s=poll_s)
     attempts = 0
     while True:
@@ -1038,6 +1126,7 @@ def take_standby_cut_after(conn, p0: int, deadline: Deadline, settle_floor: Sett
         except StandbyNotSettled as exc:
             deadline.sleep(poll_s, "the standby has not settled: snapshot xmax %d stays below %d; no commit or "
                                    "abort was replayed (is the heartbeat write running?)" % (exc.xmax, exc.floor))
+            continue
         except SnapshotNotQuiet as exc:
             state = NoQuietSnapshot(attempts, exc.bounds.xmin if exc.bounds is not None else None)
             if report is not None:
@@ -1046,17 +1135,26 @@ def take_standby_cut_after(conn, p0: int, deadline: Deadline, settle_floor: Sett
                 deadline.sleep(poll_s, "no quiet snapshot")
             except DeadlineExceeded:
                 return state
-        else:
+            continue
+        try:
             if not cut.usable_after(p0):  # cannot happen: the replay position never moves back while it runs
-                _rollback_quietly(conn)
                 raise CutError(f"R0 {lsn.format(cut.r0)} is before P0 {lsn.format(p0)}")
+            _seal_standby(cut, replication)
             return cut
+        except TimelineNotProven as exc:
+            _rollback_quietly(conn)
+            deadline.sleep(max(poll_s, 0.5), str(exc))
+        except BaseException:
+            _rollback_quietly(conn)
+            raise
 
 
-def take_keyless_standby_cut(conn, p0: int, deadline: Deadline, settle_floor: SettleFloor, *,
+def take_keyless_standby_cut(conn, replication, p0: int, deadline: Deadline, settle_floor: SettleFloor, *,
                              quiet_wait_s: float = QUIET_WAIT_DEFAULT_S, poll_s: float = 0.05,
                              report: Optional[Callable[[NoQuietSnapshot], None]] = None) -> StandbyCut:
     """The cut for a table without a key on a standby (docs/design/cut.md, "Tables without a key").
+
+    ``replication``: as for :func:`take_standby_cut_after`; the cut that is returned is sealed in every case.
 
     * A server without the export defect: an exported snapshot; ``cut.way == "exported"``.
     * A server with it: a quiet exported snapshot, waited for at most ``quiet_wait_s`` after replay has reached
@@ -1074,31 +1172,71 @@ def take_keyless_standby_cut(conn, p0: int, deadline: Deadline, settle_floor: Se
     _require_autocommit(conn)
     _floor_value(conn, settle_floor)
     if not export_defect(server_version_num(conn)):
-        return take_standby_cut_after(conn, p0, deadline, settle_floor, exported=True, poll_s=poll_s)
+        return take_standby_cut_after(conn, replication, p0, deadline, settle_floor, exported=True, poll_s=poll_s)
     wait_replay_reached(conn, p0, deadline, poll_s=poll_s)
     try:
-        got = take_standby_cut_after(conn, p0, deadline.within(quiet_wait_s), settle_floor, exported=True,
-                                     quiet_only=True, poll_s=poll_s, report=report)
-    except DeadlineExceeded:      # not settled within the quiet wait: the own way waits on, to the full deadline
-        got = NoQuietSnapshot(0, None, not_settled=True)
+        got = take_standby_cut_after(conn, replication, p0, deadline.within(quiet_wait_s), settle_floor,
+                                     exported=True, quiet_only=True, poll_s=poll_s, report=report)
+    except DeadlineExceeded as exc:   # no cut at all within the quiet wait: the own way waits on, to the full deadline
+        got = NoQuietSnapshot(0, None, not_settled=True, detail=exc.what)
     if isinstance(got, StandbyCut):
         return got
-    cut = take_standby_cut_after(conn, p0, deadline, settle_floor, poll_s=poll_s)
+    cut = take_standby_cut_after(conn, replication, p0, deadline, settle_floor, poll_s=poll_s)
     cut.extra["quiet_wait"] = got
     return cut
 
 
+def seal_primary_cut(conn, cut: PrimaryCut, deadline: Deadline, *, poll_s: float = 0.05) -> PrimaryCut:
+    """Wait until the primary has flushed its WAL up to the cut's insert position; return the cut with that
+    reading on it (``reader``, ``reader_start``).  Only such a cut can be valid (:meth:`PrimaryCut.valid_on`).
+
+    ``conn`` is the connection the cut was taken on; its transaction stays open.  The reading is plain SQL and
+    exact: a primary writes on one timeline for its whole server life, the one in the name of its current WAL
+    file, and ``pg_current_wal_flush_lsn()`` is the position ``IDENTIFY_SYSTEM`` would give.  The start time
+    must be the cut's (else :class:`CutError`: another server, or another life of it).
+
+    The wait is short where anything commits: a commit with ``synchronous_commit`` on flushes at once (the
+    heartbeat write is one), and the WAL writer flushes an asynchronous commit within three of its cycles.
+    ``DeadlineExceeded`` says how far the flush position had come.  :func:`take_primary_cut_after` calls
+    this; a caller of :func:`take_primary_cut` calls it once it has decided to use the cut.
+    """
+    _require_autocommit(conn)
+    if cut.insert_lsn is None or cut.timeline is None or cut.server_start is None:
+        raise CutError("a primary cut without an insert position, a timeline or a start time cannot be sealed")
+    while True:
+        in_recovery, flush_text, walfile, started = _one(conn, SQL_PRIMARY_FLUSH)
+        if in_recovery or flush_text is None or walfile is None:
+            raise CutError("not a primary: pg_is_in_recovery() is true")
+        if int(started) != cut.server_start:
+            raise CutError("this connection is not to the server the cut was taken on: its start time is "
+                           "another one")
+        flushed, now_on = lsn.parse(flush_text), _walfile_timeline(walfile)
+        if now_on != cut.timeline:    # cannot happen: a running primary does not change its timeline
+            raise CutError("the primary is on timeline %d, the cut was taken on timeline %d" % (now_on, cut.timeline))
+        if flushed >= cut.insert_lsn:
+            return replace(cut, reader=TimelineReading(now_on, flushed), reader_start=int(started))
+        deadline.sleep(poll_s, "the primary has flushed its WAL up to %s; the cut's insert position is %s "
+                               "(nothing has committed since; is the heartbeat write running?)"
+                       % (lsn.format(flushed), lsn.format(cut.insert_lsn)))
+
+
 def take_primary_cut_after(conn, x: int, deadline: Deadline, *, poll_s: float = 0.1) -> PrimaryCut:
-    """Take cuts on a primary until one has ``xmin >= X``; return it with its transaction left open.
+    """Take cuts on a primary until one has ``xmin >= X``; seal it (:func:`seal_primary_cut`) and return it
+    with its transaction left open.
 
     Raises ``DeadlineExceeded`` when the deadline passes first; its text names the transactions (64-bit ids)
-    that were still in progress below ``X`` at the last attempt, for the operator.
+    that were still in progress below ``X`` at the last attempt, for the operator, or says how far the flush
+    position had come.  No transaction is left open then.
     """
     _require_autocommit(conn)
     while True:
         cut = take_primary_cut(conn)
         if cut.usable_after_xid(x):
-            return cut
+            try:
+                return seal_primary_cut(conn, cut, deadline, poll_s=min(poll_s, 0.05))
+            except BaseException:
+                _rollback_quietly(conn)
+                raise
         end_transaction(conn)
         blocking = cut.blocking_xids(x)
         deadline.sleep(poll_s, "transactions older than id %d are still open: %d in progress, oldest %d (%s%s)" % (
