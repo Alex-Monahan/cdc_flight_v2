@@ -40,6 +40,12 @@ class TakeoverFailed(Exception):
     """The take-over did not win within its time."""
 
 
+class AnotherRunLeads(TakeoverFailed):
+    """The leader row moved past the epoch this take-over started from, under another run's id: another run took
+    over first. Design 4.4 and 4.5: the loser reads the record again and exits; it does not take over from the
+    winner."""
+
+
 def raw_connect(settings):
     """A plain client connection to the destination of ``settings`` (tests only)."""
     raw = duckdb.connect(settings.target, config={"custom_user_agent": settings.marker})
@@ -59,25 +65,49 @@ def take_over(settings, run_id=None, flight_id="test-flight", run_number=1, time
               report=None, pause_s=0.2):
     """Take over as design 4.5 says and return the new epoch.
 
-    On a conflict with an open transaction of an earlier run: interrupt the connections that `_cdc.connections`
-    lists for earlier epochs (``interrupt=False`` leaves that out, to show what happens without it) and try again
-    until ``timeout_s`` has passed, then raise `TakeoverFailed`. An unknown commit outcome is not repeated blindly:
-    the record is read again after more than 2 s and ``run_id`` decides.
+    The take-over decides once from which epoch it takes over (``seen``, read at the first attempt) and every
+    attempt changes the leader row only ``WHERE epoch = seen``. After a conflict or a refused attempt it reads the
+    leader row again: if the row moved past ``seen`` under another run's id, another starter won, and this one
+    raises `AnotherRunLeads` (design 4.5: "the others ... re-read the record and exit"). Otherwise the conflict
+    came from an open transaction of an earlier run: it interrupts the connections that `_cdc.connections` lists
+    for earlier epochs (``interrupt=False`` leaves that out, to show what happens without it) and tries again until
+    ``timeout_s`` has passed, then raises `TakeoverFailed`. An unknown commit outcome is not repeated blindly: the
+    record is read again after more than 2 s and ``run_id`` decides.
 
-    ``report``, a dict, receives what happened: ``attempts``, ``conflicts``, ``interrupted``, ``seconds``, and the
-    text class of the last error."""
+    ``report``, a dict, receives what happened: ``attempts``, ``conflicts``, ``interrupted``, ``seconds``, the text
+    class of the last error, and ``leader_run_id`` when another run leads."""
     run_id = run_id or uuid.uuid4().hex
     rep = report if report is not None else {}
     rep.update(attempts=0, conflicts=0, listed=0, interrupted=0, unknown=0, last_error=None)
     t0 = time.monotonic()
     deadline = Deadline.after(timeout_s)
     raw = raw_connect(settings)
+    seen = None
+
+    def decided(row):
+        """The epoch this run leads with, None to try again, or `AnotherRunLeads`."""
+        epoch, owner = int(row[0]), row[2]
+        if owner == run_id and epoch == seen + 1:
+            return epoch                                     # its own commit landed (after an unknown outcome)
+        if epoch != seen:
+            rep["seconds"] = round(time.monotonic() - t0, 3)
+            rep["leader_run_id"] = owner
+            raise AnotherRunLeads("another run leads: the leader row moved from epoch %d to %d" % (seen, epoch))
+        return None
+
     try:
         while True:
             rep["attempts"] += 1
             sent_commit = False
             try:
-                seen = int(raw.execute(READ_LEADER_SQL).fetchone()[0])
+                row = raw.execute(READ_LEADER_SQL).fetchone()
+                if seen is None:
+                    seen = int(row[0])
+                else:
+                    won = decided(row)
+                    if won is not None:
+                        rep["seconds"] = round(time.monotonic() - t0, 3)
+                        return won
                 raw.execute("BEGIN")
                 n = raw.execute(TAKEOVER_LEADER_SQL, [flight_id, run_number, run_id, seen]).fetchone()[0]
                 if n != 1:
@@ -99,12 +129,21 @@ def take_over(settings, run_id=None, flight_id="test-flight", run_number=1, time
                     with contextlib.suppress(duckdb.Error):
                         raw.close()
                     raw = raw_connect(settings)
-                    row = raw.execute(READ_LEADER_SQL).fetchone()
-                    if row[2] == run_id:
-                        rep["seconds"] = round(time.monotonic() - t0, 3)
-                        return int(row[0])
+                    if seen is not None:
+                        won = decided(raw.execute(READ_LEADER_SQL).fetchone())
+                        if won is not None:
+                            rep["seconds"] = round(time.monotonic() - t0, 3)
+                            return won
                 elif kind == "conflict":
                     rep["conflicts"] += 1
+                    try:
+                        row = raw.execute(READ_LEADER_SQL).fetchone()          # another starter, or an old run?
+                    except duckdb.Error:
+                        row = None                                             # the next attempt reads it
+                    won = decided(row) if row is not None else None
+                    if won is not None:
+                        rep["seconds"] = round(time.monotonic() - t0, 3)
+                        return won
                     if interrupt:
                         listed, done = _interrupt_earlier_raw(raw, settings, seen + 1)
                         rep["listed"] += listed

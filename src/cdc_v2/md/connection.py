@@ -20,8 +20,14 @@ a lane transaction adds for the clean-up after a failure (roll-back, removing vi
 
 What a retired connection can leave behind. The client's ``interrupt()`` does not end a call that waits for
 the server (same evidence file), so the worker thread, the reaper thread and the client connection of a retired
-connection stay until the statement in flight returns. They are daemon threads; `background_threads()` and
-`open_connections()` count them.
+connection stay until the statement in flight returns; on a network that answers nothing, until the network
+answers again (`evidence/p3/destination/blackhole.json`). So the number of them is bounded: a `Connection`
+keeps at most ``Settings.max_waiting_calls`` calls that it gave up and that have not returned; the call that
+would need one more fails at once with `ConnectionLost` and starts nothing. They are daemon threads;
+`background_threads()` counts every worker thread of a retired connection and every helper thread,
+`open_connections()` every client connection of the layer (also the short-lived ones that interrupt), and
+`waiting_calls()` the calls that were given up and still wait, so that a supervisor can end the process past a
+bound.
 
 A destination that is a local DuckDB database (tier T0) runs the same code. The server's interrupt function does
 not exist there; `interrupt_server_connection` then acts on the connections of this process: it interrupts the
@@ -87,8 +93,10 @@ _DROP_CDC = re.compile(r"""\bdrop\s+schema\s+(?:if\s+exists\s+)?(?:"?\w+"?\s*\.\
 _default_settings = None
 _registry_lock = threading.Lock()
 _open_sessions = set()                 # sessions whose client connection is open (leak checks)
+_live_sessions = set()                 # sessions whose worker thread has not ended
 _local_sessions = {}                   # server id -> session, local destinations only
-_background = set()                    # watchdog and reaper threads that have not ended
+_background = set()                    # watchdog, reaper and close threads that have not ended
+_side = {"open": 0, "calls": 0}        # short-lived connections that interrupt, and their calls in flight
 
 
 def configure(settings):
@@ -189,6 +197,13 @@ def counts_rows(sql):
     return statement_kind(sql) in COUNTED and not returns_rows(sql)
 
 
+def count_fetch(sql):
+    """What to read after a statement whose changed rows a caller may want: ``"count"`` for an INSERT, UPDATE
+    or DELETE without RETURNING, else nothing. A statement with RETURNING is never read as a count: the client
+    describes ``... RETURNING b AS "Count"`` like one, and its value can be text (finding 19; fix round, F8)."""
+    return "count" if counts_rows(sql) else None
+
+
 def _read(cur, fetch):
     if fetch == "count":
         d = cur.description
@@ -276,22 +291,40 @@ class Session:
         self.kill_text = None              # local stand-in for a server interrupt: the next statement raises this
         self.lock = threading.Lock()       # held while a statement runs on the client connection
         self._current = None               # the job handed to the worker last
+        self._side_busy = False            # an interrupt through a side connection is in flight for it
         self._q = queue.SimpleQueue()
         self._thread = threading.Thread(target=self._loop, name="cdc_v2-md-%s" % role, daemon=True)
-        self._thread.start()
+        with _registry_lock:
+            _live_sessions.add(self)
+        try:
+            self._thread.start()
+        except BaseException:
+            with _registry_lock:
+                _live_sessions.discard(self)
+            raise
 
     # ------------------------------------------------------------------ the worker thread
     def _loop(self):
-        while True:
-            job = self._q.get()
-            if job is None:
-                return
-            try:
-                job.result = job.fn()
-            except BaseException as e:               # noqa: BLE001 - handed to the caller's thread
-                job.error = e
-            finally:
-                job.done.set()
+        try:
+            while True:
+                job = self._q.get()
+                if job is None:
+                    return
+                try:
+                    job.result = job.fn()
+                except BaseException as e:           # noqa: BLE001 - handed to the caller's thread
+                    job.error = e
+                finally:
+                    job.done.set()
+        finally:
+            with _registry_lock:
+                _live_sessions.discard(self)
+
+    def waiting(self):
+        """True while a call of this connection, or an interrupt of it, has not returned (after the connection
+        was given up: a call that waits for an answer the network does not bring)."""
+        job = self._current
+        return (job is not None and not job.done.is_set() and self._thread.is_alive()) or self._side_busy
 
     def submit(self, fn):
         """Hand ``fn`` to the worker thread. Returns the job, or None when the connection is not usable."""
@@ -338,6 +371,8 @@ class Session:
                 raw.close()
                 raise duckdb.ConnectionException("Connection Error: connection closed")
             self.raw = raw                           # from here on the reaper closes it
+            with _registry_lock:
+                _open_sessions.add(self)                 # counted from the moment it exists
             # Both settings are set for this connection only (SESSION). A plain SET of the second one changes
             # it for every connection this process has to the database, and any of them could change it back.
             raw.execute("SET SESSION TimeZone = 'UTC'")
@@ -356,7 +391,6 @@ class Session:
                 sid = str(uuid.uuid4())
             self.server_id = sid
         with _registry_lock:
-            _open_sessions.add(self)
             if self.state != "new":                  # abandoned meanwhile; the reaper closes the connection
                 raise duckdb.ConnectionException("Connection Error: connection closed")
             self.state = "open"
@@ -415,8 +449,22 @@ class Session:
                 raw.interrupt()
             except Exception:                        # noqa: BLE001
                 pass
-        if self.settings.is_motherduck and self.server_id is not None:
-            _interrupt_through_side_connection(self.settings, self.server_id)
+        self._interrupt_side()
+
+    def _interrupt_side(self):
+        """MotherDuck: the server's interrupt for this connection's id, through a side connection. At most one
+        is in flight per connection: on a network that answers nothing it waits as long as the statement does."""
+        if not (self.settings.is_motherduck and self.server_id is not None):
+            return None
+        with _registry_lock:
+            if self._side_busy:
+                return None
+            self._side_busy = True
+        try:
+            return _interrupt_through_side_connection(self.settings, self.server_id)
+        finally:
+            with _registry_lock:
+                self._side_busy = False
 
     def local_interrupt(self, deadline=None):
         """Local stand-in for the server's interrupt: end the statement in flight, roll the open transaction back,
@@ -472,12 +520,12 @@ class Session:
                 raw.interrupt()
             except Exception:                        # noqa: BLE001
                 pass
-        if s.is_motherduck and self.server_id is not None:
+        if s.is_motherduck:
             try:
-                _interrupt_through_side_connection(s, self.server_id)
+                self._interrupt_side()
             except Exception:                        # noqa: BLE001
                 pass
-        elif not s.is_motherduck:
+        else:
             self.local_interrupt()                   # as the server does: the open transaction is rolled back now
         self._close_raw()
 
@@ -510,13 +558,26 @@ class Session:
 
 def _interrupt_through_side_connection(settings, server_id):
     """Call the server's interrupt function for one id through a short-lived connection of its own. Returns the
-    function's answer. Used by the watchdog and the reaper, which cannot use the connection they interrupt."""
-    side = duckdb.connect(settings.target, config={"custom_user_agent": settings.marker})
+    function's answer. Used by the watchdog and the reaper, which cannot use the connection they interrupt. The
+    connection and the call are counted (`open_connections`, `waiting_calls`) until they end."""
+    with _registry_lock:
+        _side["calls"] += 1
     try:
-        row = side.execute(INTERRUPT_SQL, [server_id]).fetchone()
-        return bool(row[0]) if row is not None else False
+        side = duckdb.connect(settings.target, config={"custom_user_agent": settings.marker})
+        with _registry_lock:
+            _side["open"] += 1
+        try:
+            row = side.execute(INTERRUPT_SQL, [server_id]).fetchone()
+            return bool(row[0]) if row is not None else False
+        finally:
+            try:
+                side.close()
+            finally:
+                with _registry_lock:
+                    _side["open"] -= 1
     finally:
-        side.close()
+        with _registry_lock:
+            _side["calls"] -= 1
 
 
 def _interrupt_local(server_id, deadline=None):
@@ -525,15 +586,21 @@ def _interrupt_local(server_id, deadline=None):
     return sess.local_interrupt(deadline) if sess is not None else False
 
 
-def _open_session(settings, role, deadline):
+def _open_session(settings, role, deadline, given_up=None):
+    """A new session with its client connection open, or the error of the connect. A session that is given up is
+    appended to ``given_up`` (the `Connection` counts the calls it gave up that still wait)."""
     sess = Session(settings, role)
     try:
         out = sess.call(sess._open, deadline, interrupt=False)
     except BaseException:
         sess.retire()
+        if given_up is not None:
+            given_up.append(sess)
         raise
     if out.ok and not out.late:                      # a connect that answered late is retired already
         return sess
+    if given_up is not None:
+        given_up.append(sess)
     if not out.late:
         sess.retire()
     if not out.sent or out.late:
@@ -582,6 +649,7 @@ class Connection:
         self.generation = 0
         self._session = None
         self._stale_ids = []               # server ids of retired connections, not yet interrupted from a new one
+        self._given_up = []                # sessions it retired; kept while a call of theirs still waits
         self._lane = None                  # the lane that owns this connection, if any
         self._in_block = False             # a lane transaction is open on it
         self._closed = False
@@ -608,12 +676,23 @@ class Connection:
         """Retire the current client connection; its server id is interrupted before the next one is used."""
         if only is not None and self._session is not only:
             only.retire()
+            self._keep_given_up(only)
             return
         sess, self._session = self._session, None
         if sess is not None:
             if sess.server_id is not None and sess.server_id not in self._stale_ids:
                 self._stale_ids.append(sess.server_id)
             sess.retire()
+            self._keep_given_up(sess)
+
+    def _keep_given_up(self, sess):
+        if sess not in self._given_up:
+            self._given_up.append(sess)
+
+    def waiting_calls(self):
+        """How many calls that this connection gave up (deadline, lost connection) have not returned yet."""
+        self._given_up = [s for s in self._given_up if s.waiting()]
+        return len(self._given_up)
 
     def ensure(self, deadline):
         """Make sure a client connection is open: connect if needed (with the attempts of the settings), then
@@ -624,11 +703,19 @@ class Connection:
             self._drop_session()
         if self._session is None:
             s = self.settings
+            waiting = self.waiting_calls()
+            if waiting >= s.max_waiting_calls:
+                # each such call holds a thread and a client connection until the network answers; one more
+                # would add more of both. Nothing is started; the caller tries again later (fix round, F7)
+                raise ConnectionLost("connection %s: %d calls that were given up still wait for the destination "
+                                     "(at most %d); no new connection until one returns"
+                                     % (self.role, waiting, s.max_waiting_calls))
             attempt = 0
             while True:
                 attempt += 1
                 try:
-                    self._session = _open_session(s, self.role, deadline.within(s.connect_deadline_s))
+                    self._session = _open_session(s, self.role, deadline.within(s.connect_deadline_s),
+                                                  self._given_up)
                     break
                 except ConnectionLost:
                     if attempt >= s.connect_attempts or deadline.remaining() <= s.connect_retry_pause_s:
@@ -700,7 +787,7 @@ class Connection:
     def execute(self, sql, params=None, deadline=None):
         """Run one statement in autocommit. Returns the number of rows an INSERT, UPDATE or DELETE changed, else
         None (also for a statement with RETURNING)."""
-        n = self._autocommit(sql, params, "count", deadline)
+        n = self._autocommit(sql, params, count_fetch(sql), deadline)
         return n if counts_rows(sql) else None
 
     def fetchall(self, sql, params=None, deadline=None):
@@ -762,15 +849,31 @@ class Connection:
 
 # ---------------------------------------------------------------------- leak checks for tests and shutdown
 def open_connections():
-    """How many client connections of this package are open in this process."""
+    """How many client connections of this package are open in this process: those of the connections in use,
+    those of retired connections that are not closed yet (also one whose connect never finished), and the
+    short-lived ones that interrupt a connection."""
     with _registry_lock:
-        return len(_open_sessions)
+        return len(_open_sessions) + _side["open"]
 
 
 def background_threads():
-    """Watchdog, reaper and close threads that have not ended."""
+    """Threads of this package that a caller does not wait for and that have not ended: watchdog, reaper and
+    close threads, and the worker thread of every retired connection."""
     with _registry_lock:
-        return [t for t in _background if t.is_alive()]
+        helpers = [t for t in _background if t.is_alive()]
+        workers = [s._thread for s in _live_sessions if s.state in ("retired", "closed") and s._thread.is_alive()]
+    return helpers + workers
+
+
+def waiting_calls():
+    """How many calls of this process were given up (deadline, lost connection) and have not returned: a
+    statement or a connect of a retired connection, and an interrupt through a side connection. A supervisor
+    that sees this above its bound ends the process (contract C11); each such call holds a thread and a client
+    connection, and on a network that answers nothing it waits until the network answers again."""
+    with _registry_lock:
+        stuck = sum(1 for s in _live_sessions if s.state in ("retired", "closed") and s._current is not None
+                    and not s._current.done.is_set())
+        return stuck + _side["calls"]
 
 
 def wait_idle(deadline):

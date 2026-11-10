@@ -14,10 +14,14 @@ nothing (`evidence/p3/destination/leader_tables_concurrent.json`). The rows are 
 package with `register_migrations`. `migrate(control_lane)` runs the missing steps, each in its own fenced
 `control`-lane transaction that also moves the package's row in `_cdc.schema_version` from the version it read to
 the next one (the run-again rule of contract C4), so a step runs once however often and from however many
-processes `migrate` is called, and a failing step leaves nothing behind.
+processes `migrate` is called, and a failing step leaves nothing behind. The row also keeps the name and a hash of
+every step applied so far (`step_hash`); `migrate` compares them with the registered list and refuses to start
+when a step that the database applied was changed, renamed, removed or moved (`SchemaError`).
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import random
 import re
@@ -101,6 +105,7 @@ NAMED_STATEMENTS = {
     "fence": FENCE_SQL,
     "clock": clock_sql,
     "register_connection": registry.REGISTER_SQL,
+    "register_fence": registry.REGISTER_FENCE_SQL,
     "list_earlier_connections": registry.LIST_EARLIER_SQL,
     "interrupt_earlier_connections": registry.INTERRUPT_EARLIER_SQL,
     "cleanup_connections": registry.CLEANUP_SQL,
@@ -181,21 +186,22 @@ def ensure_leader_tables(conn, deadline=None):
 # ---------------------------------------------------------------------------------------------------------------
 CREATE_SCHEMA_VERSION_SQL = (
     "CREATE TABLE IF NOT EXISTS _cdc.schema_version "
-    "(package VARCHAR, version BIGINT, step VARCHAR, epoch BIGINT, updated_at TIMESTAMPTZ)"
+    "(package VARCHAR, version BIGINT, step VARCHAR, applied VARCHAR, epoch BIGINT, updated_at TIMESTAMPTZ)"
 )
 _HAS_VERSION_TABLE_SQL = (
     "SELECT count(*) FROM information_schema.tables "
     "WHERE table_catalog = current_database() AND table_schema = '_cdc' AND table_name = 'schema_version'"
 )
-_READ_VERSIONS_SQL = "SELECT package, version, step FROM _cdc.schema_version"
-_READ_VERSION_SQL = "SELECT version, step FROM _cdc.schema_version WHERE package = ?"
+_READ_VERSIONS_SQL = "SELECT package, version, step, applied FROM _cdc.schema_version"
+_READ_VERSION_SQL = "SELECT version, step, applied FROM _cdc.schema_version WHERE package = ?"
 _ADD_PACKAGE_SQL = (
-    "INSERT INTO _cdc.schema_version (package, version, step, epoch, updated_at) "
-    "SELECT ?, 0, '', ?, " + clock_sql + " FROM _cdc.leader "
+    "INSERT INTO _cdc.schema_version (package, version, step, applied, epoch, updated_at) "
+    "SELECT ?, 0, '', '[]', ?, " + clock_sql + " FROM _cdc.leader "
     "WHERE NOT EXISTS (SELECT 1 FROM _cdc.schema_version WHERE package = ?)"
 )
+#: ``applied`` is a JSON list of ``[name, hash]``, one per applied step in order (`step_hash`).
 _MOVE_VERSION_SQL = (
-    "UPDATE _cdc.schema_version SET version = ?, step = ?, epoch = ?, updated_at = " + clock_sql + " "
+    "UPDATE _cdc.schema_version SET version = ?, step = ?, applied = ?, epoch = ?, updated_at = " + clock_sql + " "
     "WHERE package = ? AND version = ?"
 )
 
@@ -222,6 +228,21 @@ class Step:
         if not stmts or not all(isinstance(s, str) and s.strip() for s in stmts):
             raise ValueError("step %s needs at least one statement, each as SQL text" % self.name)
         object.__setattr__(self, "statements", stmts)
+
+    @property
+    def hash(self):
+        return step_hash(self)
+
+
+def step_hash(step):
+    """A hash of a step's name and statements (SHA-256, hex). The database keeps it for every applied step, so a
+    step that is changed after it was applied is found (fix round, F5)."""
+    h = hashlib.sha256()
+    for part in (step.name,) + tuple(step.statements):
+        data = part.encode("utf-8")
+        h.update(b"%d:" % len(data))
+        h.update(data)
+    return h.hexdigest()
 
 
 def register_migrations(package, steps):
@@ -257,23 +278,42 @@ def _pending(conn, lists, deadline):
     """Read-only look: the packages that have steps to run. Raises `SchemaError` on a mismatch."""
     if int(conn.fetchone(_HAS_VERSION_TABLE_SQL, None, deadline)[0]) == 0:
         return None
-    stored = {r[0]: (int(r[1]), r[2]) for r in conn.fetchall(_READ_VERSIONS_SQL, None, deadline)}
+    stored = {r[0]: (int(r[1]), r[2], r[3]) for r in conn.fetchall(_READ_VERSIONS_SQL, None, deadline)}
     todo = []
     for package, steps in lists:
-        version, name = stored.get(package, (0, ""))
-        _check_version(package, steps, version, name)
+        version, name, applied = stored.get(package, (0, "", "[]"))
+        _check_version(package, steps, version, name, applied)
         if version < len(steps):
             todo.append(package)
     return todo
 
 
-def _check_version(package, steps, version, name):
+def _applied_list(steps, version):
+    return json.dumps([[st.name, step_hash(st)] for st in steps[:version]], separators=(",", ":"))
+
+
+def _check_version(package, steps, version, name, applied):
+    """Refuse a database whose applied steps are not the first steps of the registered list, unchanged."""
     if version > len(steps):
         raise SchemaError("package %s: the database is at step %d, this code knows %d steps (the code is older "
                           "than the database)" % (package, version, len(steps)))
     if version > 0 and steps[version - 1].name != name:
         raise SchemaError("package %s: the database recorded step %d as %r, this code calls it %r"
                           % (package, version, name, steps[version - 1].name))
+    try:
+        recorded = [tuple(x) for x in json.loads(applied or "[]")]
+    except (TypeError, ValueError):
+        recorded = None
+    if recorded is None or len(recorded) != version or not all(len(x) == 2 for x in recorded):
+        raise SchemaError("package %s: the database's record of its %d applied steps is damaged" % (package, version))
+    for i, ((rec_name, rec_hash), st) in enumerate(zip(recorded, steps), start=1):
+        if rec_name != st.name:
+            raise SchemaError("package %s: the database applied step %d as %r, this code calls step %d %r (a step "
+                              "was renamed, removed or inserted)" % (package, i, rec_name, i, st.name))
+        if rec_hash != step_hash(st):
+            raise SchemaError("package %s: step %d %r is not the step the database applied (its statements "
+                              "changed after it was applied; a change is a new step at the end of the list)"
+                              % (package, i, st.name))
 
 
 def migrate(lane, deadline=None):
@@ -334,15 +374,15 @@ def _one_step(lane, package, steps, deadline, applied, unknown):
             row = tx.fetchone(_READ_VERSION_SQL, [package])
             if row is None:
                 tx.execute_one(_ADD_PACKAGE_SQL, [package, lane.epoch, package])
-                version, name = 0, ""
+                version, name, recorded = 0, "", "[]"
             else:
-                version, name = int(row[0]), row[1]
+                version, name, recorded = int(row[0]), row[1], row[2]
             while unknown:
                 old = unknown.pop()
                 if old[0] == package and old[1] <= version and steps[old[1] - 1].name == name:
                     applied.append(old)
             try:
-                _check_version(package, steps, version, name)
+                _check_version(package, steps, version, name, recorded)
             except SchemaError as e:
                 raise tx.fail(e)
             if version == len(steps):
@@ -350,7 +390,8 @@ def _one_step(lane, package, steps, deadline, applied, unknown):
             step = steps[version]
             for sql in step.statements:
                 tx.execute(sql)
-            tx.execute_one(_MOVE_VERSION_SQL, [version + 1, step.name, lane.epoch, package, version])
+            tx.execute_one(_MOVE_VERSION_SQL, [version + 1, step.name, _applied_list(steps, version + 1), lane.epoch,
+                                               package, version])
             entry = (package, version + 1, step.name)
     except CommitUnknown:
         if entry is not None:
@@ -367,6 +408,13 @@ def versions(conn_or_tx, deadline=None):
     return {r[0]: (int(r[1]), r[2]) for r in conn_or_tx.fetchall(_READ_VERSIONS_SQL, None, deadline)}
 
 
-__all__ = ["SchemaError", "Step", "register_migrations", "registered_migrations", "migrate", "versions",
+def applied_steps(conn_or_tx, package, deadline=None):
+    """What the database recorded for ``package``: ``[(step name, hash)]`` of every applied step, in order."""
+    row = conn_or_tx.fetchone("SELECT applied FROM _cdc.schema_version WHERE package = ?", [package], deadline)
+    return [tuple(x) for x in json.loads(row[0])] if row is not None else []
+
+
+__all__ = ["SchemaError", "Step", "step_hash", "register_migrations", "registered_migrations", "migrate", "versions",
+           "applied_steps",
            "ensure_leader_tables", "check_leader_tables", "compare_statements", "LEADER_TABLE_STATEMENTS",
            "NAMED_STATEMENTS"]

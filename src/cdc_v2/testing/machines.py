@@ -96,6 +96,7 @@ EXAMPLE_DOOR = state.Machine(
     table="_cdc_example.door",
     key_columns=("door_id",),
     state_column="state",
+    creators=("stream",),
     initial=("closed",),
     description="Example for tests: a door. One key column, no final state.",
 )
@@ -108,7 +109,9 @@ EXAMPLE_JOB = state.Machine(
     table="_cdc_example.job",
     key_columns=("batch", "part"),
     state_column="status",
-    description="Example for tests: a job. Two key columns, a transition from a state to itself, a final state.",
+    creators=("stream", "control"),
+    description="Example for tests: a job. Two key columns, a transition from a state to itself, a final state; "
+                "rows created from two lanes, each together with a transition of its parent door.",
 )
 
 EXAMPLE_TABLES = (

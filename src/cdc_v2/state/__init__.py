@@ -6,7 +6,7 @@ one table, one row per key. A package declares its machine at import:
     TABLE_LIFECYCLE = state.declare(state.Machine(
         name="table", states=("new", "loading", "streaming"),
         transitions=(("new", "loading"), ("loading", "streaming")),
-        table="_cdc.tables", key_columns=("table_id",), state_column="state"))
+        table="_cdc.tables", key_columns=("table_id",), state_column="state", creators=("stream",)))
 
 and changes the state only through `transition` (or `create` for a new row), inside the lane transaction that also
 changes the data the state governs:
@@ -18,6 +18,30 @@ holds ``from_state`` (one conditional UPDATE, exactly one row), and appends a ro
 test (`tests/destination/test_static.py`) searches `src/` for any other statement that writes a declared state
 column. `docs/state_machines.md` is generated from the declarations (``python -m cdc_v2.state``).
 
+Both write only inside an `md.Transaction` (a lane transaction, so behind the fence); anything else is
+`md.LaneMisuse`. `read` also takes a connection.
+
+**The facts of a group.** ``transition(..., values=..., expect=..., detail=...)`` sets more columns in the same
+conditional UPDATE (``values``), adds conditions on columns the caller read (``expect``; a count of 0 then
+fails the transaction with `md.Conflict`, the run-again rule of contract C4), and stores ``detail`` (identifiers,
+positions, counts and durations only, `check_fields`) in the row of `_cdc.transitions`. The stream's group is
+then two statements: the UPDATE of its position with ``expect`` on the previous value, and the INSERT of the log
+row. Every log row carries the lane, the epoch and ``seq``: the lane's fence counter ``n`` after this
+transaction's fence statement, read in the same INSERT. Two transactions of a lane that read the same ``n``
+conflict at the fence row, so ``seq`` orders the transactions of a lane exactly as they committed, and a
+duplicate (lane, ``seq``) between two transactions shows a second writer. (Every row that one transaction
+writes carries the same ``seq``.) ``changed_at`` does not give that order: it is MotherDuck's clock when the
+INSERT ran, not when the transaction committed, with millisecond resolution, and two writers can run their
+statements in one order and commit in the other.
+
+**Who creates the keys of a machine** (``creators``): one or more lane names, or ``"fresh_ids"`` for a machine
+whose keys are new random ids (alerts, requests) and that any lane may create. `create` refuses any other lane
+with `md.LaneMisuse`. `create` cannot see a row that a concurrent transaction is creating; two creators of one
+key meet only where they write the same column. On one lane name that is the fence row. A machine whose rows are
+created from several lanes (the chunks of a backfill, from the lanes ``backfill.<i>``) creates each child row
+together with a transition of its parent row (the backfill's ``planned -> reading``), which every planner
+writes: two planners then conflict on the parent's state column and only one commits.
+
 One exception is declared by contract C5: the leader machine. The bootstrap writes `_cdc.leader.state` with its own
 copy of the take-over statements, because it runs before this package can be imported.
 """
@@ -28,8 +52,13 @@ import logging
 import re
 from dataclasses import dataclass
 
+import math
+
 from cdc_v2.md import schema as _schema
 from cdc_v2.md.connection import clock_sql
+from cdc_v2.md.errors import Conflict, LaneMisuse
+from cdc_v2.md.lane import Transaction
+from cdc_v2.md.settings import LANES
 
 log = logging.getLogger("cdc_v2.state")
 
@@ -37,6 +66,50 @@ _NAME = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
 _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}$")
 _TABLE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}(\.[A-Za-z_][A-Za-z0-9_]{0,62})?$")
 _MAX_CAUSE = 200
+#: ``creators`` of a machine whose keys are new random ids: any lane may create a row.
+FRESH_IDS = "fresh_ids"
+
+# The value rules of `check_fields` (alert fields, the detail of a transition): identifiers, positions, counts
+# and durations only, so that no value of a row can reach them (SPEC 8.3).
+MAX_FIELDS = 24
+MAX_STRING = 128
+_FIELD = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
+_INT_MIN, _INT_MAX = -(2 ** 63), 2 ** 64 - 1       # positions are unsigned 64-bit (contract C0)
+
+
+class FieldError(ValueError):
+    """A field of an alert or of a transition's detail was refused before it reached the database."""
+
+
+def check_fields(fields, error=FieldError, what="field"):
+    """Return ``fields`` as a plain dict, or raise ``error``. A flat mapping of at most `MAX_FIELDS` short
+    lower-case names to an integer (64-bit, not a bool), a finite float, or a string of at most `MAX_STRING`
+    printable characters. The value itself is never put into the message: it may be a row value."""
+    if fields is None:
+        return {}
+    if not isinstance(fields, dict):
+        raise error("%ss are a mapping from name to value" % what)
+    if len(fields) > MAX_FIELDS:
+        raise error("at most %d %ss" % (MAX_FIELDS, what))
+    out = {}
+    for name, value in fields.items():
+        if not isinstance(name, str) or not _FIELD.match(name):
+            raise error("a %s name is a short lower-case identifier" % what)
+        if isinstance(value, bool):
+            ok = False
+        elif isinstance(value, int):
+            ok = _INT_MIN <= value <= _INT_MAX
+        elif isinstance(value, float):
+            ok = math.isfinite(value)
+        elif isinstance(value, str):
+            ok = len(value) <= MAX_STRING and value.isprintable()
+        else:
+            ok = False
+        if not ok:
+            raise error("%s %s: a %s of this kind is not allowed (identifiers, positions, counts and durations "
+                        "only)" % (what, name, type(value).__name__))
+        out[name] = value
+    return out
 
 
 class _Now:
@@ -79,14 +152,16 @@ class Machine:
     ``states``: every state, as short lower-case names. ``transitions``: the allowed pairs ``(from, to)``; a pair
     of one state with itself is allowed when it is listed. ``table``: where the state is stored (``schema.table``).
     ``key_columns``: the columns that identify one row; empty for a table with one row. ``state_column``: the
-    column that holds the state. ``initial``: the states a new row may be created in (empty: any state).
-    ``description``: one line for the generated document."""
+    column that holds the state. ``creators``: the lanes whose transactions create the rows (`create`), or
+    `FRESH_IDS` for keys that are new random ids (module text). ``initial``: the states a new row may be created
+    in (empty: any state). ``description``: one line for the generated document."""
     name: str
     states: tuple
     transitions: tuple
     table: str
     key_columns: tuple
     state_column: str
+    creators: object
     initial: tuple = ()
     description: str = ""
 
@@ -111,17 +186,27 @@ class Machine:
         if not isinstance(self.state_column, str) or not _IDENT.match(self.state_column) \
                 or self.state_column in keys:
             raise ValueError("machine %s: the state column is a column name that is not a key column" % self.name)
+        creators = self.creators
+        if creators != FRESH_IDS:
+            if isinstance(creators, str) or not isinstance(creators, (tuple, list)):
+                raise ValueError("machine %s: creators is a tuple of lane names or %r" % (self.name, FRESH_IDS))
+            creators = tuple(creators)
+            if not creators or len(set(creators)) != len(creators) or not all(c in LANES for c in creators):
+                raise ValueError("machine %s: creators are distinct lane names (%s)" % (self.name, ", ".join(LANES)))
         initial = tuple(self.initial)
         if not all(s in states for s in initial):
             raise ValueError("machine %s: an initial state is not declared" % self.name)
         if not isinstance(self.description, str) or "\n" in self.description:
             raise ValueError("machine %s: the description is one line" % self.name)
         for field, value in (("states", states), ("transitions", transitions), ("key_columns", keys),
-                             ("initial", initial)):
+                             ("creators", creators), ("initial", initial)):
             object.__setattr__(self, field, value)
 
     def allows(self, from_state, to_state):
         return (from_state, to_state) in self.transitions
+
+    def may_create(self, lane):
+        return self.creators == FRESH_IDS or lane in self.creators
 
 
 _machines = {}
@@ -198,18 +283,53 @@ def _where(m):
     return " AND ".join("%s IS NOT DISTINCT FROM ?" % c for c in m.key_columns) or "TRUE"
 
 
-_LOG_SQL = ("INSERT INTO _cdc.transitions (machine, key, from_state, to_state, cause, epoch, changed_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, " + clock_sql + ")")
+#: One row per change. ``seq`` is the lane's fence counter after this transaction's fence statement (the fence
+#: statement is the last one before COMMIT and raises ``n`` by one; this INSERT reads ``n`` as the transaction
+#: sees it). Parameters: machine, key, from, to, cause, epoch, lane, lane, detail.
+_LOG_SQL = ("INSERT INTO _cdc.transitions (machine, key, from_state, to_state, cause, epoch, lane, seq, detail, "
+            "changed_at) VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT CAST(n + 1 AS UBIGINT) FROM _cdc.fence WHERE lane = ?), "
+            "CAST(? AS JSON), " + clock_sql + ")")
 
 
-def _record(tx, m, key, from_state, to_state, cause):
+def _transaction(tx, what):
+    """``tx`` must be a lane transaction: only a fenced transaction may change a state (fix round, F4: through a
+    plain connection an old run changed a state after a take-over, and its log row had no epoch)."""
+    if not isinstance(tx, Transaction):
+        raise LaneMisuse("state.%s needs an md.Transaction (a lane transaction), got %s"
+                         % (what, type(tx).__name__))
+    return tx
+
+
+def _detail(detail):
+    return json.dumps(check_fields(detail, what="detail field"), sort_keys=True) if detail else None
+
+
+def _record(tx, m, key, from_state, to_state, cause, detail=None):
     key_text = json.dumps(list(key), default=str)
-    tx.execute(_LOG_SQL, [m.name, key_text, from_state, to_state, cause, getattr(tx, "epoch", None)])
+    n = tx.execute(_LOG_SQL, [m.name, key_text, from_state, to_state, cause, tx.epoch, tx.lane, tx.lane, detail])
+    if n != 1:
+        raise tx.fail(StateError("the row of _cdc.transitions was not written (%r rows)" % (n,)))
     # The line is written inside the caller's open transaction: the change holds only if that transaction
     # commits. `_cdc.transitions` is the record; the field `committed` says what the line cannot know.
     log.info("state transition", extra={"cdc": {"machine": m.name, "key": key_text, "from": from_state,
-                                                "to": to_state, "cause": cause,
-                                                "epoch": getattr(tx, "epoch", None), "committed": False}})
+                                                "to": to_state, "cause": cause, "epoch": tx.epoch, "lane": tx.lane,
+                                                "committed": False}})
+
+
+def _columns(m, mapping, what):
+    mapping = dict(mapping or {})
+    for col in mapping:
+        if not isinstance(col, str) or not _IDENT.match(col) or col in m.key_columns or col == m.state_column:
+            raise StateError("machine %s: %r in %s is not a plain column name beside key and state"
+                             % (m.name, col, what))
+    return mapping
+
+
+def _value_sql(value, params):
+    if value is NOW:
+        return clock_sql
+    params.append(value)
+    return "?"
 
 
 def _stored(reader, m, key):
@@ -225,63 +345,84 @@ def read(conn_or_tx, machine, key=()):
     return _stored(conn_or_tx, m, _key(m, key))
 
 
-def transition(tx, machine, key, from_state, to_state, cause):
+def transition(tx, machine, key, from_state, to_state, cause, *, detail=None, values=None, expect=None):
     """Move one key from ``from_state`` to ``to_state`` inside the open lane transaction ``tx``.
 
     Raises `IllegalTransition` and changes nothing when the pair is not declared (the database is not touched), or
     when the row does not hold ``from_state`` (``stored`` then says what it holds; the transaction stays usable).
-    On success the change and its row in `_cdc.transitions` are part of ``tx``."""
+    On success the change and its row in `_cdc.transitions` are part of ``tx``.
+
+    ``values`` (column -> value; `NOW` for MotherDuck's clock) sets more columns of the row in the same UPDATE.
+    ``expect`` (column -> value) adds a condition ``column IS NOT DISTINCT FROM value`` for each, and the UPDATE
+    writes those columns too (with their new value from ``values``, or with themselves), so that a concurrent
+    writer of them conflicts. With ``expect`` a count of 0 rolls the transaction back and raises `md.Conflict`:
+    what the caller read has changed, so it runs the transaction again (contract C4). ``detail`` goes into the
+    log row (`check_fields`). ``tx`` must be an `md.Transaction`, else `md.LaneMisuse`."""
     m = _resolve(machine)
     key = _key(m, key)
     cause = _cause(cause)
     if not m.allows(from_state, to_state):
         raise IllegalTransition(m.name, key, from_state, to_state, declared=False)
-    n = tx.execute("UPDATE %s SET %s = ? WHERE %s AND %s = ?" % (m.table, m.state_column, _where(m), m.state_column),
-                   [to_state, *key, from_state])
+    detail = _detail(detail)
+    values = _columns(m, values, "values")
+    expect = _columns(m, expect, "expect")
+    _transaction(tx, "transition")
+    params = [to_state]
+    sets = ["%s = ?" % m.state_column]
+    for col, value in values.items():
+        sets.append("%s = %s" % (col, _value_sql(value, params)))
+    sets += ["%s = %s" % (col, col) for col in expect if col not in values]
+    params += [*key, from_state]
+    conds = [_where(m), "%s = ?" % m.state_column]
+    for col, value in expect.items():
+        conds.append("%s IS NOT DISTINCT FROM ?" % col)
+        params.append(value)
+    n = tx.execute("UPDATE %s SET %s WHERE %s" % (m.table, ", ".join(sets), " AND ".join(conds)), params)
     if n == 1:
-        _record(tx, m, key, from_state, to_state, cause)
+        _record(tx, m, key, from_state, to_state, cause, detail)
         return
+    if n == 0 and expect:
+        raise tx.fail(Conflict("machine %s: the row no longer holds what the transaction read (%s)"
+                               % (m.name, ", ".join(sorted(expect)))))
     if n == 0:
         raise IllegalTransition(m.name, key, from_state, to_state, stored=_stored(tx, m, key))
-    err = StateError("machine %s: the transition changed %r rows of %s; the key is not unique" % (m.name, n, m.table))
-    fail = getattr(tx, "fail", None)
-    raise fail(err) if fail is not None else err
+    raise tx.fail(StateError("machine %s: the transition changed %r rows of %s; the key is not unique"
+                             % (m.name, n, m.table)))
 
 
-def create(tx, machine, key, state, cause, values=None):
+def create(tx, machine, key, state, cause, values=None, detail=None):
     """Add the row of a new key in ``state``. Fails with `IllegalTransition` when the key has a row already
     (``stored`` says in which state) or when ``state`` is not one a new row may have. ``values`` gives the other
-    columns of the new row (column name -> value; the value `NOW` stands for MotherDuck's clock).
+    columns of the new row (column name -> value; the value `NOW` stands for MotherDuck's clock); ``detail`` goes
+    into the log row.
 
-    The check for an existing row sees what this transaction sees. Two transactions that create one key at the
-    same time meet only through the fence row of their lane: on one lane the second one gets `Conflict`, on
-    two lanes both commit and the key has two rows (`read` and `transition` then raise `StateError`). So the
-    rows of one machine are created from one lane only (`docs/design/destination.md`, contract notes)."""
+    ``tx`` must be an `md.Transaction` of a lane that the machine names in ``creators`` (or any lane for
+    `FRESH_IDS`), else `md.LaneMisuse`. The check for an existing row sees what this transaction sees; two
+    transactions that create one key at the same time meet only where they write the same column (module
+    text: one lane name, or a transition of the parent row)."""
     m = _resolve(machine)
     key = _key(m, key)
     cause = _cause(cause)
     if state not in m.states or (m.initial and state not in m.initial):
         raise IllegalTransition(m.name, key, None, state, declared=False,
                                 what="a new row cannot start in state %r" % (state,))
-    values = dict(values or {})
-    for col in values:
-        if not isinstance(col, str) or not _IDENT.match(col) or col in m.key_columns or col == m.state_column:
-            raise StateError("machine %s: %r is not a plain column name beside key and state" % (m.name, col))
+    detail = _detail(detail)
+    values = _columns(m, values, "values")
+    _transaction(tx, "create")
+    if not m.may_create(tx.lane):
+        raise LaneMisuse("machine %s: rows are created by the lane %s, not by %s (Machine.creators)"
+                         % (m.name, " or ".join(m.creators), tx.lane))
     columns = list(m.key_columns) + [m.state_column] + list(values)
     exprs, params = ["?"] * (len(key) + 1), list(key) + [state]
     for value in values.values():
-        if value is NOW:
-            exprs.append(clock_sql)
-        else:
-            exprs.append("?")
-            params.append(value)
+        exprs.append(_value_sql(value, params))
     params += list(key)
     n = tx.execute("INSERT INTO %s (%s) SELECT %s WHERE NOT EXISTS (SELECT 1 FROM %s WHERE %s)"
                    % (m.table, ", ".join(columns), ", ".join(exprs), m.table, _where(m)), params)
     if n != 1:
         raise IllegalTransition(m.name, key, None, state, stored=_stored(tx, m, key),
                                 what="the key has a row already")
-    _record(tx, m, key, None, state, cause)
+    _record(tx, m, key, None, state, cause, detail)
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -290,7 +431,7 @@ def create(tx, machine, key, state, cause, values=None):
 MIGRATIONS = _schema.register_migrations("state", (
     _schema.Step("transitions_table", (
         "CREATE TABLE _cdc.transitions (machine VARCHAR, key VARCHAR, from_state VARCHAR, to_state VARCHAR, "
-        "cause VARCHAR, epoch BIGINT, changed_at TIMESTAMPTZ)",
+        "cause VARCHAR, epoch BIGINT, lane VARCHAR, seq UBIGINT, detail JSON, changed_at TIMESTAMPTZ)",
     )),
 ))
 
@@ -308,10 +449,11 @@ the same transaction as the data the state governs (SPEC 1.9). A package declare
 `cdc_v2.state.declare`.
 
 A state is changed in one way only: `cdc_v2.state.transition(tx, machine, key, from_state, to_state, cause)`, and
-`cdc_v2.state.create` for a new row. The function refuses a change that is not in the list below. It changes the
-row only if the row still holds `from_state`. It writes one row to `_cdc.transitions` for every change: machine,
-key, from, to, cause, epoch and MotherDuck's time. A static test fails when any other code under `src/` writes a
-state column.
+`cdc_v2.state.create` for a new row, both inside a lane transaction only. The function refuses a change that is
+not in the list below. It changes the row only if the row still holds `from_state`. It writes one row to
+`_cdc.transitions` for every change: machine, key, from, to, cause, epoch, lane, `seq` (the lane's fence counter
+after the transaction commits, which orders the transactions of a lane as they committed), the detail and
+MotherDuck's time. A static test fails when any other code under `src/` writes a state column.
 
 ## How to read the blocks
 
@@ -321,6 +463,8 @@ Each block below is one machine.
 - "Key" names the columns that identify one row.
 - "States" lists every state the column can hold.
 - "A new row starts in" lists the states `create` accepts.
+- "Rows are created by" names the lanes whose transactions may create a row, or says that the keys are fresh ids
+  that any lane may create.
 - The table lists every allowed transition. A pair that is not in the table is refused. A state with no row in the
   "From" column is final.
 """
@@ -349,6 +493,8 @@ def render_machine(m):
         "- Key: %s" % (", ".join("`%s`" % c for c in m.key_columns) or "none (the table has one row)"),
         "- States: %s" % ", ".join("`%s`" % s for s in m.states),
         "- A new row starts in: %s" % (", ".join("`%s`" % s for s in m.initial) or "any state"),
+        "- Rows are created by: %s" % ("fresh ids, from any lane" if m.creators == FRESH_IDS
+                                       else "lane " + ", ".join("`%s`" % c for c in m.creators)),
         "",
         "| From | To |",
         "|---|---|",
@@ -364,4 +510,5 @@ def render_document(which=None):
 
 
 __all__ = ["Machine", "declare", "machines", "get", "transition", "create", "read", "IllegalTransition",
-           "StateError", "NOW", "render_machine", "render_document", "load_all"]
+           "StateError", "NOW", "FRESH_IDS", "check_fields", "FieldError", "MAX_FIELDS", "MAX_STRING",
+           "render_machine", "render_document", "load_all"]

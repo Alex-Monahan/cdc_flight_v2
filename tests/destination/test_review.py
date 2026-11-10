@@ -253,21 +253,24 @@ def test_registration_writes_the_id_of_the_connection_that_runs_it(led, monkeypa
                 sess.retire()                                   # given up from outside right after its id was read
         return sess
     monkeypatch.setattr(mdc.Connection, "ensure", ensure)
-    with pytest.raises(md.ConnectionLost, match="while it registered"):
+    with pytest.raises(md.ConnectionLost, match="registration"):
         registry.register(beat, "control", led.epoch)
     assert look.fetchall(listed, [first, first]) == []          # no row under the id of the connection that is gone
     sid = registry.register(beat, "control", led.epoch)
     monkeypatch.undo()
     assert sid == beat.server_id and sid != first and beat.generation == 2
     assert look.fetchall(listed, [first, sid]) == [(sid,)]
-    real = mdc.Connection._run_on
+    real = mdc.Session.commit
 
-    def run_on(self, sess, *args, **kw):
-        out = real(self, sess, *args, **kw)
-        if self is beat:
-            self._drop_session()                                # given up right after the statement returned
-        return out
-    monkeypatch.setattr(mdc.Connection, "_run_on", run_on)
+    def commit(self):
+        run = real(self)
+
+        def then_given_up():
+            run()
+            if beat._session is self:
+                beat._drop_session()                            # given up right after its COMMIT returned
+        return then_given_up
+    monkeypatch.setattr(mdc.Session, "commit", commit)
     with pytest.raises(md.ConnectionLost, match="replaced while it registered"):
         registry.register(beat, "control", led.epoch)
     monkeypatch.undo()

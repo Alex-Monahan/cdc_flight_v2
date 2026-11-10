@@ -12,10 +12,11 @@ the same transaction as the data the state governs (SPEC 1.9). A package declare
 `cdc_v2.state.declare`.
 
 A state is changed in one way only: `cdc_v2.state.transition(tx, machine, key, from_state, to_state, cause)`, and
-`cdc_v2.state.create` for a new row. The function refuses a change that is not in the list below. It changes the
-row only if the row still holds `from_state`. It writes one row to `_cdc.transitions` for every change: machine,
-key, from, to, cause, epoch and MotherDuck's time. A static test fails when any other code under `src/` writes a
-state column.
+`cdc_v2.state.create` for a new row, both inside a lane transaction only. The function refuses a change that is
+not in the list below. It changes the row only if the row still holds `from_state`. It writes one row to
+`_cdc.transitions` for every change: machine, key, from, to, cause, epoch, lane, `seq` (the lane's fence counter
+after the transaction commits, which orders the transactions of a lane as they committed), the detail and
+MotherDuck's time. A static test fails when any other code under `src/` writes a state column.
 
 ## How to read the blocks
 
@@ -25,6 +26,8 @@ Each block below is one machine.
 - "Key" names the columns that identify one row.
 - "States" lists every state the column can hold.
 - "A new row starts in" lists the states `create` accepts.
+- "Rows are created by" names the lanes whose transactions may create a row, or says that the keys are fresh ids
+  that any lane may create.
 - The table lists every allowed transition. A pair that is not in the table is refused. A state with no row in the
   "From" column is final.
 
@@ -38,6 +41,7 @@ One alert record (SPEC 6.2). `resolved` means the condition it reported is over.
 - Key: `alert_id`
 - States: `open`, `resolved`
 - A new row starts in: `open`
+- Rows are created by: fresh ids, from any lane
 
 | From | To |
 |---|---|

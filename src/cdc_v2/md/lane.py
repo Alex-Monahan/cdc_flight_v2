@@ -12,9 +12,12 @@ What the block guarantees, whatever happens inside it:
 * after any failed statement nothing is committed. The transaction is rolled back at once and the object is dead:
   a COMMIT that follows a failed statement is answered "OK" by MotherDuck and commits nothing
   (`evidence/p3/destination/error_mapping.json`), so the lane never sends one;
-* every step has a deadline; a step that does not come back retires the connection (see `connection`). The
-  clean-up after a step that failed (roll-back, reading the fence row, removing the registered data) has one
-  ``rollback_deadline_s`` per call for all of it;
+* every step has a deadline; a step that does not come back retires the connection (see `connection`). A
+  statement, the registration and the fence statement each have at most ``statement_deadline_s`` (and never more
+  than what is left of the block); only `COMMIT` has what is left of the block, because a commit has no progress
+  signal and its deadline scales with the size of the group (design 3). The clean-up after a step that failed
+  (roll-back, reading the fence row, removing the registered data) has one ``rollback_deadline_s`` per call for
+  all of it;
 * an exception that breaks a step off in the caller's thread (``KeyboardInterrupt``, ...) gives the connection
   up and fails the transaction: nothing is committed after it, also when the caller swallows it;
 * the errors are the five of contract C4 and `StatementError` for a statement that the destination refused.
@@ -31,7 +34,7 @@ from cdc_v2.deadline import Deadline, DeadlineExceeded
 
 from . import errors, registry
 from .connection import (CLOCK_US_SQL, SITE_EXECUTE, SITE_FENCE, Connection, _NO_TX, as_deadline, check_sql,
-                         counts_rows, returns_rows, statement_kind)
+                         count_fetch, counts_rows, returns_rows, statement_kind)
 from .errors import (CommitUnknown, Conflict, ConnectionLost, DestinationError, FenceLost, LaneMisuse,
                      StatementError)
 from .settings import LANES
@@ -169,12 +172,14 @@ class Transaction:
                 raise LaneMisuse("the connection of lane %s is inside a transaction" % lane.name)
             sess = conn.ensure(d)
             if lane._registered_id != sess.server_id:
-                registry.register(conn, lane.name, lane.epoch, d)
+                # a transaction of its own that also writes the lane's fence row: it cannot commit after a
+                # take-over (registry.register); the statement deadline bounds it, not the block's
+                registry.register(conn, lane.name, lane.epoch, self._stmt_deadline(None))
                 if conn._session is not sess or sess.state != "open":
                     raise ConnectionLost("lane %s: the connection was replaced while it registered" % lane.name)
                 lane._registered_id = sess.server_id
             self._sess = sess
-            out = self._on(sess.statement(SITE_EXECUTE, "BEGIN", None, None, tx=True), d)
+            out = self._on(sess.statement(SITE_EXECUTE, "BEGIN", None, None, tx=True), self._stmt_deadline(None))
             if not (out.ok and not out.late):
                 raise self._failure(out, "BEGIN", "BEGIN", rollback=out.ok)
         except BaseException:
@@ -213,14 +218,14 @@ class Transaction:
         """Run one statement. Returns the number of rows an INSERT, UPDATE or DELETE changed, else None (also
         for CREATE TABLE AS and MERGE, and for a statement with RETURNING: its rows are read with
         `fetchall`)."""
-        n = self._call(sql, params, "count", deadline)
+        n = self._call(sql, params, count_fetch(sql), deadline)
         return n if counts_rows(sql) else None
 
     def execute_one(self, sql, params=None, deadline=None):
         """Run a statement that must change exactly one row (the run-again rule of C4). Any other count rolls the
         transaction back and raises `Conflict`. A statement that reports no count (a SELECT, or a statement with
         RETURNING: its result is its rows) is a mistake of the caller: rolled back, `LaneMisuse`."""
-        n = self._call(sql, params, "count", deadline)
+        n = self._call(sql, params, count_fetch(sql), deadline)
         if returns_rows(sql):
             n = None                                 # a returned value is never taken for a count
         if n == 1:
@@ -411,7 +416,9 @@ class Transaction:
         lane, conn, sess, d = self._lane, self._conn, self._sess, self._deadline
         name, epoch = lane.name, lane.epoch
         fenced, commit_sent, committed = _POINTS[name]
-        out = self._on(sess.statement(SITE_FENCE, FENCE_SQL, [epoch, name, epoch], "count"), d)
+        # the statement deadline, not the block's: a fence statement that waits for an answer the network does
+        # not bring holds the caller at most statement_deadline_s plus the grace period (SPEC 4.5)
+        out = self._on(sess.statement(SITE_FENCE, FENCE_SQL, [epoch, name, epoch], "count"), self._stmt_deadline(None))
         if not (out.ok and not out.late):
             err = self._failure(out, "the fence statement", "FENCE")
             if isinstance(err, Conflict):

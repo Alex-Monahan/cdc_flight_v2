@@ -39,6 +39,9 @@ class Settings:
     rollback_deadline_s: float = 5.0       # ROLLBACK after an error; past it the connection is abandoned
     grace_s: float = 2.0                   # wait after the interrupt before a connection is abandoned
     interrupt_deadline_s: float = 5.0      # one call of the server's interrupt function
+    max_waiting_calls: int = 2             # per connection: calls it gave up that have not returned; one more
+    #                                        fails at once with ConnectionLost (each holds a thread and a client
+    #                                        connection while the network answers nothing)
 
     def __post_init__(self):
         if not isinstance(self.database, str) or not self.database or "\n" in self.database:
@@ -57,6 +60,9 @@ class Settings:
         if isinstance(self.connect_attempts, bool) or not isinstance(self.connect_attempts, int) \
                 or self.connect_attempts < 1:
             raise ValueError("Settings.connect_attempts must be an integer >= 1")
+        if isinstance(self.max_waiting_calls, bool) or not isinstance(self.max_waiting_calls, int) \
+                or self.max_waiting_calls < 1:
+            raise ValueError("Settings.max_waiting_calls must be an integer >= 1")
 
     @property
     def is_motherduck(self) -> bool:

@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import json
 import logging
-import math
 import random
 import re
 import uuid
@@ -28,21 +27,20 @@ import uuid
 from cdc_v2 import state
 from cdc_v2.md import schema as _schema
 from cdc_v2.md.connection import as_deadline
-from cdc_v2.md.errors import Conflict, ConnectionLost
+from cdc_v2.md.errors import Conflict, ConnectionLost, LaneMisuse
+from cdc_v2.md.lane import Transaction
 
 log = logging.getLogger("cdc_v2.alerts")
 
 SEVERITIES = ("info", "warning", "critical")
-MAX_FIELDS = 24
-MAX_STRING = 128
+MAX_FIELDS = state.MAX_FIELDS
+MAX_STRING = state.MAX_STRING
 DELIVERY_PENDING = "pending"
 
 _KIND = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
-_FIELD = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
-_INT_MIN, _INT_MAX = -(2 ** 63), 2 ** 64 - 1       # positions are unsigned 64-bit (contract C0)
 
 
-class AlertError(ValueError):
+class AlertError(state.FieldError):
     """The alert was refused before it reached the database: a bad kind, severity or field."""
 
 
@@ -54,6 +52,7 @@ ALERT = state.declare(state.Machine(
     table="_cdc.alerts",
     key_columns=("alert_id",),
     state_column="state",
+    creators=state.FRESH_IDS,                      # every alert is a new random id; any lane records one
     initial=("open",),
     description="One alert record (SPEC 6.2). `resolved` means the condition it reported is over.",
 ))
@@ -69,33 +68,9 @@ MIGRATIONS = _schema.register_migrations("alerts", (
 
 def check_fields(fields):
     """Return ``fields`` as a plain dict, or raise `AlertError`. Allowed values: an integer (64-bit, not a bool), a
-    finite float, a string of at most `MAX_STRING` printable characters."""
-    if fields is None:
-        return {}
-    if not isinstance(fields, dict):
-        raise AlertError("alert fields are a mapping from name to value")
-    if len(fields) > MAX_FIELDS:
-        raise AlertError("an alert has at most %d fields" % MAX_FIELDS)
-    out = {}
-    for name, value in fields.items():
-        if not isinstance(name, str) or not _FIELD.match(name):
-            raise AlertError("an alert field name is a short lower-case identifier")
-        if isinstance(value, bool):
-            ok = False
-        elif isinstance(value, int):
-            ok = _INT_MIN <= value <= _INT_MAX
-        elif isinstance(value, float):
-            ok = math.isfinite(value)
-        elif isinstance(value, str):
-            ok = len(value) <= MAX_STRING and value.isprintable()
-        else:
-            ok = False
-        if not ok:
-            # the value itself is never put into the message: it may be a row value
-            raise AlertError("alert field %s: a %s of this kind is not allowed (identifiers, positions, counts "
-                             "and durations only)" % (name, type(value).__name__))
-        out[name] = value
-    return out
+    finite float, a string of at most `MAX_STRING` printable characters (the rules of `state.check_fields`, which
+    the detail of a state transition follows too)."""
+    return state.check_fields(fields, AlertError, "alert field")
 
 
 def dedup_key(kind, fields=None, key=()):
@@ -121,6 +96,8 @@ def _checked(kind, severity, fields, key):
 
 
 def _insert(tx, kind, severity, fields, dkey):
+    if not isinstance(tx, Transaction):
+        raise LaneMisuse("alerts.emit needs an md.Transaction (a lane transaction), got %s" % type(tx).__name__)
     alert_id = uuid.uuid4().hex
     state.create(tx, ALERT, alert_id, "open", "emitted", values={
         "kind": kind, "severity": severity, "dedup_key": dkey, "first_at": state.NOW, "last_at": state.NOW,

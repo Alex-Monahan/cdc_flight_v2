@@ -566,6 +566,8 @@ def test_connect_has_a_deadline(dest, faults):
 def test_a_lost_connection_is_reported_by_where_it_happened(led, faults, site, skip, error, lands):
     c = counter(led)
     lane = led.lane("stream", led.epoch)
+    with lane.transaction():
+        pass                                                    # registered (its COMMIT passes md.commit too)
     faults.raise_at(site, "ConnectionError", message="injected: connection reset", skip=skip, hits=1)
     with pytest.raises(error):
         with lane.transaction() as tx:
@@ -581,9 +583,10 @@ def test_an_unclassified_error_after_commit_was_sent_is_commit_unknown(led, faul
     c = counter(led)
     lane = led.lane("stream", led.epoch)
     # An error that this layer does not know (FaultInjected) before COMMIT was sent: rolled back, and its class
-    # and the kind of statement are named. A lane's first transaction is the statement that registers its
-    # connection (an INSERT), BEGIN, then the caller's statement. The registration is not repeated once it worked.
-    for skip, kind in ((0, "INSERT"), (1, "BEGIN"), (1, "UPDATE")):
+    # and the kind of statement are named. A lane's first transaction starts with the transaction that registers
+    # its connection (BEGIN, the INSERT, the UPDATE of the fence row, COMMIT), then BEGIN and the caller's
+    # statement. The registration is not repeated once it worked.
+    for skip, kind in ((0, "BEGIN"), (1, "INSERT"), (2, "UPDATE"), (3, "BEGIN"), (1, "UPDATE")):
         faults.raise_at("md.execute", skip=skip, hits=1)
         with pytest.raises(md.StatementError) as info:
             with lane.transaction() as tx:

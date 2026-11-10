@@ -68,7 +68,8 @@ from test_state import (ex,  # noqa: F401 - a fixture
                         test_create_transition_and_read, test_every_pair_of_the_alert_machine,
                         test_every_pair_of_the_example_machines, test_keys,
                         test_the_wrong_stored_state_is_refused_and_the_transaction_stays_usable,
-                        test_two_creators_of_one_key_meet_only_through_the_fence_row_of_their_lane,
+                        test_a_child_row_created_from_two_lanes_is_created_with_a_transition_of_its_parent,
+                        test_a_key_is_created_only_by_the_lanes_that_the_machine_names,
                         test_two_rows_for_one_key_fail_the_transaction,
                         test_two_transactions_cannot_both_make_one_transition)
 

@@ -5,22 +5,28 @@ The mapping was found with real MotherDuck and with fault sites; the evidence is
 
 1. A deadline that passed decides first (`cdc_v2.md.connection`): before `COMMIT` was sent the caller gets
    `cdc_v2.deadline.DeadlineExceeded`, after it `CommitUnknown`.
-2. A **transport** error: the classes `ConnectionException`, `IOException`, `HTTPException`, `InterruptException`
-   of the client, Python's `ConnectionError`, `TimeoutError`, `OSError`, and every client error whose text holds
-   one of the transport phrases below (MotherDuck reports a server interrupt, an expired lease and a lost
-   server as different classes with the same phrases). Before `COMMIT`: `ConnectionLost`. After: `CommitUnknown`.
-3. A **conflict**: a client error whose text says ``Conflict on ...`` or ``write-write conflict`` and that is not
-   a transport error: `Conflict`.
-
-4. Everything else that a statement raises is `StatementError` before `COMMIT` was sent, and `CommitUnknown`
+2. The **class** decides for three families, whatever the text says. An error about the data of a statement
+   (the client's `DataError` and `IntegrityError` families: a conversion, a constraint) and an error of DuckDB's
+   programming family (`ProgrammingError`: parser, syntax, binder, catalog, invalid input, invalid type) are
+   rule 5: their text repeats values and names of the statement without quotation marks
+   (``Catalog Error: Table with name stock_unavailable does not exist!``), so it decides nothing. The client's
+   `ConnectionException` and `InterruptException`, and Python's `ConnectionError`, `TimeoutError` and `OSError`,
+   are **transport** errors.
+3. A **transport** error by its text: any other client error whose head holds one of the transport phrases
+   below (MotherDuck reports a server interrupt, an expired lease and a lost server as `TransactionException`
+   with these phrases). The gRPC codes `UNAVAILABLE` and `DEADLINE_EXCEEDED` count only in capitals and as
+   whole words; the other phrases in any case, as whole words. An `IOException` or `HTTPException` is a
+   transport error only by this rule: a file that does not exist is an `IOException` too, and running the
+   statement again gives the same answer. Before `COMMIT`: `ConnectionLost`. After: `CommitUnknown`.
+4. A **conflict**: any other client error whose head says ``Conflict on ...``, ``write-write conflict`` or
+   ``Transaction conflict`` (DDL on a table that another transaction writes, or the other way round): `Conflict`.
+5. Everything else that a statement raises is `StatementError` before `COMMIT` was sent, and `CommitUnknown`
    after. Inside a lane transaction the transaction was rolled back; a statement in autocommit (outside a
    lane transaction) was refused as a whole, nothing of it was applied.
 
-Where the text decides (rules 2 and 3), only its **head** does: the first line up to the first quotation mark.
+Where the text decides (rules 3 and 4), only its **head** does: the first line up to the first quotation mark.
 The client quotes the values it repeats (`duplicate key "..."`, `Could not convert string '...'`, `Casting value
-"..."`), so a value of a row that holds one of the phrases decides nothing. And the text decides nothing at all
-for an error about the data of a statement (the client's `DataError` and `IntegrityError` families: a
-conversion, a constraint).
+"..."`), so a value of a row that holds one of the phrases decides nothing.
 
 What these errors keep of the client's error (SPEC 8.3): the name of its class, the kind of the statement and,
 for a lost connection, the transport phrase that decided (`label`, `StatementError`). All three come from
@@ -89,19 +95,31 @@ class LaneMisuse(RuntimeError):
     (nested, after its block, from another thread, a transaction statement in the caller's SQL)."""
 
 
-TRANSPORT_CLASSES = (duckdb.ConnectionException, duckdb.IOException, duckdb.HTTPException, duckdb.InterruptException,
-                     ConnectionError, TimeoutError)
-# Phrases seen on MotherDuck (evidence/p3/destination/error_mapping.json) for: a server-side interrupt, an expired
-# lease, a statement after the server ended the transaction, an unreachable server, a closed connection.
-TRANSPORT_RE = re.compile(
-    r"Connection Error|interrupted by user|lease expired|transaction already rolled back|Request failed|"
-    r"Could not connect|UNAVAILABLE|DEADLINE_EXCEEDED|Connection already closed|No open result set|"
-    r"connection (has been |was |is )?closed", re.IGNORECASE)
-CONFLICT_RE = re.compile(r"\bconflict on \w+|write-write conflict", re.IGNORECASE)
+#: Transport errors by their class alone (rule 2).
+TRANSPORT_CLASSES = (duckdb.ConnectionException, duckdb.InterruptException, ConnectionError, TimeoutError, OSError)
+#: Transport errors only when a transport phrase decides (rule 3); `HTTPException` is a subclass.
+IO_CLASSES = (duckdb.IOException,)
 #: Errors about the data of a statement (a value that does not convert, a constraint). Their text quotes a value
-#: of a row, so their text decides nothing: a value that holds one of the phrases above must not look like a lost
+#: of a row, so their text decides nothing: a value that holds one of the phrases below must not look like a lost
 #: connection or a conflict, which a caller answers by running the transaction again.
 DATA_CLASSES = (duckdb.DataError, duckdb.IntegrityError)
+#: DuckDB's programming family: parser, syntax, binder, catalog, invalid input, invalid type. Their text repeats
+#: names and values of the statement without quotation marks, so it decides nothing either (rule 2): always
+#: `StatementError` (seeded from 168 texts of MotherDuck, `tests/destination/data/misleading_texts.json`).
+STATEMENT_CLASSES = (duckdb.ProgrammingError,)
+#: Phrases seen on MotherDuck (evidence/p3/destination/error_mapping.json) for: a server-side interrupt, an expired
+#: lease, a statement after the server ended the transaction, an unreachable server, a closed connection; and the
+#: reason phrases of HTTP 502, 503 and 504. Whole words; the gRPC codes in capitals only (``stock_unavailable``
+#: and ``deadline_exceeded_log`` are names).
+TRANSPORT_RE = re.compile(
+    r"(?i:\bConnection Error\b|\binterrupted by user\b|\blease expired\b|\btransaction already rolled back\b|"
+    r"\bRequest failed\b|\bCould not connect\b|\bConnection already closed\b|\bNo open result set\b|"
+    r"\bconnection (?:has been |was |is )?closed\b|\bService Unavailable\b|\bBad Gateway\b|\bGateway Time-?out\b)|"
+    r"\bUNAVAILABLE\b|\bDEADLINE_EXCEEDED\b")
+#: ``Transaction conflict: attempting to insert into table "t" but it has been altered by a different
+#: transaction`` (and ``... update table ...``): DDL on one lane while another lane writes the table. Running the
+#: transaction again succeeds once the other one has committed (7 of 8 shapes of the second review).
+CONFLICT_RE = re.compile(r"(?i:\bconflict on \w+|\bwrite-write conflict\b|\bTransaction conflict\b)")
 
 _SCRUB = (
     (re.compile(r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"), "<token>"),
@@ -144,12 +162,18 @@ def safe_text(exc, limit=240):
     return _scrubbed(type(exc).__name__, _first_line(exc), limit)
 
 
+def _decided_by_text(exc):
+    """True when the text of ``exc`` may decide its kind (rules 3 and 4): a client error that is neither about
+    data nor of the programming family."""
+    return isinstance(exc, duckdb.Error) and not isinstance(exc, DATA_CLASSES + STATEMENT_CLASSES)
+
+
 def label(exc):
     """What a message or a log line of this layer says about a client error: the name of its class and, when
-    one of the transport phrases decided, that phrase. Both come from fixed lists; nothing else of the client's
-    text is repeated."""
+    one of the transport phrases is in the head of a text that may decide, that phrase. Both come from fixed
+    lists; nothing else of the client's text is repeated."""
     name = type(exc).__name__
-    if isinstance(exc, duckdb.Error) and not isinstance(exc, DATA_CLASSES):
+    if _decided_by_text(exc):
         m = TRANSPORT_RE.search(head(exc)[0])
         if m is not None:
             return "%s (%s)" % (name, m.group(0))
@@ -166,18 +190,21 @@ def refused(err, where, statement):
 
 
 def kind_of(exc):
-    """``'transport'``, ``'conflict'`` or ``'other'`` for an exception that a statement raised."""
+    """``'transport'``, ``'conflict'`` or ``'other'`` for an exception that a statement raised (the rules of the
+    module text, in their order)."""
     if isinstance(exc, DeadlineExceeded):
+        return "other"
+    if isinstance(exc, DATA_CLASSES + STATEMENT_CLASSES):
         return "other"
     if isinstance(exc, TRANSPORT_CLASSES):
         return "transport"
-    if isinstance(exc, OSError):
-        return "transport"
-    if isinstance(exc, DATA_CLASSES) or not isinstance(exc, duckdb.Error):
+    if not isinstance(exc, duckdb.Error):
         return "other"
     text = head(exc)[0]                          # a phrase inside a quoted value decides nothing
     if TRANSPORT_RE.search(text):
         return "transport"
+    if isinstance(exc, IO_CLASSES):
+        return "other"                           # a file that does not exist: the same answer again
     if CONFLICT_RE.search(text):
         return "conflict"
     return "other"

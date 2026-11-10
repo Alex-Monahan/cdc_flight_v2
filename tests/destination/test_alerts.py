@@ -114,10 +114,14 @@ def test_emit_now_passes_on_what_it_cannot_decide(al, faults):
         alerts.emit_now(stale, "lag_high", "warning")
     assert count(al.look) == 0
     new = al.lane("stream", al.epoch + 1)
+    with new.transaction():
+        pass                                                    # registered: its COMMIT passes md.commit too
     faults.raise_at("md.commit", "ConnectionError", message="injected: connection reset", hits=1)
     with pytest.raises(md.CommitUnknown):                       # lost at COMMIT: recorded or not, not known
         alerts.emit_now(new, "lag_high", "warning")
     assert count(al.look) == 0                                  # here it did not land
+    with new.transaction():
+        pass                                                    # the new connection registers first
     faults.raise_at("md.commit_reply", "ConnectionError", message="injected: connection reset", hits=1)
     with pytest.raises(md.CommitUnknown):                       # the answer to COMMIT was lost
         alerts.emit_now(new, "lag_high", "warning")

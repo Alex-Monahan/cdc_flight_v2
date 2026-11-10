@@ -1,0 +1,1225 @@
+{
+ "misleading": [
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": "other",
+   "statement": "json_extract of a text"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": "other",
+   "statement": "json_extract of a text"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "lease expired",
+   "sorted_by_9e389cc": "other",
+   "statement": "json_extract of a text"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": "other",
+   "statement": "json_extract of a text"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "connection closed",
+   "sorted_by_9e389cc": "other",
+   "statement": "json_extract of a text"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": "other",
+   "statement": "json_extract of a text"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": "other",
+   "statement": "json_extract of a text"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": "other",
+   "statement": "json_extract of a text"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": "other",
+   "statement": "json cast"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": "other",
+   "statement": "json cast"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "lease expired",
+   "sorted_by_9e389cc": "other",
+   "statement": "json cast"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": "other",
+   "statement": "json cast"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "connection closed",
+   "sorted_by_9e389cc": "other",
+   "statement": "json cast"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": "other",
+   "statement": "json cast"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": "other",
+   "statement": "json cast"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": "other",
+   "statement": "json cast"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": "other",
+   "statement": "from_json"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": "other",
+   "statement": "from_json"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "lease expired",
+   "sorted_by_9e389cc": "other",
+   "statement": "from_json"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": "other",
+   "statement": "from_json"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "connection closed",
+   "sorted_by_9e389cc": "other",
+   "statement": "from_json"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": "other",
+   "statement": "from_json"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": "other",
+   "statement": "from_json"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Malformed JSON at byte 0 of input: unexpected character.  Input:",
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": "other",
+   "statement": "from_json"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: missing ): (Connection Error",
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": "transport",
+   "statement": "regexp pattern from data"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: missing ): (Conflict on update",
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": "conflict",
+   "statement": "regexp pattern from data"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: missing ): (lease expired",
+   "planted": "lease expired",
+   "sorted_by_9e389cc": "transport",
+   "statement": "regexp pattern from data"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: missing ): (UNAVAILABLE",
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": "transport",
+   "statement": "regexp pattern from data"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: missing ): (connection closed",
+   "planted": "connection closed",
+   "sorted_by_9e389cc": "transport",
+   "statement": "regexp pattern from data"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: missing ): (unavailable_dates",
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": "transport",
+   "statement": "regexp pattern from data"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: missing ): (deadline_exceeded_log",
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": "transport",
+   "statement": "regexp pattern from data"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: missing ): (stock_unavailable",
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": "transport",
+   "statement": "regexp pattern from data"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Could not parse string",
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": "other",
+   "statement": "strptime"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Could not parse string",
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": "other",
+   "statement": "strptime"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Could not parse string",
+   "planted": "lease expired",
+   "sorted_by_9e389cc": "other",
+   "statement": "strptime"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Could not parse string",
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": "other",
+   "statement": "strptime"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Could not parse string",
+   "planted": "connection closed",
+   "sorted_by_9e389cc": "other",
+   "statement": "strptime"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Could not parse string",
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": "other",
+   "statement": "strptime"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Could not parse string",
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": "other",
+   "statement": "strptime"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Could not parse string",
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": "other",
+   "statement": "strptime"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Invalid type specifier",
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": "other",
+   "statement": "printf"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Invalid type specifier",
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": "other",
+   "statement": "printf"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Invalid type specifier",
+   "planted": "lease expired",
+   "sorted_by_9e389cc": "other",
+   "statement": "printf"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Invalid type specifier",
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": "other",
+   "statement": "printf"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Invalid type specifier",
+   "planted": "connection closed",
+   "sorted_by_9e389cc": "other",
+   "statement": "printf"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Invalid type specifier",
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": "other",
+   "statement": "printf"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Invalid type specifier",
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": "other",
+   "statement": "printf"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Invalid type specifier",
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": "other",
+   "statement": "printf"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Could not convert string",
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": "other",
+   "statement": "enum cast"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Could not convert string",
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": "other",
+   "statement": "enum cast"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Could not convert string",
+   "planted": "lease expired",
+   "sorted_by_9e389cc": "other",
+   "statement": "enum cast"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Could not convert string",
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": "other",
+   "statement": "enum cast"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Could not convert string",
+   "planted": "connection closed",
+   "sorted_by_9e389cc": "other",
+   "statement": "enum cast"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Could not convert string",
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": "other",
+   "statement": "enum cast"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Could not convert string",
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": "other",
+   "statement": "enum cast"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Could not convert string",
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": "other",
+   "statement": "enum cast"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Table with name Connection Error does not exist!",
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": "transport",
+   "statement": "table name (schema of source)"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Table with name Conflict on update does not exist!",
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": "conflict",
+   "statement": "table name (schema of source)"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Table with name lease expired does not exist!",
+   "planted": "lease expired",
+   "sorted_by_9e389cc": "transport",
+   "statement": "table name (schema of source)"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Table with name UNAVAILABLE does not exist!",
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": "transport",
+   "statement": "table name (schema of source)"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Table with name connection closed does not exist!",
+   "planted": "connection closed",
+   "sorted_by_9e389cc": "transport",
+   "statement": "table name (schema of source)"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Table with name unavailable_dates does not exist!",
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": "transport",
+   "statement": "table name (schema of source)"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Table with name deadline_exceeded_log does not exist!",
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": "transport",
+   "statement": "table name (schema of source)"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Table with name stock_unavailable does not exist!",
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": "transport",
+   "statement": "table name (schema of source)"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Table with name",
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": "other",
+   "statement": "schema name"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Table with name",
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": "other",
+   "statement": "schema name"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Table with name",
+   "planted": "lease expired",
+   "sorted_by_9e389cc": "other",
+   "statement": "schema name"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Table with name",
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": "other",
+   "statement": "schema name"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Table with name",
+   "planted": "connection closed",
+   "sorted_by_9e389cc": "other",
+   "statement": "schema name"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Table with name",
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": "other",
+   "statement": "schema name"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Table with name",
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": "other",
+   "statement": "schema name"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Table with name",
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": "other",
+   "statement": "schema name"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Referenced column",
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": "other",
+   "statement": "column name"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Referenced column",
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": "other",
+   "statement": "column name"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Referenced column",
+   "planted": "lease expired",
+   "sorted_by_9e389cc": "other",
+   "statement": "column name"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Referenced column",
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": "other",
+   "statement": "column name"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Referenced column",
+   "planted": "connection closed",
+   "sorted_by_9e389cc": "other",
+   "statement": "column name"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Referenced column",
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": "other",
+   "statement": "column name"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Referenced column",
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": "other",
+   "statement": "column name"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Referenced column",
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": "other",
+   "statement": "column name"
+  },
+  {
+   "class": "ConstraintException",
+   "head": "Constraint Error: NOT NULL constraint failed: rv_nn_0.Connection Error",
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": "other",
+   "statement": "not null column named by source"
+  },
+  {
+   "class": "ConstraintException",
+   "head": "Constraint Error: NOT NULL constraint failed: rv_nn_1.Conflict on update",
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": "other",
+   "statement": "not null column named by source"
+  },
+  {
+   "class": "ConstraintException",
+   "head": "Constraint Error: NOT NULL constraint failed: rv_nn_2.lease expired",
+   "planted": "lease expired",
+   "sorted_by_9e389cc": "other",
+   "statement": "not null column named by source"
+  },
+  {
+   "class": "ConstraintException",
+   "head": "Constraint Error: NOT NULL constraint failed: rv_nn_3.UNAVAILABLE",
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": "other",
+   "statement": "not null column named by source"
+  },
+  {
+   "class": "ConstraintException",
+   "head": "Constraint Error: NOT NULL constraint failed: rv_nn_4.connection closed",
+   "planted": "connection closed",
+   "sorted_by_9e389cc": "other",
+   "statement": "not null column named by source"
+  },
+  {
+   "class": "ConstraintException",
+   "head": "Constraint Error: NOT NULL constraint failed: rv_nn_5.unavailable_dates",
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": "other",
+   "statement": "not null column named by source"
+  },
+  {
+   "class": "ConstraintException",
+   "head": "Constraint Error: NOT NULL constraint failed: rv_nn_6.deadline_exceeded_log",
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": "other",
+   "statement": "not null column named by source"
+  },
+  {
+   "class": "ConstraintException",
+   "head": "Constraint Error: NOT NULL constraint failed: rv_nn_7.stock_unavailable",
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": "other",
+   "statement": "not null column named by source"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Scalar Function with name connection error does not exist!",
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": "transport",
+   "statement": "unknown function from config"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Scalar Function with name conflict on update does not exist!",
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": "conflict",
+   "statement": "unknown function from config"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Scalar Function with name lease expired does not exist!",
+   "planted": "lease expired",
+   "sorted_by_9e389cc": "transport",
+   "statement": "unknown function from config"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Scalar Function with name unavailable does not exist!",
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": "transport",
+   "statement": "unknown function from config"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Scalar Function with name connection closed does not exist!",
+   "planted": "connection closed",
+   "sorted_by_9e389cc": "transport",
+   "statement": "unknown function from config"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Scalar Function with name unavailable_dates does not exist!",
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": "transport",
+   "statement": "unknown function from config"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Scalar Function with name deadline_exceeded_log does not exist!",
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": "transport",
+   "statement": "unknown function from config"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Scalar Function with name stock_unavailable does not exist!",
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": "transport",
+   "statement": "unknown function from config"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Could not find key",
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": "other",
+   "statement": "union member"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Could not find key",
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": "other",
+   "statement": "union member"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Could not find key",
+   "planted": "lease expired",
+   "sorted_by_9e389cc": "other",
+   "statement": "union member"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Could not find key",
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": "other",
+   "statement": "union member"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Could not find key",
+   "planted": "connection closed",
+   "sorted_by_9e389cc": "other",
+   "statement": "union member"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Could not find key",
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": "other",
+   "statement": "union member"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Could not find key",
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": "other",
+   "statement": "union member"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Could not find key",
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": "other",
+   "statement": "union member"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Could not find key",
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": "other",
+   "statement": "struct field"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Could not find key",
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": "other",
+   "statement": "struct field"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Could not find key",
+   "planted": "lease expired",
+   "sorted_by_9e389cc": "other",
+   "statement": "struct field"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Could not find key",
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": "other",
+   "statement": "struct field"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Could not find key",
+   "planted": "connection closed",
+   "sorted_by_9e389cc": "other",
+   "statement": "struct field"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Could not find key",
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": "other",
+   "statement": "struct field"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Could not find key",
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": "other",
+   "statement": "struct field"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Could not find key",
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": "other",
+   "statement": "struct field"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Cannot deduce template type",
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": "other",
+   "statement": "map key"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Cannot deduce template type",
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": "other",
+   "statement": "map key"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Cannot deduce template type",
+   "planted": "lease expired",
+   "sorted_by_9e389cc": "other",
+   "statement": "map key"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Cannot deduce template type",
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": "other",
+   "statement": "map key"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Cannot deduce template type",
+   "planted": "connection closed",
+   "sorted_by_9e389cc": "other",
+   "statement": "map key"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Cannot deduce template type",
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": "other",
+   "statement": "map key"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Cannot deduce template type",
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": "other",
+   "statement": "map key"
+  },
+  {
+   "class": "BinderException",
+   "head": "Binder Error: Cannot deduce template type",
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": "other",
+   "statement": "map key"
+  },
+  {
+   "class": null,
+   "head": null,
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": null,
+   "statement": "set variable"
+  },
+  {
+   "class": null,
+   "head": null,
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": null,
+   "statement": "set variable"
+  },
+  {
+   "class": null,
+   "head": null,
+   "planted": "lease expired",
+   "sorted_by_9e389cc": null,
+   "statement": "set variable"
+  },
+  {
+   "class": null,
+   "head": null,
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": null,
+   "statement": "set variable"
+  },
+  {
+   "class": null,
+   "head": null,
+   "planted": "connection closed",
+   "sorted_by_9e389cc": null,
+   "statement": "set variable"
+  },
+  {
+   "class": null,
+   "head": null,
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": null,
+   "statement": "set variable"
+  },
+  {
+   "class": null,
+   "head": null,
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": null,
+   "statement": "set variable"
+  },
+  {
+   "class": null,
+   "head": null,
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": null,
+   "statement": "set variable"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Connection Error",
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": "transport",
+   "statement": "error() of a value"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: Conflict on update",
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": "conflict",
+   "statement": "error() of a value"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: lease expired",
+   "planted": "lease expired",
+   "sorted_by_9e389cc": "transport",
+   "statement": "error() of a value"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: UNAVAILABLE",
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": "transport",
+   "statement": "error() of a value"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: connection closed",
+   "planted": "connection closed",
+   "sorted_by_9e389cc": "transport",
+   "statement": "error() of a value"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: unavailable_dates",
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": "transport",
+   "statement": "error() of a value"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: deadline_exceeded_log",
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": "transport",
+   "statement": "error() of a value"
+  },
+  {
+   "class": "InvalidInputException",
+   "head": "Invalid Input Error: stock_unavailable",
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": "transport",
+   "statement": "error() of a value"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Could not convert string",
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": "other",
+   "statement": "interval"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Could not convert string",
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": "other",
+   "statement": "interval"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Could not convert string",
+   "planted": "lease expired",
+   "sorted_by_9e389cc": "other",
+   "statement": "interval"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Could not convert string",
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": "other",
+   "statement": "interval"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Could not convert string",
+   "planted": "connection closed",
+   "sorted_by_9e389cc": "other",
+   "statement": "interval"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Could not convert string",
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": "other",
+   "statement": "interval"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Could not convert string",
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": "other",
+   "statement": "interval"
+  },
+  {
+   "class": "ConversionException",
+   "head": "Conversion Error: Could not convert string",
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": "other",
+   "statement": "interval"
+  },
+  {
+   "class": "NotImplementedException",
+   "head": "Not implemented Error: Unknown TimeZone",
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": "other",
+   "statement": "timezone name"
+  },
+  {
+   "class": "NotImplementedException",
+   "head": "Not implemented Error: Unknown TimeZone",
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": "other",
+   "statement": "timezone name"
+  },
+  {
+   "class": "NotImplementedException",
+   "head": "Not implemented Error: Unknown TimeZone",
+   "planted": "lease expired",
+   "sorted_by_9e389cc": "other",
+   "statement": "timezone name"
+  },
+  {
+   "class": "NotImplementedException",
+   "head": "Not implemented Error: Unknown TimeZone",
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": "other",
+   "statement": "timezone name"
+  },
+  {
+   "class": "NotImplementedException",
+   "head": "Not implemented Error: Unknown TimeZone",
+   "planted": "connection closed",
+   "sorted_by_9e389cc": "other",
+   "statement": "timezone name"
+  },
+  {
+   "class": "NotImplementedException",
+   "head": "Not implemented Error: Unknown TimeZone",
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": "other",
+   "statement": "timezone name"
+  },
+  {
+   "class": "NotImplementedException",
+   "head": "Not implemented Error: Unknown TimeZone",
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": "other",
+   "statement": "timezone name"
+  },
+  {
+   "class": "NotImplementedException",
+   "head": "Not implemented Error: Unknown TimeZone",
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": "other",
+   "statement": "timezone name"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Collation with name connection error does not exist!",
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": "transport",
+   "statement": "collation"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Collation with name conflict on update does not exist!",
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": "conflict",
+   "statement": "collation"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Collation with name lease expired does not exist!",
+   "planted": "lease expired",
+   "sorted_by_9e389cc": "transport",
+   "statement": "collation"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Collation with name unavailable does not exist!",
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": "transport",
+   "statement": "collation"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Collation with name connection closed does not exist!",
+   "planted": "connection closed",
+   "sorted_by_9e389cc": "transport",
+   "statement": "collation"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Collation with name unavailable_dates does not exist!",
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": "transport",
+   "statement": "collation"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Collation with name deadline_exceeded_log does not exist!",
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": "transport",
+   "statement": "collation"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Collation with name stock_unavailable does not exist!",
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": "transport",
+   "statement": "collation"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Pragma Function with name Connection Error does not exist!",
+   "planted": "Connection Error",
+   "sorted_by_9e389cc": "transport",
+   "statement": "attach-like pragma"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Pragma Function with name Conflict on update does not exist!",
+   "planted": "Conflict on update",
+   "sorted_by_9e389cc": "conflict",
+   "statement": "attach-like pragma"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Pragma Function with name lease expired does not exist!",
+   "planted": "lease expired",
+   "sorted_by_9e389cc": "transport",
+   "statement": "attach-like pragma"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Pragma Function with name UNAVAILABLE does not exist!",
+   "planted": "UNAVAILABLE",
+   "sorted_by_9e389cc": "transport",
+   "statement": "attach-like pragma"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Pragma Function with name connection closed does not exist!",
+   "planted": "connection closed",
+   "sorted_by_9e389cc": "transport",
+   "statement": "attach-like pragma"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Pragma Function with name unavailable_dates does not exist!",
+   "planted": "unavailable_dates",
+   "sorted_by_9e389cc": "transport",
+   "statement": "attach-like pragma"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Pragma Function with name deadline_exceeded_log does not exist!",
+   "planted": "deadline_exceeded_lo",
+   "sorted_by_9e389cc": "transport",
+   "statement": "attach-like pragma"
+  },
+  {
+   "class": "CatalogException",
+   "head": "Catalog Error: Pragma Function with name stock_unavailable does not exist!",
+   "planted": "stock_unavailable",
+   "sorted_by_9e389cc": "transport",
+   "statement": "attach-like pragma"
+  }
+ ],
+ "transaction_conflicts": [
+  {
+   "case": "add_col__ins",
+   "class": "TransactionException",
+   "head": "TransactionContext Error: Transaction conflict: attempting to insert into table",
+   "sorted_by_9e389cc": "other",
+   "where": "statement"
+  },
+  {
+   "case": "add_col__upd",
+   "class": "TransactionException",
+   "head": "TransactionContext Error: Transaction conflict: attempting to update table",
+   "sorted_by_9e389cc": "other",
+   "where": "statement"
+  },
+  {
+   "case": "type__upd",
+   "class": "TransactionException",
+   "head": "TransactionContext Error: Transaction conflict: attempting to update table",
+   "sorted_by_9e389cc": "other",
+   "where": "statement"
+  },
+  {
+   "case": "drop__ins",
+   "class": "TransactionException",
+   "head": "TransactionContext Error: Transaction conflict: attempting to insert into table",
+   "sorted_by_9e389cc": "other",
+   "where": "statement"
+  },
+  {
+   "case": "swap__ins",
+   "class": "TransactionException",
+   "head": "TransactionContext Error: Transaction conflict: attempting to insert into table",
+   "sorted_by_9e389cc": "other",
+   "where": "statement"
+  },
+  {
+   "case": "ins__add_col_commit",
+   "class": "TransactionException",
+   "head": "TransactionContext Error: Failed to commit: MotherDuck transaction statement failed: TransactionContext Error: Failed to commit: Transaction conflict:",
+   "sorted_by_9e389cc": "other",
+   "where": "COMMIT of the inserting transaction"
+  }
+ ],
+ "what": "client texts that MotherDuck gave in the second review of package D (programs e4_misleading.py and e1b_raw_texts.py; run 2026-11-10 on MotherDuck with duckdb 1.5.6). Each text is the head the program printed: the first line up to the first quotation mark, cut at 110 characters for e4 and 150 for e1b. 8 of the 168 statements of e4 gave no error."
+}
