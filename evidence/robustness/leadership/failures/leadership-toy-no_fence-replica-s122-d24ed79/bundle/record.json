@@ -1,0 +1,119 @@
+{
+ "actions": [
+  {
+   "action": "drill",
+   "hit": 1,
+   "inside_transaction": true,
+   "interrupt_earlier_epochs": "not applicable: a file destination has no server connections to interrupt",
+   "point": "toyrep.fenced",
+   "run": "r2",
+   "t": 1.301,
+   "taken_over_while_held_by": null
+  }
+ ],
+ "campaign": "20261110T185207-1c91",
+ "clean": true,
+ "commit": "d24ed795c066b30ee4b0f1e5742fb2f7d1fed907",
+ "config": {
+  "catch_up_s": 60.0,
+  "newcomer_exit_s": 10.0,
+  "round_s": 6.0,
+  "rounds": 1,
+  "tick_s": 1.0
+ },
+ "counts": {
+  "actions": 1,
+  "rounds": 0,
+  "runs_started": 10,
+  "transactions": 980,
+  "workload_rounds": 49
+ },
+ "duration_s": 14.588,
+ "failure_id": "leadership-toy-no_fence-replica-s122-d24ed79",
+ "faults": {},
+ "first_failure_s": 13.355,
+ "fuzzer": "leadership",
+ "no_effect": {},
+ "observers": [
+  {
+   "check": "transfers",
+   "errors": [
+    "IOException"
+   ],
+   "first_violations": [],
+   "last": {
+    "expected": 24000,
+    "sum": 24000
+   },
+   "longest_gap_s": 5.311,
+   "observations": 289,
+   "seconds": 12.719,
+   "unavailable": 1,
+   "violations": 0
+  },
+  {
+   "check": "parent_child",
+   "errors": [
+    "IOException"
+   ],
+   "first_violations": [],
+   "last": {
+    "orphan_parent_ids": 0,
+    "parents": 6,
+    "parents_with_wrong_count": 0,
+    "sample_orphans": [],
+    "sample_parent_id_count_children": []
+   },
+   "longest_gap_s": 5.315,
+   "observations": 288,
+   "seconds": 12.721,
+   "unavailable": 1,
+   "violations": 0
+  },
+  {
+   "check": "debit_credit",
+   "errors": [
+    "IOException"
+   ],
+   "first_violations": [],
+   "last": {
+    "credit_rows": 19,
+    "credits": 75925,
+    "debit_rows": 13,
+    "debits": 75925
+   },
+   "longest_gap_s": 5.311,
+   "observations": 288,
+   "seconds": 12.721,
+   "unavailable": 1,
+   "violations": 0
+  },
+  {
+   "check": "large_marked",
+   "errors": [
+    "IOException"
+   ],
+   "first_violations": [],
+   "last": {
+    "batches": 1,
+    "batches_partial_or_unmarked": 0,
+    "sample_batch_rows_marked": []
+   },
+   "longest_gap_s": 5.303,
+   "observations": 289,
+   "seconds": 12.72,
+   "unavailable": 1,
+   "violations": 0
+  }
+ ],
+ "options": {},
+ "outcome": "violation",
+ "reason": "drill toyrep.fenced: writer log: [{'two_writers': True, 'order': 115, 'epoch': 2, 'after_epoch': 3, 'run': 'run2-df527e'}, {'two_writers': True, 'order': 116, 'epoch': 2, 'after_epoch': 3, 'run': 'run2-df527e'}, {'two_writers': True, 'order': 117, 'epoch': 2, 'after_epoch': 3, 'run': 'run2-df527e'}]",
+ "seed": 122,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T18:52:07Z",
+ "system": "toy-no_fence",
+ "system_spec": "toy:no_fence",
+ "tier": "local"
+}
