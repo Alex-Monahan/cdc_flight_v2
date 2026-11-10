@@ -8,11 +8,12 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
   table). **P2 Platform spike: gate passed on 2026-11-10** — every spike is done and merged, the report
   (`docs/spike_report.md`) is complete and was sent to the owner; nothing found contradicts SPEC, so the build
   continues without waiting. **P3 Core: in progress** (table below): the fault harness, the oracle, the source
-  package, the engine and the transform are merged; the apply package is reviewed twice and in its fix round; the
-  question the second review raised — which tables have a key — is measured and decided (rule K, below) and has a
-  small package of its own, which is running; the cut is in its fix round; the destination basics are being built;
-  round 1 of the fuzzers (against a toy replicator) is reviewed and waits for a writer slot for its fix round; the
-  task file of every package is written.
+  package, the engine and the transform are merged; the apply package is reviewed twice and its fix round is checked
+  (verdict: merge; it waits for the second reviewer's repeat campaigns and two small fixes); the question the second
+  review raised — which tables have a key — is measured and decided (rule K, below) and has a small package of its
+  own, which is running; the cut's fix round is checked (verdict: merge after one text fix) and it is in a second,
+  short round; the destination basics are being built; round 1 of the fuzzers (against a toy replicator) is reviewed
+  and in its fix round; the task file of every package is written.
 - Stage 2 (PlanetScale) cannot start: of its names only `PLANETSCALE_ORG` and `PLANETSCALE_DATABASE` are in the env
   file (checked again at the P1 gate). The service token and the connection values are owed by the owner.
 
@@ -52,10 +53,10 @@ green on T1 (local primary and standby, real MotherDuck, local JVM).
 |---|---|---|---|
 | H | Crash points, fault sites, process control, crash runner, TCP fault proxy, byte-stream relay | Opus | **merged** |
 | O | Oracle, T1 harness, evidence writer, workload generator and observer | Opus | **merged** (fix round included) |
-| X | The cut: where a snapshot lies in the stream | Fable | review: merge after fixes (below); **fix round running** |
+| X | The cut: where a snapshot lies in the stream | Fable | review: merge after fixes (below); fix round delivered (`23519bd`) and checked: merge after one text fix; **second, short round running** (below) |
 | E | Engine: the JVM program around stock Debezium, frames, the Python side | Opus | **merged** (two reviews, two fix rounds) |
 | D | Destination basics: lanes, fence, deadlines, errors, `_cdc` schema, transition function, alert records | Fable | running |
-| A | Apply: the statements over a change set, keyed and keyless | Opus | **delivered**; two reviews; **fix round delivered** (13 items, `68df804`); the coordinator checks it again and the second reviewer repeats its campaigns |
+| A | Apply: the statements over a change set, keyed and keyless | Opus | **delivered**; two reviews; **fix round delivered** (13 items, `68df804`); the coordinator's re-check: **merge**, with two small fixes; the second reviewer's repeat campaigns are running |
 | P | Source: connections, catalog and its observation, publication, slot, slot facts, timeline, heartbeat | Opus | **merged** (with the repair of `tools/localpg` for Postgres 16; one fix after the review) |
 | L | Leadership: guard, take-over, heartbeat, hand-over, bootstrap, platform interface | Fable | task written; after D |
 | Y | Transform: source types to destination types | Opus | **merged** (`362d00b`; one review, one fix round, one last check) |
@@ -78,6 +79,7 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
 | 1.7 crash points at every step of a schema change | P4, schema and types |
 | 1.9 schema change applied in place (P3 has the life of a catalog finding, which ends in a drop or a backfill); the full quarantine machine (P3 has the exit to `quarantined` and the operator's re-backfill) | P4 |
 | 1.7 soak of at least 1 h with at least 200 faults | a short soak at the P3 gate; the full one in the P6 campaign |
+| 1.1/1.2 for a table the stream cannot carry: an `interval` key, or a table without a key that has a scalar `interval` column, on a source of Postgres 17 or later. P3 skips it with one alert per table; the mode `full_refresh` of SPEC 3.5 carries it | P4, CDC features |
 | 1.1/1.2 for one value: `interval 'infinity'` / `'-infinity'` in a scalar `interval` column of a source on Postgres 17 or later reaches the stream as a zero interval (the Postgres driver, before any code of ours). P3 marks and counts such rows and alerts; the repair read that makes the value exact is built on the stream's group loop (plan C3, "Ambiguous zero interval"). No P3 gate workload holds an interval column | P4, schema and types |
 
 ## Decisions
@@ -313,16 +315,16 @@ Each in its own worktree and branch; the orchestrator merges. The P3 packages ar
 | Job | Phase | Started | Delivers |
 |---|---|---|---|
 | Package D, destination basics (Fable, xhigh). MotherDuck databases `cdc_v2_t_d_*`. No Postgres | P3 | 2026-11-10 | `src/cdc_v2/md/`, `src/cdc_v2/state/`, `src/cdc_v2/alerts.py`, `docs/design/destination.md`, `docs/state_machines.md`, `evidence/p3/destination/` |
-| Package A, apply: **fix round delivered** on branch `worktree-agent-adbee9c1aec8e2051` (`68df804`); re-check by the coordinator (Opus) and campaigns of the second reviewer (Fable, local DuckDB only), both reading only | P3 | 2026-11-10 | the verdict; then the merge and the sentences for design 6.1–6.5 and plan C0, C3a, C4, C10 |
+| Package A, apply: **fix round delivered** on branch `worktree-agent-adbee9c1aec8e2051` (`68df804`); the coordinator's re-check says merge; the campaigns of the second reviewer (Fable, local DuckDB only, reading only) are running | P3 | 2026-11-10 | the reviewer's result; then two small fixes by the worker (`reduce_duplicates` without spill limits, one stale docstring), the merge, and the sentences for design 6.1–6.5 and plan C0, C3a, C4, C10 |
 | Package K, the key rule (Opus, high). Homes `pg-p`, `pg-p2`, `pg-e`. No MotherDuck | P3 | 2026-11-10 | the catalog follows rule K, the engine's list of tables without a key, the measurement of what Debezium calls a key, `evidence/p3/key_rule/` |
 | Package F, fuzzers (Opus, high): **fix round running** on branch `p3-f-fuzzers` (15 items: ledger rules, suite 1.7 again, reductions, two table shapes, the shared-memory repair of `tools/localpg`, the frame reader's allocation). Homes `pg-f<n>`, ports 55700 + 8·n; localpg self-test ports | P3 | 2026-11-10 | the four fuzzers with seeds and replay, the consumer loop of SPEC 1.3 and 3.2, their self-tests with planted defects. Owed: the fix round below |
-| Package X, fix round (Fable; the worker that built the cut). Home `pg-cut`, ports 55600–55607. No MotherDuck | P3 | 2026-11-10 | the items listed below; then the coordinator checks it again and it is merged |
+| Package X, second fix round (Fable; the worker that built the cut). Home `pg-cut`, ports 55600–55607. No MotherDuck | P3 | 2026-11-10 | four items: the claim about the complete checker rests on recorded runs only (or the two runs are repeated); the takers read the reader node's identity themselves; the oracle's reader no longer imports a snapshot that may not be quiet on a standby with the export defect; section 13 and C9 adjusted. Then the merge |
 
-**Package A, apply — delivered 2026-11-10; two reviews; fix round delivered, under its last checks.** The coordinator's verdict was
-"merge after a short fix round". The second reviewer (Fable) then tested the model the package is built on —
-"a key is a queue of row versions, because a deferred unique constraint lets a transaction hold two rows of one
-key" — and found sequences for which it gives a wrong table, silently, in both modes. That question was settled
-by measurement before anything was fixed:
+**Package A, apply — delivered 2026-11-10; two reviews; fix round delivered, under its last checks.** The
+coordinator's verdict was "merge after a short fix round". The second reviewer (Fable) then tested the model the
+package is built on — "a key is a queue of row versions, because a deferred unique constraint lets a transaction hold
+two rows of one key" — and found sequences for which it gives a wrong table, silently, in both modes. That question
+was settled by measurement before anything was fixed:
 
 - **Measured** (`tests/pg_source/test_pg_keys.py`, Postgres 16.6 and 18.6, evidence
   `evidence/p3/source/replica_identity_keys_pg*.json`, hazard H-015): a deferrable unique index cannot be a
