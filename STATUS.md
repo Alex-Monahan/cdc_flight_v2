@@ -28,7 +28,7 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 | 3 MotherDuck semantics | done (laptop part and the repeat inside an F16 Flight) | `docs/spike/md_semantics.md` |
 | 1 JVM and stock Debezium on a Flight | done | `docs/spike/jvm_on_flight.md` |
 | 2 Run semantics | done | `docs/spike/run_semantics.md` |
-| 5 Local throughput (first indication) | part 1 (read rate from the replica) running; part 2 (stock Debezium streaming rate) starts when part 1 has finished, on the same private cluster | `docs/spike/local_throughput.md` |
+| 5 Local throughput (first indication) | part 1 (read rate from the replica, end to end into MotherDuck, hazards of long reads on a standby) done; part 2 (stock Debezium streaming rate on the replica's slot) running | `docs/spike/local_throughput.md`; part 2: `docs/spike/local_streaming.md` |
 | `docs/spike_report.md` and the architecture decision record | after the spikes | — |
 
 ## Decisions
@@ -84,6 +84,20 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
   affected; but a very large transaction inside a latency window will exceed the 60 s maximum, and R19 does not
   exclude it. Working rule until the owner rules: such windows are logged and reported separately, and they are
   **not** removed from the 5.2 statistic.
+- **Other sessions on the replica can stall the stream (replica mode, SPEC 5.2).** Measured locally: when any
+  session on the replica holds a lock on a table (a long report query is enough) and the primary takes an
+  `ACCESS EXCLUSIVE` lock on that table, replay on the replica stops for up to `max_standby_streaming_delay`
+  (default 30 s), and the slot on the replica delivers nothing during that time. The pipeline's own reads avoid
+  it (short chunk transactions); it cannot prevent it for other users of the same replica. Working rule: the
+  pipeline detects and reports such stalls (replay lag against the heartbeat), the runbook recommends a replica
+  that long queries do not use, and a latency window that contains such a stall is reported separately but **not**
+  removed from the 5.2 statistic. Stage 2 must check what PlanetScale sets for `max_standby_streaming_delay`.
+- **Resume bound for tables without a key (SPEC 3.7).** A table without a key must be read under one snapshot
+  (a change cannot be attributed to a chunk, and replaying a change twice changes a row count). If that snapshot
+  is lost (crash, hand-over), the table is read again from the start. So "source rows read ≤ 1.1 × table size" is
+  met for tables with a key only; a table without a key is correct after a resume but can be read twice. If 3.7 is
+  graded on a keyless table this costs points; the alternative found so far is no better (a snapshot cannot outlive
+  the session that holds it).
 - **Tables without a key (F-7).** A table without a usable replica identity cannot be added to a publication that
   publishes updates and deletes without breaking the application's own `UPDATE` and `DELETE`. Working rule: before
   such a table joins the publication the pipeline sets `REPLICA IDENTITY FULL` on it (a configuration switch turns
@@ -114,20 +128,42 @@ Each in its own worktree and branch (Opus, high effort); the orchestrator merges
 
 | Job | Phase | Started | Delivers |
 |---|---|---|---|
-| Spike worker: local read throughput (private cluster, home `pg-spike-tp`, ports 55500–55509; MotherDuck database `cdc_v2_spike_tp`) | P2 (§2 A 5, part 1) | 2026-11-09 | `spikes/local_throughput/`, `docs/spike/local_throughput.md`, `evidence/p2/local_throughput/` |
+| Spike worker: local streaming rate of stock Debezium on the replica's slot (same worker and private cluster as part 1: home `pg-spike-tp`, ports 55500–55509; JVM heap ≤ 1 GB). Also maps Debezium's position fields to the `pgoutput` BEGIN and COMMIT positions, which the design's position and cut rules rely on | P2 (§2 A 5, part 2) | 2026-11-10 | `docs/spike/local_streaming.md`, `evidence/p2/local_streaming/`, scripts in `spikes/local_throughput/` |
 | P3 worker, started early in a free slot: oracle, tier-T1 harness (isolated source and destination per test, evidence writer with redaction), seeded workload generator. MotherDuck databases `cdc_v2_t_*`; private clusters from port 55520 | P3 | 2026-11-10 | `src/cdc_v2/oracle/`, `src/cdc_v2/testing/`, `tools/oracle`, `docs/oracle.md`, `evidence/p3/oracle/` |
 | P3 worker, started early in a free slot: crash-point and fault-injection harness (named crash points, crash runner with a ledger, process control for competing runs, TCP fault proxy on ports 55440–55459, byte-stream fault relay, run-time fault sites, toy systems that prove the harness catches a wrong commit protocol). No MotherDuck use | P3 | 2026-11-10 | `src/cdc_v2/crashpoints.py`, `src/cdc_v2/faultsites.py`, `src/cdc_v2/testing/{procs,crash,netproxy,pipefaults,faults}.py`, `tools/netproxy`, `tests/harness/`, `docs/testing/harness.md`, `evidence/p3/harness/` |
 
-Not started yet: part 2 of the local throughput spike (stock Debezium streaming rate for small transactions and for
-one 10M-row transaction). It reuses the JVM program of the JVM spike (merged) and the private cluster of part 1,
-so it starts when part 1 has finished.
+| P3 core-correctness worker (Fable, xhigh): the cut — where a snapshot lies in the stream (`docs/design/core.md` 7.2). Library, a small `pgoutput` decoder for tests, a stress tool with a negative control, the argument from the Postgres source. Private cluster, home `pg-cut`, ports 55600–55607. No MotherDuck use | P3 | 2026-11-10 | `src/cdc_v2/pg/cut.py`, `src/cdc_v2/testing/pgoutput.py`, `tools/cutstress`, `tests/cut/`, `docs/design/cut.md`, `evidence/p3/cut/` |
 
 Written by the orchestrator while the spikes ran: `docs/design/core.md`, the draft contracts of the core
 (position, commit and acknowledge, leader/fence/heartbeat rows, bootstrap, apply, snapshot and stream, slot
-continuity, state machines, modules, open points). P3 workers build against it.
+continuity, state machines, modules, open points). P3 workers build against it. Changed on 2026-11-10 after the
+throughput spike (section 7): chunks of a keyed table are read under their own snapshots in short transactions;
+a row that no chunk read and whose change carries unchanged large values is fetched by key (repair read); a key
+change that carries unchanged values takes them from the row with the old key; the swap waits until the stream
+has passed every snapshot used; the cut is stated in commit end positions; the cut on a primary is an open point
+for the cut worker.
 
 Finished and merged:
 
+- 2026-11-10 — Local read throughput, part 1 (§2 A 5): `spikes/local_throughput/`, `docs/spike/local_throughput.md`,
+  `evidence/p2/local_throughput/`; dependency group `spike` (`psutil`, `pyarrow`) in `pyproject.toml`. TPC-H SF2
+  `lineitem` (12.0M rows, 2 GB) on a private cluster; **indications only, laptop numbers**. Read rate from the
+  replica: one connection is bound by its Postgres backend at about 1.0–1.1M rows/s on a `ctid` scan whatever the
+  format; our `COPY` over `ctid` ranges parsed into Arrow gives 0.67M / 1.31M / 2.47M rows/s with 1 / 2 / 4
+  connections; ranges over the primary key cost twice the backend CPU; DuckDB's Postgres reader is 20–40 % faster
+  on the client but holds every connection in one transaction for the whole scan and reports no progress per chunk.
+  End to end into MotherDuck from the laptop: 474K–586K rows/s, limited by the upload. Estimate for an F16 Flight
+  (not measured): 0.65–0.95M rows/s for our reader. The 100K rows/s of SPEC 3.1 has a wide margin; the real number
+  is a stage 2 measurement. **Decision for the backfill**: our own parallel `COPY` over `ctid` ranges from the
+  replica, two connections on F16, every chunk in its own short transaction; DuckDB's reader stays as the reference.
+  **Hazards found** (`docs/spike/local_throughput.md` §8; written into `docs/design/core.md` 7.1 and into the P5
+  list): any `ACCESS EXCLUSIVE` lock on the primary (`ALTER TABLE`, `TRUNCATE`, `VACUUM FULL`, … and an ordinary
+  vacuum that truncates empty pages at the end of a table) cancels a read on the replica that has held a lock on
+  that table for `max_standby_streaming_delay` (30 s), and **stops all replay on that replica for those 30 s**. In
+  replica mode the slot decodes replayed WAL, so the stream stalls too. With chunk transactions of well under a
+  second under a snapshot holder that holds no lock: no cancellation, replay lag ≤ 0.22 s over 625 chunks. A
+  snapshot held on the replica holds back cleanup on the primary (`hot_standby_feedback`). A table rewrite during
+  a chunked read is detected by comparing `pg_relation_filenode()` per chunk.
 - 2026-11-10 — MotherDuck semantics repeated inside an F16 Flight (§2 A 3, second part): `flights/spike_md/`,
   `spikes/md_semantics/{apply_txn,flight_extract}.py`, the "On an F16 Flight" part of `docs/spike/md_semantics.md`,
   `evidence/p2/md_semantics/flight_r4_*` (run 4 is the uncontended run; runs 2–3 are kept and labelled as
@@ -192,7 +228,7 @@ the exact-value layer.
 
 ## Next steps
 
-1. P2: merge the running spikes as they report; run the local throughput spike; write `docs/spike_report.md` and the
+1. P2: merge part 2 of the local throughput spike when it reports; write `docs/spike_report.md` and the
    architecture decision record; send the report to the owner and continue.
 2. P3 core: oracle, crash-point harness and fuzzers first. The harness must give parallel workers isolated sources:
    a private database on the shared development cluster for ordinary tests, a private cluster (own home and port

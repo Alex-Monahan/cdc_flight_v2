@@ -293,11 +293,13 @@ re-backfill and a resumed backfill (SPEC 3.3). The stream never stops for it.
    - every chunk is read in its own short transaction, far shorter than `max_standby_streaming_delay`. A long
      read transaction on a standby is cancelled by any `ACCESS EXCLUSIVE` lock taken on the primary (also by a
      vacuum that truncates the table's tail) and stalls replay, and with it the stream, until then;
-   - a snapshot that several chunks share is held by an **exporter** connection that never touches the table (it
-     holds no relation lock); readers import it with `SET TRANSACTION SNAPSHOT`;
-   - a snapshot is kept for at most `backfill.snapshot_max_age` (60 s), because it holds back cleanup on the
-     primary through `hot_standby_feedback`. After that, or when it is lost, the table continues under a new
-     snapshot (7.3). A resume is the same step;
+   - a table with a key: every chunk transaction takes its own snapshot and its own cut (7.2, 7.3). Nothing is
+     held between chunks, so the backfill holds back no cleanup on the primary and has no connection whose loss
+     ends it; a resume is nothing special;
+   - a table without a key needs one snapshot for the whole table (7.4). It is held by an **exporter** connection
+     that never touches the table (it holds no relation lock); readers import it per chunk with
+     `SET TRANSACTION SNAPSHOT`. While it lives it holds back cleanup on the primary through
+     `hot_standby_feedback`; its age is reported and has an alert threshold;
    - a chunk that fails with a recovery conflict (SQLSTATE 40001) is read again.
 3. **Catch up.** The backfill lane applies pending changes to the new table in rounds (statements of section 6),
    recording `caught_up_lsn` each time, until the rest is small.
@@ -311,27 +313,46 @@ A crash anywhere leaves either the old version with a resumable backfill, or the
 ### 7.2 Where a snapshot lies in the stream
 
 Each snapshot has a **cut**: a function that answers, for a source transaction, `inside`, `outside` or `unknown`.
+The stream identifies a transaction by the end of its commit record (`E`, section 2), so the cut is stated in `E`.
 
-On a standby (replica mode), one multi-statement message in a read-committed transaction reads
-`pg_last_wal_replay_lsn()` (`R0`), then exports the snapshot and reads `pg_last_wal_replay_lsn()` again (`R1`).
+**On a standby** (replica mode) the cut is a pair of replay positions around the moment the snapshot is taken:
+`R0` = `pg_last_wal_replay_lsn()` read by a statement that has finished before the snapshot is taken, and `R1` =
+the same function read after the snapshot exists. Two ways to get them:
+
+- a reader's own snapshot: `SELECT pg_last_wal_replay_lsn()` in autocommit (`R0`), then
+  `BEGIN ISOLATION LEVEL REPEATABLE READ`, whose first statement takes the snapshot and reads `R1`;
+- an exported snapshot: one read-committed transaction with three statements: `R0`, `pg_export_snapshot()`, `R1`.
+
+A value read by the statement that takes the snapshot is an upper bound only, never `R0`.
+
 Replay is serial, and a commit becomes visible to snapshots during the replay of its commit record, before the
-replay position moves past that record. Therefore:
+replay position moves past that record. Therefore, with `E1` = the `E` of the first transaction in the stream with
+`E > R1`:
 
-- commit record ends at or before `R0` ⇒ `inside`;
-- commit record starts after the first record that follows `R1` ⇒ `outside`;
-- otherwise `unknown` (at most the commits between `R0` and `R1`, plus the one record in flight).
+- `E ≤ R0` ⇒ `inside`;
+- `E > E1` ⇒ `outside`;
+- otherwise `unknown`: the commits in `(R0, R1]`, and the one at `E1`, whose record may have been in replay while
+  the snapshot was taken.
 
-**[test]** P3 proves this with a stress test on a hot table before anything depends on it: thousands of snapshots
-while a writer commits one counted row per transaction; the rows visible in each snapshot must equal the commits
-`inside`, plus some prefix of the `unknown` ones. `pg_current_snapshot()` cannot give the answer on a standby: there
-its in-progress list is empty **[test]**.
+The stream **has passed** a snapshot when its applied position is greater than `R1`; the transaction at `E1` is
+then applied. The heartbeat write guarantees that such a transaction arrives.
 
-On a primary (primary mode), the cut is `pg_current_snapshot()` and the transaction id of each stream transaction;
-it never answers `unknown`.
+A snapshot is used only if `R0 ≥ P0`: everything the stream applied before the table entered `backfilling` is then
+inside. This matters when backfill reads use a different replica than the slot.
 
-A snapshot is used only if `R0 ≥ P0`. This matters when backfill reads use a different replica than the slot.
-Parallel readers import the exported snapshot (`SET TRANSACTION SNAPSHOT`, measured on the standby: consistent;
-readers with their own snapshots: mixed states).
+`pg_current_snapshot()` cannot give the answer on a standby: its in-progress list is empty there. Its `xmin` and
+`xmax` can still turn `unknown` into an answer (transaction id below `xmin` ⇒ `inside`, at or above `xmax` ⇒
+`outside`), which helps 7.4.
+
+**On a primary** (primary mode, or reads from the primary) there is no such pair of positions: a commit record is
+written, and can be decoded by the slot, before the transaction becomes visible to snapshots; with synchronous
+replication that gap can be long. The cut is `pg_current_snapshot()` together with the transaction id of each
+stream transaction, and it never answers `unknown`. What replaces `R0 ≥ P0` there, so that no transaction the
+stream applied before `P0` is still invisible to the snapshot, is open point 12.
+
+**[test]** P3 proves all of 7.2 with a stress test before anything depends on it (`docs/design/cut.md`): very many
+cuts while writers commit counted rows; the rows visible in each snapshot must equal the commits `inside`, plus
+some of the `unknown` ones, and none of the `outside` ones; a deliberately wrong rule must be caught.
 
 ### 7.3 Tables with a key
 
@@ -451,3 +472,5 @@ src/cdc_v2/oracle/          source/destination comparison used by every test tie
 | 9 | Key change with unchanged TOAST values: old key on the create record, chains resolved (6.2) | P3 (1.4) and P4 (2.6) tests |
 | 10 | Several versions and missing rows after loading under several snapshots; repair read (7.3) | P3 handoff tests, workload fuzzer with TOAST values |
 | 11 | A schema change of a table during its own backfill | P4 schema wave; first rule: the table's backfill starts again |
+| 12 | Cut on a primary: a transaction decoded before `P0` that a later snapshot does not see yet (7.2) | P3 cut stress test proposes and proves the rule |
+| 13 | Catch-up that never converges (changes with unchanged values arrive faster than repair reads resolve them) | P4: bound the rounds, alert; P6 fuzzers |
