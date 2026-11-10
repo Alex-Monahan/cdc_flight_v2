@@ -27,7 +27,7 @@ MAY_CONNECT = ("md/", "testing/", "flightctl.py", "oracle/")
 #: Places of `MAY_CONNECT` whose SQL text must hold no statement that writes and no COMMIT.
 READ_ONLY = ("oracle/",)
 #: Where text that writes `_cdc.fence` may stand: the layer (fence statement, initialisation) and the take-over of
-#: the test helper. The bootstrap `flights/cdc_v2/main.py` (package L) is outside `src/` and compared separately.
+#: the test helper. The bootstrap `flights/cdc_v2/main.py` (package L) is outside `src/`; these tests do not read it.
 MAY_WRITE_FENCE = ("md/", "testing/destination.py")
 #: This package's own code: no local wall clock (C4, "No code of this package compares a local wall clock with a
 #: stored time").

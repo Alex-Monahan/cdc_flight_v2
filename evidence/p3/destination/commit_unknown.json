@@ -101,9 +101,9 @@
           "victims": 4
         },
         "80": {
-          "client_saw_the_answer": 4,
+          "client_saw_the_answer": 3,
           "commit_landed": 4,
-          "landed_without_an_answer_seen": 0,
+          "landed_without_an_answer_seen": 1,
           "rows": [
             3,
             3,
@@ -113,7 +113,7 @@
           "victims": 4
         }
       },
-      "date_utc": "2026-11-10 09:09",
+      "date_utc": "2026-11-10 10:05",
       "delays_ms": [
         0,
         10,
@@ -135,7 +135,7 @@
       },
       "killed_commits_that_did_not_land": 4,
       "killed_commits_that_landed": 32,
-      "landed_without_an_answer_seen": 16,
+      "landed_without_an_answer_seen": 17,
       "repetitions_per_delay": 4,
       "rows_of_the_final_run": 12,
       "victims": 36
