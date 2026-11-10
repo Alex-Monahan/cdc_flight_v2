@@ -57,7 +57,7 @@ green on T1 (local primary and standby, real MotherDuck, local JVM).
 | A | Apply: the statements over a change set, keyed and keyless | Opus | **delivered**; two reviews done (coordinator; a second reviewer, Fable, on the row-version model); one fix round owed, list final (below); it starts at the next free writer slot |
 | P | Source: connections, catalog and its observation, publication, slot, slot facts, timeline, heartbeat | Opus | **merged** (with the repair of `tools/localpg` for Postgres 16; one fix after the review) |
 | L | Leadership: guard, take-over, heartbeat, hand-over, bootstrap, platform interface | Fable | task written; after D |
-| Y | Transform: source types to destination types | Opus | **running** |
+| Y | Transform: source types to destination types | Opus | **delivered**; coordinator: merge after a short fix round (below); it starts at a free writer slot |
 | S | Stream: transactions, groups, commit and acknowledge, supervisor, pipeline process | Fable | task written; after E, D, A, P, K |
 | V | Slot continuity | Fable | task written; after S |
 | F | Fuzzers (stream, workload, fault, leadership), the consumer loop of 1.3 and 3.2 | Opus | **running** |
@@ -249,6 +249,12 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
   transaction two rows of such a table can hold one key, so a record that names only a key is ambiguous. If SCD2
   history or a resumable backfill is wanted for such tables, say so: it is possible in P4 at the price of a
   second apply path. A table whose primary key is immediate is not affected, also under `REPLICA IDENTITY FULL`.
+- **Enums and JSON (SPEC 2.4).** SPEC 2.4 lists both among the types that map to native MotherDuck types. P3
+  delivers both as `VARCHAR`, lossless. Enums: a DuckDB `ENUM` cannot follow labels that are renamed or
+  reordered at the source (H-033) without rewriting the column; the coordinator recommends a native `ENUM` in P4
+  with a transactional column rewrite on such a change. JSON: DuckDB's `JSON` refuses some values that Postgres
+  `json` holds (a lone surrogate escape); P4 plans native `JSON` with the wide form `UNION(JSON, VARCHAR)` for
+  such values. Say so if `VARCHAR` should stay for either.
 - **Infinite intervals (source on Postgres 17 or later).** Stock Debezium cannot deliver `interval 'infinity'`
   through the stream: the value arrives as a zero interval (Decisions). The rule decided makes the value exact
   by a read at a known place in the stream, built in P4; a table without a key that has an `interval` column on
@@ -299,7 +305,7 @@ Each in its own worktree and branch; the orchestrator merges. The P3 packages ar
 | Second review of package A (Fable, reads only): **done**. It found counterexamples to the row-version model and the catch-up rules (below); it runs its campaigns again on the fixed branch | P3 | 2026-11-10 | findings in A's fix round |
 | Package F, fuzzers (Opus, high). Homes `pg-f<n>`, ports 55700 + 8·n; MotherDuck databases `cdc_v2_t_f_*` | P3 | 2026-11-10 | the four fuzzers with seeds and replay, the consumer loop of SPEC 1.3 and 3.2, their self-tests with planted defects |
 | Package X, fix round (Fable; the worker that built the cut). Home `pg-cut`, ports 55600–55607. No MotherDuck | P3 | 2026-11-10 | the items listed below; then the coordinator checks it again and it is merged |
-| Package Y, transform (Opus, high). Home `pg-y`, ports 55656–55663. No MotherDuck | P3 | 2026-11-10 | `src/cdc_v2/transform/`, `docs/design/transform.md`, the cross-path test (stream form against backfill form through a local Postgres), the list of ambiguous interval columns and their mask |
+| Package Y, transform (Opus, high): **delivered**, branch `worktree-agent-a2d7d8aabb7b8b6a5`, not merged; fix round owed. Home `pg-y`, ports 55656–55663. No MotherDuck | P3 | 2026-11-10 | `src/cdc_v2/transform/`, `docs/design/transform.md`, the cross-path test (stream form against backfill form through a local Postgres), the list of ambiguous interval columns and their mask |
 
 **Package A, apply — delivered 2026-11-10; two reviews; one fix round owed.** The coordinator's verdict was
 "merge after a short fix round". The second reviewer (Fable) then tested the model the package is built on —
@@ -341,6 +347,16 @@ grouping for tables without a key; the planning schema that lives inside one lan
 needs from D's transaction. Limits accepted for P3 and carried: an unchanged TOASTed key column needs `REPLICA
 IDENTITY FULL` on such a table (owner's question with F-7, P4); no pruning by key for some key types (measured in
 P9).
+
+**Package Y, transform — delivered 2026-11-10, coordinator's verdict: merge after a short fix round.** Proven
+by the worker: on every baseline type family the stream form and the backfill form give the same destination
+value, on Postgres 18.6 and 16.6 (59 tables, 3,284 streamed records, 6,795 values compared); errors never carry
+a value; the transform connection cannot reach MotherDuck. The fix round: a negative control for the cross-path
+test; the plan names a key column that the stream cannot deliver injectively (a scalar interval key on Postgres
+17 or later); one interval text style on both paths (arrays and composites that hold intervals printed
+differently on the two paths: the read sessions take `IntervalStyle=postgres`, as the engine's session must
+have); fewer property examples in the default run. What goes to other packages and to P4 is in plan 6.2, "From
+the review of Y". Two points for the owner are in the questions below (enums and JSON as `VARCHAR`).
 
 **Package E, the engine — merged 2026-11-10** (`11599e6`; JVM program `jvm/src/cdc_v2/engine/`, the Python side
 `src/cdc_v2/stream/{frames,engine,jvm}.py`, `tests/engine/`, `docs/design/engine.md`, `evidence/p3/engine/`).
