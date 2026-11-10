@@ -79,7 +79,7 @@ def test_a_black_holed_path_bounds_every_call_and_the_calls_left_waiting(md_dest
     t0 = time.monotonic()
 
     def note(**kw):
-        kw["t"] = round(time.monotonic() - t0, 2)
+        kw["t_test"] = round(time.monotonic() - t0, 2)          # since the test began; "t" is the child's own
         rec.append(kw)
         return kw
 
@@ -118,18 +118,16 @@ def test_a_black_holed_path_bounds_every_call_and_the_calls_left_waiting(md_dest
             child.send("repeat 12")
             reps = [note(phase="repeat", **child.next()) for _ in range(12)]
             child.send("monitor 10 5")
-            while True:
-                r = note(phase="monitor_still_blackholed", **child.next())
-                if r["t"] >= 10:
-                    break
+            while not note(phase="monitor_still_blackholed", **child.next()).get("last"):
+                pass
             px.set_fault("pass")
             note(event="healed")
-            child.send("monitor 120 2 until_idle")
+            child.send("monitor 120 1 until_idle")
             while True:
                 r = note(phase="monitor_after_heal", **child.next())
-                if r["md_waiting_calls"] == 0 and r["md_background"] == 0 or r["t"] >= 120:
+                if r.get("last"):
                     break
-            freed_after_s = r["t"]
+            freed_after_s = r["t"]                                  # seconds since the path passed again
             assert r["md_waiting_calls"] == 0 and r["md_background"] == 0, r
             child.send("final")
             final = note(phase="final", **child.next())

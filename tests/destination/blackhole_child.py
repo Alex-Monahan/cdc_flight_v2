@@ -131,7 +131,7 @@ def main():
                 if cmd[3:] == ["until_idle"] and md.waiting_calls() == 0 and not md.background_threads():
                     break
                 time.sleep(step)
-            out(ev="monitor", t=round(time.monotonic() - t0, 1))
+            out(ev="monitor", t=round(time.monotonic() - t0, 1), last=True)
         elif what == "final":
             s, e, m = timed(lambda: tx_update())
             out(ev="final", seconds=s, error=e, gen=conn.generation)

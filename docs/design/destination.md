@@ -5,7 +5,7 @@ statement, the leader tables, the connection registry, the migrations of the `_c
 function for state machines, and alerts. It is built to contracts C0, C1, C4 and C5 of `docs/design/p3_plan.md`
 and to section 4 of `docs/design/core.md`. This document describes the layer **as built**, the mapping of errors
 with its evidence, the deadline mechanism, and every place where the contract was open or the design was wrong
-(sections 13 and 14).
+(sections 13 and 14). Section 14.3 says what the fix round after the two reviews of this package changed.
 
 | File | What |
 |---|---|
@@ -19,7 +19,7 @@ with its evidence, the deadline mechanism, and every place where the contract wa
 | `src/cdc_v2/alerts.py` | `emit`, `emit_now`, `resolve` |
 | `src/cdc_v2/testing/destination.py` | a destination for one test (local or MotherDuck), a small take-over (design 4.5) |
 | `src/cdc_v2/testing/machines.py` | `check_machine` (every pair of states of a declared machine), the search for state writes |
-| `tests/destination/` | the tests; `sut.py` is a small system under test, `connect_relay.py` a CONNECT relay; `test_from_apply.py` holds the tests of the seven points from the review of apply (section 14.1), `test_review.py` the seeded tests from the review of this package (section 14.2) |
+| `tests/destination/` | the tests; `sut.py` is a small system under test, `connect_relay.py` a CONNECT relay; `test_from_apply.py` holds the tests of the seven points from the review of apply (section 14.1), `test_review.py` the seeded tests from the review of this package (section 14.2), `test_fix_round.py` and `test_md_fix_round.py` those of the fix round (section 14.3), with `review_cases.py` and `data/misleading_texts.json` (cases and texts of the second reviewer's programs), `fence_campaign.py` (the take-over at every point, many rounds) and `blackhole_child.py` (a lane on a black-holed path) |
 | `evidence/p3/destination/` | the evidence that this document points to |
 
 ## 1. Words
@@ -53,7 +53,8 @@ conn.fetchall(sql, params=None, deadline=None)       # autocommit; also fetchone
 
 `md.Settings(database, marker="cdc_v2", connect_deadline_s=30.0, connect_attempts=3, connect_retry_pause_s=0.5,
 statement_deadline_s=60.0, transaction_deadline_s=300.0, rollback_deadline_s=5.0, grace_s=2.0,
-interrupt_deadline_s=5.0)` is a frozen dataclass.
+interrupt_deadline_s=5.0, max_waiting_calls=2)` is a frozen dataclass. `max_waiting_calls` bounds, per
+connection, the calls that it gave up and that have not returned (section 4).
 
 - `database` is a plain MotherDuck database name. The layer opens it alone (`attach_mode=single`), so no other
   database of the account is attached. `:memory:` or `:memory:<name>` gives a local database (tier T0); a file
@@ -117,7 +118,18 @@ when its table is named `leader`, `fence` or `heartbeat`
 `test_from_apply.py::test_the_leader_tables_stay_protected_next_to_scratch_schemas`).
 
 `md.open_connections()`, `md.background_threads()` and `md.wait_idle(deadline)` let a test check that nothing is
-left (`test_lane.py::test_no_connection_and_no_thread_is_left`).
+left (`test_lane.py::test_no_connection_and_no_thread_is_left`). `md.waiting_calls()` counts the calls of the
+process that were given up and still wait for an answer; a supervisor ends the process when it passes its bound
+(section 4).
+
+- `open_connections()`: every client connection of the layer, from the moment the client returned it (also one
+  whose connect never finished its first statement on the server), and the short-lived connections that
+  interrupt a connection by id.
+- `background_threads()`: watchdog, reaper and close threads, and the worker thread of every retired
+  connection.
+- `waiting_calls()`: a statement or a connect of a retired connection that has not returned, and an interrupt
+  through a short-lived connection that has not returned. `Connection.waiting_calls()` counts those of one
+  connection.
 
 ### 2.2 Lanes and transactions
 
@@ -160,7 +172,9 @@ apply (section 14.1). The tests named here without a file are in `tests/destinat
   in the tokens of the client's tokenizer, because the client describes the result of `… RETURNING k AS "Count"`
   like a count (finding 19). Two texts are taken for a `RETURNING` clause that are none: a column label
   `AS returning` and a parameter named `$returning`. They give `None` where a count was possible, never a wrong
-  number. Tests: `test_execute_returns_a_count_for_insert_update_and_delete_only`,
+  number. A statement with `RETURNING` is not read as a count at all: `… RETURNING b AS "Count"` with a text
+  value was a `StatementError(ValueError)` and rolled the transaction back (fix round, F8;
+  `test_fix_round.py::test_a_returning_column_named_count_that_holds_text_is_no_count`). Tests: `test_execute_returns_a_count_for_insert_update_and_delete_only`,
   `test_merge_reports_no_count_and_truncate_counts_as_a_delete`,
   `test_a_returning_clause_is_found_by_the_tokenizer_of_the_client`,
   `test_execute_one_never_takes_a_returned_value_for_a_count`.
@@ -191,19 +205,48 @@ apply (section 14.1). The tests named here without a file are in `tests/destinat
 
 `cdc_v2.md.registry` keeps `_cdc.connections (epoch, lane, connection_id, registered_at)`.
 
-- `register(conn, lane, epoch, deadline=None)` returns the server connection id. The lane calls it itself
-  before the first `BEGIN` on every new client connection. One statement inserts the row only if `_cdc.leader`
-  still holds the epoch; no row inserted is `FenceLost`
-  (`test_lane.py::test_new_connection_of_a_stale_epoch_is_refused_at_registration`). The statement runs on the
-  client connection whose id it writes. A connection that is replaced while it registers is `ConnectionLost`
-  (`test_review.py::test_registration_writes_the_id_of_the_connection_that_runs_it`).
+- `register(conn, lane, epoch, deadline=None, retry_conflict=False)` returns the server connection id. The lane
+  calls it itself before the first `BEGIN` on every new client connection, with the statement deadline. It is a
+  transaction of its own (fix round, item 2):
+
+  ```sql
+  BEGIN;
+  INSERT INTO _cdc.connections (epoch, lane, connection_id, registered_at) VALUES (?, ?, ?::UUID, <md clock>);
+  UPDATE _cdc.fence SET epoch = epoch WHERE lane = ? AND epoch = ?;      -- exactly one row, else FenceLost
+  COMMIT;
+  ```
+
+  The `UPDATE` writes the column that a take-over writes, so a registration and a take-over cannot both
+  commit: a registration whose transaction began before the take-over committed gets `Conflict`, one that
+  begins after it gets `FenceLost`, and one that commits first is in the list when the new leader interrupts
+  the earlier epochs. Until the fix round the registration was one `INSERT … SELECT … FROM _cdc.leader WHERE
+  epoch = ?` in autocommit: it read the leader row and wrote only `_cdc.connections`, so on MotherDuck one that
+  read the old epoch could commit after the take-over and after the new leader's interrupt had read the list.
+  Tests: `test_lane.py::test_new_connection_of_a_stale_epoch_is_refused_at_registration`,
+  `test_fix_round.py::test_a_registration_while_a_take_over_is_open_does_not_commit`,
+  `test_fix_round.py::test_a_registration_frozen_between_its_check_and_its_commit_and_a_take_over_in_between`
+  (both also on MotherDuck). The statements run on the client connection whose id they write. A connection
+  that is replaced while it registers is `ConnectionLost`, and so is a lost answer of its `COMMIT`; the
+  connection is then given up, so the next call registers a new one
+  (`test_review.py::test_registration_writes_the_id_of_the_connection_that_runs_it`). The `COMMIT` passes the
+  fault sites `md.commit` and `md.commit_reply` like every `COMMIT`.
+- A registration holds the fence row of its lane until it commits. A take-over meets it as a conflict and
+  cannot interrupt it (its row is not in the list yet); a registration that is frozen there delays a take-over
+  until MotherDuck ends its transaction (about 29 s, section 8.3). And a registration that commits while a
+  transaction of the same lane name is open makes that transaction's fence statement conflict (`Conflict`).
+  Neither happens to a lane, which registers before its own transactions.
 - `md.interrupt_earlier(conn, epoch, deadline=None)` returns `(listed, interrupted)`: the rows with an epoch
   **below** `epoch`, and how many of them the server interrupted. The caller's own connection is left out.
 - `registry.cleanup(conn_or_tx, epoch, deadline=None)` deletes the rows of epochs before `epoch - 1`.
 
 A connection that writes for an epoch without being a lane (the heartbeat connection of package L) calls
-`register` itself, with one of the fixed lane names
-(`test_lane.py::test_a_connection_that_is_not_a_lane_registers_under_a_lane_name`).
+`register(conn, "control", epoch, retry_conflict=True)` itself
+(`test_lane.py::test_a_connection_that_is_not_a_lane_registers_under_a_lane_name`). Its registration writes the
+fence row of `control`, which a transaction of the control lane holds between its fence statement and its
+`COMMIT`: that rare `Conflict` it tries again until its deadline
+(`test_fix_round.py::test_a_connection_that_is_not_a_lane_registers_under_control_and_retries_a_conflict`). Its
+registration can also make an open transaction of the control lane end with `Conflict` (the bullet above); a
+control-lane caller runs it again, as the migrations do.
 
 Section 7 says what the server lists and what an interrupt answers.
 
@@ -262,13 +305,19 @@ done = md.migrate(control_lane)          # [(package, version, step name), ...] 
 - It first looks without writing. When nothing is pending it writes nothing
   (`test_schema.py::test_running_again_does_nothing_and_writes_nothing`).
 - Each step runs in its own fenced transaction together with the move of its version row in
-  `_cdc.schema_version (package, version, step, epoch, updated_at)`. The move follows the run-again rule
+  `_cdc.schema_version (package, version, step, applied, epoch, updated_at)`. The move follows the run-again rule
   (`execute_one` with a condition on the version read). So a step is applied exactly once, also when two leaders
   migrate at once (`test_schema.py::test_leaders_at_once_apply_every_step_exactly_once`) and when the answer
   of a `COMMIT` is lost (`test_schema.py::test_a_step_whose_commit_has_no_answer_is_applied_once`: after
   `CommitUnknown` it waits 2.5 s and reads again).
-- A database that is newer than the code, or whose recorded step names differ, is refused with `SchemaError`
-  (`test_schema.py::test_a_database_that_does_not_fit_the_code_is_refused`).
+- A database that is newer than the code, or whose applied steps differ from the first steps of the registered
+  list, is refused with `SchemaError` before anything runs
+  (`test_schema.py::test_a_database_that_does_not_fit_the_code_is_refused`). The version row keeps, in the column
+  `applied`, the name and a hash (SHA-256 of the name and the statements, `schema.step_hash`) of every applied
+  step, and `migrate` compares all of them: a step changed under its name, a renamed, removed or inserted step
+  are refused (fix round, F5; until then only the last step's name was compared;
+  `test_fix_round.py::test_a_changed_or_renamed_applied_step_refuses_to_start`). `schema.applied_steps(conn,
+  package)` reads them.
 - The lists `state` and `alerts` of this package run first, the others in the order of their package names.
 
 ### 2.5 State machines (contract C5)
@@ -280,12 +329,37 @@ CHUNK = state.declare(state.Machine(
     name="chunk", states=("planned", "loading", "done"),
     transitions={("planned", "loading"), ("loading", "done"), ("loading", "planned")},
     table="_cdc.chunks", key_columns=("table_id", "chunk_no"), state_column="state",
+    creators=tuple("backfill.%d" % i for i in range(16)),
     initial=("planned",), description="one chunk of a backfill"))
 
 state.create(tx, CHUNK, (table_id, 0), "planned", "plan", values={"created_at": state.NOW})
-state.transition(tx, CHUNK, (table_id, 0), "planned", "loading", "loader 3 took it")
+state.transition(tx, CHUNK, (table_id, 0), "planned", "loading", "loader 3 took it",
+                 values={"rows": 0}, expect={"loader": None}, detail={"loader": 3})
 state.read(conn_or_tx, CHUNK, (table_id, 0))        # the stored state, or None
 ```
+
+- `transition` and `create` write only inside an `md.Transaction`; anything else (a plain `Connection`) is
+  `LaneMisuse`, and so for `alerts.emit`. After a take-over the old run had changed a state and created a row
+  through a plain connection, without the fence, and the row of `_cdc.transitions` had no epoch (fix round,
+  F4; `test_fix_round.py::test_the_state_module_and_alerts_write_only_inside_a_lane_transaction`). `read` still
+  takes a connection.
+- **Who creates the keys of a machine** (`creators`, required): lane names from the fixed set, or
+  `state.FRESH_IDS` for keys that are new random ids (alerts, requests) and that any lane may create. `create`
+  refuses any other lane with `LaneMisuse` before it touches the database. A machine whose rows are created
+  from several lanes (the chunks of a backfill, from `backfill.<i>`) creates each child row together with a
+  transition of its parent row (the backfill's `planned` → `reading`), which every planner writes; two planners
+  then conflict on the parent's state column and only one commits (fix round, item 3;
+  `test_state.py::test_a_key_is_created_only_by_the_lanes_that_the_machine_names`,
+  `test_state.py::test_a_child_row_created_from_two_lanes_is_created_with_a_transition_of_its_parent`).
+- **The facts of a group** (fix round, item 1): `transition(…, cause, *, detail=None, values=None,
+  expect=None)` and `create(…, values=None, detail=None)`. `values` sets more columns in the same conditional
+  `UPDATE` (`state.NOW` for MotherDuck's clock). `expect` adds `AND col IS NOT DISTINCT FROM ?` for each column,
+  and the `UPDATE` writes those columns too (with their new value, or with themselves), so a concurrent writer
+  of them conflicts; with `expect` a count of 0 rolls the transaction back and raises `Conflict` (the run-again
+  rule of C4). `detail` follows the value rules of alert fields (`state.check_fields`; identifiers, positions,
+  counts and durations only) and is stored as JSON. The stream's group is then two statements: the `UPDATE` of
+  its position with `expect` on the previous value, and the `INSERT` of the log row
+  (`test_fix_round.py::test_values_and_expect_in_the_same_conditional_update`).
 
 - `transition` refuses a pair that is not declared **before** it touches the database
   (`IllegalTransition`, `declared=False`).
@@ -293,15 +367,22 @@ state.read(conn_or_tx, CHUNK, (table_id, 0))        # the stored state, or None
   is stored; the caller's transaction stays usable. More than one row for a key: `StateError`, and the
   transaction fails.
 - Every transition and every `create` appends to `_cdc.transitions (machine, key, from_state, to_state, cause,
-  epoch, changed_at)` in the same transaction (`test_state.py::test_a_transition_is_part_of_the_callers_transaction`).
+  epoch, lane, seq, detail, changed_at)` in the same transaction
+  (`test_state.py::test_a_transition_is_part_of_the_callers_transaction`). `seq` (`UBIGINT`) is written in the
+  same `INSERT` as `(SELECT n + 1 FROM _cdc.fence WHERE lane = ?)`: the lane's fence counter after this
+  transaction's fence statement, which is the last statement before `COMMIT`. Two transactions of one lane that
+  read the same `n` conflict at the fence row, so `seq` orders the transactions of a lane exactly as they
+  committed, and a duplicate (lane, `seq`) between two transactions shows a second writer. Every row of one
+  transaction carries the same `seq`; a transaction that writes no row leaves a gap
+  (`test_fix_round.py::test_a_transition_row_carries_its_lane_epoch_seq_and_detail`,
+  `::test_seq_has_no_gaps_and_equals_the_fence_counter_on_two_lanes_and_two_epochs`,
+  `::test_a_rolled_back_transaction_leaves_no_transition_row`,
+  `::test_a_run_that_bypasses_the_fence_shows_a_duplicate_seq`).
+- **`changed_at` does not give the order of commit.** It is MotherDuck's clock when the `INSERT` ran, not when
+  the transaction committed, in whole milliseconds (section 10). Two writers can run their statements in one
+  order and commit in the other, and rows of one millisecond have equal times. Order by (lane, `seq`).
 - Two transactions cannot both make one transition
   (`test_state.py::test_two_transactions_cannot_both_make_one_transition`).
-- **Create the rows of one machine from one lane.** `create` looks for a row of the key with what its
-  transaction sees, and it writes nothing that a second creator reads. Two transactions that create one key at
-  the same time meet only in the fence row of their lane. On one lane name the second gets `Conflict`. On two
-  lanes both commit and the key has two rows; every later `read`, `transition` and `create` of that key then
-  fails with `StateError`, so the damage is seen. The layer does not prevent it (contract note 34; section 14.2;
-  `test_state.py::test_two_creators_of_one_key_meet_only_through_the_fence_row_of_their_lane`).
 - The log line `state transition` (logger `cdc_v2.state`) is written inside the caller's open transaction. Its
   record says so: `committed: False`. `_cdc.transitions` is the record of what holds
   (`test_review.py::test_a_log_line_written_inside_a_transaction_says_that_nothing_is_committed_yet`).
@@ -327,7 +408,10 @@ alerts.resolve(tx, alerts.dedup_key("table_quarantined", {"table_id": 16385}, ("
 - `fields` holds only identifiers, positions, counts and durations (SPEC 8.3): at most 24 fields; a value is an
   integer of 64 bits (not a boolean), a finite float, or a string of at most 128 printable characters. Anything
   else raises `AlertError` and nothing is written
-  (`test_alerts.py::test_a_value_that_is_not_an_identifier_position_count_or_duration_is_refused`).
+  (`test_alerts.py::test_a_value_that_is_not_an_identifier_position_count_or_duration_is_refused`). The rules are
+  `state.check_fields`, which the detail of a transition follows too; `AlertError` is a `state.FieldError`.
+- The machine `alert` has fresh ids (`creators=state.FRESH_IDS`): every lane records alerts. `emit` takes an
+  `md.Transaction` only (section 2.5).
 - `key` names the fields that, with the kind, tell one condition from another. `dedup_key` is stored so that
   the deliverer can send one message per condition.
 - `emit_now` tries again after `Conflict` and `ConnectionLost` until its deadline. It passes on `FenceLost` and
@@ -344,9 +428,15 @@ alerts.resolve(tx, alerts.dedup_key("table_quarantined", {"table_id": 16385}, ("
 - `local_destination()` and `motherduck_destination(prefix)` give a private destination with the leader
   tables and remove it at the end. `Destination.lead()` takes over, migrates and returns the epoch.
 - `take_over(settings, …)` is a stand-in for the bootstrap of package L. It follows design 4.5: in one
-  transaction it raises the epoch in the leader row, in every fence row and in the heartbeat row. On a conflict
-  it interrupts the connections of earlier epochs and tries again until its time is over (`TakeoverFailed`).
-  After an unknown commit outcome it waits 2.5 s, reads the record and decides by `run_id`.
+  transaction it raises the epoch in the leader row, in every fence row and in the heartbeat row. It decides
+  once from which epoch it takes over (`seen`, read at its first attempt). After a conflict it reads the leader
+  row again: if the row moved past `seen` under another run's id, another starter won, and it raises
+  `AnotherRunLeads` (a `TakeoverFailed`; design 4.5: the losers re-read and exit). Otherwise it interrupts the
+  connections of earlier epochs and tries again until its time is over (`TakeoverFailed`). After an unknown
+  commit outcome it waits 2.5 s, reads the record and decides by `run_id`. Until the fix round a loser re-read
+  `seen` at every attempt and took over again from the winner: with three simultaneous starters all three were
+  returned as leader, 5 rounds of 5 (F6; `test_fix_round.py::test_three_simultaneous_starters_have_exactly_one_leader`,
+  also on MotherDuck). Package L copies this stand-in.
 - `create_database(name)`, `drop_database(name)` and `leftover_databases(prefix)` create and drop a MotherDuck
   test database through `cdc_v2.testing.md` (package O), the one place that does this. It checks the name, has
   a deadline, and writes a **ledger** entry (an empty file named like the database, under
@@ -359,10 +449,10 @@ alerts.resolve(tx, alerts.dedup_key("table_quarantined", {"table_id": 16385}, ("
 
 | Step | What the layer does | Fault site | Crash point |
 |---|---|---|---|
-| 1 | On a new client connection: connect and set the two session settings; interrupt the server connection it replaces, by id; register in `_cdc.connections` (one `INSERT`) | `md.connect`, `md.execute` | |
+| 1 | On a new client connection: connect and set the two session settings; interrupt the server connection it replaces, by id; register in `_cdc.connections` (a transaction of its own: `BEGIN`, the `INSERT`, the `UPDATE` of the lane's fence row, `COMMIT`; section 2.3) | `md.connect`, `md.execute`, `md.commit`, `md.commit_reply` | |
 | 2 | `BEGIN` | `md.execute` | |
 | 3 | The caller's statements | `md.execute` | |
-| 4 | The fence statement; it must change exactly one row | `md.fence` | `<lane>.fenced` after it |
+| 4 | The fence statement; it must change exactly one row. Its deadline is the statement deadline (and never more than what is left of the block) | `md.fence` | `<lane>.fenced` after it |
 | 5 | The block's deadline is checked one last time | | `<lane>.commit_sent` after it |
 | 6 | `COMMIT` | `md.commit` before it is sent, `md.commit_reply` after the destination has executed it | `<lane>.committed` after it returned |
 
@@ -371,9 +461,10 @@ alerts.resolve(tx, alerts.dedup_key("table_quarantined", {"table_id": 16385}, ("
   destination refuses rolls back and raises `StatementError` (section 5). Both:
   `test_lane.py::test_an_exception_rolls_back_and_is_passed_on`.
 - What the fault site `md.execute` sees before the caller's statements. On a lane's first connection: the
-  registering `INSERT`, then `BEGIN`. On a connection that replaces one that was given up, locally the same; on
-  MotherDuck the interrupt of the old id comes first, as a statement of its own. On a registered connection:
-  `BEGIN` only. (Locally the interrupt is a call inside the process and passes no fault site.)
+  registration's `BEGIN`, `INSERT` and `UPDATE` (its `COMMIT` passes `md.commit`), then `BEGIN`. On a connection
+  that replaces one that was given up, locally the same; on MotherDuck the interrupt of the old id comes first,
+  as a statement of its own. On a registered connection: `BEGIN` only. (Locally the interrupt is a call inside
+  the process and passes no fault site.)
 - The clean-up after a step that failed has one short deadline (`rollback_deadline_s`) for all of it: the
   roll-back, the read of the fence row after a conflict in the fence statement, and the removal of registered
   data. A roll-back that does not answer retires the connection; the caller still gets its own exception
@@ -386,15 +477,42 @@ alerts.resolve(tx, alerts.dedup_key("table_quarantined", {"table_id": 16385}, ("
 
 **Rule.** No statement of this layer holds its caller longer than its deadline plus the grace period (`grace_s`,
 default 2 s). A lane call that fails adds its clean-up: it returns at the latest `rollback_deadline_s` (default
-5 s) plus the grace period after the step that failed (section 3).
+5 s) plus the grace period after the step that failed (section 3). The deadline of a statement, of the fence
+statement and of the registration is the statement deadline (`statement_deadline_s`, default 60 s), and never
+more than what is left of the block; only `COMMIT` has what is left of the block, because a commit has no
+progress signal and the caller sets the block's deadline by the size of the group (design 3). Until the fix
+round the fence statement and the registration waited for what was left of the block, up to 300 s with the
+defaults, above the 120 s of SPEC 4.5 (F7;
+`test_fix_round.py::test_the_fence_statement_and_the_registration_wait_the_statement_deadline_not_the_blocks`).
+
+**The worst case with the defaults**, on a network that answers nothing, for one call of a lane: connect 30 s
+(`connect_deadline_s`) plus 2 s; the interrupt of an old id 5 s plus 2 s; the registration 60 s plus 2 s; each
+statement and the fence statement 60 s plus 2 s; `COMMIT` what is left of the block (default 300 s) plus 2 s.
+A connect that the destination refuses is tried `connect_attempts` (3) times. Once a connection holds
+`max_waiting_calls` (2) calls that it gave up, its next call fails at once with `ConnectionLost` and starts
+nothing. Measured with short settings on a black-holed path (section 9.4).
+
+**Calls that were given up.** The worker thread, the reaper thread and the client connection of a retired
+connection stay until the statement in flight returns; the client library offers no way to end them earlier
+(the next paragraph). On a network that answers nothing that is until the network answers again (section 9.4:
+all were freed within seconds of the path passing again). So they are counted and bounded (fix round, items 6
+and 15):
+
+- `md.waiting_calls()` counts them (the statement or connect of a retired connection, and an interrupt through a
+  short-lived connection, that have not returned). A supervisor that sees more than its bound ends the process
+  (package L, contract C11); the fuzzers measure it.
+- `md.background_threads()` counts every worker of a retired connection and every helper thread;
+  `md.open_connections()` every client connection of the layer, from the moment the client returned it, and the
+  short-lived connections that interrupt. Until the fix round a connect that never finished its first statement
+  and the workers were not counted (the second review measured 1 and 13 where 26 threads were left).
+- Per connection at most `max_waiting_calls` (default 2) such calls: the call that would need one more fails at
+  once with `ConnectionLost` (`… calls that were given up still wait for the destination`) and starts nothing.
+  Per such call at most three threads stay (worker, watchdog, reaper) and at most one interrupt through a
+  short-lived connection is in flight. Until the fix round every attempt on a black-holed path left two more
+  threads, without a bound (2 to 26 after 12 attempts). Test:
+  `test_fix_round.py::test_the_calls_that_were_given_up_are_counted_and_capped_per_connection`.
 
 What the rule does not cover:
-
-- **Threads of a connection that was given up.** The worker thread, the reaper thread and the client connection
-  of a retired connection stay until the statement in flight returns; the client library offers no way to end
-  them earlier (the next paragraph). They are daemon threads, and `md.background_threads()` and
-  `md.open_connections()` count them. On a network that answers nothing they can stay for as long as the client
-  waits. This is open (section 14.2).
 - **A process that cannot start a thread.** The watchdog thread is started at the deadline. When that fails,
   the failure is logged (`md background thread not started`), the caller waits to the end of the grace period,
   the connection is given up and the block fails
@@ -456,21 +574,51 @@ committed (`test_lane.py::test_an_expired_deadline_stops_the_block_before_commit
 
 ## 5. Error mapping
 
-The rules, in the order they are applied (`src/cdc_v2/md/errors.py`):
+The rules, in the order they are applied (`src/cdc_v2/md/errors.py`; changed in the fix round, F1 to F3):
 
 1. A deadline that passed decides first: before `COMMIT` `DeadlineExceeded`, from `COMMIT` on `CommitUnknown`.
-2. A **transport** error: the client's classes `ConnectionException`, `IOException`, `HTTPException`,
-   `InterruptException`; Python's `ConnectionError`, `TimeoutError`, `OSError`; and every client error that is
-   not about data and whose text (its head, see below) holds one of the phrases `Connection Error`, `interrupted by user`, `lease expired`, `transaction already
-   rolled back`, `Request failed`, `Could not connect`, `UNAVAILABLE`, `DEADLINE_EXCEEDED`, `Connection already
-   closed`, `No open result set`, `connection … closed`. The phrases are needed because MotherDuck reports a
-   server interrupt in a transaction as `TransactionException`, not as a connection error.
-3. A **conflict**: a client error that is not about data and whose head says `Conflict on …` or
-   `write-write conflict`.
-4. Everything else that a statement raises is `md.StatementError` before `COMMIT` was sent, and `CommitUnknown`
+2. The **class** decides for three families, whatever the text says. An error about the data of a statement
+   (the client's `DataError` and `IntegrityError`) and an error of DuckDB's programming family
+   (`ProgrammingError`: parser, syntax, binder, catalog, invalid input, invalid type) is rule 5: their text
+   repeats values and names of the statement without quotation marks. The client's `ConnectionException` and
+   `InterruptException` and Python's `ConnectionError`, `TimeoutError` and `OSError` are **transport** errors.
+3. A **transport** error by its text: any other client error whose head holds one of the phrases `Connection
+   Error`, `interrupted by user`, `lease expired`, `transaction already rolled back`, `Request failed`, `Could
+   not connect`, `Connection already closed`, `No open result set`, `connection … closed`, `Service
+   Unavailable`, `Bad Gateway`, `Gateway Timeout` (whole words, any case), or the gRPC codes `UNAVAILABLE` and
+   `DEADLINE_EXCEEDED` (whole words, capitals only). The phrases are needed because MotherDuck reports a server
+   interrupt in a transaction as `TransactionException`, not as a connection error. An `IOException` or
+   `HTTPException` is a transport error by this rule only: a file that does not exist is an `IOException` too.
+4. A **conflict**: any other client error whose head says `Conflict on …`, `write-write conflict` or
+   `Transaction conflict` (DDL on a table while another transaction writes it).
+5. Everything else that a statement raises is `md.StatementError` before `COMMIT` was sent, and `CommitUnknown`
    from `COMMIT` on. Inside a lane transaction the transaction was rolled back. A statement in autocommit was
    refused as a whole. An exception of the caller's own code inside a block is no error of a statement: it is
    passed on unchanged after the roll-back.
+
+What the fix round changed, from the second review (seeded tests in `test_errors.py` and `test_fix_round.py`,
+the texts in `tests/destination/data/misleading_texts.json`):
+
+- **F1.** `Transaction conflict: attempting to insert into/update table … altered by a different transaction`
+  was a `StatementError` (8 of 40 two-lane shapes: `ADD COLUMN`, `ALTER TYPE`, `DROP` and the swap of SPEC 3.2
+  on one lane while another lane writes; 7 of the 8 succeed when run again). The stream counts a
+  `StatementError` as a failure of the table, so tables were quarantined for nothing. It is `Conflict` now,
+  also as the answer of `COMMIT` (`Failed to commit: … Transaction conflict:`). After a `DROP` the next attempt
+  meets `CatalogException`, a `StatementError`
+  (`test_fix_round.py::test_ddl_on_one_lane_while_another_lane_writes_is_a_conflict_and_runs_again`, also on
+  MotherDuck).
+- **F2.** The transport rule was case-insensitive and had no word boundaries:
+  `Catalog Error: Table with name stock_unavailable does not exist!` was `ConnectionLost` and was retried for
+  ever; 48 of 168 MotherDuck texts of the second review were sorted wrongly, all of them `CatalogException`
+  and `InvalidInputException`. Now the programming family is decided by its class and the gRPC codes count in
+  capitals as whole words; all 168 texts are seeded tests
+  (`test_errors.py::test_every_misleading_text_that_motherduck_gave_is_refused_not_retried`; the 168 statements
+  locally and through the layer: `test_errors.py::test_the_misleading_statements_on_local_duckdb_are_refused_not_retried`,
+  `test_fix_round.py::test_the_misleading_statements_through_the_layer_are_refused`, also on MotherDuck).
+- **F3.** `IOException` was a transport error by its class: a missing file gave `ConnectionLost` 5 of 5 times
+  with a new connection each time, and an autocommit `INSERT` from it `CommitUnknown` with nothing applied. Now
+  an IO or HTTP error is a transport error only when a transport phrase decides
+  (`test_fix_round.py::test_a_missing_file_is_refused_and_not_a_lost_connection`, also on MotherDuck).
 
 **`md.StatementError(where, error_class, statement)`** is a `DestinationError`. Its message is
 `<where>: the destination refused a statement (<error_class> in <statement>)`, for example
@@ -525,17 +673,18 @@ table in `test_errors.py::test_how_an_exception_is_sorted`. The review of this p
 to it. Every text that MotherDuck gave in the runs of this package has its phrase in the head
 (`test_errors.py::test_no_text_that_motherduck_gave_has_its_phrase_only_inside_a_quoted_value`).
 
-Limit of the head rule: a value that the client repeats **without** quotation marks, in an error that is not
-about data, is part of the head. `Catalog Error: Table with name lease expired does not exist!` is sorted as a
-transport error (`test_errors.py::test_the_known_limit_of_the_head_rule`). The caller then runs the transaction
-again and meets the same error. It shows as a loop of retries that the caller's limit ends, not as wrong data.
+Limit of the head rule: a value that the client repeats **without** quotation marks, in an error that is
+neither about data nor of the programming family, is part of the head and can decide. No such text was seen; the
+catalog and binder errors, which repeat names without quotation marks, are decided by their class since the fix
+round (`test_errors.py::test_the_known_limit_of_the_head_rule`). The caller would run the transaction again and
+meet the same error: a loop of retries that the caller's limit ends, not wrong data.
 
 | Where | Transport error | Conflict | Other error | Deadline |
 |---|---|---|---|---|
 | connect | `ConnectionLost` after the last attempt | | every other error of the client is `ConnectionLost` too | `DeadlineExceeded` |
 | the interrupt of an old connection id | `ConnectionLost`; tried again at the next call | | `StatementError`, once; the id is dropped | `DeadlineExceeded`; tried again at the next call |
-| registration (one insert in autocommit) | `ConnectionLost`, also when its outcome is unknown | `Conflict` | `StatementError` | `DeadlineExceeded` |
-| registration inserted no row | `FenceLost` | | | |
+| registration (a transaction of its own, section 2.3) | `ConnectionLost`, also when the outcome of its `COMMIT` is unknown | `Conflict` (a take-over is open, or committed after it began) | `StatementError` | `DeadlineExceeded` |
+| registration: the fence row holds another epoch | `FenceLost` | | | |
 | `BEGIN`, a statement | `ConnectionLost`; the session is dropped | `Conflict` after roll-back | `StatementError` after roll-back | `DeadlineExceeded` |
 | the fence statement | `ConnectionLost` | `FenceLost` if the fence row holds another epoch, else `Conflict` | `StatementError` after roll-back | `DeadlineExceeded` |
 | the fence statement changed no row | `FenceLost` after roll-back | | | |
@@ -997,8 +1146,8 @@ the test that holds it. Tests without a file name are in `tests/destination/test
 
 15. **A connection that is not a lane registers under a lane name.** C4 speaks of "every connection of a lane".
     The heartbeat connection of package L writes for an epoch too, so it calls
-    `registry.register(conn, <a lane name>, epoch)` itself
-    (`test_a_connection_that_is_not_a_lane_registers_under_a_lane_name`).
+    `registry.register(conn, "control", epoch, retry_conflict=True)` itself
+    (`test_a_connection_that_is_not_a_lane_registers_under_a_lane_name`; section 2.3).
 16. **`md.interrupt_earlier(conn, epoch)`** means the epochs below `epoch`. It leaves the caller's own
     connection out and returns `(listed, interrupted)` (`test_interrupt_earlier_and_cleanup`).
 17. **`registry.cleanup(conn_or_tx, epoch)`** deletes the rows of epochs below `epoch - 1`, as design 4 says
@@ -1071,14 +1220,35 @@ the test that holds it. Tests without a file name are in `tests/destination/test
 33. **Scratch schemas of apply.** `check_sql` does not take a statement on `_cdc_apply_<random>` for one on the
     leader tables, and still refuses the same statements on `_cdc` (section 2.1). The check of the leader tables and the migrations
     never look outside `_cdc` (section 2.4).
-34. **The rows of one state machine are created from one lane.** C5 does not say what happens when two
-    transactions create one key. Built: nothing prevents it on two lanes; the damage is seen at the next use of
-    the key (section 2.5). A unique constraint or a row that both creators write would prevent it; that is a
-    change of the design and a question for the coordinator (section 14.2).
+34. **Who creates the keys of a machine** (decided by the coordinator in the fix round, item 3). C5 did not say
+    what happens when two transactions create one key; on two lanes both committed. Built:
+    `Machine(creators=(lane, …) | state.FRESH_IDS)`, required, and `create` refuses any other lane with
+    `LaneMisuse`; a child row is created together with a transition of its parent row (section 2.5).
 35. **Log lines of alerts and state transitions carry `committed: False`** (sections 2.5 and 2.6). C4 and C5 name
     no log lines.
 36. **The bound of a lane call that fails** is `rollback_deadline_s` plus the grace period after the failed
     step, for the whole clean-up (section 4). C4 says only that the roll-back has a short deadline.
+
+**Added with the fix round** (section 14.3; the coordinator's replacement sentences for C4 and C5 say the same)
+
+38. **`state.transition(tx, machine, key, from_state, to_state, cause, *, detail=None, values=None,
+    expect=None)`** and **`state.create(…, values=None, detail=None)`**; every row of `_cdc.transitions` carries
+    lane, epoch, `seq` and `detail` (section 2.5; item 1).
+39. **`state.transition`, `state.create` and `alerts.emit` take an `md.Transaction` only**; `state.read` takes a
+    connection too (item 12).
+40. **The registration is a transaction of its own** that writes the epoch of its lane's fence row (section
+    2.3; item 2). Its `COMMIT` passes `md.commit` and `md.commit_reply`. `registry.register` has
+    `retry_conflict` for the heartbeat connection.
+41. **`md.waiting_calls()` and `Settings.max_waiting_calls`** (section 4; items 6 and 15). The call past the cap
+    is `ConnectionLost` at once.
+42. **The deadline of the fence statement and of the registration is the statement deadline** (section 4;
+    item 15).
+43. **`_cdc.schema_version.applied`** keeps the name and hash of every applied step; a difference is
+    `SchemaError` (section 2.4; item 13).
+44. **`cdc_v2.testing.destination.AnotherRunLeads`**, a `TakeoverFailed`, for the loser of simultaneous
+    starters (section 2.7; item 14).
+45. **Marker `d_full`** for the rest of the full test matrices of this package (section 16; item 7). It is
+    registered in `tests/destination/conftest.py`, because this package does not edit `pyproject.toml`.
 
 **Added with the merge of the transform (package Y)**
 
@@ -1253,21 +1423,55 @@ was before the fix; it was run against a copy of that code.
 | Log lines before the commit | The lines `alert` and `state transition` read like facts and are written inside an open transaction that can still roll back | `committed: False` in the record (sections 2.5 and 2.6) | `test_review.py::test_a_log_line_written_inside_a_transaction_says_that_nothing_is_committed_yet` |
 | Two creators of one key | On two lanes both commit and the key has two rows | **not solved**; the damage is seen, and the rule is the callers' (contract note 34) | `test_state.py::test_two_creators_of_one_key_meet_only_through_the_fence_row_of_their_lane` |
 
-Open after the review:
+Open after the review, and what became of it in the fix round (section 14.3):
 
-- **Two creators of one key on two lanes** (above). It needs a decision about the design: a unique constraint
-  on the key, or a row that both creators write. A question for the coordinator.
-- **Threads of a retired connection on a network that answers nothing** (section 4). The client library gives
-  no way to end a call that waits for the server; no test of this package shows how long such a call waits.
-- **A connection of an old run that registers late.** The registering `INSERT` is refused once it sees another
-  epoch in the leader row (section 2.3). One that read the old epoch just before the take-over committed can
-  still land right after it. The call of `md.interrupt_earlier` after the take-over (finding 2) interrupts such
-  a connection only if its row is there when the call runs; one that lands later is not interrupted. Its
-  transaction cannot commit (the fence statement refuses it), but a frozen old run can then hold data rows until
-  MotherDuck ends its transaction, about 29 s (finding 2). It delays the new run; it cannot make a result
-  wrong. This window was not built in a test; it follows from the order of the statements.
-- **The limit of the head rule** (section 5) and the two texts that the `RETURNING` rule takes for a clause
-  (section 2.2).
+- **Two creators of one key on two lanes**: closed by `Machine.creators` (item 3).
+- **Threads of a retired connection on a network that answers nothing**: bounded and counted (items 6 and 15;
+  section 4). The client library still gives no way to end a call that waits for the server.
+- **A connection of an old run that registers late**: closed; the registration writes the fence row (item 2).
+- **The limit of the head rule** (section 5): narrowed to errors outside the data and programming families.
+  The two texts that the `RETURNING` rule takes for a clause (section 2.2) stay; they err toward no count.
+
+### 14.3 The fix round
+
+Two reviews of the delivery `9e389cc`: the coordinator's ("merge after named fixes", items 1 to 7) and a second
+reviewer's, who attacked the layer with programs of its own (items 8 to 16, its findings F0 to F8). Every item
+has a test that fails on the code of `9e389cc`: the new tests were run against that code (the tree of this
+commit with `src` of `9e389cc`), and every test named here failed there, except the permanent test of item 8,
+which passes on both (`fix_round_old_code.json`). The tests without a file are in `test_fix_round.py`.
+
+| Item | What was wrong | What was done | Tests |
+|---|---|---|---|
+| 1 | A row of `_cdc.transitions` had no place for the facts of a group and no order of commit | columns `lane`, `seq`, `detail`; `values`, `expect`, `detail` (section 2.5) | `test_a_transition_row_carries_its_lane_epoch_seq_and_detail`, `test_seq_has_no_gaps_and_equals_the_fence_counter_on_two_lanes_and_two_epochs`, `test_a_rolled_back_transaction_leaves_no_transition_row`, `test_a_run_that_bypasses_the_fence_shows_a_duplicate_seq`, `test_values_and_expect_in_the_same_conditional_update` |
+| 2 | The registration read `_cdc.leader` and wrote only `_cdc.connections`: one that read the old epoch could commit after the take-over | a transaction that writes the lane's fence row (section 2.3); the heartbeat under `control` with `retry_conflict` | `test_a_registration_while_a_take_over_is_open_does_not_commit`, `test_a_registration_frozen_between_its_check_and_its_commit_and_a_take_over_in_between`, `test_a_connection_that_is_not_a_lane_registers_under_control_and_retries_a_conflict` |
+| 3 | Nothing said who creates the keys of a machine | `Machine.creators` (section 2.5) | `test_state.py::test_a_key_is_created_only_by_the_lanes_that_the_machine_names`, `test_state.py::test_a_child_row_created_from_two_lanes_is_created_with_a_transition_of_its_parent`, `test_state.py::test_a_wrong_declaration_is_refused` |
+| 4 | Section 15 said "do not retry `StatementError`", against the stream's rule for a failed table | the sentence of section 15 | |
+| 5 | The evidence files named a command that had not run and no commit | each result names its command and commit (`conftest.run_command`, `run_commit`); one recorded run per MotherDuck file (section 16) | |
+| 6 | The threads of a retired connection could not be counted from outside | `md.waiting_calls()` (section 4) | with item 15 |
+| 7 | The full matrices made the default run slow | marker `d_full` (section 16) | |
+| 8 (F0) | In 1 of 30 runs a take-over at `stream.fenced` returned and the old empty block then reported a successful `COMMIT` | a campaign that tells a breach from an OK that committed nothing (section 14.4); a permanent test | `test_a_take_over_at_every_point_of_a_lane_transaction_keeps_the_fence`, `test_md_fix_round.py::test_a_take_over_at_every_point_of_a_lane_transaction_on_motherduck` |
+| 9 (F1) | `Transaction conflict: …` was `StatementError` | `Conflict` (section 5) | `test_errors.py::test_every_transaction_conflict_text_that_motherduck_gave_is_a_conflict`, `test_ddl_on_one_lane_while_another_lane_writes_is_a_conflict_and_runs_again` |
+| 10 (F2) | Transport words inside other errors (48 of 168 texts) | the programming family by class; gRPC codes in capitals, whole words (section 5) | `test_errors.py::test_every_misleading_text_that_motherduck_gave_is_refused_not_retried`, `test_errors.py::test_the_misleading_statements_on_local_duckdb_are_refused_not_retried`, `test_the_misleading_statements_through_the_layer_are_refused` |
+| 11 (F3) | `IOException` was transport by its class | transport only by a phrase (section 5) | `test_a_missing_file_is_refused_and_not_a_lost_connection` |
+| 12 (F4) | The state module accepted a plain `Connection` | `LaneMisuse` (section 2.5) | `test_the_state_module_and_alerts_write_only_inside_a_lane_transaction` |
+| 13 (F5) | Migrations compared only the last step's name | the name and hash of every step (section 2.4) | `test_a_changed_or_renamed_applied_step_refuses_to_start` |
+| 14 (F6) | The stand-in take-over named three leaders | `AnotherRunLeads` (section 2.7) | `test_three_simultaneous_starters_have_exactly_one_leader` |
+| 15 (F7) | Threads grew without a cap on a black-holed path; the counters undercounted; the fence statement and the registration waited for the block's deadline | counted, capped, the statement deadline (section 4) | `test_the_calls_that_were_given_up_are_counted_and_capped_per_connection`, `test_the_fence_statement_and_the_registration_wait_the_statement_deadline_not_the_blocks`, `test_md_fix_round.py::test_a_black_holed_path_bounds_every_call_and_the_calls_left_waiting` |
+| 16 (F8) | `RETURNING b AS "Count"` with text was `StatementError` | never read as a count (section 2.2) | `test_a_returning_column_named_count_that_holds_text_is_no_count` |
+
+Changes that the fix round made to tests of the first delivery: the tests that counted the statements of a
+lane's first transaction now count the registration as `BEGIN`, `INSERT`, `UPDATE` and `COMMIT`
+(`test_lane.py::test_an_unclassified_error_after_commit_was_sent_is_commit_unknown`, the lost-connection matrix,
+`test_alerts.py::test_emit_now_passes_on_what_it_cannot_decide`,
+`test_review.py::test_registration_writes_the_id_of_the_connection_that_runs_it`, and in
+`test_md_procs.py` the slow commit of `takeover_case`, which now skips the registration's `COMMIT`); the test of
+two creators on two lanes became the two tests of item 3; the known limit of the head rule moved to a class
+outside the programming family; `InvalidInputException("Connection already closed")`, which no client path
+raises (a closed connection is `ConnectionException`), is no longer sorted as transport.
+
+Not this package's, for information (the second reviewer's E1): a swap (`DROP` and rename) on one lane and a
+committed `INSERT` of another lane into the dropped table both commit, and the insert is lost with the table.
+A DDL that drops a table does not conflict with a committed write of another lane to it (section 15).
 
 ## 15. What the callers must know
 
@@ -1288,10 +1492,25 @@ For packages A, L, S, V, B and the integrator. Each line is backed by the sectio
 - `Conflict` can come again. After an interrupt the row is free after about 1 s; without one, after about 29 s
   (sections 7 and 8.3). Try again with a pause and a limit.
 - A statement that the destination refuses (a conversion error, a constraint error, a name that does not
-  exist, text that does not parse) raises `md.StatementError`, a `DestinationError`. The transaction was rolled
-  back. Running it again gives the same answer, so do not put it into a retry loop together with `Conflict` and
-  `ConnectionLost`. Read `error_class` and `statement`; both are safe to log and to put into an alert. The
-  client's text is not available, on purpose (section 5; SPEC 8.3).
+  exist, text that does not parse, a file that does not exist) raises `md.StatementError`, a
+  `DestinationError`. The transaction was rolled back. Never put it into the transport retry loop with
+  `Conflict` and `ConnectionLost`; the stream counts it as a failure of the table, and runs the group again up
+  to `apply.max_table_attempts` before the table leaves the stream (design 3). Read `error_class` and
+  `statement`; both are safe to log and to put into an alert. The client's text is not available, on purpose
+  (section 5; SPEC 8.3).
+- `Conflict` includes DDL on a table that another transaction writes (`Transaction conflict: …`, section 5).
+  After it, read the table's schema again before the statements are built again: a column may have been added
+  or changed (the spike's question 4).
+- **A DDL that drops a table does not conflict with a committed write of another lane to it.** A swap (`DROP`
+  and rename, SPEC 3.2) on one lane and an `INSERT` of another lane into the old table, committed first, both
+  commit, and the inserted rows are lost with the dropped table (the second reviewer's E1). Packages B and S
+  need a rule for it (serialise the swap with the table's stream writes); the layer does not prevent it.
+- A block can fail before the caller's first statement: its connection's registration (section 2.3) gives
+  `FenceLost` after a take-over, `Conflict` while a take-over is open, `ConnectionLost` or `DeadlineExceeded` on
+  a bad network. Treat them as for any other step.
+- On a network that answers nothing, a connection gives up at most `max_waiting_calls` calls; after that every
+  call fails at once with `ConnectionLost` until one returns (section 4). Retry with a pause, as for any
+  `ConnectionLost`.
 - `tx.execute` returns a count only for `INSERT`, `UPDATE`, `DELETE` (and `TRUNCATE`) without `RETURNING`. It
   returns `None` for `MERGE`, `CREATE TABLE … AS`, `COPY` and for every statement with `RETURNING`; read the rows
   of `RETURNING` with `tx.fetchall`. `tx.execute_one` with `RETURNING` is `LaneMisuse` (section 2.2).
@@ -1303,7 +1522,13 @@ For packages A, L, S, V, B and the integrator. Each line is backed by the sectio
   reaches the other connections of the process to that database (finding 21).
 - Drop what a transaction created table by table, then the schema. `DROP SCHEMA … CASCADE` in that case ends as
   `CommitUnknown`, and nothing is committed (finding 20).
-- Create the rows of one state machine from one lane (section 2.5).
+- Declare who creates the rows of a machine (`creators`: lane names, or `state.FRESH_IDS` for fresh random
+  ids). A machine whose rows are created from several lanes creates each child row together with a transition
+  of its parent row, which every creator writes (section 2.5). Change a state only inside a lane transaction.
+- `state.transition(…, values=…, expect=…, detail=…)`: set the data of the row in the same `UPDATE`, put the
+  values the transaction read into `expect` (a changed value is `Conflict`, the run-again rule), and keep
+  `detail` to identifiers, positions, counts and durations. Order the rows of `_cdc.transitions` of a lane by
+  `seq`; `changed_at` is not the order of commit (section 2.5).
 - A log line `alert` or `state transition` with `committed: False` says what a transaction wrote, not what
   holds. The tables say what holds (sections 2.5 and 2.6).
 - A block whose deadline has passed gets `DeadlineExceeded` before `COMMIT` and commits nothing (section 4). A
@@ -1333,8 +1558,12 @@ For packages A, L, S, V, B and the integrator. Each line is backed by the sectio
 - Test the heartbeat statement and the leader statements against the take-over in every order, as
   `tests/destination/probes/probe_fence_columns.py` does for the fence row (section 6). This package tested only
   the fence row.
-- The heartbeat connection is no lane. Register it with `registry.register(conn, <a lane name>, epoch)` before
-  its first write (contract note 15).
+- The heartbeat connection is no lane. Register it with `registry.register(conn, "control", epoch,
+  retry_conflict=True)` before its first write and after every change of `conn.generation` (contract note 15;
+  section 2.3). Its registration can make an open control-lane transaction end with `Conflict`.
+- The take-over decides once from which epoch it takes over, and a loser exits when the leader row moved past
+  that epoch under another run's id (`AnotherRunLeads` in the stand-in, section 2.7). Copy that rule.
+- The supervisor (contract C11) reads `md.waiting_calls()` and ends the process past its bound (section 4).
 - `Connection.abort()` ends a call in flight from another thread (section 4).
 - The static tests read `src/cdc_v2` (section 12). There, a text that writes `_cdc.fence` outside `cdc_v2.md`
   is flagged by `test_only_the_layer_holds_the_fence_statement`, and a write of the state column of a
