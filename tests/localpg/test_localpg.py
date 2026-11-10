@@ -392,6 +392,26 @@ def test_version_dependent_settings_are_refused_with_a_message(cluster):
     assert cluster.node("replica")["overrides"] == {} and cluster.node("primary")["overrides"] == {}
 
 
+def test_restart_settings_unset_and_inherited_by_a_new_standby(cluster):
+    """`unset` of a restart-only setting restarts the nodes (it failed with a configuration error before), in an
+    order a standby accepts; `add-standby` inherits the upstream's standby-matched settings."""
+    lp("set", "all", "max_prepared_transactions=5")
+    p = lp("add-standby")
+    assert "standby2" in p.stdout
+    c = cluster.refresh()
+    assert c.q("standby2", "show max_prepared_transactions") == [("5",)]
+    assert c.node("standby2")["overrides"] == {"max_prepared_transactions": "5"}
+    p = lp("unset", "all", "max_prepared_transactions")
+    assert p.stdout.index("unset: primary") < p.stdout.index("unset: replica")      # lowering: primary first
+    for n in ("primary", "replica", "standby2"):
+        assert c.q(n, "show max_prepared_transactions") == [("0",)]
+    s = c.status()
+    assert s["all_running"] and all(n.get("replay_pause_state") in (None, "not paused") for n in s["nodes"])
+    p = lp("set", "all", "max_prepared_transactions=3")
+    assert p.stdout.index("set: replica") < p.stdout.index("set: primary")            # raising: standbys first
+    lp("reset")
+
+
 OTHER_BIN = {16: "/opt/homebrew/opt/postgresql@18/bin", 18: "/opt/homebrew/opt/postgresql@16/bin"}.get(PG_MAJOR)
 
 

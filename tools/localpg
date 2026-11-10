@@ -741,7 +741,9 @@ def create_standby(cfg, st, name, port, upstream):
     assert_own_port(cfg, port)
     upport = st["nodes"][upstream]["port"]
     slot = "cdc_v2_phys_" + name
-    st["nodes"][name] = {"port": port, "upstream": upstream, "slot": slot, "ready": False, "overrides": {}}
+    # a hot standby needs the STANDBY_MATCHED settings at least as high as its upstream: inherit its overrides
+    inherited = {k: v for k, v in st["nodes"][upstream].get("overrides", {}).items() if k in STANDBY_MATCHED}
+    st["nodes"][name] = {"port": port, "upstream": upstream, "slot": slot, "ready": False, "overrides": inherited}
     save_state(cfg, st)
     psql(cfg, upport, "select pg_create_physical_replication_slot({s}, true) where not exists "
                       "(select 1 from pg_replication_slots where slot_name = {s});".format(s=lit(slot)))
@@ -1008,12 +1010,24 @@ def apply_settings(cfg, st, names, keys):
         time.sleep(0.2)
         errs = psql_json(cfg, port, "select coalesce(json_agg(json_build_object('name', name, 'error', error)), "
                                     "'[]'::json) from pg_file_settings where error is not null;") or []
-        # "setting could not be applied" means: postmaster context, needs a restart
-        real = [e for e in errs if e["error"] != "setting could not be applied"]
+        # "setting could not be applied" means: postmaster context, needs a restart. A restart-only setting whose
+        # line was removed (`unset`) shows up as an error without a name: 'parameter "x" cannot be changed without
+        # restarting the server'.
+        restart_rx = re.compile(r'parameter "([^"]+)" cannot be changed without restarting the server')
+        needs = set()
+        real = []
+        for e in errs:
+            m = restart_rx.search(e["error"] or "")
+            if e["error"] == "setting could not be applied":
+                needs.add(e["name"])
+            elif m:
+                needs.add(m.group(1))
+            else:
+                real.append(e)
         if real:
             raise Fail("%s: configuration error: %s" % (name, "; ".join("%s: %s" % (e["name"] or "?", e["error"])
                                                                          for e in real)))
-        pending = sorted({e["name"] for e in errs if e["name"]} | set(filter(None, (psql(
+        pending = sorted({n for n in needs if n} | set(filter(None, (psql(
             cfg, port, "select string_agg(name, ',') from pg_settings where pending_restart;") or "").split(","))))
         pending = ",".join(pending)
         how = "reloaded"
@@ -1026,6 +1040,26 @@ def apply_settings(cfg, st, names, keys):
                            % ",".join(lit(k) for k in keys)) if keys else {}
         report.append("%s: %s %s" % (name, how, " ".join("%s=%s" % kv for kv in sorted(values.items()))))
     return report
+
+
+def matched_value_rises(cfg, st, names, key, new_value):
+    """Whether the new value of `key` (None: back to localpg's base value or the server default) is larger than the
+    value a running node of `names` has now."""
+    base = dict(BASE_SETTINGS).get(key)
+    for n in names:
+        if not postmaster_of(cfg, n):
+            continue
+        row = psql_json(cfg, st["nodes"][n]["port"], "select json_build_object('cur', setting, 'boot', boot_val) "
+                                                     "from pg_settings where name = %s;" % lit(key))
+        if not row:
+            continue
+        target = new_value if new_value is not None else (base if base is not None else row["boot"])
+        try:
+            if int(target) > int(row["cur"]):
+                return True
+        except (TypeError, ValueError):
+            continue
+    return False
 
 
 def cmd_set(cfg, args):
@@ -1059,6 +1093,11 @@ def cmd_set(cfg, args):
                     if unknown:
                         raise Fail("unknown setting(s): %s" % ", ".join(sorted(unknown)), EXIT_USAGE)
                 st["nodes"][n]["overrides"].update(changes)
+        # A standby refuses to run with a smaller value of a STANDBY_MATCHED setting than its primary: when such a
+        # value goes up, restart the standbys first; when it goes down, the primaries first.
+        raising = any(matched_value_rises(cfg, st, names, k, None if args.unset else changes[k])
+                      for k in set(keys) & STANDBY_MATCHED)
+        names = [n for n in ordered_nodes(cfg, st, standbys_first=raising) if n in names]
         save_state(cfg, st)
         for n in names:
             write_node_conf(cfg, st, n)

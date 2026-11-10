@@ -6,10 +6,10 @@ observation, the publication and replica identity, the slot and its facts, timel
 
 See docs/design/source.md.
 """
-from cdc_v2.pg import catalog, errors, heartbeat, publication, replica_identity, slot, timeline
+from cdc_v2.pg import catalog, errors, heartbeat, preflight, publication, replica_identity, slot, timeline
 from cdc_v2.pg.conn import PgConnection, SessionSettingsMismatch, connect
 from cdc_v2.pg.settings import (FIXED_SESSION_SETTINGS, NodeSettings, Password, SourceSettings, configure,
                                 configured)
 
-__all__ = ["catalog", "errors", "heartbeat", "publication", "replica_identity", "slot", "timeline", "connect", "PgConnection", "SessionSettingsMismatch", "NodeSettings", "Password", "SourceSettings",
+__all__ = ["catalog", "errors", "heartbeat", "preflight", "publication", "replica_identity", "slot", "timeline", "connect", "PgConnection", "SessionSettingsMismatch", "NodeSettings", "Password", "SourceSettings",
            "configure", "configured", "FIXED_SESSION_SETTINGS"]

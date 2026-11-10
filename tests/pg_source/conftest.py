@@ -209,6 +209,7 @@ def breakable() -> Cluster:
     c.ensure()
     yield c
     c.lp("reset")
+    c.load()                # new passwords (with the 16 binaries the main pair is this same home)
 
 
 class Scratch:

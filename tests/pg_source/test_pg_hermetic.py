@@ -321,6 +321,12 @@ def test_timeline_contains():
         timeline.contains(h, -1, 3)
 
 
+def test_parse_full_xid():
+    from cdc_v2.pg.preflight import parse_full_xid
+    assert parse_full_xid("0:745") == 745 and parse_full_xid("2:5") == (2 << 32) | 5
+    assert parse_full_xid("123") == 123 and parse_full_xid(None) is None
+
+
 # ----------------------------------------------------------------------------------------------- slot values
 
 def test_slot_column_lists_per_version():

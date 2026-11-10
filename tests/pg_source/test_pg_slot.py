@@ -39,6 +39,8 @@ def idle_primary(cluster, quiet_s=17, limit_s=180):
     """Wait until the primary is idle: its insert position has not moved for `quiet_s` seconds. Its background
     writer then logs no running-transactions record until new important WAL is written (it logs one at most every
     15 s and only after other WAL; autovacuum after earlier tests is such WAL)."""
+    # a checkpoint now, so that no timed checkpoint (which logs a running-transactions record) falls into the test
+    cluster.boot("primary", "checkpoint")
     end = time.monotonic() + limit_s
     last, since = None, time.monotonic()
     while time.monotonic() < end:
