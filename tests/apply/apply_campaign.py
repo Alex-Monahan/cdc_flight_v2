@@ -68,12 +68,17 @@ def shapes_evidence():
         "shapes": {k: sorted(v)[0] for k, v in sorted(seen.items())}})
 
 
-KINDS = ["keyed", "keyless", "catch_up", "rounds", "cut"]
+KINDS = ["keyed", "keyless", "catch_up", "rounds", "cut", "keyed_form"]
+#: keyed_form: composite keys with a part whose form can change (X1 of the second fix round)
+FORM_OPS = ["form_and_move"] * 4 + ["move_form", "move", "insert", "update", "delete", "swap_via_temp"]
 
 
 def run_one(kind, conn, seed, form, table):
     if kind == "keyed":
         return stream_scenario(conn, seed, keyed=True, form=form, table=table)
+    if kind == "keyed_form":
+        return stream_scenario(conn, seed, keyed=True, form=form, table=table, n_keys=2, ops=FORM_OPS,
+                               key_kinds=["double", "interval", "int", "double"])
     if kind == "keyless":
         return stream_scenario(conn, seed, keyed=False, form=form, table=table)
     if kind == "catch_up":

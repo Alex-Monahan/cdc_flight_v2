@@ -155,19 +155,20 @@ def run_case(case, conn, form="local", table="t"):
 
 def stream_scenario(conn, seed: int, keyed: bool, form: str = "local", table: str = "t", n_txn: Optional[int] = None,
                     max_ops: int = 5, one_tx: Optional[bool] = None, value_kinds=None, key_kinds=None,
-                    apply_fn=None):
+                    apply_fn=None, n_keys: Optional[int] = None, ops=None):
     """A random table and history; the history cut into change sets at random transaction boundaries and applied
     in stream mode, one transaction per change set or all in one. Returns a ledger entry; raises AssertionError
     when the destination differs from the source."""
     rng = random.Random(seed)
-    meta, kinds = random_meta(rng, keyed, rng.randint(1, 4), value_kinds=value_kinds, key_kinds=key_kinds)
+    meta, kinds = random_meta(rng, keyed, rng.randint(1, 4), value_kinds=value_kinds, key_kinds=key_kinds,
+                              n_keys=n_keys)
     src = (KeyedSource if keyed else KeylessSource)(meta, rng, kinds)
     src.seed_rows(rng.randint(0, 8))
     start = src.snapshot()
     n_txn = n_txn or rng.randint(1, 6)
     recs = []
     for _ in range(n_txn):
-        recs += src.ops_txn(rng.randint(1, max_ops))
+        recs += src.ops_txn(rng.randint(1, max_ops), **({"ops": ops} if ops else {}))
     target = Target(SCHEMA, table)
     create_table(conn, SCHEMA, table, meta, start)
     sets = split_by_txn(recs, [t for t in range(1, n_txn + 1) if rng.random() < 0.35])

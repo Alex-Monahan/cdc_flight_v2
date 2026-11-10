@@ -33,15 +33,24 @@ class Shapes:
 
     # -------------------------------------------------------------------------------------------- keyed
 
-    def _one_row(self, prefix: str) -> str:
-        """The destination holds exactly one row at the relation's key `prefix`<i> (evaluated on the table as
-        the statement starts)."""
-        return " AND (SELECT count(*) FROM %s AS t2 WHERE %s) = 1" % (self.T, key_join(self.meta, "t2", "n", prefix))
+    # Every check reads the table in a scope of its own (a derived table or an ANTI JOIN): a reference to the
+    # relation from inside a subquery over the table would bind to a destination column of the same name.
 
-    def _free_target(self) -> str:
+    def _counts(self, rel: str, prefix: str, outer: bool, extra: str = "") -> str:
+        """Per key `prefix`<i> of the relation: the destination rows there (`c`), as the statement starts."""
+        cols = ", ".join("m.%s%d" % (prefix, c.position) for c in self.meta.key_columns)
+        return "(SELECT %s%s, count(t2.%s) AS c FROM %s AS m %sJOIN %s AS t2 ON %s GROUP BY ALL)" % (
+            cols, extra, self.meta.key_columns[0].qname, rel, "LEFT " if outer else "", self.T,
+            key_join(self.meta, "t2", "m", prefix))
+
+    def _pjoin(self, left: str, right: str, prefix: str) -> str:
+        return " AND ".join("%s = %s" % (join_wrap("%s.%s%d" % (left, prefix, c.position), c.dtype),
+                                         join_wrap("%s.%s%d" % (right, prefix, c.position), c.dtype))
+                            for c in self.meta.key_columns)
+
+    def _free_target(self, alias: str = "n") -> str:
         """A target key that the source did not hold at the start (xp = 0) has no row."""
-        return " AND (n.xp = 1 OR NOT EXISTS (SELECT 1 FROM %s AS t3 WHERE %s))" % (
-            self.T, key_join(self.meta, "t3", "n", "x"))
+        return " ANTI JOIN %s AS t3 ON %s.xp = 0 AND %s" % (self.T, alias, key_join(self.meta, "t3", alias, "x"))
 
     def k1_delete(self, rel: str) -> str:
         """Stream (`per_key`): the rows of the relation's keys go only if every key holds p rows (p = 1: the
@@ -49,9 +58,9 @@ class Shapes:
         go, or, when no key has p = 1, all rows found go), whatever the sums of rows are."""
         cond = ""
         if self.per_key:
-            cond = (" AND (NOT EXISTS (SELECT 1 FROM {rel} AS n2 WHERE (SELECT count(*) FROM {T} AS t2 WHERE {j2}) "
-                    "<> n2.p) OR NOT EXISTS (SELECT 1 FROM {rel} AS n3 WHERE n3.p = 1))").format(
-                rel=rel, T=self.T, j2=key_join(self.meta, "t2", "n2", "x"))
+            cond = (" AND (NOT EXISTS (SELECT 1 FROM {cnt} AS q WHERE q.c <> q.p) "
+                    "OR NOT EXISTS (SELECT 1 FROM {rel} AS m3 WHERE m3.p = 1))").format(
+                cnt=self._counts(rel, "x", True, ", m.p"), rel=rel)
         return "DELETE FROM %s AS t USING %s AS n WHERE %s%s" % (self.T, rel, key_join(self.meta, "t", "n", "x"), cond)
 
     def _need(self, c: Column) -> str:
@@ -69,9 +78,13 @@ class Shapes:
     def k3_move(self, rel: str) -> str:
         cols = list(self.meta.key_columns) + self.mover_cols
         sets = ", ".join("%s = n.%s" % (c.qname, c.a) for c in cols)
-        return "UPDATE %s AS t SET %s FROM %s AS n WHERE %s%s%s" % (
-            self.T, sets, rel, key_join(self.meta, "t", "n", "rx"), self._one_row("rx") if self.per_key else "",
-            self._free_target() if self.new_keys else "")
+        src = rel
+        if self.per_key:
+            # each root alone at its key; with new_keys, each target that must be free is free
+            src = "(SELECT n.* FROM %s AS n JOIN %s AS q ON %s%s WHERE q.c = 1)" % (
+                rel, self._counts(rel, "rx", False), self._pjoin("n", "q", "rx"),
+                self._free_target() if self.new_keys else "")
+        return "UPDATE %s AS t SET %s FROM %s AS n WHERE %s" % (self.T, sets, src, key_join(self.meta, "t", "n", "rx"))
 
     def k4_sentinel_column(self, c: Column, rel: str) -> str:
         return "UPDATE %s AS t SET %s = %s FROM %s AS n WHERE %s%s AND %s" % (
@@ -88,8 +101,7 @@ class Shapes:
 
     def k6_insert(self, rel: str) -> str:
         cols = list(self.meta.columns)
-        free = (" WHERE NOT EXISTS (SELECT 1 FROM %s AS t WHERE %s)" % (self.T, key_join(self.meta, "t", "n", "x"))
-                if self.new_keys else "")
+        free = (" ANTI JOIN %s AS t ON %s" % (self.T, key_join(self.meta, "t", "n", "x")) if self.new_keys else "")
         return "INSERT INTO %s (%s) SELECT %s FROM %s AS n%s" % (self.T, ", ".join(c.qname for c in cols),
                                                                   ", ".join("n.%s" % c.a for c in cols), rel, free)
 
@@ -106,8 +118,7 @@ class Shapes:
         sel = ", ".join(("CASE WHEN n.h%d THEN n.%s ELSE t.%s END" % (c.position, c.a, c.qname))
                         if c.position in upos else "n.%s" % c.a for c in cols)
         return "INSERT INTO %s (%s) SELECT %s FROM %s AS n JOIN %s AS t ON t.rowid = n.rid%s" % (
-            self.T, ", ".join(c.qname for c in cols), sel, rel, self.T,
-            self._free_target().replace(" AND ", " WHERE ", 1) if self.new_keys else "")
+            self.T, ", ".join(c.qname for c in cols), sel, rel, self.T, self._free_target() if self.new_keys else "")
 
     def k8_delete_copied(self, rel: str) -> str:
         return "DELETE FROM %s WHERE rowid IN (SELECT rid FROM %s)" % (self.T, rel)

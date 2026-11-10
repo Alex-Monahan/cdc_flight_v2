@@ -537,8 +537,61 @@ class KeyedSource:
         self.delete(recs, b)
         self.move(recs, a, kb)
 
+    def _forms(self, i, lit):
+        """Other forms of key part i's literal: equal at the source, different exactly."""
+        c = self.keys[i]
+        return [l for l in SPECS[self.kinds[c.position]].keys if src_key_canon(l, c.type) == src_key_canon(lit, c.type)
+                and lit_canon(l, c.type) != lit_canon(lit, c.type)]
+
+    def _src_free(self, kt, besides=None):
+        ck = tuple(src_key_canon(l, c.type) for l, c in zip(kt, self.keys))
+        return all(self.kcanon(r) != ck for r in self.rows if r is not besides)
+
+    def form_and_move(self, recs):
+        """Second fix round, X1: a composite key whose one part changes only in form while another part changes
+        (a copy), next to a move of another row: onto the copy's old form afterwards, or away from the key that the
+        copy lands on before it; sometimes through a ring of three keys."""
+        if len(self.rows) < 2 or len(self.keys) < 2:
+            return
+        rows = list(self.rows)
+        self.rng.shuffle(rows)
+        for a in rows:
+            kt = tuple(a.vals[c.position] for c in self.keys)
+            for i in self.rng.sample(range(len(self.keys)), len(self.keys)):
+                alts = self._forms(i, kt[i])
+                if not alts:
+                    continue
+                others = [b for b in self.rows if b is not a]
+                # the form-only change second: a row b whose key is the copy's target moves away first
+                for b in others:
+                    kb = tuple(b.vals[c.position] for c in self.keys)
+                    if any(lit_canon(kb[i], self.keys[i].type) == lit_canon(l, self.keys[i].type) for l in alts) and \
+                            self.rng.random() < 0.5:
+                        tmp = self._free_key()
+                        if tmp is None:
+                            break
+                        self.move(recs, b, tmp)
+                        self.move(recs, a, kb)
+                        if self.rng.random() < 0.5 and self._src_free(kt):
+                            self.move(recs, b, kt)                       # and b onto a's old form: a ring
+                        return
+                # the form-only change first: a -> (other form of part i, another value of part j), then b -> kt
+                for j in self.rng.sample([j for j in range(len(self.keys)) if j != i], len(self.keys) - 1):
+                    pool = list(SPECS[self.kinds[self.keys[j].position]].keys)
+                    self.rng.shuffle(pool)
+                    for l2 in pool:
+                        nk = list(kt)
+                        nk[i], nk[j] = self.rng.choice(alts), l2
+                        nk = tuple(nk)
+                        if self._src_free(nk, besides=a) and self.kcanon({c.position: l for c, l in zip(self.keys, nk)}) \
+                                != self.kcanon(a):
+                            self.move(recs, a, nk)
+                            self.move(recs, self.rng.choice(others), kt)
+                            return
+        return
+
     OPS = ["insert", "insert", "update", "update", "update", "delete", "move", "move_same_key", "move_form",
-           "swap_via_temp", "rotate_via_temp", "chain", "temp_row", "delete_then_reuse"]
+           "swap_via_temp", "rotate_via_temp", "chain", "temp_row", "delete_then_reuse", "form_and_move"]
 
     def ops_txn(self, n_ops: int, ops=None) -> List[Rec]:
         self.txn += 1
