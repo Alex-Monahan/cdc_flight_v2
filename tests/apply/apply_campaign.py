@@ -160,7 +160,7 @@ def main():
         "command": "uv run python tests/apply/apply_campaign.py --target %s --seconds %d --start %d%s"
                    % (args.target, args.seconds, args.start, " --controls %d" % args.controls if args.controls else ""),
         "concurrent_load": os.environ.get("CDC_V2_CAMPAIGN_NOTE", "other build workers may have been running"),
-        "note": "the scenario of a seed is KINDS[seed % 5]; form relation when seed % 4 == 3; passing seeds are "
+        "note": "the scenario of a seed is KINDS[seed % 6]; form relation when seed % 4 == 3; passing seeds are "
                 "counted, not listed (repeat any with run_one)"}
     if args.controls:
         summary["negative_controls_examples_to_catch"] = controls(args.controls)

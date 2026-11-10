@@ -57,11 +57,11 @@
       "keyed": true,
       "mode": "stream",
       "ok": true,
-      "one_tx": true,
-      "records": 49,
+      "one_tx": false,
+      "records": 59,
       "seed": 4000012,
-      "sets": 4,
-      "statements": 132,
+      "sets": 5,
+      "statements": 165,
       "types": [
         "BLOB",
         "DATE"
@@ -84,12 +84,12 @@
       ]
     },
     {
-      "duplicates_removed": 0,
+      "duplicates_removed": 1,
       "form": "local",
       "loaded_rows": 4,
       "mode": "catch_up",
       "ok": true,
-      "records": 13,
+      "records": 19,
       "seed": 6000018,
       "snapshots": 3,
       "split": false,
@@ -135,12 +135,12 @@
     {
       "duplicates_removed": 0,
       "form": "local",
-      "loaded_rows": 7,
+      "loaded_rows": 8,
       "mode": "catch_up",
       "ok": true,
-      "records": 16,
+      "records": 6,
       "seed": 9000027,
-      "snapshots": 1,
+      "snapshots": 3,
       "split": false,
       "types": [
         "BLOB",
@@ -155,11 +155,11 @@
       "keyed": true,
       "mode": "stream",
       "ok": true,
-      "one_tx": true,
-      "records": 35,
+      "one_tx": false,
+      "records": 36,
       "seed": 10000030,
-      "sets": 4,
-      "statements": 10,
+      "sets": 3,
+      "statements": 6,
       "types": [
         "INTEGER",
         "INTEGER[]",
@@ -234,14 +234,14 @@
       ]
     },
     {
-      "duplicates_removed": 0,
+      "duplicates_removed": 1,
       "form": "local",
-      "loaded_rows": 3,
+      "loaded_rows": 6,
       "mode": "catch_up",
       "ok": true,
-      "records": 28,
+      "records": 17,
       "seed": 15000045,
-      "snapshots": 1,
+      "snapshots": 3,
       "split": false,
       "types": [
         "BOOLEAN",
@@ -286,15 +286,15 @@
       ]
     },
     {
-      "duplicates_removed": 1,
+      "duplicates_removed": 0,
       "form": "local",
-      "loaded_rows": 6,
+      "loaded_rows": 7,
       "mode": "catch_up",
       "ok": true,
-      "records": 42,
+      "records": 20,
       "seed": 18000054,
-      "snapshots": 3,
-      "split": true,
+      "snapshots": 1,
+      "split": false,
       "types": [
         "FLOAT",
         "TIMESTAMP"
@@ -333,14 +333,14 @@
       ]
     },
     {
-      "duplicates_removed": 0,
+      "duplicates_removed": 1,
       "form": "local",
-      "loaded_rows": 1,
+      "loaded_rows": 4,
       "mode": "catch_up",
       "ok": true,
-      "records": 4,
+      "records": 20,
       "seed": 21000063,
-      "snapshots": 3,
+      "snapshots": 2,
       "split": false,
       "types": [
         "DECIMAL(18,3)",
@@ -356,10 +356,10 @@
       "mode": "stream",
       "ok": true,
       "one_tx": false,
-      "records": 64,
+      "records": 66,
       "seed": 22000066,
-      "sets": 1,
-      "statements": 2,
+      "sets": 3,
+      "statements": 8,
       "types": [
         "STRUCT(a DOUBLE, \"b c\" VARCHAR)",
         "VARCHAR"
@@ -382,10 +382,10 @@
     {
       "duplicates_removed": 0,
       "form": "relation",
-      "loaded_rows": 1,
+      "loaded_rows": 2,
       "mode": "catch_up",
       "ok": true,
-      "records": 14,
+      "records": 7,
       "seed": 24000072,
       "snapshots": 1,
       "split": false,
@@ -406,7 +406,7 @@
       "records": 24,
       "seed": 25000075,
       "sets": 3,
-      "statements": 6,
+      "statements": 5,
       "types": [
         "INTEGER",
         "INTEGER[]",

@@ -1,6 +1,6 @@
 {
-  "code_version": "e59ca6bc175c50fbf581af08e92616acc1ec46e4",
-  "command": "uv run python tests/apply/apply_campaign.py --target local --seconds 600 --start 40000000 --controls 200",
+  "code_version": "23e4efe837ebe98973de1f6d1b83522845583840",
+  "command": "uv run python tests/apply/apply_campaign.py --target local --seconds 1200 --start 10000000 --controls 200",
   "concurrent_load": "other build workers may have been running",
   "failed_seeds": [],
   "failures": 0,
@@ -9,21 +9,22 @@
     "last_record_decides (keyed stream)": 1,
     "plain GROUP BY on values (keyless stream)": 10
   },
-  "note": "the scenario of a seed is KINDS[seed % 5]; form relation when seed % 4 == 3; passing seeds are counted, not listed (repeat any with run_one)",
-  "records": 131920,
-  "rounds_unresolved_rate": 0.0321,
+  "note": "the scenario of a seed is KINDS[seed % 6]; form relation when seed % 4 == 3; passing seeds are counted, not listed (repeat any with run_one)",
+  "records": 192121,
+  "rounds_unresolved_rate": 0.0301,
   "scenarios": {
-    "catch_up": 1279,
-    "cut": 1279,
-    "keyed": 1280,
-    "keyless": 1279,
-    "rounds": 1279
+    "catch_up": 1708,
+    "cut": 1709,
+    "keyed": 1708,
+    "keyed_form": 1708,
+    "keyless": 1708,
+    "rounds": 1708
   },
-  "seconds": 600.1,
+  "seconds": 1200.1,
   "seed_range": [
-    40000000,
-    40006395
+    10000000,
+    10010248
   ],
-  "seeds": 6396,
+  "seeds": 10249,
   "target": "local"
 }

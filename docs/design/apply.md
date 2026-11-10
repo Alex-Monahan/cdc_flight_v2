@@ -461,7 +461,7 @@ how many examples it took (`campaign_local.json`, `negative_controls_examples_to
 | `duckdb_semantics.json` | section 5, local and MotherDuck side by side |
 | `md_cases.json` | every named case on MotherDuck, both forms, with statements and seconds |
 | `md_property.json` | property examples on MotherDuck |
-| `campaign_local.json` | the campaign: summary, seed range, every failing seed, the negative controls, the code version |
+| `campaign_local.json` | the campaign: summary, seed range, every failing seed, the negative controls, the code version (second fix round: 10,249 seeds, 192,121 records, six kinds including `keyed_form`, 0 failures; the second reviewer's keyed stream program, unchanged, on seeds 1000-2835 and 200000-201686 plus its 15 refused seeds: 3,525 seeds, 0 bad) |
 | `check_new_keys_cost.json` | the cost of the stream start-state check (2.5) |
 | `shapes.json` | the SQL of every statement shape for a sample table |
 | `perf_md.json` | speed indications |
