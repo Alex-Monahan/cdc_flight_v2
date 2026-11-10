@@ -31,6 +31,35 @@ heartbeat. Contract: `docs/design/p3_plan.md` C0, C1, C7. Packages Y (transform)
   needs more (creating the publication, setting replica identity) is the setup role's, and the split is part of
   what you deliver.
 
+## Found since this task was written — build on it
+
+- **`tools/localpg` cannot start a pair with the Postgres 16 binaries.** It writes `sync_replication_slots`
+  (17+) for every node, and its status query reads slot columns that exist from 17 on. Repair the tool first:
+  settings, queries and the failover-slot commands depend on the server's version, and a command that needs 17
+  says so instead of failing in SQL. Run the tool's self-tests (`tests/localpg`, their own home and ports) with
+  the 16 binaries too (`CDC_V2_PG_BIN`), skipping only what 16 cannot do, and keep them green on 18. Update
+  `docs/localpg.md`. Commit this alone, early, and push it: packages E, V and T wait for it.
+- **Slot creation on a standby** (`docs/spike/local_streaming.md` section 1): unaided it took 0.95–8.1 s here,
+  and 0.7–0.9 s with `pg_log_standby_snapshot()` on the primary. The admin role of `docs/localpg.md` (the role
+  shaped like a managed provider's) was **refused** that function; only the bootstrap superuser could call it.
+  So `slot.create` must not depend on it: use it where the role may, and otherwise rely on what the server
+  logs by itself (say exactly what: a checkpoint, the background writer after other WAL and at which interval)
+  together with a write of your own. Bound and test both ways, and report which grant would be needed.
+- **The holder of the slot.** Debezium sets the application name of its replication connection to a fixed text,
+  so an engine instance cannot be told by a name. The engine will be recognised by the walsender's process id
+  together with its backend start time. `slot.facts` therefore returns the holder's `backend_start` with full
+  precision; show by test that the runtime role sees that row of `pg_stat_activity` for a walsender of the same
+  role, on a primary and on a standby, without `pg_read_all_stats`.
+- **Heartbeat.** Debezium's own heartbeat records do not advance when the WAL holds only changes of tables
+  outside the publication (measured by package E). The source-side heartbeat must therefore be something that
+  the publication carries or that the engine turns into a frame with a position (the engine frames logical
+  messages as `MESSAGE`; inside a transaction they count in the END record's `event_count`). Decide with that.
+  A black-holed replication connection is noticed neither by the engine nor by the driver; the pipeline will
+  notice it because a heartbeat it wrote does not come back. So `heartbeat.beat` returns what the stream needs
+  to recognise that write when it arrives (its position on the primary and a value unique to the write).
+- Package E's document (`docs/design/engine.md`) reaches `main` during your work. Merge `origin/main` when your
+  report is near, read its sections on HELLO, HEARTBEAT and MESSAGE frames, and name any disagreement.
+
 ## What to build (`src/cdc_v2/pg/`)
 
 ### 1. Connections

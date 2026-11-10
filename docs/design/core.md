@@ -42,10 +42,16 @@ them are treated as a crash: correctness never depends on a shutdown handler hav
 - Debezium re-sends whole transactions in commit order after a restart. A transaction whose commit LSN is ≤ the
   applied position is discarded as a whole; one whose commit LSN is greater is applied as a whole. No row-level
   position is needed for the stream, and the 32-bit transaction id is never used as a key.
-- The END record's `event_count` is compared with the number of change records received for that transaction
-  (which records Debezium counts is established by test in package E). A mismatch is a protocol error: the batch
-  is not committed and the stream component restarts. A mismatch at the same position after the configured number
-  of restarts takes the skip-and-backfill path of SPEC 4.3; it never restarts for ever.
+- The records of one transaction are found by their **order** in the stream: BEGIN, the changes and END are
+  contiguous. Debezium's transaction `id` is not a key: it is `<xid>:<the record's own LSN>` and differs from record
+  to record (`docs/spike/local_streaming.md` §4: equal in 0 of 1,222 transactions). A change record does not carry
+  its own transaction's commit end LSN (its `lsn_commit` is the previous transaction's); only END does. The commit
+  record's start LSN is not available from Debezium and is not needed.
+- The END record's `event_count` is compared with the number of change records received for that transaction (which
+  records Debezium counts is established by test in package E; against the server's own stream it was exact for
+  1,222 of 1,222 transactions), and each change's `total_order` with its place in the transaction. A mismatch is a
+  protocol error: the batch is not committed and the stream component restarts. A mismatch at the same position
+  after the configured number of restarts takes the skip-and-backfill path of SPEC 4.3; it never restarts for ever.
 - A change row that is stored (pending log, staging) is ordered by (commit position, `seq`). `seq` alone orders
   rows only inside one engine instance: it starts at 0 again with every engine start.
 - The applied position is stored in `_cdc.stream_state` (one row per slot) and is written in the same MotherDuck
@@ -88,6 +94,13 @@ Rules:
 - The engine acknowledges nothing on its own: `offset.flush.interval.ms=0`, memory offset store, and the consumer
   calls `markProcessed` only for END or heartbeat records at or below the durable position. The pipeline says
   "durable" only for a position whose commit it has seen return, or has read back as the stored applied position.
+- `offset.flush.interval.ms=0` together with `heartbeat.interval.ms` is **required**, not a tuning choice: with a
+  flush interval and no heartbeat, Debezium never confirms the last transaction before an idle period or a stop,
+  and every restart receives it again (`docs/spike/local_streaming.md` §6). Package E proves by test that the slot's
+  `confirmed_flush_lsn` reaches the last applied transaction within a bound while the source is idle.
+- Nothing inside a transaction can be confirmed. An engine start after a large transaction that is not yet
+  confirmed makes the server decode and spill it again before it sends anything (10M rows: 36 s and 2.6 GB on the
+  node that holds the slot, measured locally). This time is part of the recovery time of SPEC 5.2.
 - The commit deadline scales with the size of the group: `apply.commit_timeout_base` plus
   `apply.commit_timeout_per_million_rows` × rows. A commit has no progress signal, so the supervisor uses this
   deadline instead of the 120 s silence rule while a commit is in flight.
