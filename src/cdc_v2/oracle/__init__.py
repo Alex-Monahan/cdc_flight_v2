@@ -9,7 +9,7 @@ Equality is defined per type by the canonical forms in `canonical.py` (documente
 imports nothing from the pipeline.
 """
 from .canonical import RULES, FALLBACK, MdType, PgColumnType, parse_md_type, py_canon, rule_for
-from .compare import Destination, OracleConfig, OracleError, Result, Source, TableResult, compare
+from .comparison import Destination, OracleConfig, OracleError, Result, Source, TableResult, compare
 from .position import (PositionTimeout, applied_lsn_from_stream_state, format_lsn, parse_lsn, wait_for_applied)
 
 __all__ = ["RULES", "FALLBACK", "MdType", "PgColumnType", "parse_md_type", "py_canon", "rule_for", "Destination",

@@ -1,0 +1,59 @@
+{
+  "cases": [
+    {
+      "after_delete_insert": "False",
+      "after_update": "True",
+      "before": "True",
+      "case": "double -0 to 0",
+      "delete_insert_changed_representation": true,
+      "update_changed_representation": false,
+      "where": "local"
+    },
+    {
+      "after_delete_insert": "False",
+      "after_update": "True",
+      "before": "True",
+      "case": "real -0 to 0",
+      "delete_insert_changed_representation": true,
+      "update_changed_representation": false,
+      "where": "local"
+    },
+    {
+      "after_delete_insert": "0:30",
+      "after_update": "1:0",
+      "before": "1:0",
+      "case": "interval 1 month to 30 days",
+      "delete_insert_changed_representation": true,
+      "update_changed_representation": false,
+      "where": "local"
+    },
+    {
+      "after_delete_insert": "False",
+      "after_update": "True",
+      "before": "True",
+      "case": "double -0 to 0",
+      "delete_insert_changed_representation": true,
+      "update_changed_representation": false,
+      "where": "motherduck"
+    },
+    {
+      "after_delete_insert": "False",
+      "after_update": "True",
+      "before": "True",
+      "case": "real -0 to 0",
+      "delete_insert_changed_representation": true,
+      "update_changed_representation": false,
+      "where": "motherduck"
+    },
+    {
+      "after_delete_insert": "0:30",
+      "after_update": "1:0",
+      "before": "1:0",
+      "case": "interval 1 month to 30 days",
+      "delete_insert_changed_representation": true,
+      "update_changed_representation": false,
+      "where": "motherduck"
+    }
+  ],
+  "duckdb": "1.5.6"
+}
