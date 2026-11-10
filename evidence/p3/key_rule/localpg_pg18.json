@@ -1,5 +1,5 @@
 {
-  "command": "uv run pytest -m localpg tests/pg_source, with the environment variables CDC_V2_P_EVIDENCE set to 1, CDC_V2_P_EVIDENCE_DIR set to key_rule and CDC_V2_P_EVIDENCE_NAME set to this file name",
+  "command": "uv run pytest -m localpg tests/pg_source, with the environment variables CDC_V2_P_EVIDENCE set to 1, CDC_V2_P_EVIDENCE_DIR set to key_rule, CDC_V2_P_EVIDENCE_NAME set to localpg_pg18.json",
   "machine_note": "shared 10-core laptop, up to three other workers running; indications only",
   "major": 18,
   "psycopg": "3.3.8",
@@ -7,12 +7,12 @@
     "bracket": {
       "primary": {
         "ddl": 300,
-        "observations": 131,
-        "observe_p50_s": 0.0041,
+        "observations": 102,
+        "observe_p50_s": 0.0083,
         "violations_lower": 0,
         "violations_upper": 0,
-        "wrong_bracket_observations": 131,
-        "wrong_bracket_violations_caught": 245
+        "wrong_bracket_observations": 102,
+        "wrong_bracket_violations_caught": 194
       },
       "primary_commit_waiting": {
         "after_release": {
@@ -28,16 +28,16 @@
       },
       "standby": {
         "ddl": 400,
-        "observations": 162,
-        "observe_p50_s": 0.0058,
+        "observations": 122,
+        "observe_p50_s": 0.0098,
         "violations_lower": 0,
         "violations_upper": 0,
-        "wrong_bracket_observations": 162,
-        "wrong_bracket_violations_caught": 298
+        "wrong_bracket_observations": 122,
+        "wrong_bracket_violations_caught": 235
       }
     },
     "deadlines": {
-      "statement_cancel_s": 0.516
+      "statement_cancel_s": 0.509
     },
     "errors": {
       "recovery_conflict": {
@@ -56,7 +56,7 @@
           0,
           0
         ],
-        "wal_bytes_per_write_upper_bound": 234.2,
+        "wal_bytes_per_write_upper_bound": 234.0,
         "writes": 200
       },
       "decoded": {
@@ -64,9 +64,9 @@
         "commit_in_bracket": true,
         "recognised_by_marker_and_xid": true,
         "standby_lag": {
-          "bytes_behind": 136,
+          "bytes_behind": 72,
           "replay_lag_s_visible_to_runtime": false,
-          "seconds_since_replayed_commit": 0.019529
+          "seconds_since_replayed_commit": 0.028585
         }
       },
       "own_end_equals_position": {
@@ -306,6 +306,60 @@
           "primary_key_deferrable": true
         }
       },
+      "identity_sees_every_change_of_the_key_facts": {
+        "DEFAULT to USING INDEX": {
+          "after": [
+            "index",
+            [
+              1
+            ]
+          ],
+          "before": [
+            "default",
+            null
+          ]
+        },
+        "FULL to DEFAULT": {
+          "after": [
+            "default",
+            null
+          ],
+          "before": [
+            "full",
+            null
+          ]
+        },
+        "the index of USING INDEX replaced": {
+          "after": [
+            "index",
+            [
+              2
+            ]
+          ],
+          "before": [
+            "index",
+            [
+              1
+            ]
+          ]
+        },
+        "the key made deferrable": {
+          "key_attnums": [
+            [
+              1
+            ],
+            []
+          ],
+          "pk_deferrable": [
+            false,
+            true
+          ]
+        }
+      },
+      "name_rule_refuses_and_reports": {
+        "published_by_other_means_reported": true,
+        "refusal": "table name contains a double quote: stock Debezium cannot stream it"
+      },
       "what_postgres_lets_a_key_be": {
         "catalog": {
           "def_def": {
@@ -419,56 +473,56 @@
     "observe_cost": {
       "1000_tables_30_columns": {
         "primary": {
-          "observe_max_s": 0.0937,
-          "observe_p50_s": 0.0749,
+          "observe_max_s": 0.098,
+          "observe_p50_s": 0.0771,
           "tables": 1000,
-          "tables_full_read_s": 0.131
+          "tables_full_read_s": 0.122
         },
         "replica": {
-          "observe_max_s": 0.0975,
-          "observe_p50_s": 0.0767,
+          "observe_max_s": 0.0985,
+          "observe_p50_s": 0.0782,
           "tables": 1000,
-          "tables_full_read_s": 0.104
+          "tables_full_read_s": 0.121
         }
       }
     },
     "preflight": {
       "runtime_role_pg18": {
         "primary": {
-          "checkpoint_next_xid": 30210,
+          "checkpoint_next_xid": 32389,
           "pg_control_checkpoint_callable": true,
           "problems": []
         },
         "replica": {
-          "checkpoint_next_xid": 30210,
+          "checkpoint_next_xid": 32389,
           "pg_control_checkpoint_callable": true,
           "problems": []
         }
       }
     },
     "proxy": {
-      "blackhole_connect_deadline_1.5_s": 2.01,
+      "blackhole_connect_deadline_1.5_s": 2.002,
       "blackhole_idle_in_transaction": {
-        "client_deadline_1.0_s": 1.516,
-        "server_session_gone_after_s": 2.097
+        "client_deadline_1.0_s": 1.511,
+        "server_session_gone_after_s": 2.07
       },
       "blackhole_statement_deadline_1.0_s": 1.508,
       "delay_0.2_each_way_statement_s": 0.405,
-      "refused_connect_s": 0.002,
+      "refused_connect_s": 0.001,
       "reset_noticed_s": 0.0
     },
     "publication": {
       "add_under_writers": {
         "all_of_them_decoded": true,
-        "before_next_xid": 426,
+        "before_next_xid": 415,
         "before_next_xid_decoded": 0,
-        "committed_writer_transactions": 864,
+        "committed_writer_transactions": 834,
         "open_across_change_note": "-1 was written before the ALTER PUBLICATION, -2 after; both were decoded",
         "open_across_change_rows_decoded": [
           "-1",
           "-2"
         ],
-        "with_xid_ge_next_xid": 438
+        "with_xid_ge_next_xid": 419
       }
     },
     "session_settings": {
@@ -499,9 +553,9 @@
           "nudge_errors": [],
           "nudge_method": null,
           "nudges": 0,
-          "waited_s": 4.0
+          "waited_s": 4.01
         },
-        "returned_after_s": 4.02
+        "returned_after_s": 4.03
       },
       "killed_client": {
         "ours": {
@@ -514,22 +568,22 @@
         }
       },
       "long_transaction": {
-        "after_commit_s": 10.67,
+        "after_commit_s": 10.71,
         "timed_out_report": {
           "creator_terminated": false,
           "leftover": false,
-          "next_xid": 32331,
+          "next_xid": 34499,
           "nudge_errors": [],
           "nudge_method": "write",
           "nudges": 10,
           "oldest_prepared_at": null,
-          "oldest_running_xid": 32331,
+          "oldest_running_xid": 34499,
           "prepared_transactions": 0,
-          "waited_s": 6.0
+          "waited_s": 6.01
         }
       },
       "prepared_transaction": {
-        "after_commit_prepared_s": 8.16,
+        "after_commit_prepared_s": 8.09,
         "timed_out_report": {
           "creator_terminated": false,
           "leftover": false,
@@ -537,18 +591,18 @@
           "nudge_errors": [],
           "nudge_method": "write",
           "nudges": 10,
-          "oldest_prepared_at": "2026-11-10T12:58:56.747858+00:00",
+          "oldest_prepared_at": "2026-11-10T13:51:52.284309+00:00",
           "oldest_running_xid": 759,
           "prepared_transactions": 1,
           "waited_s": 6.01
         }
       },
-      "standby_snapshot_granted_after_idle_s": 0.04,
-      "standby_write_nudge_after_idle_s": 3.85
+      "standby_snapshot_granted_after_idle_s": 0.02,
+      "standby_write_nudge_after_idle_s": 4.07
     },
     "slot_facts": {
       "advance_seen": {
-        "confirmed_flush_moved_bytes": 13136,
+        "confirmed_flush_moved_bytes": 12992,
         "timeline_source_standby": "checkpoint"
       },
       "holder_visible_to_runtime_primary": {
@@ -570,23 +624,23 @@
       "drop_and_recreate": {
         "catalog_xmin": {
           "differs": true,
-          "original": 32370,
-          "recreated": 32372
+          "original": 34537,
+          "recreated": 34538
         },
         "confirmed_flush_lsn": {
           "differs": true,
-          "original": 567346272,
-          "recreated": 567346456
+          "original": 618617888,
+          "recreated": 618624416
         },
         "inactive_since": {
           "differs": true,
-          "original": "2026-11-10T12:57:23.777679+00:00",
-          "recreated": "2026-11-10T12:57:25.740276+00:00"
+          "original": "2026-11-10T13:50:21.959118+00:00",
+          "recreated": "2026-11-10T13:50:42.716860+00:00"
         },
         "restart_lsn": {
           "differs": true,
-          "original": 567320968,
-          "recreated": 567346272
+          "original": 618608640,
+          "recreated": 618617888
         },
         "safe_wal_size": {
           "differs": false,

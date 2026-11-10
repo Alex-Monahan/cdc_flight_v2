@@ -1,5 +1,5 @@
 {
-  "command": "uv run pytest -m localpg tests/pg_source, with the environment variables CDC_V2_P_PG_MAJOR set to 16, CDC_V2_P_EVIDENCE set to 1, CDC_V2_P_EVIDENCE_DIR set to key_rule and CDC_V2_P_EVIDENCE_NAME set to this file name",
+  "command": "uv run pytest -m localpg tests/pg_source, with the environment variables CDC_V2_P_PG_MAJOR set to 16, CDC_V2_P_EVIDENCE set to 1, CDC_V2_P_EVIDENCE_DIR set to key_rule, CDC_V2_P_EVIDENCE_NAME set to localpg_pg16.json",
   "machine_note": "shared 10-core laptop, up to three other workers running; indications only",
   "major": 16,
   "psycopg": "3.3.8",
@@ -7,37 +7,37 @@
     "bracket": {
       "primary": {
         "ddl": 300,
-        "observations": 100,
-        "observe_p50_s": 0.0093,
+        "observations": 95,
+        "observe_p50_s": 0.0129,
         "violations_lower": 0,
         "violations_upper": 0,
-        "wrong_bracket_observations": 100,
-        "wrong_bracket_violations_caught": 183
+        "wrong_bracket_observations": 95,
+        "wrong_bracket_violations_caught": 178
       },
       "primary_commit_waiting": {
         "after_release": {
-          "lower": "0/55FA440",
+          "lower": "0/55F4CA0",
           "table_visible": true,
           "visible_xid": true
         },
-        "commit_record_end": "0/55FA440",
-        "observation_lower": "0/55FA440",
-        "observation_upper": "0/55FA440",
+        "commit_record_end": "0/55F4CA0",
+        "observation_lower": "0/55F4CA0",
+        "observation_upper": "0/55F4CA0",
         "table_visible": false,
         "visible_xid": false
       },
       "standby": {
         "ddl": 400,
-        "observations": 121,
-        "observe_p50_s": 0.0129,
+        "observations": 111,
+        "observe_p50_s": 0.016,
         "violations_lower": 0,
         "violations_upper": 0,
-        "wrong_bracket_observations": 121,
-        "wrong_bracket_violations_caught": 227
+        "wrong_bracket_observations": 111,
+        "wrong_bracket_violations_caught": 205
       }
     },
     "deadlines": {
-      "statement_cancel_s": 0.506
+      "statement_cancel_s": 0.516
     },
     "errors": {
       "recovery_conflict": {
@@ -66,7 +66,7 @@
         "standby_lag": {
           "bytes_behind": 304,
           "replay_lag_s_visible_to_runtime": false,
-          "seconds_since_replayed_commit": 0.022404
+          "seconds_since_replayed_commit": 0.021444
         }
       },
       "own_end_equals_position": {
@@ -295,6 +295,60 @@
           "primary_key_deferrable": true
         }
       },
+      "identity_sees_every_change_of_the_key_facts": {
+        "DEFAULT to USING INDEX": {
+          "after": [
+            "index",
+            [
+              1
+            ]
+          ],
+          "before": [
+            "default",
+            null
+          ]
+        },
+        "FULL to DEFAULT": {
+          "after": [
+            "default",
+            null
+          ],
+          "before": [
+            "full",
+            null
+          ]
+        },
+        "the index of USING INDEX replaced": {
+          "after": [
+            "index",
+            [
+              2
+            ]
+          ],
+          "before": [
+            "index",
+            [
+              1
+            ]
+          ]
+        },
+        "the key made deferrable": {
+          "key_attnums": [
+            [
+              1
+            ],
+            []
+          ],
+          "pk_deferrable": [
+            false,
+            true
+          ]
+        }
+      },
+      "name_rule_refuses_and_reports": {
+        "published_by_other_means_reported": true,
+        "refusal": "table name contains a double quote: stock Debezium cannot stream it"
+      },
       "what_postgres_lets_a_key_be": {
         "catalog": {
           "def_def": {
@@ -408,16 +462,16 @@
     "observe_cost": {
       "1000_tables_30_columns": {
         "primary": {
-          "observe_max_s": 0.1102,
-          "observe_p50_s": 0.0788,
+          "observe_max_s": 0.117,
+          "observe_p50_s": 0.0815,
           "tables": 1000,
-          "tables_full_read_s": 0.117
+          "tables_full_read_s": 0.115
         },
         "replica": {
-          "observe_max_s": 0.1085,
-          "observe_p50_s": 0.0874,
+          "observe_max_s": 0.104,
+          "observe_p50_s": 0.0841,
           "tables": 1000,
-          "tables_full_read_s": 0.116
+          "tables_full_read_s": 0.117
         }
       }
     },
@@ -436,28 +490,28 @@
       }
     },
     "proxy": {
-      "blackhole_connect_deadline_1.5_s": 2.007,
+      "blackhole_connect_deadline_1.5_s": 2.006,
       "blackhole_idle_in_transaction": {
-        "client_deadline_1.0_s": 1.512,
-        "server_session_gone_after_s": 2.084
+        "client_deadline_1.0_s": 1.521,
+        "server_session_gone_after_s": 2.105
       },
-      "blackhole_statement_deadline_1.0_s": 1.508,
+      "blackhole_statement_deadline_1.0_s": 1.521,
       "delay_0.2_each_way_statement_s": 0.405,
       "refused_connect_s": 0.002,
-      "reset_noticed_s": 0.001
+      "reset_noticed_s": 0.0
     },
     "publication": {
       "add_under_writers": {
         "all_of_them_decoded": true,
-        "before_next_xid": 384,
+        "before_next_xid": 414,
         "before_next_xid_decoded": 0,
-        "committed_writer_transactions": 738,
+        "committed_writer_transactions": 839,
         "open_across_change_note": "-1 was written before the ALTER PUBLICATION, -2 after; both were decoded",
         "open_across_change_rows_decoded": [
           "-1",
           "-2"
         ],
-        "with_xid_ge_next_xid": 354
+        "with_xid_ge_next_xid": 425
       }
     },
     "session_settings": {
@@ -488,9 +542,9 @@
           "nudge_errors": [],
           "nudge_method": null,
           "nudges": 0,
-          "waited_s": 4.01
+          "waited_s": 4.02
         },
-        "returned_after_s": 4.03
+        "returned_after_s": 4.04
       },
       "killed_client": {
         "ours": {
@@ -503,7 +557,7 @@
         }
       },
       "long_transaction": {
-        "after_commit_s": 17.52,
+        "after_commit_s": 7.05,
         "timed_out_report": {
           "creator_terminated": false,
           "leftover": false,
@@ -526,18 +580,18 @@
           "nudge_errors": [],
           "nudge_method": "write",
           "nudges": 10,
-          "oldest_prepared_at": "2026-11-10T13:09:14.348678+00:00",
+          "oldest_prepared_at": "2026-11-10T14:02:24.543024+00:00",
           "oldest_running_xid": 737,
           "prepared_transactions": 1,
-          "waited_s": 6.02
+          "waited_s": 6.01
         }
       },
-      "standby_snapshot_granted_after_idle_s": 0.03,
-      "standby_write_nudge_after_idle_s": 4.47
+      "standby_snapshot_granted_after_idle_s": 0.07,
+      "standby_write_nudge_after_idle_s": 4.06
     },
     "slot_facts": {
       "advance_seen": {
-        "confirmed_flush_moved_bytes": 13256,
+        "confirmed_flush_moved_bytes": 13320,
         "timeline_source_standby": "checkpoint"
       },
       "holder_visible_to_runtime_primary": {
@@ -560,12 +614,12 @@
         "catalog_xmin": {
           "differs": true,
           "original": 769,
-          "recreated": 770
+          "recreated": 771
         },
         "confirmed_flush_lsn": {
           "differs": true,
-          "original": 50749432,
-          "recreated": 50819072
+          "original": 50817288,
+          "recreated": 50819904
         },
         "inactive_since": {
           "differs": false,
@@ -574,8 +628,8 @@
         },
         "restart_lsn": {
           "differs": true,
-          "original": 50740376,
-          "recreated": 50749432
+          "original": 50741080,
+          "recreated": 50817288
         },
         "safe_wal_size": {
           "differs": false,
