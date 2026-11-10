@@ -1,0 +1,926 @@
+{
+  "spike": "leader",
+  "duckdb_client": "1.5.6",
+  "started_utc": "2026-11-10T02:31:46Z",
+  "note": "measured from a laptop over the public internet; performance numbers are indications only",
+  "part_a": {
+    "autocommit_update": {
+      "rounds": 1000,
+      "exactly_one_winner": 1000,
+      "bad_rounds": [],
+      "loser_outcomes": {
+        "zero_rows": 2633,
+        "error: TransactionException: TransactionContext Error: Conflict on update!": 367
+      },
+      "latency": {
+        "n": 4000,
+        "min": 0.07654905319213867,
+        "p50": 0.08988690376281738,
+        "p90": 0.18820500373840332,
+        "p99": 0.3489851951599121,
+        "max": 0.7885189056396484,
+        "mean": 0.12092863315343857
+      }
+    },
+    "txn_update": {
+      "rounds": 300,
+      "exactly_one_winner": 300,
+      "bad_rounds": [],
+      "loser_outcomes": {
+        "error: TransactionException: TransactionContext Error: Conflict on update!": 900
+      },
+      "latency": {
+        "n": 1200,
+        "min": 0.14551210403442383,
+        "p50": 0.31282830238342285,
+        "p90": 0.3526332378387451,
+        "p99": 0.41380786895751953,
+        "max": 0.6970417499542236,
+        "mean": 0.2913872649272283
+      }
+    },
+    "txn_read_then_update": {
+      "rounds": 300,
+      "exactly_one_winner": 300,
+      "bad_rounds": [],
+      "loser_outcomes": {
+        "error: TransactionException: TransactionContext Error: Conflict on update!": 900
+      },
+      "latency": {
+        "n": 1200,
+        "min": 0.21467375755310059,
+        "p50": 0.3458740711212158,
+        "p90": 0.42180705070495605,
+        "p99": 0.4535360336303711,
+        "max": 0.6095497608184814,
+        "mean": 0.34371815701325736
+      }
+    },
+    "insert_pk": {
+      "rounds": 300,
+      "exactly_one_winner": 300,
+      "bad_rounds": [],
+      "loser_outcomes": {
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 1\" violates primary key constraint.": 2,
+        "error: TransactionException: TransactionContext Error: Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key \"1\"": 1,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 2\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 3\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 4\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 5\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 6\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 7\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 8\" violates primary key constraint.": 2,
+        "error: TransactionException: TransactionContext Error: Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key \"8\"": 1,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 9\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 10\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 11\" violates primary key constraint.": 2,
+        "error: TransactionException: TransactionContext Error: Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key \"11\"": 1,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 12\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 13\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 14\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 15\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 16\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 17\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 18\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 19\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 20\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 21\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 22\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 23\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 24\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 25\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 26\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 27\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 28\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 29\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 30\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 31\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 32\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 33\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 34\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 35\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 36\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 37\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 38\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 39\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 40\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 41\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 42\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 43\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 44\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 45\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 46\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 47\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 48\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 49\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 50\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 51\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 52\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 53\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 54\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 55\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 56\" violates primary key constraint.": 3,
+        "error: TransactionException: TransactionContext Error: Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key \"57\"": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 58\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 59\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 60\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 61\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 62\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 63\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 64\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 65\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 66\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 67\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 68\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 69\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 70\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 71\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 72\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 73\" violates primary key constraint.": 3,
+        "error: TransactionException: TransactionContext Error: Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key \"74\"": 2,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 74\" violates primary key constraint.": 1,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 75\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 76\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 77\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 78\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 79\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 80\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 81\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 82\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 83\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 84\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 85\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 86\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 87\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 88\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 89\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 90\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 91\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 92\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 93\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 94\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 95\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 96\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 97\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 98\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 99\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 100\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 101\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 102\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 103\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 104\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 105\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 106\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 107\" violates primary key constraint.": 3,
+        "error: TransactionException: TransactionContext Error: Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key \"108\"": 2,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 108\" violates primary key constraint.": 1,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 109\" violates primary key constraint.": 2,
+        "error: TransactionException: TransactionContext Error: Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key \"109\"": 1,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 110\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 111\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 112\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 113\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 114\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 115\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 116\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 117\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 118\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 119\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 120\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 121\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 122\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 123\" violates primary key constraint.": 3,
+        "error: TransactionException: TransactionContext Error: Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key \"124\"": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 125\" violates primary key constraint.": 2,
+        "error: TransactionException: TransactionContext Error: Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key \"125\"": 1,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 126\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 127\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 128\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 129\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 130\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 131\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 132\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 133\" violates primary key constraint.": 3,
+        "error: TransactionException: TransactionContext Error: Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key \"134\"": 2,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 134\" violates primary key constraint.": 1,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 135\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 136\" violates primary key constraint.": 2,
+        "error: TransactionException: TransactionContext Error: Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key \"136\"": 1,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 137\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 138\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 139\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 140\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 141\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 142\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 143\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 144\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 145\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 146\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 147\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 148\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 149\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 150\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 151\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 152\" violates primary key constraint.": 3,
+        "error: TransactionException: TransactionContext Error: Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key \"153\"": 1,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 153\" violates primary key constraint.": 2,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 154\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 155\" violates primary key constraint.": 3,
+        "error: TransactionException: TransactionContext Error: Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key \"156\"": 1,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 156\" violates primary key constraint.": 2,
+        "error: TransactionException: TransactionContext Error: Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key \"157\"": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 158\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 159\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 160\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 161\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 162\" violates primary key constraint.": 3,
+        "error: TransactionException: TransactionContext Error: Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key \"163\"": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 164\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 165\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 166\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 167\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 168\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 169\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 170\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 171\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 172\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 173\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 174\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 175\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 176\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 177\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 178\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 179\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 180\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 181\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 182\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 183\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 184\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 185\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 186\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 187\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 188\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 189\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 190\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 191\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 192\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 193\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 194\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 195\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 196\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 197\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 198\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 199\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 200\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 201\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 202\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 203\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 204\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 205\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 206\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 207\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 208\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 209\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 210\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 211\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 212\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 213\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 214\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 215\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 216\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 217\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 218\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 219\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 220\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 221\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 222\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 223\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 224\" violates primary key constraint.": 2,
+        "error: TransactionException: TransactionContext Error: Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key \"224\"": 1,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 225\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 226\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 227\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 228\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 229\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 230\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 231\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 232\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 233\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 234\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 235\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 236\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 237\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 238\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 239\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 240\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 241\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 242\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 243\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 244\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 245\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 246\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 247\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 248\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 249\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 250\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 251\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 252\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 253\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 254\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 255\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 256\" violates primary key constraint.": 3,
+        "error: TransactionException: TransactionContext Error: Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key \"257\"": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 258\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 259\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 260\" violates primary key constraint.": 3,
+        "error: TransactionException: TransactionContext Error: Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key \"261\"": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 262\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 263\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 264\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 265\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 266\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 267\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 268\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 269\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 270\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 271\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 272\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 273\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 274\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 275\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 276\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 277\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 278\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 279\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 280\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 281\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 282\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 283\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 284\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 285\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 286\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 287\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 288\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 289\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 290\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 291\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 292\" violates primary key constraint.": 2,
+        "error: TransactionException: TransactionContext Error: Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key \"292\"": 1,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 293\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 294\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 295\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 296\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 297\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 298\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 299\" violates primary key constraint.": 3,
+        "error: ConstraintException: Constraint Error: Duplicate key \"epoch: 300\" violates primary key constraint.": 3
+      },
+      "latency": {
+        "n": 1200,
+        "min": 0.07698893547058105,
+        "p50": 0.2752683162689209,
+        "p90": 0.3437619209289551,
+        "p99": 0.412337064743042,
+        "max": 0.9297060966491699,
+        "mean": 0.2548161041736603
+      }
+    }
+  },
+  "part_b": [
+    {
+      "fence": "first",
+      "stopped": "in_txn",
+      "takeover": "interrupt",
+      "touch_shared": false,
+      "pass": true,
+      "takeover_after_s": 0.5159060955047607,
+      "takeover_attempts": 2,
+      "takeover_errors": {
+        "TransactionException: TransactionContext Error: Conflict on update!": 1
+      },
+      "interrupt_used": true,
+      "l2_commits": 3,
+      "l2_errors": {},
+      "l1_rows_committed_from_paused_txn_on": 0,
+      "l1_rows_before_pause": 3,
+      "final_leader": [
+        2,
+        "L2"
+      ],
+      "shared_counter": [
+        0,
+        "none"
+      ],
+      "l1_messages_from_pause_on": [
+        [
+          "in_txn",
+          3,
+          null
+        ],
+        [
+          "error",
+          3,
+          "TransactionException: TransactionContext Error: Failed to commit: MotherDuck transaction statement failed: Connection Error: interrupted by user"
+        ],
+        [
+          "stepped_down_newer_epoch",
+          3,
+          2
+        ]
+      ]
+    },
+    {
+      "fence": "last",
+      "stopped": "in_txn",
+      "takeover": "interrupt",
+      "touch_shared": false,
+      "pass": true,
+      "takeover_after_s": 0.1575641632080078,
+      "takeover_attempts": 1,
+      "takeover_errors": {},
+      "interrupt_used": false,
+      "l2_commits": 3,
+      "l2_errors": {},
+      "l1_rows_committed_from_paused_txn_on": 0,
+      "l1_rows_before_pause": 3,
+      "final_leader": [
+        2,
+        "L2"
+      ],
+      "shared_counter": [
+        0,
+        "none"
+      ],
+      "l1_messages_from_pause_on": [
+        [
+          "in_txn",
+          3,
+          null
+        ],
+        [
+          "error",
+          3,
+          "TransactionException: TransactionContext Error: Conflict on update!"
+        ],
+        [
+          "stepped_down_newer_epoch",
+          3,
+          2
+        ]
+      ]
+    },
+    {
+      "fence": "first",
+      "stopped": "between_txns",
+      "takeover": "interrupt",
+      "touch_shared": false,
+      "pass": true,
+      "takeover_after_s": 0.1613302230834961,
+      "takeover_attempts": 1,
+      "takeover_errors": {},
+      "interrupt_used": false,
+      "l2_commits": 3,
+      "l2_errors": {},
+      "l1_rows_committed_from_paused_txn_on": 0,
+      "l1_rows_before_pause": 2,
+      "final_leader": [
+        2,
+        "L2"
+      ],
+      "shared_counter": [
+        0,
+        "none"
+      ],
+      "l1_messages_from_pause_on": [
+        [
+          "in_txn",
+          2,
+          null
+        ],
+        [
+          "committed",
+          2,
+          null
+        ],
+        [
+          "stepped_down_zero_rows",
+          3,
+          null
+        ]
+      ]
+    },
+    {
+      "fence": "first",
+      "stopped": "in_txn",
+      "takeover": "interrupt",
+      "touch_shared": true,
+      "pass": true,
+      "takeover_after_s": 2.102679967880249,
+      "takeover_attempts": 4,
+      "takeover_errors": {
+        "TransactionException: TransactionContext Error: Conflict on update!": 3
+      },
+      "interrupt_used": true,
+      "l2_commits": 3,
+      "l2_errors": {},
+      "l1_rows_committed_from_paused_txn_on": 0,
+      "l1_rows_before_pause": 3,
+      "final_leader": [
+        2,
+        "L2"
+      ],
+      "shared_counter": [
+        6,
+        "L2"
+      ],
+      "l1_messages_from_pause_on": [
+        [
+          "in_txn",
+          3,
+          null
+        ],
+        [
+          "error",
+          3,
+          "TransactionException: TransactionContext Error: Failed to commit: MotherDuck transaction statement failed: Connection Error: interrupted by user"
+        ],
+        [
+          "stepped_down_newer_epoch",
+          3,
+          2
+        ]
+      ]
+    },
+    {
+      "fence": "last",
+      "stopped": "in_txn",
+      "takeover": "interrupt",
+      "touch_shared": true,
+      "pass": true,
+      "takeover_after_s": 0.22656607627868652,
+      "takeover_attempts": 1,
+      "takeover_errors": {},
+      "interrupt_used": false,
+      "l2_commits": 3,
+      "l2_errors": {
+        "TransactionException: TransactionContext Error: Conflict on update!": 1
+      },
+      "l1_rows_committed_from_paused_txn_on": 0,
+      "l1_rows_before_pause": 3,
+      "final_leader": [
+        2,
+        "L2"
+      ],
+      "shared_counter": [
+        6,
+        "L2"
+      ],
+      "l1_messages_from_pause_on": [
+        [
+          "in_txn",
+          3,
+          null
+        ],
+        [
+          "error",
+          3,
+          "TransactionException: TransactionContext Error: transaction already rolled back: Connection Error: interrupted by user"
+        ],
+        [
+          "stepped_down_newer_epoch",
+          3,
+          2
+        ]
+      ]
+    },
+    {
+      "fence": "first",
+      "stopped": "between_txns",
+      "takeover": "interrupt",
+      "touch_shared": false,
+      "pass": true,
+      "takeover_after_s": 0.1591198444366455,
+      "takeover_attempts": 1,
+      "takeover_errors": {},
+      "interrupt_used": false,
+      "l2_commits": 3,
+      "l2_errors": {},
+      "l1_rows_committed_from_paused_txn_on": 0,
+      "l1_rows_before_pause": 2,
+      "final_leader": [
+        2,
+        "L2"
+      ],
+      "shared_counter": [
+        0,
+        "none"
+      ],
+      "l1_messages_from_pause_on": [
+        [
+          "in_txn",
+          2,
+          null
+        ],
+        [
+          "committed",
+          2,
+          null
+        ],
+        [
+          "stepped_down_zero_rows",
+          3,
+          null
+        ]
+      ]
+    },
+    {
+      "fence": "first",
+      "stopped": "in_txn",
+      "takeover": "interrupt",
+      "touch_shared": false,
+      "pass": true,
+      "takeover_after_s": 2.1591899394989014,
+      "takeover_attempts": 4,
+      "takeover_errors": {
+        "TransactionException: TransactionContext Error: Conflict on update!": 3
+      },
+      "interrupt_used": true,
+      "l2_commits": 3,
+      "l2_errors": {},
+      "l1_rows_committed_from_paused_txn_on": 0,
+      "l1_rows_before_pause": 3,
+      "final_leader": [
+        2,
+        "L2"
+      ],
+      "shared_counter": [
+        0,
+        "none"
+      ],
+      "l1_messages_from_pause_on": [
+        [
+          "in_txn",
+          3,
+          null
+        ],
+        [
+          "error",
+          3,
+          "TransactionException: TransactionContext Error: Failed to commit: MotherDuck transaction statement failed: Connection Error: interrupted by user"
+        ],
+        [
+          "stepped_down_newer_epoch",
+          3,
+          2
+        ]
+      ]
+    },
+    {
+      "fence": "last",
+      "stopped": "in_txn",
+      "takeover": "interrupt",
+      "touch_shared": false,
+      "pass": true,
+      "takeover_after_s": 0.1613621711730957,
+      "takeover_attempts": 1,
+      "takeover_errors": {},
+      "interrupt_used": false,
+      "l2_commits": 3,
+      "l2_errors": {},
+      "l1_rows_committed_from_paused_txn_on": 0,
+      "l1_rows_before_pause": 3,
+      "final_leader": [
+        2,
+        "L2"
+      ],
+      "shared_counter": [
+        0,
+        "none"
+      ],
+      "l1_messages_from_pause_on": [
+        [
+          "in_txn",
+          3,
+          null
+        ],
+        [
+          "error",
+          3,
+          "TransactionException: TransactionContext Error: Conflict on update!"
+        ],
+        [
+          "stepped_down_newer_epoch",
+          3,
+          2
+        ]
+      ]
+    },
+    {
+      "fence": "first",
+      "stopped": "between_txns",
+      "takeover": "interrupt",
+      "touch_shared": false,
+      "pass": true,
+      "takeover_after_s": 0.16945934295654297,
+      "takeover_attempts": 1,
+      "takeover_errors": {},
+      "interrupt_used": false,
+      "l2_commits": 3,
+      "l2_errors": {},
+      "l1_rows_committed_from_paused_txn_on": 0,
+      "l1_rows_before_pause": 2,
+      "final_leader": [
+        2,
+        "L2"
+      ],
+      "shared_counter": [
+        0,
+        "none"
+      ],
+      "l1_messages_from_pause_on": [
+        [
+          "in_txn",
+          2,
+          null
+        ],
+        [
+          "committed",
+          2,
+          null
+        ],
+        [
+          "stepped_down_zero_rows",
+          3,
+          null
+        ]
+      ]
+    },
+    {
+      "fence": "first",
+      "stopped": "in_txn",
+      "takeover": "interrupt",
+      "touch_shared": true,
+      "pass": true,
+      "takeover_after_s": 1.2883961200714111,
+      "takeover_attempts": 3,
+      "takeover_errors": {
+        "TransactionException: TransactionContext Error: Conflict on update!": 2
+      },
+      "interrupt_used": true,
+      "l2_commits": 3,
+      "l2_errors": {},
+      "l1_rows_committed_from_paused_txn_on": 0,
+      "l1_rows_before_pause": 3,
+      "final_leader": [
+        2,
+        "L2"
+      ],
+      "shared_counter": [
+        6,
+        "L2"
+      ],
+      "l1_messages_from_pause_on": [
+        [
+          "in_txn",
+          3,
+          null
+        ],
+        [
+          "error",
+          3,
+          "TransactionException: TransactionContext Error: Failed to commit: MotherDuck transaction statement failed: Connection Error: interrupted by user"
+        ],
+        [
+          "stepped_down_newer_epoch",
+          3,
+          2
+        ]
+      ]
+    },
+    {
+      "fence": "last",
+      "stopped": "in_txn",
+      "takeover": "interrupt",
+      "touch_shared": true,
+      "pass": true,
+      "takeover_after_s": 0.16062498092651367,
+      "takeover_attempts": 1,
+      "takeover_errors": {},
+      "interrupt_used": false,
+      "l2_commits": 3,
+      "l2_errors": {
+        "TransactionException: TransactionContext Error: Conflict on update!": 2
+      },
+      "l1_rows_committed_from_paused_txn_on": 0,
+      "l1_rows_before_pause": 3,
+      "final_leader": [
+        2,
+        "L2"
+      ],
+      "shared_counter": [
+        6,
+        "L2"
+      ],
+      "l1_messages_from_pause_on": [
+        [
+          "in_txn",
+          3,
+          null
+        ],
+        [
+          "error",
+          3,
+          "TransactionException: TransactionContext Error: transaction already rolled back: Connection Error: interrupted by user"
+        ],
+        [
+          "stepped_down_newer_epoch",
+          3,
+          2
+        ]
+      ]
+    },
+    {
+      "fence": "first",
+      "stopped": "between_txns",
+      "takeover": "interrupt",
+      "touch_shared": false,
+      "pass": true,
+      "takeover_after_s": 0.16971421241760254,
+      "takeover_attempts": 1,
+      "takeover_errors": {},
+      "interrupt_used": false,
+      "l2_commits": 3,
+      "l2_errors": {},
+      "l1_rows_committed_from_paused_txn_on": 0,
+      "l1_rows_before_pause": 2,
+      "final_leader": [
+        2,
+        "L2"
+      ],
+      "shared_counter": [
+        0,
+        "none"
+      ],
+      "l1_messages_from_pause_on": [
+        [
+          "in_txn",
+          2,
+          null
+        ],
+        [
+          "committed",
+          2,
+          null
+        ],
+        [
+          "stepped_down_zero_rows",
+          3,
+          null
+        ]
+      ]
+    },
+    {
+      "fence": "first",
+      "stopped": "in_txn",
+      "takeover": "wait",
+      "touch_shared": false,
+      "pass": null,
+      "takeover_after_s": 31.976244926452637,
+      "takeover_attempts": 15,
+      "takeover_errors": {
+        "TransactionException: TransactionContext Error: Conflict on update!": 14
+      },
+      "interrupt_used": false,
+      "l2_commits": 3,
+      "l2_errors": {},
+      "l1_rows_committed_from_paused_txn_on": 0,
+      "l1_rows_before_pause": 3,
+      "final_leader": [
+        2,
+        "L2"
+      ],
+      "shared_counter": [
+        0,
+        "none"
+      ],
+      "l1_messages_from_pause_on": [
+        [
+          "in_txn",
+          3,
+          null
+        ],
+        [
+          "error",
+          3,
+          "TransactionException: TransactionContext Error: Failed to commit: MotherDuck transaction statement failed: Connection Error: time-based lease expired"
+        ],
+        [
+          "stepped_down_newer_epoch",
+          3,
+          2
+        ]
+      ]
+    }
+  ],
+  "finished_utc": "2026-11-10T02:48:35Z"
+}

@@ -1,0 +1,159 @@
+{
+  "spike": "txn_size",
+  "duckdb_client": "1.5.6",
+  "started_utc": "2026-11-10T02:42:48Z",
+  "note": "measured from a laptop over the public internet; performance numbers are indications only",
+  "part1_10000000": {
+    "rows": 10000000,
+    "insert_s": 20.792934894561768,
+    "inserted": 10000000,
+    "update_s": 0.2433338165283203,
+    "updated": 10000000,
+    "delete_s": 0.2773549556732178,
+    "deleted": 10000000,
+    "commit_s": 0.0812830924987793,
+    "status": "committed",
+    "total_s": 21.39507508277893,
+    "rows_after": 1000,
+    "client_peak_rss_mb": 88
+  },
+  "part1_10000000_surviving": {
+    "insert_s": 20.144696950912476,
+    "update_s": 0.1407170295715332,
+    "commit_s": 8.91373610496521,
+    "total_s": 29.19972586631775
+  },
+  "part2": {
+    "insert_select@10000": {
+      "seconds": 0.217,
+      "rows_per_s": 46056
+    },
+    "delete_using@10000": {
+      "seconds": 0.257,
+      "rows_per_s": 38947
+    },
+    "update_from@10000": {
+      "seconds": 0.175,
+      "rows_per_s": 57053
+    },
+    "merge_half_update_half_insert@10000": {
+      "seconds": 0.241,
+      "rows_per_s": 41523
+    },
+    "delete_insert_upsert@10000": {
+      "seconds": 0.281,
+      "rows_per_s": 35606
+    },
+    "insert_or_replace_pk@10000": {
+      "seconds": 0.305,
+      "rows_per_s": 32760
+    },
+    "insert_select@1000000": {
+      "seconds": 0.664,
+      "rows_per_s": 1506503
+    },
+    "delete_using@1000000": {
+      "seconds": 0.464,
+      "rows_per_s": 2154430
+    },
+    "update_from@1000000": {
+      "seconds": 0.727,
+      "rows_per_s": 1375238
+    },
+    "merge_half_update_half_insert@1000000": {
+      "seconds": 5.87,
+      "rows_per_s": 170365
+    },
+    "delete_insert_upsert@1000000": {
+      "seconds": 0.871,
+      "rows_per_s": 1148281
+    },
+    "insert_or_replace_pk@1000000": {
+      "seconds": 1.623,
+      "rows_per_s": 616140
+    },
+    "insert_select@10000000": {
+      "seconds": 1.325,
+      "rows_per_s": 7549369
+    },
+    "delete_using@10000000": {
+      "seconds": 1.982,
+      "rows_per_s": 5045553
+    },
+    "update_from@10000000": {
+      "seconds": 0.982,
+      "rows_per_s": 10188280
+    },
+    "merge_half_update_half_insert@10000000": {
+      "seconds": 2.14,
+      "rows_per_s": 4673445
+    },
+    "delete_insert_upsert@10000000": {
+      "seconds": 3.057,
+      "rows_per_s": 3271390
+    },
+    "insert_or_replace_pk@10000000": {
+      "seconds": 8.423,
+      "rows_per_s": 1187165
+    }
+  },
+  "part3": {
+    "batch1_conn1": {
+      "commits_per_s": 3.8,
+      "rows_per_s": 4,
+      "txn_latency_s": {
+        "n": 229,
+        "min": 0.2165219783782959,
+        "p50": 0.25748395919799805,
+        "p90": 0.3036212921142578,
+        "p99": 0.31908416748046875,
+        "max": 0.45161890983581543,
+        "mean": 0.2626833613782991
+      },
+      "errors": 0
+    },
+    "batch1_conn4": {
+      "commits_per_s": 15.1,
+      "rows_per_s": 15,
+      "txn_latency_s": {
+        "n": 904,
+        "min": 0.2200942039489746,
+        "p50": 0.26305675506591797,
+        "p90": 0.2943720817565918,
+        "p99": 0.3454298973083496,
+        "max": 0.7938120365142822,
+        "mean": 0.2658779407497001
+      },
+      "errors": 0
+    },
+    "batch100_conn1": {
+      "commits_per_s": 3.1,
+      "rows_per_s": 308,
+      "txn_latency_s": {
+        "n": 185,
+        "min": 0.2830979824066162,
+        "p50": 0.32047295570373535,
+        "p90": 0.37058377265930176,
+        "p99": 0.4176828861236572,
+        "max": 0.7409830093383789,
+        "mean": 0.32456208048640073
+      },
+      "errors": 0
+    },
+    "batch100_conn4": {
+      "commits_per_s": 11.9,
+      "rows_per_s": 1190,
+      "txn_latency_s": {
+        "n": 714,
+        "min": 0.27922821044921875,
+        "p50": 0.3318290710449219,
+        "p90": 0.3830080032348633,
+        "p99": 0.44339895248413086,
+        "max": 0.5228588581085205,
+        "mean": 0.33700309714683296
+      },
+      "errors": 0
+    }
+  },
+  "finished_utc": "2026-11-10T02:50:29Z"
+}
