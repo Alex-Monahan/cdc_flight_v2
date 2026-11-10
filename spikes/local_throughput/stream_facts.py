@@ -90,10 +90,12 @@ def workload(n_tx: int, seed: int = 7) -> dict:
                 ins_small(c, rnd.randint(1, 50))
                 kinds["insert"] += 1
             elif r < 0.7:
-                lo = rnd.randint(1, 4000)
-                c.execute("UPDATE public.upd_keyed SET l_comment = md5(random()::text) WHERE l_orderkey BETWEEN %s "
-                          "AND %s", (lo, lo + rnd.randint(0, 3)))
+                n = c.execute("UPDATE public.upd_keyed SET l_comment = md5(random()::text) WHERE ctid IN (SELECT ctid "
+                              "FROM public.upd_keyed OFFSET %s LIMIT %s)",
+                              (rnd.randint(0, 15000), rnd.randint(1, 4))).rowcount
                 kinds["update"] += 1
+                if n == 0:  # TPC-H order keys are sparse: such a transaction changes nothing
+                    kinds["update_matching_no_row"] = kinds.get("update_matching_no_row", 0) + 1
             elif r < 0.8:
                 lo = rnd.randint(4000, 5000)
                 c.execute("DELETE FROM public.upd_keyed WHERE ctid IN (SELECT ctid FROM public.upd_keyed WHERE "
@@ -102,7 +104,8 @@ def workload(n_tx: int, seed: int = 7) -> dict:
             else:
                 ins_small(c, rnd.randint(1, 10))
                 lo = rnd.randint(1, 4000)
-                c.execute("UPDATE public.upd_keyed SET l_comment = 'multi' WHERE l_orderkey = %s", (lo,))
+                c.execute("UPDATE public.upd_keyed SET l_comment = 'multi' WHERE ctid IN (SELECT ctid FROM "
+                          "public.upd_keyed OFFSET %s LIMIT 1)", (lo,))
                 if rnd.random() < 0.5:
                     key[0] += 1
                     c.execute("INSERT INTO public.stream_unpub VALUES (%s, 'u')", (key[0],))
@@ -153,7 +156,7 @@ def main():
     a = ap.parse_args()
     node = a.node
     ev = {"utc": C.utc(), "load_avg": C.load_avg(), "node": node}
-    S.truncate("stream_small", "upd_keyed")
+    S.truncate("stream_small", "upd_keyed", "stream_unpub")
     for n in ("replica", "primary"):
         S.drop_slot(n)
         S.drop_slot(n, PEEK)
@@ -182,6 +185,7 @@ def main():
     eng.consumer.stdin.write(b"STOP\n")
     eng.consumer.stdin.flush()
     eng.consumer.wait(timeout=60)
+    eng.props_path.unlink(missing_ok=True)  # it holds the local runtime password
     ev["errors"] = eng.errors()
     server = peek(node)
     ev["workload"] = sp
@@ -216,6 +220,12 @@ def analyse(recs, server, sp) -> dict:
     checks = {k: [0, 0] for k in (
         "BEGIN.id = '<xid>:<server B.final_lsn = commit record start>'",
         "BEGIN.id = '<xid>:<server C.end_lsn>'",
+        "BEGIN.id = '<xid>:<server BEGIN row lsn (SQL interface)>'",
+        "BEGIN.id = '<xid>:<first change lsn>'",
+        "BEGIN offset.lsn = BEGIN.id lsn",
+        "END.id = '<xid>:<server C.end_lsn>'",
+        "change transaction.id = '<xid>:<that change's source.lsn>'",
+        "change transaction.total_order = position in the transaction (1-based)",
         "END.id = BEGIN.id",
         "END.event_count = number of change events = server I/U/D count",
         "END.data_collections counts = per-table change events",
@@ -254,6 +264,17 @@ def analyse(recs, server, sp) -> dict:
             bid_lsn = int(str(b["value"]["id"]).split(":")[1])
             chk("BEGIN.id = '<xid>:<server B.final_lsn = commit record start>'", bid_lsn == t["final_lsn"])
             chk("BEGIN.id = '<xid>:<server C.end_lsn>'", bid_lsn == t["end_lsn"])
+            chk("BEGIN.id = '<xid>:<server BEGIN row lsn (SQL interface)>'", bid_lsn == t["begin_row_lsn"])
+            if ch:
+                chk("BEGIN.id = '<xid>:<first change lsn>'", bid_lsn == ch[0]["value"]["source"]["lsn"])
+            chk("BEGIN offset.lsn = BEGIN.id lsn", b["offset"].get("lsn") == bid_lsn)
+            chk("END.id = '<xid>:<server C.end_lsn>'", e["value"]["id"] == f"{x}:{t['end_lsn']}")
+            for i, r in enumerate(ch):
+                tr = r["value"].get("transaction") or {}
+                chk("change transaction.id = '<xid>:<that change's source.lsn>'",
+                    tr.get("id") == f"{x}:{r['value']['source']['lsn']}")
+                chk("change transaction.total_order = position in the transaction (1-based)",
+                    tr.get("total_order") == i + 1)
             chk("END.id = BEGIN.id", e["value"]["id"] == b["value"]["id"])
             chk("END.event_count = number of change events = server I/U/D count",
                 e["value"]["event_count"] == len(ch) == len(t["changes"]))

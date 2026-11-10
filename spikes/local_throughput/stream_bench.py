@@ -324,6 +324,7 @@ def t_restart(cfg, node, sig, rep) -> dict:
     ts = time.time()
     os.kill(eng.jvm_pid, sig)
     eng.consumer.wait(timeout=120)
+    eng.props_path.unlink(missing_ok=True)  # it holds the local runtime password
     t_dead = time.time()
     S.wait_slot_idle(node)
     with C.pg_connect(node, "admin") as c:

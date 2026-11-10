@@ -197,9 +197,6 @@ class Engine:
         for m in re.finditer(r'^"([^"]+)".*?cpu=([\d.]+)ms', out, re.M):
             name = re.sub(r"\d+", "N", m.group(1)) if m.group(1).startswith(("Thread-", "pool-")) else m.group(1)
             res[name] = res.get(name, 0.0) + float(m.group(2))
-        for m in re.finditer(r'^"(GC Thread|C2 CompilerThread|C1 CompilerThread|G1 [^"]+|VM Thread)[^"]*".*?cpu=([\d.]+)ms',
-                             out, re.M):
-            pass
         return res
 
     def stop(self, sig=signal.SIGTERM, timeout=60) -> float:

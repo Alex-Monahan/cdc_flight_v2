@@ -1,0 +1,380 @@
+{
+ "utc": "2026-11-10T06:51:44Z",
+ "load_avg": [
+  6.28,
+  10.23,
+  10.14
+ ],
+ "node": "replica",
+ "slot": {
+  "node": "replica",
+  "help_standby": true,
+  "ok": true,
+  "seconds": 0.65,
+  "consistent_point": "18/191987E0",
+  "pg_log_standby_snapshot_calls": 1
+ },
+ "peek_slot": {
+  "node": "replica",
+  "help_standby": true,
+  "ok": true,
+  "seconds": 0.81,
+  "consistent_point": "18/19198818",
+  "pg_log_standby_snapshot_calls": 1
+ },
+ "errors": [],
+ "workload": {
+  "sentinels": [
+   [
+    "before_empty_0",
+    17154139
+   ],
+   [
+    "before_xid_only_0",
+    17154140
+   ],
+   [
+    "before_unpublished_only_0",
+    17154142
+   ],
+   [
+    "before_rollback_0",
+    17154144
+   ],
+   [
+    "before_savepoints_0",
+    17154146
+   ],
+   [
+    "after_0",
+    17154151
+   ],
+   [
+    "before_empty_1",
+    17154152
+   ],
+   [
+    "before_xid_only_1",
+    17154153
+   ],
+   [
+    "before_unpublished_only_1",
+    17154155
+   ],
+   [
+    "before_rollback_1",
+    17154157
+   ],
+   [
+    "before_savepoints_1",
+    17154159
+   ],
+   [
+    "after_1",
+    17154164
+   ],
+   [
+    "before_empty_2",
+    17154165
+   ],
+   [
+    "before_xid_only_2",
+    17154166
+   ],
+   [
+    "before_unpublished_only_2",
+    17154168
+   ],
+   [
+    "before_rollback_2",
+    17154170
+   ],
+   [
+    "before_savepoints_2",
+    17154172
+   ],
+   [
+    "after_2",
+    17154177
+   ]
+  ],
+  "xid_only": [
+   17154141,
+   17154154,
+   17154167
+  ],
+  "unpublished_only": [
+   17154143,
+   17154156,
+   17154169
+  ],
+  "rolled_back": [
+   17154145,
+   17154158,
+   17154171
+  ],
+  "savepoints": [
+   17154147,
+   17154160,
+   17154173
+  ],
+  "kinds": {
+   "insert": 636,
+   "update": 223,
+   "delete": 110,
+   "multi": 231,
+   "with_unpublished": 122
+  }
+ },
+ "records": 40871,
+ "topics": [
+  "cdc_v2_stream.public.stream_small",
+  "cdc_v2_stream.public.upd_keyed",
+  "cdc_v2_stream.transaction"
+ ],
+ "server_transactions": 1222,
+ "server_transactions_with_changes": 1222,
+ "debezium_begin_events": 1222,
+ "debezium_end_events": 1222,
+ "matched_transactions": 1222,
+ "debezium_tx_without_server_tx": [],
+ "checks": {
+  "BEGIN.id = '<xid>:<server B.final_lsn = commit record start>'": {
+   "true": 0,
+   "of": 1222
+  },
+  "BEGIN.id = '<xid>:<server C.end_lsn>'": {
+   "true": 0,
+   "of": 1222
+  },
+  "BEGIN.id = '<xid>:<server BEGIN row lsn (SQL interface)>'": {
+   "true": 1222,
+   "of": 1222
+  },
+  "BEGIN.id = '<xid>:<first change lsn>'": {
+   "true": 1222,
+   "of": 1222
+  },
+  "BEGIN offset.lsn = BEGIN.id lsn": {
+   "true": 1222,
+   "of": 1222
+  },
+  "END.id = '<xid>:<server C.end_lsn>'": {
+   "true": 1222,
+   "of": 1222
+  },
+  "change transaction.id = '<xid>:<that change's source.lsn>'": {
+   "true": 38427,
+   "of": 38427
+  },
+  "change transaction.total_order = position in the transaction (1-based)": {
+   "true": 38427,
+   "of": 38427
+  },
+  "END.id = BEGIN.id": {
+   "true": 0,
+   "of": 1222
+  },
+  "END.event_count = number of change events = server I/U/D count": {
+   "true": 1222,
+   "of": 1222
+  },
+  "END.data_collections counts = per-table change events": {
+   "true": 1222,
+   "of": 1222
+  },
+  "change source.lsn = server row lsn of that change": {
+   "true": 38427,
+   "of": 38427
+  },
+  "change source.txId = server xid": {
+   "true": 38427,
+   "of": 38427
+  },
+  "change source.sequence[1] = source.lsn": {
+   "true": 38427,
+   "of": 38427
+  },
+  "change source.sequence[0] = previous transaction's commit end LSN (server C.end_lsn)": {
+   "true": 18427,
+   "of": 18427
+  },
+  "change offset.lsn = source.lsn": {
+   "true": 38427,
+   "of": 38427
+  },
+  "change offset.lsn_proc = source.lsn": {
+   "true": 38427,
+   "of": 38427
+  },
+  "change offset.lsn_commit = previous transaction's commit end LSN": {
+   "true": 18427,
+   "of": 18427
+  },
+  "change offset.lsn_commit = this transaction's commit end LSN": {
+   "true": 0,
+   "of": 38427
+  },
+  "END offset.lsn_commit = this transaction's server C.end_lsn": {
+   "true": 1222,
+   "of": 1222
+  },
+  "END offset.lsn = this transaction's server C.end_lsn": {
+   "true": 1222,
+   "of": 1222
+  },
+  "END offset.lsn_proc = this transaction's server C.end_lsn": {
+   "true": 1222,
+   "of": 1222
+  },
+  "END offset.lsn_commit = server C.commit_lsn (commit record start)": {
+   "true": 0,
+   "of": 1222
+  },
+  "BEGIN offset.lsn_commit = previous transaction's commit end LSN": {
+   "true": 1221,
+   "of": 1221
+  },
+  "any Debezium field = server C.commit_lsn (commit record start)": {
+   "true": 0,
+   "of": 1222
+  },
+  "server C.commit_lsn = B.final_lsn": {
+   "true": 1222,
+   "of": 1222
+  },
+  "server commit row lsn (SQL interface) = C.end_lsn": {
+   "true": 1222,
+   "of": 1222
+  }
+ },
+ "special": {
+  "xid_only": [
+   {
+    "xid": 17154141,
+    "server_tx": false,
+    "server_changes": 0,
+    "debezium_begin": false,
+    "debezium_end": false,
+    "debezium_changes": 0,
+    "end_event_count": null
+   },
+   {
+    "xid": 17154154,
+    "server_tx": false,
+    "server_changes": 0,
+    "debezium_begin": false,
+    "debezium_end": false,
+    "debezium_changes": 0,
+    "end_event_count": null
+   },
+   {
+    "xid": 17154167,
+    "server_tx": false,
+    "server_changes": 0,
+    "debezium_begin": false,
+    "debezium_end": false,
+    "debezium_changes": 0,
+    "end_event_count": null
+   }
+  ],
+  "unpublished_only": [
+   {
+    "xid": 17154143,
+    "server_tx": false,
+    "server_changes": 0,
+    "debezium_begin": false,
+    "debezium_end": false,
+    "debezium_changes": 0,
+    "end_event_count": null
+   },
+   {
+    "xid": 17154156,
+    "server_tx": false,
+    "server_changes": 0,
+    "debezium_begin": false,
+    "debezium_end": false,
+    "debezium_changes": 0,
+    "end_event_count": null
+   },
+   {
+    "xid": 17154169,
+    "server_tx": false,
+    "server_changes": 0,
+    "debezium_begin": false,
+    "debezium_end": false,
+    "debezium_changes": 0,
+    "end_event_count": null
+   }
+  ],
+  "rolled_back": [
+   {
+    "xid": 17154145,
+    "server_tx": false,
+    "server_changes": 0,
+    "debezium_begin": false,
+    "debezium_end": false,
+    "debezium_changes": 0,
+    "end_event_count": null
+   },
+   {
+    "xid": 17154158,
+    "server_tx": false,
+    "server_changes": 0,
+    "debezium_begin": false,
+    "debezium_end": false,
+    "debezium_changes": 0,
+    "end_event_count": null
+   },
+   {
+    "xid": 17154171,
+    "server_tx": false,
+    "server_changes": 0,
+    "debezium_begin": false,
+    "debezium_end": false,
+    "debezium_changes": 0,
+    "end_event_count": null
+   }
+  ],
+  "savepoints": [
+   {
+    "xid": 17154147,
+    "server_tx": true,
+    "server_changes": 6,
+    "debezium_begin": true,
+    "debezium_end": true,
+    "debezium_changes": 6,
+    "end_event_count": 6
+   },
+   {
+    "xid": 17154160,
+    "server_tx": true,
+    "server_changes": 6,
+    "debezium_begin": true,
+    "debezium_end": true,
+    "debezium_changes": 6,
+    "end_event_count": 6
+   },
+   {
+    "xid": 17154173,
+    "server_tx": true,
+    "server_changes": 6,
+    "debezium_begin": true,
+    "debezium_end": true,
+    "debezium_changes": 6,
+    "end_event_count": 6
+   }
+  ],
+  "empty_transaction": [
+   {
+    "records_between_sentinel_END_and_next_sentinel": 2
+   },
+   {
+    "records_between_sentinel_END_and_next_sentinel": 2
+   },
+   {
+    "records_between_sentinel_END_and_next_sentinel": 2
+   }
+  ]
+ }
+}
