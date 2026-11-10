@@ -452,7 +452,10 @@ stays in place behind every entry.
   delete removes exactly one occurrence (SPEC 1.2).
 - **Why prevention.** The destination never executes the intermediate states, and the one table shape whose records
   can be ambiguous by key is never applied by key.
-- **Test.** `test_h015_key_chains_swaps` (DEFAULT and FULL identity, history mode on), `test_h015_duplicate_rows`.
+- **Test.** `test_h015_key_chains_swaps` (DEFAULT and FULL identity, history mode on), `test_h015_duplicate_rows`,
+  `tests/pg_source/test_pg_keys.py::test_catalog_follows_rule_k`, `::test_deferrable_key_set_full_then_publish`,
+  `::test_how_a_primary_key_becomes_deferrable`, `tests/engine/test_engine_keys.py::test_what_debezium_calls_a_key_and_the_list`,
+  `::test_a_listed_table_without_an_old_image`, `tests/pg_source/test_pg_hermetic.py::test_rule_k_and_identity_problem_over_every_combination`.
 - **Residual.** None known.
 
 ### H-016 TRUNCATE variants (and Debezium's default that drops them)

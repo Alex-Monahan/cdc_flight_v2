@@ -233,6 +233,7 @@ def test_how_a_primary_key_becomes_deferrable(cluster, scratch):
     # 1. ALTER CONSTRAINT … DEFERRABLE on a primary key
     out["alter_constraint_deferrable"] = list(refused(scratch, f"alter table {s}.k alter constraint k_pkey "
                                                                 f"deferrable"))
+    assert out["alter_constraint_deferrable"][0] == "42809"      # "… is not a foreign key constraint"
     # 2. drop and add in one statement: the table keeps its OID and relfilenode, the index is new
     idx0 = _pk_index(scratch, "k")
     scratch.admin(f"alter table {s}.k drop constraint k_pkey, add primary key (id) deferrable initially deferred")
@@ -256,6 +257,7 @@ def test_how_a_primary_key_becomes_deferrable(cluster, scratch):
     # 3. ALTER CONSTRAINT … NOT DEFERRABLE on the deferrable key
     out["alter_constraint_not_deferrable"] = list(refused(scratch, f"alter table {s}.k alter constraint k_pkey "
                                                                     f"not deferrable"))
+    assert out["alter_constraint_not_deferrable"][0] == "42809"
     # 4. back to immediate through a unique index built beforehand: drop and add … USING INDEX
     scratch.admin(f"create unique index k_id on {s}.k (id)")
     scratch.admin(f"alter table {s}.k drop constraint k_pkey, add constraint k_pkey primary key using index k_id")

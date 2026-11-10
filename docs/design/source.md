@@ -120,8 +120,9 @@ A recovery conflict was produced for real: a standby transaction holding `ACCESS
 `catalog.tables(conn, include=None | [(schema, name)] | callable, *, publication, deadline) -> [SourceTable]`, read in
 one REPEATABLE READ transaction. Default: every ordinary or partitioned table outside `pg_catalog`,
 `information_schema`, `pg_toast*` and `pg_temp_*` (temporary tables of other sessions are not visible anyway).
-`SourceTable` (frozen; `hash()` over everything, `shape_hash()` over OID, names, columns, key and replica identity —
-not `relfilenode`, row security or publication membership):
+`SourceTable` (frozen; `hash()` over everything, `shape_hash()` over OID, names, columns, the key facts (`has_key`,
+`key_attnums`, `primary_key_deferrable`) and replica identity — not `relfilenode`, row security or publication
+membership; a key that becomes deferrable or immediate changes it):
 
 - identity: `oid`, `schema`, `name`, `relfilenode`, `relkind` (`ordinary` | `partitioned`), `is_partition`,
   `partition_root`, `persistence` (`permanent` | `unlogged` | `temporary`), `rls_enabled`, `rls_forced`,
@@ -131,9 +132,11 @@ not `relfilenode`, row security or publication membership):
   range/multirange/pseudo; a domain's ultimate base, enum labels in sort order, array element, composite fields,
   range subtype), `ndims` (as declared), `not_null`, `has_default`, `generated` (`stored`, `virtual` on 18),
   `identity`, `storage`, `toastable` ("unchanged possible": variable length and storage other than plain);
-- key: `key` / `key_attnums` (primary key, else the replica identity index, in key order; the key columns of the
-  index only, never its `INCLUDE` columns), `key_source`,
-  `has_primary_key`, `replica_identity` (`default` | `index` | `full` | `nothing`), `replica_identity_index`,
+- key (rule K, §3): `has_key` (property: the table has a key by rule K), `key` / `key_attnums` (the primary key's
+  columns in key order when `has_key`, else empty; the key columns of the index only, never its `INCLUDE`
+  columns), `key_source` (`'primary key'` when `has_key`, else `None`), `has_primary_key`,
+  `primary_key_deferrable` (`NOT pg_index.indimmediate` of the primary key), `replica_identity` (`default` |
+  `index` | `full` | `nothing`), `replica_identity_index` (named also when it is no key),
   `replica_identity_index_is_key`, and `replica_identity_problem` (§3);
 - publication: `published` (directly or through a partition ancestor), `publication_columns`,
   `publication_row_filter` (H-023: reported; the pipeline refuses them).
@@ -166,7 +169,9 @@ catalog columns are read (no `format_type`, no `regclass` casts): those use the 
   visible at its commit, never before.
 
 `TableFacts.identity` = (OID, per live column `(attnum, name, type oid, typmod)`, key attnums) — what package T
-compares. `relfilenode` is not part of it.
+compares. `relfilenode` is not part of it. `TableFacts` carries the raw `pk_attnums`, `pk_deferrable` (read in the
+same statement), `has_key` (rule K) and `key_attnums` (`pk_attnums` when `has_key`, else empty), so an
+observation and `catalog.tables` give the same answer (`test_catalog_follows_rule_k`, 14 table shapes).
 
 **[test] the bracket** (`test_bracket_on_standby`, `test_bracket_on_primary`): a writer creates tables on the
 primary, each in its own transaction, recording an interval that holds its commit (`L0` = insert position inside the
@@ -185,7 +190,8 @@ returns, and the next observation contains the table with `visible(xid)` true.
 OID → value: `appeared`, `disappeared`, `recreated` (same name, new OID, old OID gone: H-007), `renamed` (same OID;
 a name freed by a rename and taken by a new table is `renamed` + `appeared`, not `recreated`; a swap a↔b is two
 renames), and per OID a `TableChange`: columns added, dropped, renamed (same `attnum`), retyped (type or typmod),
-`rewritten` (`relfilenode`: TRUNCATE, VACUUM FULL, CLUSTER, rewriting ALTER), `key_changed`,
+`rewritten` (`relfilenode`: TRUNCATE, VACUUM FULL, CLUSTER, rewriting ALTER), `key_changed` (key attnums by rule K,
+or the deferrability of the primary key),
 `replica_identity_changed`, `persistence_changed`, `publication_changed`. A drop and add of a column with the same
 name and type is a drop of one `attnum` and an add of another, never a rename.
 
@@ -199,11 +205,22 @@ name and type is a drop of one `attnum` and an add of another, never a rename.
   are absorbed: test with 4 concurrent callers). `publish_via_partition_root = false` (H-021): leaves are published
   under their own names and a partition's TRUNCATE is delivered; the combined-table mode of SPEC 7.3 is the
   applier's job. `publish_generated_columns` is left at the server default (P4 type wave decides, H-022).
+- **Rule K** (core design section 6). A table *has a key* when it has a primary key that is not deferrable
+  (`pg_index.indimmediate`) and its replica identity is `DEFAULT`, `FULL`, or `USING INDEX` on the primary key's
+  own index; its key is the primary key. Every other table that can be published is a *table without a key* and
+  needs `REPLICA IDENTITY FULL`: a table with no primary key (also with unique indexes, also with `USING INDEX`),
+  and a table whose primary key is deferrable. `catalog.has_key(...)` is the rule, `SourceTable.has_key` and
+  `TableFacts.has_key` apply it, and for a table without a key `key` and `key_attnums` are empty and `key_source`
+  is `None`. The engine is told which tables are without a key (`docs/design/engine.md` 4a), because Debezium
+  calls more tables keyed than rule K does.
 - Before anything is added, every named table is read again and `check` refuses (`NotPublishable` with a reason per
   table): unlogged or temporary tables (H-030); a table **without a primary key that is not `REPLICA IDENTITY FULL`,
-  also with `REPLICA IDENTITY USING INDEX`** (Debezium gives such a table no key and the engine would carry an
-  incomplete old image); `REPLICA IDENTITY NOTHING`; a table with a primary key whose identity index is another
-  index. For a partitioned table its leaf partitions are checked too (with `publish_via_partition_root = false`
+  also with `REPLICA IDENTITY USING INDEX`** (it has no key by rule K and the engine would carry an incomplete old
+  image); a table **with a deferrable primary key that is not `REPLICA IDENTITY FULL`** ("primary key is
+  deferrable: needs REPLICA IDENTITY FULL (replica identity is …)"); `REPLICA IDENTITY NOTHING`; a table with an
+  immediate primary key whose identity index is another index. `set_full` then `ensure` publishes a table with a
+  deferrable primary key, and the source's own `UPDATE` and `DELETE` keep working
+  (`test_deferrable_key_set_full_then_publish`). For a partitioned table its leaf partitions are checked too (with `publish_via_partition_root = false`
   they are what is published). `replica_identity.set_full(primary, table, deadline, lock_timeout_ms=None)` fixes
   all of them (`SET LOCAL lock_timeout`; `LockTimeout` when the ACCESS EXCLUSIVE lock is not granted in time;
   returns False when nothing had to change); for a partitioned table it sets every existing leaf as well (an
@@ -215,8 +232,19 @@ name and type is a drop of one `attnum` and an add of another, never a rename.
   checked row by row, so the decoded stream never shows two rows with one key; a deferrable primary key is not a
   replica identity (a published table with one and `REPLICA IDENTITY DEFAULT` refuses its own `UPDATE` and
   `DELETE`, SQLSTATE 55000), and with `REPLICA IDENTITY FULL` it is the only table shape whose stream can show two
-  rows with one key. **Open until package K is merged:** the catalog and `check` do not read
-  `pg_index.indimmediate` yet and call such a table keyed.
+  rows with one key.
+- **How a key becomes deferrable or immediate on an existing table** (`test_how_a_primary_key_becomes_deferrable`,
+  Postgres 16.6 and 18.6, evidence `evidence/p3/key_rule/source_keys_pg16.json` and `source_keys_pg18.json`).
+  `ALTER TABLE … ALTER CONSTRAINT <pkey> [NOT] DEFERRABLE` is refused on both versions (42809, "constraint … is not
+  a foreign key constraint"). The only way is to drop the primary key and add a new one, which can be one
+  statement: `ALTER TABLE t DROP CONSTRAINT t_pkey, ADD PRIMARY KEY (id) DEFERRABLE`, or `… ADD CONSTRAINT t_pkey
+  PRIMARY KEY USING INDEX i [DEFERRABLE]` with a unique index built beforehand (Postgres then marks that index
+  not immediate). The table keeps its OID and `relfilenode`; the primary key's index is a new one. The catalog
+  then reports `has_key` false, `key_attnums` empty, `primary_key_deferrable` true; `shape_hash` changes;
+  `diff` reports `key_changed` (not `rewritten`, not a column change). Going back to an immediate key gives the
+  first `shape_hash` again. Under `REPLICA IDENTITY DEFAULT` a published table whose key became deferrable
+  refuses its own `UPDATE` at once (55000, H-014): making a key deferrable on a published table needs `REPLICA
+  IDENTITY FULL` first, which only the table's owner can do.
 - `next_xid` (X of design 7.5) = `pg_snapshot_xmax(pg_current_snapshot())` read after the change committed: the first
   unassigned transaction id. Every transaction with a smaller id started before the change.
 - `publication.state(conn)` → `PublicationState(exists, oid, owner, all_tables, publish, via_root,
@@ -488,6 +516,10 @@ Readings of C7 where it left something open (simplest reading taken):
 11. Tests use the TCP fault proxy on this package's own ports (55644–55647 / 55652–55655) by setting
     `cdc_v2.testing.netproxy.PORT_FIRST/PORT_LAST` in the test: `NetProxy` refuses ports outside 55440–55459.
     A port-range parameter in `NetProxy` would remove that.
+12. Rule K (package K): the new fields have defaults (`SourceTable.primary_key_deferrable = False`,
+    `TableFacts.pk_deferrable = False`), so values built by hand in other packages' tests keep working; such a
+    value must then carry `key_attnums` that follow the rule itself. `identity_problem` takes `pk_deferrable` as
+    a keyword (default `False`).
 
 **What packages V, B, S, T and Y must know that C7 does not say**
 
@@ -502,6 +534,8 @@ Readings of C7 where it left something open (simplest reading taken):
   `heartbeat.check` before the stream starts; xids are compared on their low 32 bits.
 - T: `catalog.observe` on the standby gives the bracket; on a primary use `visible(xid)`; `TableFacts.identity`
   excludes `relfilenode`; `published` includes membership through a partition ancestor; `publication.has_table`.
+  A primary key becomes deferrable or immediate only by drop and add (§3): same OID and `relfilenode`,
+  `TableFacts.has_key`, `key_attnums` and `pk_deferrable` change, `diff` gives `key_changed`.
 - Y: the session settings table of §1 (IntervalStyle `iso_8601`, DateStyle `ISO, YMD`, `extra_float_digits = 3`,
   `bytea_output = hex`, TimeZone UTC, `lc_monetary = C`).
 
@@ -524,6 +558,10 @@ CDC_V2_P_EVIDENCE=1 CDC_V2_P_EVIDENCE_NAME=x.json … -k <test>                 
 CDC_V2_P_BRACKET_RUNS=40 … -k test_bracket_on_primary                           # repeats the primary bracket run
 CDC_V2_P_EVIDENCE=1 CDC_V2_P_EVIDENCE_NAME=replica_identity_keys_pg18.json … tests/pg_source/test_pg_keys.py  # H-015
 ```
+
+Package K (rule K) writes its evidence to `evidence/p3/key_rule/`: the variable `CDC_V2_P_EVIDENCE_DIR` names a
+directory under `evidence/p3` (here `key_rule`), and the file names are `source_keys_pg18.json`,
+`source_keys_pg16.json` (only `test_pg_keys.py`) and `localpg_pg18.json`, `localpg_pg16.json` (the whole suite).
 
 The `localpg` suite builds or starts its own pairs through `tools/localpg`, runs ≈ 9–11 minutes per version (the
 recovery-conflict test waits 30 s; slot-creation tests wait for an idle primary, 26 s each), removes every schema,

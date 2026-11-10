@@ -94,7 +94,8 @@ The validity buffer is empty when the column has no NULL, else ⌈n/8⌉ bytes. 
 bit or an empty value, and bits beyond n are zero, so the Java and Python encoders agree byte for byte.
 
 **Column sets** of a ROWS frame, named by the column position `i` in the schema version: `seq` (int64), `op`
-(text `c`, `u`, `d`), `a<i>` for every column, `b<i>` for every column of a table without a key, `u<i>` (boolean)
+(text `c`, `u`, `d`), `a<i>` for every column, `b<i>` for every column of a table without a key (Debezium gives it
+no key, or it is listed in `cdc_v2.keyless.tables`, section 4a), `u<i>` (boolean)
 for every column whose SCHEMA flag "unchanged possible" is set, `k<i>` for every key column of a table with a key.
 `a<i>`: new image; for a delete of a table with a key only the key columns, the rest NULL; for a delete of a table
 without a key all NULL (the old image is in `b<i>`). `k<i>`: the old key on the create record that follows a key
@@ -219,6 +220,65 @@ holds Linux x86-64 tarballs only (no entry for macOS arm64), so the suites could
 `$JAVA_HOME` or the PATH) and says so in `JvmArtifacts.jdk_source`; every number in this package was measured with
 Homebrew OpenJDK 23.0.2 on macOS arm64, classes compiled with `--release 17`. Jars: always the 73 locked jars,
 verified, nothing else on the classpath.
+
+## 4a. Tables without a key (rule K)
+
+Rule K (core design section 6; `docs/design/source.md` §3) says which tables have a key; the catalog is the one
+authority. Debezium has a rule of its own, and it calls more tables keyed (table below). So the pipeline tells the
+engine which tables are without a key.
+
+- **Setting.** `EngineSettings.keyless_tables`: exact `(schema, table)` names, no patterns, sorted and without
+  repeats; each name non-empty and without NUL. It travels as the one property `cdc_v2.keyless.tables`: every name
+  followed by a NUL character (`encode_table_names`), the one character no Postgres name can hold, so names with
+  a dot, a comma, a quote, a space, upper-case or non-ASCII letters arrive exactly (`test_build_properties_writes_
+  the_list_of_tables_without_a_key`). An empty value is an empty list. `extra` cannot set it (every `cdc_v2.` key
+  is protected; `test_extra_may_not_override_the_list_of_tables_without_a_key`), and the JVM refuses a malformed
+  value with FATAL (`test_java_refuses_a_malformed_list_of_tables_without_a_key`, 6 cases).
+- **A listed table** is a table without a key whatever Debezium's key says: its `SCHEMA` frame has `has_key` 0, no
+  key positions and no column flagged as key; its `ROWS` frames carry `b<i>` (the old image) for every column and
+  no `k<i>`; Debezium's `__debezium.oldkey` header is not read. A table that is not listed is treated as before:
+  Debezium's key decides.
+- **No old image.** An update or delete of a table without a key (listed, or keyless to Debezium) that arrives
+  without any old image stops the engine with FATAL `update without an old image in <schema>.<table>, a table
+  without a key (seq n)` (never a value). pgoutput sends no old image for an update that does not change an
+  identity column under `DEFAULT` or `USING INDEX`. An old image that holds only the identity columns (a delete, or
+  an update of an identity column, under `USING INDEX` or `DEFAULT`) arrives with NULLs in the other columns and
+  cannot be told from real NULLs in the engine; the prevention is `publication.check`, which refuses every table
+  without a key that is not `REPLICA IDENTITY FULL` (`test_a_listed_table_without_an_old_image`,
+  `evidence/p3/key_rule/engine_incomplete_old_image.json`).
+- **The list is read at start.** A table that appears later is treated by Debezium's key. The `SCHEMA` frame of
+  every table carries `has_key`, the key positions and a key flag per column; package S compares them with the
+  catalog at every `SCHEMA` frame and restarts the engine with a new list when they differ (C2, plan 6.2). The
+  engine itself never consults the catalog.
+
+**What Debezium calls a key, and what the list changes** (`tests/engine/test_engine_keys.py::test_what_debezium_
+calls_a_key_and_the_list`, Postgres 18.6 pair `pg-e`, Debezium 3.7.1, `evidence/p3/key_rule/engine_key_cases.json`).
+Every case is `REPLICA IDENTITY FULL` with columns `(id, v, u)`; each receives an insert of two rows, an update of
+`u`, an update of `id` (1 → 10) and a delete. One engine reads the slot without the list, a second reads the same
+slot (nothing was acknowledged) with all five listed.
+
+| Case | Rule K | Without the list: `has_key`, key positions | Without the list: rows | With the list |
+|---|---|---|---|---|
+| 1 deferrable primary key | no key | 1, `[0]` (`id`) | `c`, `c`, `u` (no old image), key change = `d` with only `id` + `c` with `k0` = 1, `d` with only `id` | 0, `[]`; `b<i>` complete; the key change is `d` (old image) + `c` (new image) |
+| 2 no primary key, unique index, `NOT NULL` | no key | 1, `[0]` | as case 1 | as case 1 |
+| 3 no primary key, unique index, nullable | no key | 1, `[0]` | as case 1; a delete of one of two rows with `id` NULL arrives as `d` with every column NULL: it names no row | as case 1; the NULL-key delete carries its old image |
+| 4 no primary key, deferrable unique constraint | no key | 1, `[0]` | as case 1 | as case 1 |
+| 5 no primary key, no unique index (control) | no key | 0, `[]` | `b<i>` complete; the update of `id` is one `u` | the same rows as without the list |
+
+So **Debezium gives a key where the catalog says "no key" in cases 1–4**: it takes the primary key even when it
+is deferrable, and without a primary key the unique index of the table, also on a nullable column and also a
+deferrable constraint. Without the list the engine followed that key and sent no old image for these tables, also
+for a table with no primary key and a unique index, which the catalog had always called keyless; the list is what
+makes the two agree. With the list, replaying each table's records in arrival order (old image out, new image in)
+gives exactly the rows the source holds at the end, for all five cases; for case 1 the direct swap `UPDATE … SET
+id = 3 - id` arrives as `d (1,p,1)`, `c (2,p,1)`, `d (2,q,2)`, `c (1,q,2)` — two rows hold key 2 after the second
+record — and the transaction "insert a duplicate, then delete the old row" as `c (2,dup,0)`, `d (2,p,1)`. An update
+of a listed table that changes the column Debezium takes as key arrives as a delete and a create (Debezium splits
+it before the engine sees it; event count 2, section 9); a table Debezium already calls keyless sends one update.
+Both shapes carry complete old and new images; the changelog of P4 shows the shape that arrives.
+
+Negative control: the check "a stream without a key, whose replay equals the source" fails on the stream read
+without the list for cases 1–4 (asserted in every run of the test).
 
 ## 5. Acknowledgement
 
@@ -507,6 +567,10 @@ here (P9).
     the source package's.
 13. The source package's nudge writes a logical message with the prefix `cdc_v2.nudge`, which lies outside the
     default `message.prefix.include.list` (`cdc_v2_.*`) on purpose: it never reaches the pipeline.
+14. Rule K (package K): the list of tables without a key is `EngineSettings.keyless_tables`, one property
+    `cdc_v2.keyless.tables` with NUL after every name (section 4a). The FATAL for an update or delete without an
+    old image of a table without a key is new with package K; before it such a record arrived with NULLs in
+    `b<i>`.
 
 ## 13. Review
 
@@ -531,6 +595,7 @@ All done; the tests are named where each is described.
 uv run -q pytest -q tests/engine                                         # hermetic (default run): codec, detection, Engine with a fake JVM
 uv run -q pytest -q -m jvm tests/engine                                  # local JVM, no Postgres
 uv run -q pytest -q -m "jvm and localpg" tests/engine                    # the private pair pg-e (ports 55620-55627)
+uv run -q pytest -q -m "jvm and localpg" tests/engine/test_engine_keys.py   # rule K, section 4a (≈ 30 s)
 CDC_V2_E_LONG=1 uv run -q pytest -q -m "jvm and localpg" tests/engine    # long variants (1,000 detection seeds, 180 s freeze)
 CDC_V2_E_MEASURE=1 uv run -q pytest -q -m "jvm and localpg" tests/engine/test_engine_measure.py -s
 # with the variable CDC_V2_E_EVIDENCE set to the directory evidence/p3/engine, the suites also write the evidence files
