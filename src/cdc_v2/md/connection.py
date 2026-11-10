@@ -65,8 +65,10 @@ CLOCK_US_SQL = "SELECT epoch_us(uuid_extract_timestamp(uuidv7())) FROM _cdc.lead
 
 INTERRUPT_SQL = "SELECT md_interrupt_server_connection(?::UUID)"
 #: The kinds of statement whose changed rows `execute` returns (contract C4). The names are those of
-#: `duckdb.StatementType`; TRUNCATE is a DELETE there.
+#: `duckdb.StatementType`; TRUNCATE is a DELETE there. A statement with a RETURNING clause is not counted
+#: (`counts_rows`).
 COUNTED = frozenset(("INSERT", "UPDATE", "DELETE"))
+_WORD = re.compile(rb"[A-Za-z0-9_]")
 #: The kind of a statement that the client's parser refused.
 UNPARSED = "UNPARSED"
 INTERRUPTED_TEXT = "Connection Error: interrupted by user"      # MotherDuck's text after a server-side interrupt
@@ -157,6 +159,34 @@ def statement_kind(sql):
         return _parse(sql)[0]
     except (LaneMisuse, TypeError):
         return UNPARSED
+
+
+@functools.lru_cache(maxsize=1024)
+def returns_rows(sql):
+    """True when the statement has a RETURNING clause: its result is the rows it returns, not a count.
+
+    The client tells the two apart nowhere (same result type, same description when a returned column is named
+    ``Count``), so the clause is looked for in the tokens of the client's tokenizer, on this side. RETURNING is
+    a reserved word: it is a keyword token as the clause, and not inside a text, a quoted name or a comment.
+    Two other places give a keyword token too: a column label after AS (``SELECT 1 AS returning``) and a
+    parameter named ``$returning``. They count as a RETURNING clause; the mistake is on the safe side (no count
+    where one was possible, never a wrong number). Text that cannot be tokenized counts as returning rows."""
+    try:
+        raw = sql.encode("utf-8")                    # the tokenizer's positions are byte offsets
+        tokens = duckdb.tokenize(sql)
+    except Exception:                                # noqa: BLE001 - not text, or text the tokenizer refuses
+        return True
+    for pos, kind in tokens:
+        if (kind == duckdb.token_type.keyword and raw[pos:pos + 9].lower() == b"returning"
+                and not _WORD.match(raw[pos + 9:pos + 10])):
+            return True
+    return False
+
+
+def counts_rows(sql):
+    """True when `execute` returns the number of rows the statement changed: an INSERT, UPDATE or DELETE
+    without a RETURNING clause (contract C4)."""
+    return statement_kind(sql) in COUNTED and not returns_rows(sql)
 
 
 def _read(cur, fetch):
@@ -669,9 +699,9 @@ class Connection:
 
     def execute(self, sql, params=None, deadline=None):
         """Run one statement in autocommit. Returns the number of rows an INSERT, UPDATE or DELETE changed, else
-        None."""
+        None (also for a statement with RETURNING)."""
         n = self._autocommit(sql, params, "count", deadline)
-        return n if statement_kind(sql) in COUNTED else None
+        return n if counts_rows(sql) else None
 
     def fetchall(self, sql, params=None, deadline=None):
         return self._autocommit(sql, params, "all", deadline)

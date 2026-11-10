@@ -580,19 +580,22 @@ def test_a_lost_connection_is_reported_by_where_it_happened(led, faults, site, s
 def test_an_unclassified_error_after_commit_was_sent_is_commit_unknown(led, faults):
     c = counter(led)
     lane = led.lane("stream", led.epoch)
-    faults.raise_at("md.commit", hits=1)                        # FaultInjected: nothing this layer knows
-    with pytest.raises(md.CommitUnknown):
-        with lane.transaction() as tx:
-            tx.execute(BUMP)
-    # the same error before COMMIT was sent: rolled back, and its class and the kind of statement are named.
-    # First in BEGIN (the new connection registers with one statement, then BEGIN), then in the statement
-    for kind in ("BEGIN", "UPDATE"):
-        faults.raise_at("md.execute", skip=1, hits=1)
+    # An error that this layer does not know (FaultInjected) before COMMIT was sent: rolled back, and its class
+    # and the kind of statement are named. A lane's first transaction is the statement that registers its
+    # connection (an INSERT), BEGIN, then the caller's statement. The registration is not repeated once it worked.
+    for skip, kind in ((0, "INSERT"), (1, "BEGIN"), (1, "UPDATE")):
+        faults.raise_at("md.execute", skip=skip, hits=1)
         with pytest.raises(md.StatementError) as info:
             with lane.transaction() as tx:
                 tx.execute(BUMP)
         assert (info.value.error_class, info.value.statement) == ("FaultInjected", kind)
         assert value(c) == 0 and lane.conn.usable               # the connection is kept
+    assert lane.conn.generation == 1
+    faults.raise_at("md.commit", hits=1)                        # the same error once COMMIT is on its way
+    with pytest.raises(md.CommitUnknown):
+        with lane.transaction() as tx:
+            tx.execute(BUMP)
+    assert value(c) == 0 and not lane.conn.usable               # (the fault site is before the COMMIT is sent)
     with lane.transaction() as tx:
         tx.execute(BUMP)
     assert value(c) == 1 and lane.conn.generation == 2

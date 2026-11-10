@@ -75,6 +75,13 @@ COUNTS = [
     ("SELECT count(*) FROM c1", None, None),
     ('SELECT 5 AS "Count"', None, None),                        # the name of a result column decides nothing
     ("INSERT INTO c1 VALUES (7, 70) RETURNING k", None, None),  # its result is its rows: read them with fetchall
+    # Seeded: a returned column named like the client's count column. The first returned value (41) came back
+    # as the count of all three statements before the layer looked for the RETURNING clause itself.
+    ('INSERT INTO c1 VALUES (41, 410), (42, 420) RETURNING k AS "Count"', None, None),
+    ('UPDATE c1 SET v = v + 1 WHERE k = 41 RETURNING k AS "Count"', None, None),
+    ('DELETE FROM c1 WHERE k IN (41, 42) RETURNING k AS "Count"', None, None),
+    ("UPDATE c1 SET v = v WHERE k = 7 -- RETURNING k", None, 1),                # the word in a comment
+    ("UPDATE c1 SET v = v WHERE k = 7 AND 'é RETURNING' <> ''", None, 1),       # the word in a text
     ("CREATE SCHEMA c3", None, None),
     ("DROP SCHEMA c3", None, None),
     ("DROP TABLE c2", None, None),
@@ -116,6 +123,51 @@ def test_merge_reports_no_count_and_truncate_counts_as_a_delete(led, measured):
                                     "truncate_returns": truncated, "rows_after_truncate": left})
     assert rows == [(1, 10), (2, 5), (9, 90)]                   # the MERGE did run
     assert truncated == 3 and left == 0
+
+
+@pytest.mark.parametrize("sql, returning", [
+    ("INSERT INTO t VALUES (1) RETURNING k", True),
+    ('insert into t values (1) returning k as "Count"', True),
+    ("DELETE FROM t RETURNING\n*", True),
+    ("UPDATE t SET v = 1 WHERE k = $1 RETURNING/* c */k", True),
+    ("INSERT INTO t VALUES ('é ü 日本') RETURNING k", True),       # the tokenizer's positions are byte offsets
+    ("MERGE INTO t USING s ON t.k = s.k WHEN MATCHED THEN DELETE RETURNING *", True),
+    ("INSERT INTO t VALUES (1)", False),
+    ("INSERT INTO t VALUES ('RETURNING k')", False),
+    ("INSERT INTO t VALUES (1) -- RETURNING k", False),
+    ("INSERT INTO t VALUES (1) /* RETURNING k */", False),
+    ('DELETE FROM "returning"', False),
+    ("DELETE FROM t WHERE returning_x = 1", False),
+    ("SELECT $$ returning $$", False),
+    ("", False),
+    # The two known over-matches. They give None where a count was possible, never a wrong number.
+    ("INSERT INTO t SELECT 1 AS returning", True),
+    ("DELETE FROM t WHERE k = $returning", True),
+    (None, True), (5, True),                                        # not text: nothing is counted
+])
+def test_a_returning_clause_is_found_by_the_tokenizer_of_the_client(sql, returning):
+    """Seeded with the statements of `COUNTS` above. The client reports a statement with RETURNING like one
+    without (same result type; the same description when a returned column is named ``Count``)."""
+    assert mdc.returns_rows(sql) is returning
+    assert not (returning and mdc.counts_rows(sql))
+
+
+def test_execute_one_never_takes_a_returned_value_for_a_count(led):
+    """Seeded: the UPDATE changes two rows and returns ``k`` (1 and 1) under the name ``Count``. `execute_one`
+    took the first returned value for "one row changed" and the transaction committed."""
+    c = counter(led)
+    c.execute("INSERT INTO t VALUES (1, 100)")                  # a second row with k = 1
+    lane = led.lane("stream", led.epoch)
+    with pytest.raises(md.LaneMisuse, match="reports its changed rows"):
+        with lane.transaction() as tx:
+            tx.execute_one('UPDATE t SET v = v + 1 WHERE k = 1 RETURNING k AS "Count"')
+    assert c.fetchall("SELECT v FROM t ORDER BY v") == [(0,), (100,)]           # rolled back
+    with pytest.raises(md.Conflict, match="changed 2"):
+        with lane.transaction() as tx:
+            tx.execute_one(BUMP)                                # the same statement without RETURNING: counted
+    with lane.transaction() as tx:                              # the rows of RETURNING are read with fetchall
+        assert sorted(tx.fetchall('UPDATE t SET v = v + 1 WHERE k = 1 RETURNING v AS "Count"')) == [(1,), (101,)]
+    assert c.fetchall("SELECT v FROM t ORDER BY v") == [(1,), (101,)]
 
 
 @pytest.mark.parametrize("sql, kind", [

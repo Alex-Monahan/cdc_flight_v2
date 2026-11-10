@@ -30,8 +30,8 @@ from cdc_v2 import crashpoints
 from cdc_v2.deadline import Deadline, DeadlineExceeded
 
 from . import errors, registry
-from .connection import (CLOCK_US_SQL, COUNTED, SITE_EXECUTE, SITE_FENCE, Connection, _NO_TX, as_deadline,
-                         check_sql, statement_kind)
+from .connection import (CLOCK_US_SQL, SITE_EXECUTE, SITE_FENCE, Connection, _NO_TX, as_deadline, check_sql,
+                         counts_rows, returns_rows, statement_kind)
 from .errors import (CommitUnknown, Conflict, ConnectionLost, DestinationError, FenceLost, LaneMisuse,
                      StatementError)
 from .settings import LANES
@@ -214,12 +214,15 @@ class Transaction:
         for CREATE TABLE AS and MERGE, and for a statement with RETURNING: its rows are read with
         `fetchall`)."""
         n = self._call(sql, params, "count", deadline)
-        return n if statement_kind(sql) in COUNTED else None
+        return n if counts_rows(sql) else None
 
     def execute_one(self, sql, params=None, deadline=None):
         """Run a statement that must change exactly one row (the run-again rule of C4). Any other count rolls the
-        transaction back and raises `Conflict`."""
+        transaction back and raises `Conflict`. A statement that reports no count (a SELECT, or a statement with
+        RETURNING: its result is its rows) is a mistake of the caller: rolled back, `LaneMisuse`."""
         n = self._call(sql, params, "count", deadline)
+        if returns_rows(sql):
+            n = None                                 # a returned value is never taken for a count
         if n == 1:
             return 1
         self._rollback()
