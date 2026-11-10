@@ -195,7 +195,10 @@ class Proc:
         """SIGKILL to the group and to every descendant that left it (found through parent pids)."""
         table = process_table()
         self._remember(table)
-        self.signal_group(signal.SIGKILL, table)
+        try:
+            self.signal_group(signal.SIGKILL, table)
+        except PermissionError:
+            pass            # macOS EPERM for a group in transition: the process and its known descendants follow
         for pid in self._known_alive(table):
             try:
                 os.kill(pid, signal.SIGKILL)

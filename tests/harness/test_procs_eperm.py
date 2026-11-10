@@ -29,3 +29,11 @@ def test_eperm_for_a_living_group_is_raised(monkeypatch, tmp_path):
     finally:
         monkeypatch.undo()
         p.kill_and_wait(10)
+
+
+def test_kill_tree_survives_eperm_of_the_group(monkeypatch, tmp_path):
+    p = procs.start([sys.executable, "-c", "import time; time.sleep(30)"], name="long",
+                    log_path=str(tmp_path / "l.log"))
+    monkeypatch.setattr(os, "killpg", _eperm)
+    p.kill_tree()                       # the group answers EPERM; the process itself is still killed
+    assert p.wait(10).killed
