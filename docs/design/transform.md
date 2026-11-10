@@ -32,7 +32,7 @@ t.stream(plan, rows); t.backfill(plan, rows); t.ambiguous(plan, rows); t.close()
   same value with the same hash.
 - `TablePlan` (frozen): `schema`, `table`, `oid`, `server_version_num`, `columns` (one `ColumnPlan` per position:
   `source_name`, `source_type` (format_type, with modifiers), `base_type`, `family`, `dest_name`, `native_type`,
-  `wide_type`, `form` ('native' | 'wide'), `dest_type`, `key`, `unchanged_possible` (catalog `toastable`),
+  `wide_type`, `form` ('native' | 'wide'), `dest_type`, `key`, `unchanged_possible` (variable-length type, as the engine decides; not the column storage),
   `stream_forms`, `numeric`, `step`), `has_key`, `key_positions`, `ambiguous`, `collisions`, `hash`;
   `widened(position)`, `widen_sql(position, column_sql=None)`, `with_step(position, sql)`, `table_meta()`,
   `create_columns()`, `column_ddl()`, `arrow_schema()`.
@@ -114,31 +114,34 @@ exactly as Postgres's `EncodeDateTime`/`EncodeInterval` print it.
 
 | Table | Direction | 1 row: µs per call | 1,000 rows: rows/s | 100,000 rows: rows/s (MB/s of input) |
 |---|---|---|---|---|
-| lineitem (16 columns) | stream | 93 | 5.9 M | 11.7 M (2,211) |
-| lineitem | backfill | 5,926 | 149 K | 875 K (200) |
-| narrow (bigint, int) | stream | 8 | 124 M | – (all passed on) |
-| narrow | backfill | 507 | 1.7 M | 15.8 M (406) |
-| 200 columns (10 families) | stream | 38,300 | 17 K | 55 K (144) |
-| 200 columns | backfill | 181,187 | 4.5 K | 23 K (81) |
+| lineitem (16 columns) | stream | 92 | 5.6 M | 11.4 M (2,150) |
+| lineitem | backfill | 8,229 | 108 K | 782 K (179) |
+| narrow (bigint, int) | stream | 8 | 120 M | – (all passed on) |
+| narrow | backfill | 735 | 1.3 M | 15.0 M (385) |
+| 200 columns (10 families) | stream | 49,630 | 16 K | 52 K (137) |
+| 200 columns | backfill | 201,830 | 4.3 K | 22 K (79) |
 
-- At lineitem width the transform is 9 times (backfill) and more than 100 times (stream) faster than the 100,000
+Final run, after the review fixes; an earlier run of the same code without the digit check of constrained
+numerics gave 875 K rows/s for the lineitem backfill (other workers were running; numbers vary by about 10 %).
+
+- At lineitem width the transform is about 8 times (backfill) and more than 100 times (stream) faster than the 100,000
   rows/s the pipeline needs (SPEC 3.1, 5.1).
 - What limits it: (1) the parse and plan of one DuckDB statement per call (prepared statements are unusable, above):
-  about 6 ms for lineitem's backfill statement, 38 to 180 ms for 200 columns. A one-row stream batch avoids it by
-  the fast path (93 µs); a one-row backfill batch does not occur (chunks are large). (2) DuckDB's text parsing for
+  about 6–8 ms for lineitem's backfill statement, 50 to 200 ms for 200 columns. A one-row stream batch avoids it
+  by the fast path (92 µs); a one-row backfill batch does not occur (chunks are large). (2) DuckDB's text parsing for
   some families, measured per column on 100,000 rows: interval 1.3 M values/s (both directions), timestamptz text
   1.0 M/s, date text 3.5 M/s, unconstrained numeric 16 M/s (it was 0.8 M/s: DuckDB parses text into a DECIMAL wider
   than 18 digits about 50 times slower than into `DECIMAL(18, s)`, so a text whose digits fit goes that way and is
   widened exactly). A 200-column table with 20 interval and 20 timestamptz columns is therefore limited to about
-  23–55 K rows/s per core.
+  22–52 K rows/s per core.
 - For package S: at 2,000 small transactions per second (SPEC 5.3) a table whose stream columns all have a fast path
   costs about 0.1 ms per batch; a table with an `interval`, `uuid`, `timetz`, unconstrained numeric or money column
   costs a statement (about 1 ms) per batch. Concatenating the consecutive `ROWS` batches of one table and schema
   version before the transform (it is row-local) removes that cost.
 
 **Memory** (`memory_100mb.json`, growth of the resident set during one conversion, measured in a fresh process with
-a sampler): a 100 MB `bytea` value through the backfill (200 MB of hex text) adds 1.0 × the batch (about 2 × the
-value); a 100 MB text value (both paths) and a 100 MB `bytea` value in the stream add nothing (passed on, no copy).
+a sampler): a 100 MB `bytea` value through the backfill (200 MB of hex text) adds 0.9–1.0 × the batch (about 2 × the
+value; 0.89 in the final run); a 100 MB text value (both paths) and a 100 MB `bytea` value in the stream add nothing (passed on, no copy).
 
 ## 5. Contract notes
 
@@ -216,6 +219,18 @@ DuckDB's JSON refuses lone surrogate escapes; TIMETZ → VARCHAR prints `-01:00:
 union whose selected child is NULL gives a real NULL; `TimeZone` cannot be given in the connect configuration
 (only `SET` after connect); with external access off `temp_directory` cannot be changed after connect; column-name
 folding is ASCII-only.
+
+## 7a. Review
+
+A read-only reviewer with fresh context (Opus) checked, by running hermetic code, 550,000 floats, 40,000 dates and
+timestamps, 8,000 intervals, the numeric fast path, money and timetz, and found no silent wrong value for valid input.
+It found four edge cases, all fixed with a regression test (`tests/transform/test_transform_vectors.py`, section
+"review findings"): (1) a constrained numeric checked only NaN, so a row with more digits than the current typmod
+(decoded before an `ALTER COLUMN TYPE`) would have been rounded by the cast: the digit test now applies to every
+numeric and such a value widens; (2) the stream's date fast path could wrap on a transport value beyond Postgres's
+range: it now covers only Postgres's range; (3) "unchanged possible" came from the column's storage, but `SET STORAGE
+PLAIN` leaves out-of-line values in place: it now follows the type (variable length), as the engine does; (4) a step
+template with a lone `}` failed at compile time: refused when set.
 
 ## 8. Tests and how to run them
 

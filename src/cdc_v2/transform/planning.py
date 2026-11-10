@@ -29,7 +29,7 @@ class ColumnPlan:
     wide_type: Optional[str]         # DuckDB type of the wide form; None: one form only
     form: str                        # 'native' | 'wide': the form the destination column is in
     key: bool
-    unchanged_possible: bool         # the stream may send this column as "unchanged" (u<i>)
+    unchanged_possible: bool         # the stream may send this column as "unchanged" (u<i>): variable length
     stream_forms: tuple              # transport forms the engine may send (docs/design/engine.md 3)
     numeric: Optional[tuple] = None  # numeric: (width, scale, general)
     step: Optional[str] = None       # SPEC 8.3 seam: SQL over '{x}' (the converted value), applied on both paths
@@ -189,6 +189,16 @@ def dest_names(names) -> tuple:
 # ------------------------------------------------------------------------------------------------ plan()
 
 
+def _unchanged_possible(column) -> bool:
+    """A value of a variable-length type can be stored out of line and then arrive as "unchanged", whatever the
+    column's storage says now (SET STORAGE PLAIN does not move values already stored out of line). The engine's rule
+    is the same: text or bytes form and not of fixed length."""
+    t = column.type
+    if t.kind == "domain" and t.base is not None:
+        t = t.base
+    return t.kind == "array" or t.typlen == -1
+
+
 def plan(source_table, schema_frame=None, *, server_version_num: int) -> TablePlan:
     """The plan of one source table (`cdc_v2.pg.catalog.SourceTable`). Positions are the table's live columns in
     `attnum` order (the engine's positions). With `schema_frame` (the engine's SCHEMA frame) the frame is checked
@@ -206,7 +216,7 @@ def plan(source_table, schema_frame=None, *, server_version_num: int) -> TablePl
         cols.append(ColumnPlan(
             position=i, attnum=c.attnum, source_name=c.name, source_type=c.type_name, base_type=spec.base_type,
             family=spec.family, dest_name=dnames[i], native_type=spec.native_type, wide_type=spec.wide_type,
-            form="native", key=i in key_positions, unchanged_possible=bool(c.toastable),
+            form="native", key=i in key_positions, unchanged_possible=_unchanged_possible(c),
             stream_forms=spec.stream_forms, numeric=spec.numeric))
     ambiguous = tuple(c.position for c in cols if c.family == "interval") if server_version_num >= 170000 else ()
     p = TablePlan(schema=source_table.schema, table=source_table.name, oid=source_table.oid,

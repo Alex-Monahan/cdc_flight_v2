@@ -515,3 +515,43 @@ def same_values(a, b):
     if pa.types.is_timestamp(a.type):
         return a.view(pa.int64()).equals(b.view(pa.int64()))
     return a.equals(b)
+
+
+
+# ------------------------------------------------------------------------------------------------ review findings
+
+def test_constrained_numeric_with_more_digits_than_the_typmod_is_a_misfit_never_rounded():
+    """Reviewer finding 1: a row decoded before an ALTER COLUMN TYPE can carry more digits than the catalog's typmod
+    now allows; it must widen, never be rounded by the cast (both paths)."""
+    for text in ("12.345", "1234.56"):
+        with pytest.raises(T.WideningNeeded):
+            back("numeric", [text], numeric_typmod(5, 2))
+        with pytest.raises(T.WideningNeeded):
+            strm("numeric", pa.array([text]), numeric_typmod(5, 2))
+    w = back("numeric", ["12.345", "1.50"], numeric_typmod(5, 2), wide=True)
+    assert union_values(w) == [(1, "12.345"), (0, D("1.50"))]
+
+
+def test_date_fast_path_never_wraps():
+    """Reviewer finding 2: a transport value beyond Postgres's date range takes the SQL path (ConversionError)
+    instead of wrapping in the int32 add."""
+    with pytest.raises(T.ConversionError):
+        strm("date", pa.array([2147483000], pa.int32()))
+
+
+def test_unchanged_possible_follows_the_type_not_the_storage():
+    """Reviewer finding 3: SET STORAGE PLAIN leaves out-of-line values where they are; a variable-length column can
+    still arrive as unchanged."""
+    c = col(1, "t", "text", toastable=False)
+    p = T.plan(table([c]), server_version_num=V18)
+    assert p.columns[0].unchanged_possible and p.table_meta().columns[0].unchanged_possible
+    assert not T.plan(one("int8"), server_version_num=V18).columns[0].unchanged_possible
+    assert T.plan(table([col(1, "a", array("int4"), type_name="x")]), server_version_num=V18).columns[0] \
+        .unchanged_possible
+
+
+def test_step_with_a_lone_brace_is_refused():
+    """Reviewer finding 4."""
+    p = T.plan(one("text"), server_version_num=V18).with_step(0, "{x} || '}'")
+    with pytest.raises(ValueError):
+        T.backfill(p, pa.record_batch({"a0": pa.array(["a"])}))

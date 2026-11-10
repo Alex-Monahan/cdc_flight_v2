@@ -294,6 +294,7 @@ class Transformer:
 
 
 _TS_TOP = F.INT64_MAX - F.PG_EPOCH_US - 1          # below it a stream timestamp is finite and fits TIMESTAMP
+_DATE_MIN, _DATE_MAX = -2451545, 2145031948         # Postgres's date range in days since 2000-01-01
 
 
 def _fast_all(c: _Compiled, rows: pa.RecordBatch):
@@ -312,7 +313,9 @@ def _fast_all(c: _Compiled, rows: pa.RecordBatch):
             if cv.fast == "date":
                 if valid:
                     mm = pc.min_max(arr)
-                    if mm["min"].as_py() == F.INT32_MIN or mm["max"].as_py() == F.INT32_MAX:
+                    # only the Postgres range (4714-11-24 BC .. 5874897-12-31): the add cannot wrap, and an
+                    # infinity sentinel or anything beyond takes the SQL path
+                    if mm["min"].as_py() < _DATE_MIN or mm["max"].as_py() > _DATE_MAX:
                         return None
                 res = pc.add(arr, pa.scalar(F.PG_EPOCH_DAYS, pa.int32())).view(pa.date32())
             elif cv.fast == "ts":
@@ -361,7 +364,8 @@ def _seq(rows: pa.RecordBatch, row):
 def _with_step(cv: F.Conv, step: str, dest_type: str) -> F.Conv:
     """SPEC 8.3 seam: `step` is SQL in which `{x}` stands for the converted value (no other braces). A column that
     is passed through goes through SQL when it has a step."""
-    if "{" in step.replace("{x}", ""):
+    rest = step.replace("{x}", "")
+    if "{" in rest or "}" in rest:
         raise ValueError("a step may contain no braces other than {x}")
     if cv.kind == "sql" and not cv.post:
         return F.Conv("sql", cv.in_type, cv.out_type, cv.layers,

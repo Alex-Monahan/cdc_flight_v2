@@ -4,11 +4,11 @@
     {
       "batch_bytes": 209715210,
       "direction": "backfill",
-      "extra_over_batch": 1.0,
+      "extra_over_batch": 0.89,
       "kind": "bytea",
-      "peak_rss_mb": 1042,
-      "rss_before_mb": 832,
-      "seconds": 0.494,
+      "peak_rss_mb": 1019,
+      "rss_before_mb": 833,
+      "seconds": 0.559,
       "value_bytes": 104857600
     },
     {
@@ -26,7 +26,7 @@
       "direction": "backfill",
       "extra_over_batch": 0.0,
       "kind": "text",
-      "peak_rss_mb": 300,
+      "peak_rss_mb": 299,
       "rss_before_mb": 299,
       "seconds": 0.0,
       "value_bytes": 104857600

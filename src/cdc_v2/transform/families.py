@@ -438,14 +438,13 @@ def _numeric(spec: TypeSpec, form: str) -> Conv:
         (("il", "((CASE WHEN {p}dot = 0 THEN {p}len ELSE {p}dot - 1 END) - CASE WHEN {p}neg THEN 1 ELSE 0 END)"),
          ("fl", "(CASE WHEN {p}dot = 0 THEN 0 ELSE {p}len - {p}dot END)")),
     )
-    if general:
-        # cheap test first; the exact one (leading zeros of the integer part, trailing zeros of the fraction) only
-        # for the texts that the cheap one does not settle
-        fits = ("(NOT %s AND (CASE WHEN {p}il <= %d AND {p}fl <= %d THEN TRUE ELSE "
-                "strlen(ltrim(split_part(ltrim({x}, '-'), '.', 1), '0')) <= %d AND "
-                "strlen(rtrim(split_part({x}, '.', 2), '0')) <= %d END))" % (special, w - s, s, w - s, s))
-    else:
-        fits = "(NOT %s)" % special
+    # cheap test first; the exact one (leading zeros of the integer part, trailing zeros of the fraction) only for
+    # the texts that the cheap one does not settle. Also for a constrained numeric: Postgres prints its values within
+    # the typmod, but a row decoded before an ALTER COLUMN TYPE may carry more digits than the catalog now allows;
+    # such a value is a misfit (wide form), never rounded by the cast
+    fits = ("(NOT %s AND (CASE WHEN {p}il <= %d AND {p}fl <= %d THEN TRUE ELSE "
+            "strlen(ltrim(split_part(ltrim({x}, '-'), '.', 1), '0')) <= %d AND "
+            "strlen(rtrim(split_part({x}, '.', 2), '0')) <= %d END))" % (special, w - s, s, w - s, s))
     native = "CAST({x} AS DECIMAL(%d,%d))" % (w, s)
     if w > 18 and s <= 17:
         # DuckDB parses text into a DECIMAL wider than 18 digits about 50 times slower than into DECIMAL(18, s);

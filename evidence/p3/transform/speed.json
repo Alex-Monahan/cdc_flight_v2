@@ -6,110 +6,110 @@
     "lineitem/backfill/1": {
       "calls": 2000,
       "mb_per_s": 0.0,
-      "rows_per_s": 169,
-      "us_per_call": 5925.9
+      "rows_per_s": 122,
+      "us_per_call": 8229.0
     },
     "lineitem/backfill/1000": {
-      "calls": 75,
-      "mb_per_s": 31.5,
-      "rows_per_s": 149162,
-      "us_per_call": 6704.1
+      "calls": 55,
+      "mb_per_s": 22.9,
+      "rows_per_s": 108477,
+      "us_per_call": 9218.6
     },
     "lineitem/backfill/100000": {
-      "calls": 5,
-      "mb_per_s": 200.3,
-      "rows_per_s": 874849,
-      "us_per_call": 114305.5
+      "calls": 4,
+      "mb_per_s": 179.0,
+      "rows_per_s": 781973,
+      "us_per_call": 127881.6
     },
     "lineitem/stream/1": {
-      "calls": 5366,
+      "calls": 5415,
       "mb_per_s": 2.2,
-      "rows_per_s": 10731,
-      "us_per_call": 93.2
+      "rows_per_s": 10829,
+      "us_per_call": 92.3
     },
     "lineitem/stream/1000": {
-      "calls": 2929,
-      "mb_per_s": 1045.5,
-      "rows_per_s": 5856758,
-      "us_per_call": 170.7
+      "calls": 2781,
+      "mb_per_s": 992.6,
+      "rows_per_s": 5560205,
+      "us_per_call": 179.8
     },
     "lineitem/stream/100000": {
-      "calls": 59,
-      "mb_per_s": 2211.0,
-      "rows_per_s": 11731108,
-      "us_per_call": 8524.3
+      "calls": 58,
+      "mb_per_s": 2149.7,
+      "rows_per_s": 11405961,
+      "us_per_call": 8767.3
     },
     "narrow/backfill/1": {
       "calls": 2000,
       "mb_per_s": 0.0,
-      "rows_per_s": 1972,
-      "us_per_call": 507.0
+      "rows_per_s": 1361,
+      "us_per_call": 734.5
     },
     "narrow/backfill/1000": {
-      "calls": 869,
-      "mb_per_s": 37.7,
-      "rows_per_s": 1737750,
-      "us_per_call": 575.5
+      "calls": 648,
+      "mb_per_s": 28.1,
+      "rows_per_s": 1295614,
+      "us_per_call": 771.8
     },
     "narrow/backfill/100000": {
-      "calls": 79,
-      "mb_per_s": 405.7,
-      "rows_per_s": 15775166,
-      "us_per_call": 6339.1
+      "calls": 75,
+      "mb_per_s": 384.9,
+      "rows_per_s": 14964955,
+      "us_per_call": 6682.3
     },
     "narrow/stream/1": {
-      "calls": 62621,
-      "mb_per_s": 3.6,
-      "rows_per_s": 125240,
-      "us_per_call": 8.0
+      "calls": 59519,
+      "mb_per_s": 3.5,
+      "rows_per_s": 119038,
+      "us_per_call": 8.4
     },
     "narrow/stream/1000": {
-      "calls": 61937,
-      "mb_per_s": 3097.3,
-      "rows_per_s": 123872503,
-      "us_per_call": 8.1
+      "calls": 60066,
+      "mb_per_s": 3003.8,
+      "rows_per_s": 120130849,
+      "us_per_call": 8.3
     },
     "narrow/stream/100000": {
-      "calls": 60595,
-      "mb_per_s": 302973.5,
-      "rows_per_s": 12118919215,
+      "calls": 60244,
+      "mb_per_s": 301217.0,
+      "rows_per_s": 12048662429,
       "us_per_call": 8.3
     },
     "wide200/backfill/1": {
       "calls": 2000,
       "mb_per_s": 0.0,
-      "rows_per_s": 6,
-      "us_per_call": 181187.3
+      "rows_per_s": 5,
+      "us_per_call": 201829.7
     },
     "wide200/backfill/1000": {
       "calls": 3,
-      "mb_per_s": 14.8,
-      "rows_per_s": 4512,
-      "us_per_call": 221625.3
+      "mb_per_s": 13.9,
+      "rows_per_s": 4266,
+      "us_per_call": 234407.4
     },
     "wide200/backfill/100000": {
       "calls": 1,
-      "mb_per_s": 80.6,
-      "rows_per_s": 22886,
-      "us_per_call": 4369487.9
+      "mb_per_s": 78.5,
+      "rows_per_s": 22275,
+      "us_per_call": 4489243.8
     },
     "wide200/stream/1": {
       "calls": 2000,
       "mb_per_s": 0.1,
-      "rows_per_s": 26,
-      "us_per_call": 38300.1
+      "rows_per_s": 20,
+      "us_per_call": 49629.5
     },
     "wide200/stream/1000": {
-      "calls": 9,
-      "mb_per_s": 42.9,
-      "rows_per_s": 17391,
-      "us_per_call": 57500.0
+      "calls": 8,
+      "mb_per_s": 38.4,
+      "rows_per_s": 15564,
+      "us_per_call": 64250.7
     },
     "wide200/stream/100000": {
       "calls": 1,
-      "mb_per_s": 143.5,
-      "rows_per_s": 54737,
-      "us_per_call": 1826906.6
+      "mb_per_s": 137.0,
+      "rows_per_s": 52252,
+      "us_per_call": 1913793.8
     }
   },
   "test": "tests/transform/test_transform_measure.py::test_speed",
