@@ -75,8 +75,13 @@ and on replication connections, and the printed texts are the ones above.
 - Statement: a watchdog fires at the deadline, sends a cancel request (`cancel_safe`, bounded by `cancel_grace_s`),
   and if the call has not returned `cancel_grace_s` later shuts the socket down, which fails the blocked call at once.
   A call reached by the watchdog raises `DeadlineExceeded` and the connection is closed (a late cancel could hit the
-  next statement). Bound: deadline + 2 × `cancel_grace_s`.
-- Close: on a helper thread, bounded the same way.
+  next statement); the close runs in the background after the socket is shut, so it adds no wait. Bound:
+  deadline + 2 × `cancel_grace_s`. The shutdown uses a duplicate of the socket that the connection keeps for its
+  lifetime, so it can never reach a reused descriptor of another connection.
+- `transaction()`: after an SQL error inside the block, the ROLLBACK has its own `cancel_grace_s` deadline.
+- Close: on a helper thread; past the deadline the socket is shut down and the close finishes in the background.
+- Limit: a fault-site `block` rule at `pg.execute` sleeps in the calling thread and is not interrupted by the
+  watchdog (test runs with a control file only).
 
 Measured with the TCP fault proxy (`evidence … proxy`, grace 0.5 s): black hole during connect, during a statement
 and while idle in a transaction all end at the deadline plus at most two graces; while idle in a transaction the
@@ -124,7 +129,8 @@ not `relfilenode`, row security or publication membership):
   range/multirange/pseudo; a domain's ultimate base, enum labels in sort order, array element, composite fields,
   range subtype), `ndims` (as declared), `not_null`, `has_default`, `generated` (`stored`, `virtual` on 18),
   `identity`, `storage`, `toastable` ("unchanged possible": variable length and storage other than plain);
-- key: `key` / `key_attnums` (primary key, else the replica identity index, in key order), `key_source`,
+- key: `key` / `key_attnums` (primary key, else the replica identity index, in key order; the key columns of the
+  index only, never its `INCLUDE` columns), `key_source`,
   `has_primary_key`, `replica_identity` (`default` | `index` | `full` | `nothing`), `replica_identity_index`,
   `replica_identity_index_is_key`, and `replica_identity_problem` (§3);
 - publication: `published` (directly or through a partition ancestor), `publication_columns`,
@@ -151,9 +157,10 @@ catalog columns are read (no `format_type`, no `regclass` casts): those use the 
   ended at or before `b` is visible, none that committed after `a` is.
 - **On a primary** only the upper bound is a guarantee: no commit inserted after `a` is visible. A commit record is
   written before its transaction becomes visible (and with synchronous replication it can stay invisible for long), so
-  a DDL whose commit ended before `b` may still be invisible; its transaction id is then in the snapshot's
-  in-progress list (`CatalogObservation.in_progress`). A DDL transaction's catalog change becomes visible at its
-  commit, never before.
+  a DDL whose commit ended before `b` may still be invisible (measured: §7). Whether a given transaction is in the
+  observation is `CatalogObservation.visible(xid)`: below the snapshot's `xmax` and not in its in-progress list
+  (a transaction at or above `xmax` is invisible without being listed). A DDL transaction's catalog change becomes
+  visible at its commit, never before.
 
 `TableFacts.identity` = (OID, per live column `(attnum, name, type oid, typmod)`, key attnums) — what package T
 compares. `relfilenode` is not part of it.
@@ -186,9 +193,11 @@ name and type is a drop of one `attnum` and an add of another, never a rename.
   table): unlogged or temporary tables (H-030); a table **without a primary key that is not `REPLICA IDENTITY FULL`,
   also with `REPLICA IDENTITY USING INDEX`** (Debezium gives such a table no key and the engine would carry an
   incomplete old image); `REPLICA IDENTITY NOTHING`; a table with a primary key whose identity index is another
-  index. `replica_identity.set_full(primary, table, deadline, lock_timeout_ms=None)` fixes all of them (`SET LOCAL
-  lock_timeout`; `LockTimeout` when the ACCESS EXCLUSIVE lock is not granted in time; returns False when the table
-  already was FULL). The catalog observation reports the same rule as `TableFacts.replica_identity_problem`.
+  index. For a partitioned table its leaf partitions are checked too (with `publish_via_partition_root = false`
+  they are what is published). `replica_identity.set_full(primary, table, deadline, lock_timeout_ms=None)` fixes
+  all of them (`SET LOCAL lock_timeout`; `LockTimeout` when the ACCESS EXCLUSIVE lock is not granted in time;
+  returns False when nothing had to change); for a partitioned table it sets every existing leaf as well (an
+  `ALTER TABLE` on the parent does not reach the partitions; a partition attached later needs its own call). The catalog observation reports the same rule as `TableFacts.replica_identity_problem`.
   The wrong order is shown by test: a keyless table added without FULL makes the source's own `UPDATE` and `DELETE`
   fail (SQLSTATE 55000, "does not have a replica identity and publishes updates").
 - `next_xid` (X of design 7.5) = `pg_snapshot_xmax(pg_current_snapshot())` read after the change committed: the first
@@ -197,6 +206,10 @@ name and type is a drop of one `attnum` and an add of another, never a rename.
   generated_columns, tables[(oid, schema, name, columns, row_filter)])`, `.problems` lists differences from what we
   create. H-034: a publication that was dropped and recreated has another `oid` (test); compare it with the oid
   recorded when the slot was created. Changes between the drop and the recreate are not in the stream.
+- `publication.has_table(conn, schema, name, *, publication, deadline) -> bool`: the table is in the publication
+  (directly, through a partition ancestor, or FOR ALL TABLES); a catalog read the runtime role may do. The attach
+  step uses it, through `heartbeat.check`, for the heartbeat table.
+- `publication.leaves(conn, schema, name)`: the leaf partitions of a partitioned table.
 - `publication.remove(...)` exists for an operator; nothing calls it automatically.
 
 ## 4. Slot
@@ -205,8 +218,11 @@ name and type is a drop of one `attnum` and an add of another, never a rename.
 CreatedSlot(name, consistent_point, on_standby, failover, seconds, nudges, nudge_method)`; logical, `pgoutput`, not
 temporary, two-phase off; refuses an existing name (`SlotExists`).
 
+- The creating statement runs with `statement_timeout = 0` (the caller's deadline bounds it, not the session's
+  30 s) and `client_connection_check_interval = 1000`; both are reset afterwards.
 - **On a standby** the creation waits for a running-transactions record from the primary. With `primary` given, a
-  helper thread asks for one every 0.5 s: `pg_log_standby_snapshot()` when the role may call it
+  helper thread asks for one every 0.5 s, on a connection of its own opened from `primary`'s settings (the caller's
+  connection is only used to choose the method and for the report), stopping 1 s before the deadline: `pg_log_standby_snapshot()` when the role may call it
   (`nudge_method` = `standby_snapshot`), otherwise a write of its own (`write`: a non-transactional logical message
   `pg_logical_emit_message(false, 'cdc_v2.nudge', '')`, which needs no table privilege). What the server does by
   itself: the primary's background writer logs a running-transactions record at most every 15 s and only when
@@ -217,9 +233,11 @@ temporary, two-phase off; refuses an existing name (`SlotExists`).
   builder waits for every transaction running at the first record).
 - **Grant needed for the fast path**: `GRANT EXECUTE ON FUNCTION pg_catalog.pg_log_standby_snapshot() TO <runtime
   role>`, given by a superuser (the admin role of a managed provider cannot, it does not own the function).
-- **At the deadline** the creation is cancelled (`SlotCreateTimeout`, a `DeadlineExceeded`); if the creating backend
-  is still there (cancel not answered), it is terminated by process id **and** backend start time from a second
-  connection; then the call checks that no slot exists (`report["leftover"]`). The report names what the roles may see
+- **When the creation fails** — at the deadline (`SlotCreateTimeout`, a `DeadlineExceeded`), on a lost connection or
+  any other error, on a standby and on a primary — the creating backend, if still there, is terminated by process
+  id **and** backend start time from a second connection; then the call checks whether a slot exists
+  (`report["leftover"]`: True, False, or None with `cleanup_error` when the check itself failed). The report is the
+  exception's `report` attribute. The report names what the roles may see
   of the cause: the primary's oldest running transaction id (`pg_snapshot_xmin`), the number and age of prepared
   transactions, the nudge method and count.
 - A client that dies during the creation: with `client_connection_check_interval = 1000` (set by `create` for the
@@ -266,7 +284,10 @@ the server version (columns a version lacks are None). `None` when the slot does
 reads the facts, then runs `pg_terminate_backend(active_pid, wait)` **in a statement that checks again that the slot's
 `active_pid` and that backend's start time are the ones read**; repeats until the slot is inactive (`'inactive'`),
 missing (`'missing'`), or — with `expect = (pid, start µs)` — held by another backend (`'other holder'`, nothing
-terminated). Never terminates a pid from anywhere else. Races tested: the holder exits by itself between the read and
+terminated). `'holder unknown'`: the slot is active but its holder's start time is not visible to this role (a
+backend of another role, without `pg_read_all_stats`); nothing is terminated and `drop(terminate=True)` raises
+`SlotActive`. The terminate does not wait for the exit (`pg_terminate_backend(pid)`); the loop reads the facts again.
+Never terminates a pid from anywhere else. Races tested: the holder exits by itself between the read and
 the terminate (nothing is terminated); another session takes the slot in between (the stale read terminates
 nothing; without `expect` the new holder of our slot is terminated in the next round, with `expect` the call returns
 `'other holder'`).
@@ -277,6 +298,8 @@ position)` over a `replication=database` connection (opened from the node's sett
 query protocol (`PgConnection.simple`, libpq `PQexec`); `cdc_v2_runtime` (REPLICATION) may.
 `timeline.contains(history, position, timeline)`: true when `timeline` is the current one, or an ancestor and
 `position ≤` its switch point; false for a position past the switch on the old timeline and for an unknown timeline.
+The comparison is right for end-of-record positions (a commit end, `confirmed_flush_lsn`, the applied position), not
+for a record's start such as `restart_lsn`.
 Tested with a real promotion on the breakable pair: the old primary kept writing on timeline 1 after the standby was
 promoted; a position before the switch → true, after it on timeline 1 → false, on timeline 2 → true.
 
@@ -284,17 +307,37 @@ promoted; a position before the switch → true, after it on timeline 1 → fals
 
 ## 5. Heartbeat
 
-Built form: a **row in a published table of ours**, written as a transaction of its own on the primary:
+**Built form: a row in a published heartbeat table of ours** (the recommended form of the task; not a logical
+message), written as a transaction of its own on the primary:
 `INSERT INTO cdc_v2.heartbeat (slot, marker, n, beat_at) … ON CONFLICT (slot) DO UPDATE SET marker = …, n = n + 1,
-beat_at = now()` — one row per slot name. It arrives on the stream as `BEGIN`, `ROWS`, `END`, and only an `END`
-moves the applied position (C2), so an idle slot advances and so does a slot behind busy unpublished tables (test).
-`heartbeat.setup_sql(runtime_role)` gives the setup role's statements (schema, table with a primary key — so no
-replica identity change — and `SELECT, INSERT, UPDATE` for the runtime role); `publication.ensure` adds the table.
+beat_at = now()` — one row per slot name. It arrives on the stream as `BEGIN`, `ROWS`, `END`; only an `END` moves the
+applied position (C2), so an idle slot advances and so does a slot behind busy unpublished tables (test). A
+non-transactional logical message would not do (it has no `END`); a transactional one would need the message prefix
+in `message.prefix.include.list` and `pg_logical_emit_message` on the primary.
 
-`heartbeat.beat(primary, slot, *, deadline) -> HeartbeatWrite(slot, marker, n, xid, lower, upper)`: `marker` is a new
-UUID per write (the stream recognises its write by it, and by the 64-bit transaction id `xid`); `lower ≤` start of
-the commit record `<` commit end `≤ upper` (tested against the decoded `C` message). The write is idempotent and two
-runs may do it at once: each sets its slot's row to its own marker. Cost: §7.
+What the runtime role needs for it: `USAGE` on schema `cdc_v2` and `SELECT, INSERT, UPDATE` on `cdc_v2.heartbeat`
+(nothing else; no `pg_logical_emit_message`).
+
+What creates it: `heartbeat.ensure(setup, runtime_role, *, publication, deadline)`, run by the setup (bootstrap)
+role, idempotent: `CREATE SCHEMA IF NOT EXISTS`, `CREATE TABLE IF NOT EXISTS` (a primary key, so no replica identity
+change), the grants, and `publication.ensure` for the table. `heartbeat.setup_sql(runtime_role)` lists the
+statements. The check for the attach step, with the runtime role: `heartbeat.check(conn, *, publication, deadline)
+-> [problems]` (table missing; not in the publication — `publication.has_table`; this role may not write it). Empty
+means ready. Without the table in the publication an idle source never moves and the marker never comes back.
+
+`heartbeat.beat(primary, deadline, *, slot='cdc_v2_slot') -> HeartbeatWrite(slot, marker, n, xid, lower, upper,
+position)`:
+
+- `position` (= `upper`) is `pg_current_wal_insert_lsn()` read on the same connection **after COMMIT returned**, so
+  the beat's commit end is ≤ `position`. The stream recognises the beat by position: an `END` whose `ack_position`
+  (a commit end) is ≥ `position` belongs to a transaction that committed at or after the beat, and the slot decodes in
+  commit order, so the beat has been decoded when that `END` arrives — also when the heartbeat table is outside
+  `table.include.list`. When no other WAL is written between the commit and the read, the beat's own `END` has
+  `ack_position == position` (measured: §7); otherwise the next transaction's `END` (at the latest the next beat)
+  proves it.
+- `marker` is a new UUID per write and `xid` the 64-bit transaction id (pgoutput and Debezium carry its low 32 bits);
+  `lower ≤` start of the commit record `<` commit end `≤ upper` (tested against the decoded `C` message).
+- Idempotent; two runs may beat at once: each sets its slot's row to its own marker. Cost: §7.
 
 `heartbeat.standby_lag(primary, standby, *, deadline) -> StandbyLag(bytes_behind, replay_position,
 receive_position, primary_position, seconds_since_replayed_commit, replay_lag_s, replay_paused,

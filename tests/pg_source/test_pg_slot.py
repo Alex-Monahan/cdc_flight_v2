@@ -84,24 +84,30 @@ def test_create_on_standby_with_granted_standby_snapshot(cluster, scratch):
                      db=cluster.info["database"])
 
 
-def test_create_on_idle_primary_without_nudge_times_out_and_leaves_nothing(cluster, scratch):
-    published_table(scratch)
-    stby = scratch.connect("replica", cancel_grace_s=0.5)
-    idle_primary(cluster)
+def test_create_on_idle_primary_without_nudge_times_out_and_leaves_nothing(breakable):
+    """A truly idle primary needs autovacuum off: its work after earlier tests is WAL that the background writer
+    follows with a running-transactions record, which would let the creation finish."""
+    c = breakable
+    c.lp("set", "all", "autovacuum=off")
+    c.q("primary", "create table if not exists cdc_v2_idlep (id int primary key)")
+    c.q("primary", "create publication cdc_v2_pub_idlep for table cdc_v2_idlep")
+    c.replay_to_primary()
+    stby = c.connect("replica", cancel_grace_s=0.5)
+    idle_primary(c)
     t = time.monotonic()
     with pytest.raises(slot.SlotCreateTimeout) as ei:
-        slot.create(stby, scratch.slot, D(4), nudge=None)
+        slot.create(stby, "cdc_v2_slot_idlep", D(4), nudge=None)
     took = time.monotonic() - t
     rep = ei.value.report
     assert rep["leftover"] is False and took < 4 + 6
-    with scratch.connect("replica") as c:
-        assert slot.facts(c, scratch.slot, deadline=D()) is None
+    with c.connect("replica") as cc:
+        assert slot.facts(cc, "cdc_v2_slot_idlep", deadline=D()) is None
     # a running-transactions record now arrives; the abandoned creation must not finish the slot later
     for _ in range(10):
-        cluster.boot("primary", "select pg_log_standby_snapshot()")
+        c.boot("primary", "select pg_log_standby_snapshot()")
         time.sleep(0.3)
-    with scratch.connect("replica") as c:
-        assert slot.facts(c, scratch.slot, deadline=D()) is None
+    with c.connect("replica") as cc:
+        assert slot.facts(cc, "cdc_v2_slot_idlep", deadline=D()) is None
     record("slot_create", "idle_primary_no_nudge", {"deadline_s": 4, "returned_after_s": round(took, 2),
                                                     "report": rep})
 
@@ -123,10 +129,15 @@ def test_create_blocked_by_a_long_transaction(cluster, scratch):
     record("slot_create", "long_transaction", {"timed_out_report": rep, "after_commit_s": round(c.seconds, 2)})
 
 
-def test_creation_whose_client_is_killed_leaves_no_slot(cluster, scratch):
+def test_creation_whose_client_is_killed_leaves_no_slot(breakable):
     """H-042: a creation abandoned by a killed client. With client_connection_check_interval the backend aborts;
-    the negative control (a plain creation without it) shows that the slot would otherwise appear later."""
-    published_table(scratch)
+    the negative control (a plain creation without it) shows that the slot would otherwise appear later. Runs on
+    the breakable pair with autovacuum off, so that the primary is really idle and the creation really waits."""
+    cluster = breakable
+    cluster.lp("set", "all", "autovacuum=off")
+    cluster.q("primary", "create table if not exists cdc_v2_kill (id int primary key)")
+    cluster.q("primary", "create publication cdc_v2_pub_kill for table cdc_v2_kill")
+    cluster.replay_to_primary()
     creds = cluster.passwords["runtime"]
     args = {"port": cluster.ports["replica"], "db": cluster.info["database"], "user": creds["user"],
             "password": creds["password"], "ca": cluster.info["ca_cert"]}
@@ -142,9 +153,11 @@ def test_creation_whose_client_is_killed_leaves_no_slot(cluster, scratch):
         "c=psycopg.connect(host='localhost',port=a['port'],dbname=a['db'],user=a['user'],password=a['password'],"
         "sslmode='verify-full',sslrootcert=a['ca'],autocommit=True)\nprint('ready',flush=True)\n"
         "c.execute(\"select pg_create_logical_replication_slot(%s,'pgoutput')\",(a['slot'],))\n")
+    waiting_sql = ("select count(*) from pg_stat_activity where state = 'active' "
+                   "and query like '%%pg_create_logical_replication_slot%%' and pid <> pg_backend_pid()")
     out = {}
     for label, script in (("ours", script_ours), ("plain_negative_control", script_plain)):
-        name = scratch.slot + ("_a" if label == "ours" else "_b")
+        name = "cdc_v2_slot_kill" + ("_a" if label == "ours" else "_b")
         idle_primary(cluster)
         env = dict(os.environ, PYTHONPATH=os.path.join(ROOT, "src"))
         p = subprocess.Popen([sys.executable, "-c", script], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -152,15 +165,17 @@ def test_creation_whose_client_is_killed_leaves_no_slot(cluster, scratch):
         p.stdin.write(json.dumps(dict(args, slot=name)))
         p.stdin.close()
         assert p.stdout.readline().strip() == "ready"
-        time.sleep(2.0)                                    # the creation is waiting now
+        wait_for(lambda: cluster.boot("replica", waiting_sql)[0][0] == 1, timeout=10, what="creation waiting")
+        time.sleep(1.0)
+        assert cluster.boot("replica", waiting_sql)[0][0] == 1, "the creation finished before the kill"
         p.send_signal(signal.SIGKILL)
         p.wait(10)
-        time.sleep(2.0)                                    # > client_connection_check_interval
+        time.sleep(2.5)                                    # > client_connection_check_interval
         for _ in range(10):
             cluster.boot("primary", "select pg_log_standby_snapshot()")
             time.sleep(0.3)
         exists = bool(cluster.boot("replica", "select 1 from pg_replication_slots where slot_name = %s", (name,)))
-        out[label] = {"slot_exists_afterwards": exists}
+        out[label] = {"creation_was_waiting_at_kill": True, "slot_exists_afterwards": exists}
         p.stdout.close()
     record("slot_create", "killed_client", out)
     assert out["ours"]["slot_exists_afterwards"] is False
