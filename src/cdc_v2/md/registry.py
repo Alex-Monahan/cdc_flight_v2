@@ -23,9 +23,13 @@ REGISTER_SQL = ("INSERT INTO _cdc.connections (epoch, lane, connection_id, regis
                 "SELECT epoch, ?, ?::UUID, uuid_extract_timestamp(uuidv7()) FROM _cdc.leader WHERE epoch = ?")
 #: The connection ids of every epoch before the given one. Parameter: epoch (exclusive).
 LIST_EARLIER_SQL = "SELECT DISTINCT connection_id::VARCHAR FROM _cdc.connections WHERE epoch < ?"
-#: MotherDuck only: interrupts those connections in one statement and counts them. Parameter: epoch (exclusive).
+#: MotherDuck only: interrupts those connections in one statement and counts them. Parameters: epoch (exclusive),
+#: the id of the connection that runs the statement (left out: a statement that interrupts its own connection fails).
 INTERRUPT_EARLIER_SQL = ("SELECT count(*), count(*) FILTER (WHERE md_interrupt_server_connection(connection_id)) "
-                         "FROM (SELECT DISTINCT connection_id FROM _cdc.connections WHERE epoch < ?)")
+                         "FROM (SELECT DISTINCT connection_id FROM _cdc.connections "
+                         "WHERE epoch < ? AND connection_id <> ?::UUID)")
+#: Stands for "no connection" where `INTERRUPT_EARLIER_SQL` is run by a connection that never registered.
+NO_CONNECTION = "00000000-0000-0000-0000-000000000000"
 #: Removes the rows of epochs before the previous one. Parameter: the leader's own epoch.
 CLEANUP_SQL = "DELETE FROM _cdc.connections WHERE epoch < ? - 1"
 
@@ -60,8 +64,11 @@ def register(conn, lane, epoch, deadline=None):
 
 def interrupt_earlier(conn, epoch, deadline=None):
     """Interrupt every connection that `_cdc.connections` lists for an epoch **before** ``epoch``: a statement in
-    flight ends and an open transaction is rolled back on the server. Returns ``(listed, interrupted)``;
-    ``interrupted`` counts the connections the server still knew.
+    flight ends and an open transaction is rolled back on the server. Returns ``(listed, interrupted)``.
+    ``listed`` leaves out the connection ``conn`` itself. ``interrupted`` counts the connections that had a
+    statement in flight or a transaction open on the server: MotherDuck answers false for a connection that is
+    idle outside a transaction, for a closed one and for an id it does not know
+    (`evidence/p3/destination/registry_takeover.json`, key ``what_the_server_answers``).
 
     A take-over that saw epoch ``s`` and meets a conflict calls this with ``s + 1`` and tries again (design 4.5).
     The new leader calls it once more with its own epoch after it won: a connection of the old run can register
@@ -69,16 +76,19 @@ def interrupt_earlier(conn, epoch, deadline=None):
     if conn._in_block:
         raise LaneMisuse("this connection is inside a lane transaction")
     d = as_deadline(deadline, conn.settings.statement_deadline_s)
+    sess = conn.ensure(d)
+    own = sess.server_id
     if conn.is_motherduck:
-        row = conn._run(SITE_EXECUTE, INTERRUPT_EARLIER_SQL, [_epoch(epoch)], "one", d, writes=False)
+        row = conn._run_on(sess, SITE_EXECUTE, INTERRUPT_EARLIER_SQL, [_epoch(epoch), own], "one", d, writes=False)
         listed, done = (int(row[0]), int(row[1] or 0)) if row is not None else (0, 0)
     else:
-        rows = conn._run(SITE_EXECUTE, LIST_EARLIER_SQL, [_epoch(epoch)], "all", d, writes=False)
-        listed, done = len(rows), 0
-        for (sid,) in rows:
+        rows = conn._run_on(sess, SITE_EXECUTE, LIST_EARLIER_SQL, [_epoch(epoch)], "all", d, writes=False)
+        ids = [sid for (sid,) in rows if sid != own]
+        listed, done = len(ids), 0
+        for sid in ids:
             if d.expired:
                 raise DeadlineExceeded("interrupting the connections of earlier epochs")
-            if sid != conn.server_id and _interrupt_local(sid):
+            if _interrupt_local(sid):
                 done += 1
     if listed:
         log.info("interrupted connections of earlier epochs",

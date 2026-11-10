@@ -56,6 +56,7 @@ clock_sql = "uuid_extract_timestamp(uuidv7())"
 #: `pytz` module, which is not a dependency). `_cdc.leader` always has exactly one row.
 CLOCK_US_SQL = "SELECT epoch_us(uuid_extract_timestamp(uuidv7())) FROM _cdc.leader"
 
+INTERRUPT_SQL = "SELECT md_interrupt_server_connection(?::UUID)"
 INTERRUPTED_TEXT = "Connection Error: interrupted by user"      # MotherDuck's text after a server-side interrupt
 _ROLE = re.compile(r"^[a-z][a-z0-9_.-]{0,40}$")
 _NO_TX = re.compile(r"no transaction is active", re.IGNORECASE)
@@ -250,7 +251,9 @@ class Session:
             if s.is_motherduck:
                 sid = str(raw.execute("SELECT md_current_client_connection_id()").fetchone()[0])
                 # connect() does no network round trip when this process already has the database open, so one
-                # statement goes to the server here; it also shows that the server knows this connection's id
+                # statement goes to the server here: a server that cannot be reached is found now, inside the
+                # deadline of the connect, and not by the first statement of the caller. (The answer is not used:
+                # the server lists a connection only while it has a statement in flight or a transaction open.)
                 raw.execute("SELECT count(*) FROM md_active_server_connections() WHERE client_connection_id = ?::UUID",
                             [sid]).fetchall()
             else:
@@ -410,7 +413,7 @@ def _interrupt_through_side_connection(settings, server_id):
     function's answer. Used by the watchdog and the reaper, which cannot use the connection they interrupt."""
     side = duckdb.connect(settings.target, config={"custom_user_agent": settings.marker})
     try:
-        row = side.execute("SELECT md_interrupt_server_connection(?::UUID)", [server_id]).fetchone()
+        row = side.execute(INTERRUPT_SQL, [server_id]).fetchone()
         return bool(row[0]) if row is not None else False
     finally:
         side.close()
@@ -528,21 +531,26 @@ class Connection:
                     deadline.sleep(s.connect_retry_pause_s, "connecting to the destination (%s)" % self.role)
             self.generation += 1
         while self._stale_ids:
-            self._interrupt(self._stale_ids[0], deadline.within(self.settings.interrupt_deadline_s))
+            # on the connection made sure of above, not through `_interrupt`: that one asks `ensure` for a connection
+            self._interrupt_on(self._session, self._stale_ids[0],
+                               deadline.within(self.settings.interrupt_deadline_s))
             self._stale_ids.pop(0)
         return self._session
 
     # ------------------------------------------------------------------ calls
     def _run(self, site, sql, params, fetch, deadline, writes):
         """One autocommit statement with the error rules of the class docstring."""
-        sess = self.ensure(deadline)
+        return self._run_on(self.ensure(deadline), site, sql, params, fetch, deadline, writes)
+
+    def _run_on(self, sess, site, sql, params, fetch, deadline, writes):
+        """`_run` on a session that is already made sure of."""
         out = sess.call(sess.statement(site, sql, params, fetch), deadline)
         if out.ok and not out.late:
             return out.result
         if not out.sent:
             raise DeadlineExceeded("destination statement not started before its deadline (%s)" % self.role)
         if out.late:
-            self._drop_session()
+            self._drop_session(sess)
             if writes:
                 if out.ok:
                     return out.result                # it did complete; only the connection is replaced
@@ -552,7 +560,7 @@ class Connection:
         err = out.error
         kind = errors.kind_of(err)
         if kind == "transport":
-            self._drop_session()
+            self._drop_session(sess)
             text = errors.safe_text(err)
             if writes:
                 raise CommitUnknown("connection lost during a writing statement outside a transaction (%s): %s"
@@ -584,16 +592,22 @@ class Connection:
         """MotherDuck's clock, microseconds since 1970 (design 4.1). Needs the leader tables."""
         return int(self.fetchone(CLOCK_US_SQL, None, deadline)[0])
 
+    def _interrupt_on(self, sess, server_id, deadline):
+        """Interrupt one server connection by id, with a statement on the session ``sess`` (MotherDuck)."""
+        if not self.is_motherduck:
+            return _interrupt_local(server_id)
+        row = self._run_on(sess, SITE_EXECUTE, INTERRUPT_SQL, [str(server_id)], "one", deadline, writes=False)
+        return bool(row[0]) if row is not None else False
+
     def _interrupt(self, server_id, deadline):
         if not self.is_motherduck:
             return _interrupt_local(server_id)
-        row = self._run(SITE_EXECUTE, "SELECT md_interrupt_server_connection(?::UUID)", [str(server_id)], "one",
-                        deadline, writes=False)
-        return bool(row[0]) if row is not None else False
+        return self._interrupt_on(self.ensure(deadline), server_id, deadline)
 
     def interrupt_server_connection(self, server_id, deadline=None):
         """Interrupt another connection of this pipeline by its server-side id: a statement in flight ends, an open
-        transaction is rolled back. Returns False when the server does not know the id (already gone)."""
+        transaction is rolled back. Returns False when there was nothing to end: the connection is idle outside a
+        transaction, is closed, or the server does not know the id."""
         if self._in_block:
             raise LaneMisuse("this connection is inside a lane transaction")
         if self.usable and str(server_id) == self.server_id:

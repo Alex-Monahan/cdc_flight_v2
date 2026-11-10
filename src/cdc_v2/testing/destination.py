@@ -48,7 +48,7 @@ def raw_connect(settings):
 
 def _interrupt_earlier_raw(raw, settings, epoch):
     if settings.is_motherduck:
-        row = raw.execute(registry.INTERRUPT_EARLIER_SQL, [epoch]).fetchone()
+        row = raw.execute(registry.INTERRUPT_EARLIER_SQL, [epoch, registry.NO_CONNECTION]).fetchone()
         return int(row[0]), int(row[1] or 0)
     rows = raw.execute(registry.LIST_EARLIER_SQL, [epoch]).fetchall()
     return len(rows), sum(1 for (sid,) in rows if _interrupt_local(sid))

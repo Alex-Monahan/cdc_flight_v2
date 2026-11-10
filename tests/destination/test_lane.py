@@ -381,6 +381,11 @@ def test_interrupt_earlier_and_cleanup(led):
     with lanes[3].transaction() as tx:                          # the leader's own connection was not touched
         tx.execute(BUMP)
     assert value(c) == 4
+    # a connection that is listed for an earlier epoch itself leaves itself out (on MotherDuck a statement that
+    # interrupts its own connection fails): the two others are init and the stream lane of epoch 2
+    assert registry.interrupt_earlier(lanes[1].conn, 3)[0] == 2
+    with pytest.raises(md.LaneMisuse):
+        lanes[1].conn.interrupt_server_connection(lanes[1].conn.server_id)
     assert registry.cleanup(admin, 3) >= 1                      # rows older than the previous epoch
     assert c.fetchall("SELECT DISTINCT epoch FROM _cdc.connections ORDER BY 1") == [(2,), (3,)]
     with lanes[3].transaction() as tx:
@@ -412,6 +417,40 @@ def test_a_replaced_connection_is_interrupted_by_id_before_the_new_one_is_used(l
     assert value(c) == 2
     rows = c.fetchall("SELECT connection_id::VARCHAR FROM _cdc.connections WHERE lane = 'stream' ORDER BY registered_at")
     assert [r[0] for r in rows] == [first, lane.conn.server_id]     # the new connection registered itself
+
+
+def test_the_interrupt_of_a_replaced_connection_runs_on_the_new_connection(led, faults, monkeypatch):
+    """Regression (found by the `md` run of the lost-connection tests). On MotherDuck the id of a replaced
+    connection is interrupted with a statement on the new connection. `ensure()` asked `ensure()` for that
+    connection and never returned. Here without MotherDuck: a macro has the name of MotherDuck's function and the
+    connection class is told that it talks to MotherDuck."""
+    c = counter(led)
+    raw = led.raw()
+    raw.execute("CREATE MACRO md_interrupt_server_connection(id) AS (id IS NOT NULL)")
+    raw.close()
+    monkeypatch.setattr(mdc.Connection, "is_motherduck", property(lambda self: True))
+    seen = []
+    real = mdc.Connection._interrupt_on
+
+    def spy(self, sess, sid, deadline):
+        out = real(self, sess, sid, deadline)
+        seen.append((self.role, str(sid), sess.server_id, out))
+        return out
+    monkeypatch.setattr(mdc.Connection, "_interrupt_on", spy)
+    lane = led.lane("stream", led.epoch)
+    with lane.transaction() as tx:
+        tx.execute(BUMP)
+    first = lane.conn.server_id
+    faults.raise_at("md.fence", "ConnectionError", message="injected: connection reset", hits=1)
+    with pytest.raises(md.ConnectionLost):
+        with lane.transaction() as tx:
+            tx.execute(BUMP)
+    assert not lane.conn.usable and seen == []
+    with lane.transaction() as tx:
+        tx.execute(BUMP)
+    assert seen == [("stream", first, lane.conn.server_id, True)]   # asked once, through the new connection
+    assert lane.conn.server_id != first and lane.conn.generation == 2 and value(c) == 2
+    assert led.connect("other").interrupt_server_connection(first) is True      # the public call takes the same way
 
 
 # --------------------------------------------------------------------------------------------- deadlines
