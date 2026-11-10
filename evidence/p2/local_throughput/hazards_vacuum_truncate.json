@@ -1,0 +1,388 @@
+{
+ "started_utc": "2026-11-10T03:31:32Z",
+ "load_avg": [
+  3.59,
+  5.03,
+  6.72
+ ],
+ "replica_settings": {
+  "hot_standby": "on",
+  "hot_standby_feedback": "on",
+  "max_standby_archive_delay": "30000ms",
+  "max_standby_streaming_delay": "30000ms",
+  "wal_receiver_status_interval": "10s"
+ },
+ "primary_settings": {
+  "autovacuum": "on",
+  "vacuum_truncate": "on"
+ },
+ "scenarios": [
+  {
+   "scenario": "vacuum_truncate",
+   "rows": 4000658,
+   "pre": {
+    "deleted_rows": 399978,
+    "pages_before": 80993
+   },
+   "action": {
+    "at_s": 5.0,
+    "pages_after": 72893,
+    "primary_statement_s": 0.18
+   },
+   "duration_s": 60.0,
+   "active_reader": {
+    "passes": 10,
+    "bytes": 8128593221,
+    "error": {
+     "type": "SerializationFailure",
+     "sqlstate": "40001",
+     "message": "canceling statement due to conflict with recovery",
+     "detail": "User was holding a relation lock for too long.",
+     "seconds_after_action": 30.2
+    },
+    "ended_s": 35.2
+   },
+   "idle_reader": {
+    "error": {
+     "type": "SerializationFailure",
+     "sqlstate": "40001",
+     "message": "terminating connection due to conflict with recovery",
+     "detail": "User was holding a relation lock for too long.",
+     "seconds_after_action": 55.5
+    },
+    "ended_s": 60.5
+   },
+   "writes": {
+    "txns": 298,
+    "errors": []
+   },
+   "replay_lag_max_bytes": 4928104,
+   "replay_lag_max_s": 29.79,
+   "replay_lag_samples": [
+    {
+     "t": 0.0,
+     "bytes": 0,
+     "seconds": 0.01
+    },
+    {
+     "t": 1.1,
+     "bytes": 0,
+     "seconds": 0.2
+    },
+    {
+     "t": 2.1,
+     "bytes": 0,
+     "seconds": 0.16
+    },
+    {
+     "t": 3.1,
+     "bytes": 0,
+     "seconds": 0.14
+    },
+    {
+     "t": 4.1,
+     "bytes": 0,
+     "seconds": 0.09
+    },
+    {
+     "t": 5.2,
+     "bytes": 0,
+     "seconds": 0.03
+    },
+    {
+     "t": 6.2,
+     "bytes": 156248,
+     "seconds": 1.05
+    },
+    {
+     "t": 7.2,
+     "bytes": 330496,
+     "seconds": 2.07
+    },
+    {
+     "t": 8.2,
+     "bytes": 504640,
+     "seconds": 3.09
+    },
+    {
+     "t": 9.3,
+     "bytes": 752248,
+     "seconds": 4.12
+    },
+    {
+     "t": 10.3,
+     "bytes": 892024,
+     "seconds": 5.16
+    },
+    {
+     "t": 11.3,
+     "bytes": 1065512,
+     "seconds": 6.18
+    },
+    {
+     "t": 12.4,
+     "bytes": 1239656,
+     "seconds": 7.21
+    },
+    {
+     "t": 13.4,
+     "bytes": 1413800,
+     "seconds": 8.23
+    },
+    {
+     "t": 14.4,
+     "bytes": 1588072,
+     "seconds": 9.26
+    },
+    {
+     "t": 15.4,
+     "bytes": 1727088,
+     "seconds": 10.29
+    },
+    {
+     "t": 16.5,
+     "bytes": 1900528,
+     "seconds": 11.33
+    },
+    {
+     "t": 17.5,
+     "bytes": 2074672,
+     "seconds": 12.36
+    },
+    {
+     "t": 18.5,
+     "bytes": 2248920,
+     "seconds": 13.4
+    },
+    {
+     "t": 19.6,
+     "bytes": 2423064,
+     "seconds": 14.42
+    },
+    {
+     "t": 20.6,
+     "bytes": 2562080,
+     "seconds": 15.44
+    },
+    {
+     "t": 21.6,
+     "bytes": 2736352,
+     "seconds": 16.45
+    },
+    {
+     "t": 22.6,
+     "bytes": 2909736,
+     "seconds": 17.48
+    },
+    {
+     "t": 23.7,
+     "bytes": 3083880,
+     "seconds": 18.53
+    },
+    {
+     "t": 24.7,
+     "bytes": 3258128,
+     "seconds": 19.55
+    },
+    {
+     "t": 25.7,
+     "bytes": 3397144,
+     "seconds": 20.56
+    },
+    {
+     "t": 26.7,
+     "bytes": 3571312,
+     "seconds": 21.59
+    },
+    {
+     "t": 27.8,
+     "bytes": 3744696,
+     "seconds": 22.61
+    },
+    {
+     "t": 28.8,
+     "bytes": 3918944,
+     "seconds": 23.64
+    },
+    {
+     "t": 29.8,
+     "bytes": 4093088,
+     "seconds": 24.67
+    },
+    {
+     "t": 30.8,
+     "bytes": 4267256,
+     "seconds": 25.7
+    },
+    {
+     "t": 31.9,
+     "bytes": 4406432,
+     "seconds": 26.72
+    },
+    {
+     "t": 32.9,
+     "bytes": 4580576,
+     "seconds": 27.74
+    },
+    {
+     "t": 33.9,
+     "bytes": 4753960,
+     "seconds": 28.77
+    },
+    {
+     "t": 34.9,
+     "bytes": 4928104,
+     "seconds": 29.79
+    },
+    {
+     "t": 36.0,
+     "bytes": 0,
+     "seconds": 0.02
+    },
+    {
+     "t": 37.0,
+     "bytes": 0,
+     "seconds": 0.19
+    },
+    {
+     "t": 38.0,
+     "bytes": 0,
+     "seconds": 0.15
+    },
+    {
+     "t": 39.1,
+     "bytes": 0,
+     "seconds": 0.09
+    },
+    {
+     "t": 40.1,
+     "bytes": 0,
+     "seconds": 0.02
+    },
+    {
+     "t": 41.1,
+     "bytes": 0,
+     "seconds": 0.18
+    },
+    {
+     "t": 42.1,
+     "bytes": 0,
+     "seconds": 0.13
+    },
+    {
+     "t": 43.1,
+     "bytes": 0,
+     "seconds": 0.08
+    },
+    {
+     "t": 44.1,
+     "bytes": 0,
+     "seconds": 0.05
+    },
+    {
+     "t": 45.2,
+     "bytes": 0,
+     "seconds": 0.17
+    },
+    {
+     "t": 46.2,
+     "bytes": 0,
+     "seconds": 0.14
+    },
+    {
+     "t": 47.2,
+     "bytes": 0,
+     "seconds": 0.1
+    },
+    {
+     "t": 48.2,
+     "bytes": 0,
+     "seconds": 0.06
+    },
+    {
+     "t": 49.2,
+     "bytes": 0,
+     "seconds": 0.01
+    },
+    {
+     "t": 50.2,
+     "bytes": 0,
+     "seconds": 0.18
+    },
+    {
+     "t": 51.3,
+     "bytes": 0,
+     "seconds": 0.13
+    },
+    {
+     "t": 52.3,
+     "bytes": 0,
+     "seconds": 0.08
+    },
+    {
+     "t": 53.3,
+     "bytes": 0,
+     "seconds": 0.05
+    },
+    {
+     "t": 54.3,
+     "bytes": 0,
+     "seconds": 0.2
+    },
+    {
+     "t": 55.3,
+     "bytes": 0,
+     "seconds": 0.16
+    },
+    {
+     "t": 56.3,
+     "bytes": 0,
+     "seconds": 0.12
+    },
+    {
+     "t": 57.4,
+     "bytes": 0,
+     "seconds": 0.09
+    },
+    {
+     "t": 58.4,
+     "bytes": 0,
+     "seconds": 0.06
+    },
+    {
+     "t": 59.4,
+     "bytes": 0,
+     "seconds": 0.02
+    },
+    {
+     "t": 60.4,
+     "bytes": 0,
+     "seconds": 0.2
+    },
+    {
+     "t": 61.4,
+     "bytes": 0,
+     "seconds": 0.18
+    },
+    {
+     "t": 62.5,
+     "bytes": 0,
+     "seconds": 0.14
+    }
+   ],
+   "conflicts_delta": {
+    "tablespace": 0,
+    "lock": 2,
+    "snapshot": 0,
+    "bufferpin": 0,
+    "deadlock": 0,
+    "active_logicalslot": 0
+   },
+   "vacuum_notices": [
+    "table \"hz_li\": truncated 80993 to 72893 pages",
+    "finished vacuuming \"cdc_v2_test.public.hz_li\": index scans: 1\npages: 8100 removed, 72893 remain, 8100 scanned (10.00% of total), 0 eagerly scanned\ntuples: 399978 removed, 3600244 remain, 0 are dead but not yet removable\nremovable cutoff: 62854, which was 26 XIDs old when operation ended\nfrozen: 0 pages from table (0.00% of total) had 0 tuples frozen\nvisibility map: 8098 pages set all-visible, 8098 pages set all-frozen (0 were all-visible)\nindex scan needed: 8098 pages from table (10.00% of total) had 399978 dead item identifiers removed\nindex \"hz_li_pkey\": pages: 15402 in total, 1514 newly deleted, 1514 currently deleted, 0 reusable\navg read rate: 764.439 MB/s, avg write rate: 76.633 MB/s\nbuffer usage: 44621 hits, 15402 reads, 1544 dirtied\nWAL usage: 28860 records, 1545 full page images, 15254104 bytes, 0 buffers full\nsystem usage: CPU: user: 0.05 s, system: 0.01 s, elapsed: 0.15 s"
+   ]
+  }
+ ],
+ "finished_utc": "2026-11-10T03:33:16Z"
+}

@@ -15,6 +15,8 @@ Each scenario recreates public.hz_li (a ~2M-row slice of lineitem) on the primar
       add_column       ALTER TABLE hz_li ADD COLUMN hz_extra int
       vacuum_truncate  rows on the last 10 % of pages deleted (and replayed) before the readers start; VACUUM at 5 s
                        can then truncate the tail (needs an ACCESS EXCLUSIVE lock)
+      lock_chunked     as lock, but the reader is a backfill worker with one short transaction per chunk that
+                       imports a snapshot held by an exporter connection that never touches the table (no idle reader)
 Every error is recorded with SQLSTATE, message, detail and the time since the action.
 """
 from __future__ import annotations
@@ -49,8 +51,9 @@ def err(e: Exception, t_action: float | None) -> dict:
 
 
 class Run:
-    def __init__(self, duration: float):
+    def __init__(self, duration: float, update_hz: bool = True):
         self.duration = duration
+        self.update_hz = update_hz
         self.stop = threading.Event()
         self.t0 = time.time()
         self.t_action: float | None = None
@@ -78,6 +81,38 @@ class Run:
             self.active["error"] = err(e, self.t_action)
         self.active["ended_s"] = self.rel()
 
+    def chunked_reader(self):
+        """A backfill worker that imports a snapshot held by an exporter that never touches the table, one short
+        transaction per chunk (1/40 of the pages), so a relation lock is only held while a chunk is read."""
+        try:
+            with C.pg_connect("replica", "runtime") as exp, C.pg_connect("replica", "runtime") as c:
+                exp.execute("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
+                snap = exp.execute("select pg_export_snapshot()").fetchone()[0]
+                pages = c.execute("select pg_relation_size('public.hz_li') / 8192").fetchone()[0]
+                step = -(-pages // 40)
+                self.active["chunk_txn_s"] = []
+                i = 0
+                while time.time() - self.t0 < self.duration:
+                    a = (i % 40) * step
+                    t = time.time()
+                    c.execute("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
+                    c.execute(f"SET TRANSACTION SNAPSHOT '{snap}'")
+                    with c.cursor().copy(f"COPY (SELECT * FROM public.hz_li WHERE ctid >= '({a},0)'::tid AND "
+                                         f"ctid < '({a + step},0)'::tid) TO STDOUT (FORMAT binary)") as cp:
+                        for d in cp:
+                            self.active["bytes"] += len(d)
+                    c.execute("COMMIT")
+                    self.active["chunk_txn_s"].append(round(time.time() - t, 2))
+                    i += 1
+                    if i % 40 == 0:
+                        self.active["passes"] += 1
+                exp.execute("COMMIT")
+        except Exception as e:
+            self.active["error"] = err(e, self.t_action)
+        ct = sorted(self.active.get("chunk_txn_s") or [0])
+        self.active["chunk_txn_s"] = {"n": len(ct), "median": ct[len(ct) // 2], "max": ct[-1]}
+        self.active["ended_s"] = self.rel()
+
     def idle_reader(self):
         try:
             with C.pg_connect("replica", "runtime") as c:
@@ -97,8 +132,9 @@ class Run:
             while not self.stop.is_set():
                 try:
                     c.execute("INSERT INTO public.hz_load (pad) SELECT md5(g::text) FROM generate_series(1, 200) g")
-                    c.execute("UPDATE public.hz_li SET l_comment = left(md5(random()::text), 40) "
-                              "WHERE l_orderkey >= %s AND l_orderkey < %s", (k * 40 + 1, k * 40 + 41))
+                    if self.update_hz:
+                        c.execute("UPDATE public.hz_li SET l_comment = left(md5(random()::text), 40) "
+                                  "WHERE l_orderkey >= %s AND l_orderkey < %s", (k * 40 + 1, k * 40 + 41))
                     c.commit()
                     self.writes["txns"] += 1
                 except Exception as e:
@@ -137,10 +173,18 @@ def scenario(name: str, duration: float) -> dict:
             pre["deleted_rows"] = p.execute(f"DELETE FROM public.hz_li WHERE ctid >= '({cut},0)'::tid").rowcount
             pre["pages_before"] = pages
         C.wait_replica_caught_up()
+        # hot_standby_feedback: the standby reports its xmin every wal_receiver_status_interval (10 s); until then
+        # the deleted rows are "dead but not yet removable" and VACUUM cannot empty (or truncate) the tail
+        time.sleep(12)
     c0 = conflicts()
-    run = Run(duration)
-    ths = [threading.Thread(target=f, daemon=True) for f in (run.active_reader, run.idle_reader, run.writer,
-                                                              run.sampler)]
+    # in vacuum_truncate the update load would append new tuple versions after the deleted tail (no free space
+    # map entries yet), which makes the tail non-trailing; the write load then goes to hz_load only
+    run = Run(duration, update_hz=(name != "vacuum_truncate"))
+    chunked = name.endswith("_chunked")
+    ths = [threading.Thread(target=f, daemon=True)
+           for f in (run.chunked_reader if chunked else run.active_reader, run.idle_reader, run.writer, run.sampler)]
+    if chunked:  # no idle-in-transaction reader in this variant: replace it with a no-op
+        ths[1] = threading.Thread(target=lambda: None, daemon=True)
     for t in ths:
         t.start()
     time.sleep(5)
@@ -152,7 +196,7 @@ def scenario(name: str, duration: float) -> dict:
         if name == "vacuum":
             p.execute("VACUUM (VERBOSE) public.hz_li")
             action["vacuum1_s"] = round(time.time() - t, 2)
-        elif name == "lock":
+        elif name in ("lock", "lock_chunked"):
             p.execute("BEGIN")
             p.execute("LOCK TABLE public.hz_li IN ACCESS EXCLUSIVE MODE")
             p.execute("COMMIT")
@@ -187,6 +231,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--scenarios", default="baseline,vacuum,lock,add_column,vacuum_truncate")
     ap.add_argument("--duration", type=float, default=75)
+    ap.add_argument("--out", default="hazards.json")
     a = ap.parse_args()
     ev = {"started_utc": C.utc(), "load_avg": C.load_avg()}
     with C.pg_connect("replica", "admin") as r:
@@ -207,7 +252,7 @@ def main():
         p.execute("DROP TABLE IF EXISTS public.hz_li")
         p.execute("DROP TABLE IF EXISTS public.hz_load")
     ev["finished_utc"] = C.utc()
-    C.write_json("hazards.json", ev)
+    C.write_json(a.out, ev)
 
 
 if __name__ == "__main__":

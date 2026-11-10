@@ -1,6 +1,7 @@
 """End to end, replica -> MotherDuck staging table in cdc_v2_spike_tp, as a local indication (item 3 and 4).
 
     tools/with-env uv run --group spike python spikes/local_throughput/e2e_md.py --routes upload,duckdb,copy_parquet,loaders [--repeats 3] [--threads 8] [--workers 4] [--k 1,2,4]
+    tools/with-env uv run --group spike python spikes/local_throughput/e2e_md.py --summarize # e2e_summary.csv + table
     tools/with-env uv run --group spike python spikes/local_throughput/e2e_md.py --drop      # drop cdc_v2_spike_tp
 
 Routes (results appended to evidence/p2/local_throughput/e2e.jsonl):
@@ -36,7 +37,9 @@ def md_connect(threads: int | None = None, memory_limit: str = "2GB"):
     cfg = C.md_config(memory_limit)
     if threads:
         cfg["threads"] = threads
-    return duckdb.connect(f"md:{C.MD_DB}?attach_mode=single", config=cfg)
+    con = duckdb.connect(f"md:{C.MD_DB}?attach_mode=single", config=cfg)
+    con.execute("SET enable_progress_bar = false")
+    return con
 
 
 def ensure_db():
@@ -98,6 +101,7 @@ def route_duckdb(threads: int) -> dict:
     cpu = C.self_cpu() - c0
     n = con.execute("SELECT count(*) FROM stage_i").fetchone()[0]
     con.execute("DROP TABLE stage_i")
+    con.execute("DETACH pg")  # md: connections of one process share a DuckDB instance; the attach would persist
     con.close()
     return {"wall_s": round(wall, 2), "rows": n, "client_cpu_s": round(cpu, 2), **pg}
 
@@ -212,8 +216,43 @@ def route_loaders(k: int, threads: int) -> dict:
             "insert_s_median": ins[len(ins) // 2], "insert_s_max": ins[-1], "chunks": len(files)}
 
 
+def summarize():
+    import csv
+    from collections import defaultdict
+    recs = [json.loads(x) for x in (C.EVIDENCE / "e2e.jsonl").read_text().splitlines() if x.strip()]
+    by = defaultdict(list)
+    for r in recs:
+        if r["label"] in ("laptop", "f16_shape"):
+            by[(r["label"], r["route"], r.get("k"))].append(r)
+    rows = []
+    for (label, route, k), rs in sorted(by.items(), key=lambda x: (x[0][0], x[0][1], x[0][2] or 0)):
+        s = lambda f: C.summarize([r.get(f) for r in rs])  # noqa: E731
+        rows.append({"label": label, "route": route + (f" K={k}" if k else ""), "n": len(rs),
+                     "rows_per_s_median": s("rows_per_s")["median"], "rows_per_s_min": s("rows_per_s")["min"],
+                     "rows_per_s_max": s("rows_per_s")["max"], "wall_s_median": s("wall_s")["median"],
+                     "read_phase_s_median": s("read_to_parquet_s").get("median"),
+                     "load_phase_s_median": s("load_s").get("median"),
+                     "insert_per_chunk_s_median": s("insert_s_median").get("median"),
+                     "client_cpu_s_median": s("client_cpu_s").get("median") or s("read_client_cpu_s").get("median"),
+                     "rows_ok": all(r["rows_ok"] for r in rs),
+                     "load_avg_1m": "/".join(str(r["load_avg"][0]) for r in rs)})
+    with open(C.EVIDENCE / "e2e_summary.csv", "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(rows[0]))
+        w.writeheader()
+        w.writerows(rows)
+    print("| shape | route | n | rows/s median | min-max | wall s | read phase s | load phase s | s per chunk INSERT |"
+          " rows ok | load 1m |")
+    print("|---|---|---|---|---|---|---|---|---|---|---|")
+    for r in rows:
+        print(f"| {r['label']} | {r['route']} | {r['n']} | {r['rows_per_s_median']:,.0f} | "
+              f"{r['rows_per_s_min']:,.0f}-{r['rows_per_s_max']:,.0f} | {r['wall_s_median']} | "
+              f"{r['read_phase_s_median'] or ''} | {r['load_phase_s_median'] or ''} | "
+              f"{r['insert_per_chunk_s_median'] or ''} | {r['rows_ok']} | {r['load_avg_1m']} |")
+
+
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--summarize", action="store_true")
     ap.add_argument("--routes", default="upload,duckdb,copy_parquet,loaders")
     ap.add_argument("--repeats", type=int, default=3)
     ap.add_argument("--threads", type=int, default=8)
@@ -222,6 +261,9 @@ def main():
     ap.add_argument("--label", default="")
     ap.add_argument("--drop", action="store_true")
     a = ap.parse_args()
+    if a.summarize:
+        summarize()
+        return
     if a.drop:
         drop_db()
         print(f"dropped {C.MD_DB}")
