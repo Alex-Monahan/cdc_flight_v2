@@ -63,6 +63,7 @@ BASE_SETTINGS = [
     ("wal_level", "logical"),
     ("hot_standby", "on"),
     ("hot_standby_feedback", "on"),
+    ("wal_retrieve_retry_interval", "1s"),     # standbys reconnect within ~1 s after a primary restart or crash
     ("sync_replication_slots", "on"),
     ("ssl", "on"),
     ("ssl_min_protocol_version", "TLSv1.2"),
@@ -277,6 +278,11 @@ def postmaster_of(cfg, name):
     return Postmaster(pid, start, port, status)
 
 
+def process_stopped(pid):
+    st = run(["/bin/ps", "-o", "stat=", "-p", str(pid)], T_QUICK, check=False).stdout.strip()
+    return not st or st.startswith("T")
+
+
 def wait_gone(pids, timeout):
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -295,18 +301,18 @@ def hard_kill(cfg, name):
     if not pm:
         return []
     os.kill(pm.pid, signal.SIGSTOP)
-    deadline = time.time() + 5
-    while time.time() < deadline:
-        st = run(["/bin/ps", "-o", "stat=", "-p", str(pm.pid)], T_QUICK, check=False).stdout.strip()
-        if not st or st.startswith("T"):
-            break
-        time.sleep(0.01)
-    kids = child_pids(pm.pid)
-    for k in kids:
+    kids = []
+    try:
+        deadline = time.time() + 5
+        while time.time() < deadline and not process_stopped(pm.pid):
+            time.sleep(0.01)
+        kids = child_pids(pm.pid)
+        for k in kids:
+            with contextlib.suppress(ProcessLookupError):
+                os.kill(k, signal.SIGKILL)
+    finally:
         with contextlib.suppress(ProcessLookupError):
-            os.kill(k, signal.SIGKILL)
-    with contextlib.suppress(ProcessLookupError):
-        os.kill(pm.pid, signal.SIGKILL)
+            os.kill(pm.pid, signal.SIGKILL)
     left = wait_gone([pm.pid] + kids, 15)
     if left:
         raise Fail("%s: processes still present after SIGKILL: %s" % (name, left))
@@ -562,6 +568,8 @@ def stop_node(cfg, name, mode="fast"):
     pm = postmaster_of(cfg, name)
     if not pm:
         return False
+    if process_stopped(pm.pid):          # a frozen postmaster (SIGSTOP) cannot act on a shutdown request
+        os.kill(pm.pid, signal.SIGCONT)
     kids = child_pids(pm.pid)
     p = run([cfg.bin("pg_ctl"), "stop", "-D", cfg.data_dir(name), "-m", mode, "-w", "-t", "60"], T_CTL, cfg=cfg,
             check=False)
@@ -805,8 +813,11 @@ def cmd_up(cfg, args):
 
 def cmd_down(cfg, args):
     t0 = time.time()
+    if not os.path.isdir(cfg.home):
+        say("down: nothing was running (no home at %s)" % cfg.home)
+        return EXIT_OK
     with home_lock(cfg):
-        st = load_state(cfg)
+        load_state(cfg)          # validates the port base against an existing home
         stopped = stop_everything_found(cfg)
     say("down: %s (%.1f s)" % ("stopped " + ", ".join(stopped) if stopped else "nothing was running",
                                time.time() - t0))
@@ -968,7 +979,7 @@ def apply_settings(cfg, st, names, keys):
             stop_node(cfg, name)
             start_node(cfg, name)
             how = "restarted (%s)" % pending
-        values = psql_json(cfg, port, "select coalesce(json_object_agg(name, setting || coalesce(unit, '')), "
+        values = psql_json(cfg, port, "select coalesce(json_object_agg(name, current_setting(name)), "
                                       "'{}'::json) from pg_settings where name = any(array[%s]);"
                            % ",".join(lit(k) for k in keys)) if keys else {}
         report.append("%s: %s %s" % (name, how, " ".join("%s=%s" % kv for kv in sorted(values.items()))))

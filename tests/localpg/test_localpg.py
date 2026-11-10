@@ -2,6 +2,7 @@
 import json
 import os
 import shutil
+import signal
 import stat
 import threading
 import time
@@ -152,6 +153,25 @@ def test_down_leaves_no_process_and_up_restarts(cluster):
     lp("up")
     assert cluster.q("primary", "select v from %s" % t, role="admin") == [("kept",)]
     assert replica_has(cluster, t, 1) == [("kept",)]
+
+
+def test_frozen_postmaster_does_not_hang_status_or_down(cluster):
+    pid = cluster.node("replica")["pid"]
+    os.kill(pid, signal.SIGSTOP)         # pid identified through the replica's postmaster.pid (localpg status)
+    try:
+        t0 = time.time()
+        s = json.loads(lp("status", "--json", check=False, timeout=60).stdout)
+        assert time.time() - t0 < 20
+        rep = next(n for n in s["nodes"] if n["name"] == "replica")
+        assert rep["running"] and "error" in rep
+        t0 = time.time()
+        lp("down", timeout=120)
+        assert time.time() - t0 < 30
+        assert not alive(pid)
+    finally:
+        if alive(pid):
+            os.kill(pid, signal.SIGCONT)
+    lp("up")
 
 
 def test_status_reports_nodes_and_slots(cluster):
