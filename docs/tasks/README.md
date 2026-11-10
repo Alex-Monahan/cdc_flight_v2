@@ -56,7 +56,8 @@ Before you start: `git fetch origin && git merge --ff-only origin/main`.
   case with the evidence, and report it. Do not work around it silently.
 - Shared small modules exist already; use them, do not make a second one: `cdc_v2.lsn` (positions),
   `cdc_v2.deadline` (deadlines), `cdc_v2.crashpoints` and `cdc_v2.faultsites` (named crash points and fault
-  sites), `cdc_v2.evidence` (redacting evidence writer).
+  sites), `cdc_v2.testing` (process control, crash runner, TCP fault proxy, byte-stream relay, and
+  `harness_evidence.write_evidence`, the one writer of evidence files); see `docs/testing/harness.md`.
 
 ## Tests and evidence
 

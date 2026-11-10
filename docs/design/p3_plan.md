@@ -52,14 +52,29 @@ inside the process before a value is buffered on disk or sent anywhere); the lon
   core design. Package S builds the loader of the one configuration file that fills them.
 - Time: durations are measured on the monotonic clock of the process; every comparison of times across processes
   uses MotherDuck's clock (design 4.1). No code compares a local wall clock with a stored time.
-- Every blocking call takes a deadline (SPEC 4.5). A package offers no call that can wait for ever.
+- Every blocking call takes a deadline (SPEC 4.5): a `cdc_v2.deadline.Deadline` (monotonic; `Deadline.after`,
+  `remaining`, `check`, `within`, `sleep`). A package offers no call that can wait for ever. A deadline that passes
+  raises `cdc_v2.deadline.DeadlineExceeded`, the one class for this in every package.
+- Evidence files are written through `cdc_v2.testing.harness_evidence.write_evidence` only (it scrubs paths and
+  the user name, then refuses what is left).
 - Logs go through `logging` with structured fields; no value of a source row is ever logged (SPEC 8.3).
 
 ### C1 Crash points and fault sites (package H)
 
-`cdc_v2.crashpoints`: `declare(name, description)` once, `crash_point(name)` at the place. The Java side implements
-the same environment contract. The names of section 3 of the core design are used as written there. Every package
-declares its points; a test fails if a declared point is never reached by the crash runner.
+Delivered; the contract is `docs/testing/harness.md`.
+
+- `cdc_v2.crashpoints`: `declare(name, description, once=False)` at module level, `crash_point(name)` at the place.
+  The Java side implements the same environment contract (`CDC_V2_CRASH_*`); the pipeline passes those variables to
+  the JVM unchanged.
+- Names are `<area>.<step>`. The names of section 3 of the core design are used as written there. Every package
+  puts a point after every step that changes durable state (destination, source slot, local spill that a restart
+  reads) and immediately before every blocking commit. The second kind is run with the action `kill_later`, which
+  is the only way to produce "commit in flight when the process died".
+- A point that is declared and never reached by the crash runner is a failure of the suite, not a pass.
+- `cdc_v2.faultsites`: `declare_site(name, description)`, `fault_site(name)` immediately before a call to an
+  outside service that the TCP proxy cannot reach (MotherDuck). Package D owns the `md.*` sites.
+- Process control, the crash runner, the TCP fault proxy and the byte-stream relay are in `cdc_v2.testing`; a
+  package's crash and fault tests use them and do not build their own.
 
 ### C2 Engine frames (package E)
 
@@ -76,14 +91,21 @@ fuzzer).
 | `HELLO` | protocol version, Debezium version, slot, the position the engine starts from |
 | `SCHEMA` | table, schema version (counter per table), per column: position, source name, Debezium type and semantic name, source type name with length and scale, nullable, part of the key, whether its values can be sent as "unchanged" |
 | `ROWS` | table, schema version, row count, columns as buffers (below) |
-| `BEGIN` / `END` | transaction id, commit time and all position fields of the record's offset; `END` also the event count in total and per table |
-| `TRUNCATE` | the tables of one truncate, in the order received |
-| `HEARTBEAT` | position fields of a heartbeat record (the position moved without data) |
+| `BEGIN` / `END` | transaction id, commit time, all position fields of the record's offset and its `ack_position` (below); `END` also the event count in total and per table |
+| `TRUNCATE` | one table and its `seq`; a truncate of several tables arrives as consecutive frames |
+| `MESSAGE` | a logical decoding message: prefix, transactional or not, content bytes, `seq`, position fields (SPEC 7.4 consumes it in P4; the frame exists from the start) |
+| `HEARTBEAT` | position fields of a heartbeat record and its `ack_position` (the position moved without data) |
 | `BATCH_END` | end of one engine batch |
 | `FATAL` | the engine stops: class, message and cause chain of the error |
 
 Every record gets a sequence number `seq` in arrival order: commit order, then order inside the transaction. Rows of
 several tables travel in separate `ROWS` frames; `seq` restores their order.
+
+`ack_position` of an `END` or `HEARTBEAT` frame is exactly the position that the source will be told is confirmed
+if that record is the newest one acknowledged (`docs/research/debezium.md` 3.1: the commit position of the offset
+if it has one, else the processed position). For an `END` it is the transaction's commit end position, which is
+the applied position of the core design, section 2. Over the life of one engine it never decreases; the engine
+checks that and stops with `FATAL` if it would.
 
 `ROWS` columns are column-oriented buffers in little-endian Arrow layout, written by our own Java code (no Arrow
 library in the JVM), so that Python wraps them with `pyarrow.Array.from_buffers` without touching single values:
@@ -108,9 +130,15 @@ Column sets of a `ROWS` frame, each column named by its position `i` in the sche
 `bytea` and arrays a mark that does not travel inside the value). The engine turns it into `u<i>`; after the
 engine, no code compares a value with a placeholder. The H-003 tests are part of package E.
 
-Commands to the engine: `DURABLE <position>` (the destination commit at this position is durable: the engine
-acknowledges the newest `END` at or below it), `STOP`. End of input means the parent is gone: the engine halts at
-once without acknowledging anything.
+Commands to the engine, one per line on standard input:
+
+- `CONFIG <json>` — the first line, once: the Debezium properties, with the source password. Secrets reach the JVM
+  only this way: never in arguments, in the environment, in a file or in a log line.
+- `DURABLE <position>` — the destination commit at this position is durable. The engine marks as processed the
+  newest `END` or `HEARTBEAT` record whose `ack_position` is at or below it, and then finishes the batch
+  bookkeeping. It acknowledges nothing else, ever.
+- `STOP` — stop reading the slot, close the engine, exit 0.
+- End of input means the parent is gone: the engine halts at once without acknowledging anything.
 
 Back-pressure: the pipeline stops reading file descriptor 3; the engine blocks in its write; Debezium's queue fills;
 the slot read stops. Nothing between the slot and the applier is unbounded.
@@ -118,12 +146,16 @@ the slot read stops. Nothing between the slot and the applier is unbounded.
 Python side (`cdc_v2.stream.engine`):
 
 ```python
-engine = Engine(config, start_position, artifacts)      # starts the JVM in its own process group
+engine = Engine(config, start_position, artifacts)      # starts the JVM as a child, in the pipeline's process group
 for frame in engine.frames(deadline=...):               # Schema | Rows(table, version, RecordBatch) | Begin | End |
     ...                                                 # Truncate | Heartbeat | BatchEnd; raises EngineBroken, EngineFatal
 engine.durable(position)
-engine.stop(deadline)        # then kill of the process group; engine.kill() at any time
+engine.stop(deadline)        # STOP, wait, then SIGKILL of the JVM; engine.kill() at any time
 ```
+
+The JVM stays in the process group of the pipeline, so that the bootstrap's kill of that group (design section 5)
+and a freeze of the whole tree reach it. The pipeline kills the JVM by its process id; the JVM starts no lasting
+child of its own.
 
 ### C3 Transform (package Y)
 
@@ -180,10 +212,33 @@ with lane.transaction(deadline) as tx:
 md.clock_sql                                   # the expression for MotherDuck's clock (4.1)
 ```
 
-Errors: `FenceLost` (another run leads: the caller stops every lane and the pipeline exits), `CommitUnknown` (the
-connection was lost during `COMMIT`: the caller reads the state and continues from what it finds), `DeadlineExceeded`
-(the statement was interrupted; the connection is closed and replaced). Every call has a deadline; none can wait for
-ever (SPEC 4.5). No other module issues `BEGIN`, `COMMIT` or the fence statement.
+Errors (all in `cdc_v2.md.errors`, all subclasses of `DestinationError` except the deadline):
+
+| Error | Meaning | What the caller may do |
+|---|---|---|
+| `FenceLost` | another run leads; the transaction was rolled back | stop every lane; the pipeline exits |
+| `CommitUnknown` | the connection was lost, or the deadline passed, after `COMMIT` was sent | read the state in a new transaction and continue from what it finds; never assume either outcome |
+| `Conflict` | the transaction lost a write-write conflict and was rolled back; nothing was applied | run it again from the start |
+| `ConnectionLost` | the connection was lost before `COMMIT` was sent; nothing was applied | run it again from the start; the lane has replaced the connection |
+| `cdc_v2.deadline.DeadlineExceeded` | a statement before `COMMIT` was interrupted; rolled back; the connection is closed and replaced | as the caller's own deadline rule says |
+
+Any other error of the destination (a statement that is wrong, a value that does not fit) is passed on unchanged
+after the roll-back; it is not a transport error and is never retried blindly.
+
+**Run-again rule.** A sent `COMMIT` can become durable up to about 2 s after its client is gone, and a dead
+client's open transaction can hold its rows for about 30 s (`docs/spike/md_semantics.md`). So every transaction
+that a caller may run again (after `CommitUnknown`, `Conflict`, `ConnectionLost` or a restart) must (1) read the
+state it starts from inside the new transaction, never reuse an earlier read, and (2) change that state with a
+condition on the value it read (the applied position, the chunk's state, the machine's state), checking that
+exactly one row changed. Then a late first copy and the second copy can never both commit. The lane offers
+`tx.execute_one(sql, params)` for such a statement: it raises `Conflict` when the statement changed no row.
+
+Crash points of a lane, declared by package D for each lane name: `<lane>.fenced` (fence statement executed),
+`<lane>.commit_sent` (immediately before `COMMIT`; run with `kill_later`), `<lane>.committed` (`COMMIT` returned).
+Fault sites: `md.connect`, `md.execute`, `md.fence`, `md.commit`.
+
+Every call has a deadline; none can wait for ever (SPEC 4.5). No other module issues `BEGIN`, `COMMIT` or the fence
+statement.
 
 `_cdc` schema: created and migrated by `cdc_v2.md.schema` only; every package adds its tables there.
 
