@@ -1,0 +1,11 @@
+$ CDC_V2_HARNESS_EVIDENCE=evidence/p3/harness tools/with-env uv run -q pytest -v -p no:cacheprovider -m t1 tests/harness/test_harness_pg_proxy.py
+============================= test session starts ==============================
+platform darwin -- Python 3.13.1, pytest-9.2.0, pluggy-1.7.0
+rootdir: ~/Documents/claude_auto/cdc_flight_v2/.claude/worktrees/agent-a2e6fbe4207b30836
+configfile: pyproject.toml
+plugins: hypothesis-6.170.15, timeout-2.4.0
+collected 6 items
+
+tests/harness/test_harness_pg_proxy.py ......                            [100%]
+
+============================== 6 passed in 10.23s ==============================

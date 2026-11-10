@@ -28,6 +28,8 @@ Modes and outcomes (one ledger line per scenario):
                  and check. The ledger lists the last point each killed instance reached.
 ``freeze``       SIGSTOP the instance (at a random time, or at a crash point with action ``stop``), optionally start a
                  second instance while it is frozen, SIGCONT, catch up, check.
+``hang``         the instance hangs at a crash point with a live process (action ``hang``); a second instance must
+                 make progress while it hangs (SPEC 4.2 "a hung component with a live process"; SPEC 4.5).
 
 Outcomes: ``pass``; failures ``not_reached``, ``wrong_exit``, ``no_catch_up``, ``diverged`` (check failed),
 ``survivor`` (a process outlived the scenario), ``error`` (anything else).
@@ -50,6 +52,7 @@ from cdc_v2.testing import procs
 from cdc_v2.testing.harness_evidence import register_root, scrub, write_evidence
 
 FAILURES = ("not_reached", "wrong_exit", "no_catch_up", "diverged", "survivor", "error")
+MAX_LEDGER_HITS = 200
 
 
 class Adapter:
@@ -199,7 +202,11 @@ class _Scenario:
         except Exception as exc:        # noqa: BLE001
             if self.rec["outcome"] in (None, "pass"):
                 self.fail("error", "teardown: %s: %s" % (type(exc).__name__, exc))
-        self.rec["hits"] = [{k: h.get(k) for k in ("tag", "point", "hit", "fire", "action")} for h in self.hits()]
+        hits = self.hits()
+        self.rec["hits_total"] = len(hits)
+        if len(hits) > MAX_LEDGER_HITS:                  # keep the start and the end of a long log
+            hits = hits[:MAX_LEDGER_HITS // 2] + hits[-MAX_LEDGER_HITS // 2:]
+        self.rec["hits"] = [{k: h.get(k) for k in ("tag", "point", "hit", "fire", "action")} for h in hits]
         self.rec["workload_steps"] = self.step
         self.timing("total_s", self.t0)
         if self.rec["outcome"] is None:
@@ -258,6 +265,10 @@ class CrashRunner:
 
     # -- mode (a): every crash point -----------------------------------------------------------------------------
     def run_crash_points(self, points=None, seeds=(1, 2, 3), action="kill"):
+        """Mode (a). ``action`` is ``kill`` (SPEC 1.7) or ``raise`` (the process must exit by itself after firing);
+        ``stop`` and ``hang`` leave the process alive and belong to `run_freeze`."""
+        if action not in ("kill", "raise"):
+            raise ValueError("run_crash_points takes action kill or raise; use run_freeze for stop and hang")
         points = list(points or self.declared)
         jobs = [(lambda sc, p=p: self._crash_point(sc, p, action), "crash_point", p, s) for p in points for s in seeds]
         return self._run_all(jobs)
@@ -319,16 +330,25 @@ class CrashRunner:
         return sc.catch_up_and_check()
 
     # -- mode (c): freeze and continue ---------------------------------------------------------------------------
-    def run_freeze(self, seeds=(1, 2, 3), second_instance=True, at_points=None):
+    def run_freeze(self, seeds=(1, 2, 3), second_instance=True, at_points=None, action="stop"):
+        """Mode (c). Without ``at_points``: SIGSTOP of the instance's group at a random time. With ``at_points``: the
+        instance stops itself there (``action="stop"``), or hangs there with a live process (``action="hang"``, a
+        hung component; it is never continued, only killed at the end). Then a second instance may start; after the
+        freeze the first is continued (``stop``), then catch-up and check."""
+        if action not in ("stop", "hang"):
+            raise ValueError("run_freeze takes action stop or hang")
+        if action == "hang" and not at_points:
+            raise ValueError("action hang needs at_points")
+        mode = "freeze" if action == "stop" else "hang"
         jobs = []
         for s in seeds:
             if at_points:
-                jobs += [(lambda sc, p=p: self._freeze(sc, second_instance, p), "freeze", p, s) for p in at_points]
+                jobs += [(lambda sc, p=p: self._freeze(sc, second_instance, p, action), mode, p, s) for p in at_points]
             else:
-                jobs.append((lambda sc: self._freeze(sc, second_instance, None), "freeze", None, s))
+                jobs.append((lambda sc: self._freeze(sc, second_instance, None, action), mode, None, s))
         return self._run_all(jobs)
 
-    def _freeze(self, sc, second_instance, at_point):
+    def _freeze(self, sc, second_instance, at_point, action="stop"):
         cfg = self.cfg
         rng = random.Random(sc.seed)
         sc.adapter.setup(sc.dir, sc.seed)
@@ -337,17 +357,18 @@ class CrashRunner:
         if at_point:
             hs, mx = hit_seed(at_point, sc.seed), sc.adapter.max_hit(at_point) or cfg.max_hit
             spec = "seed:%d:%d" % (hs, mx)
-            sc.rec.update(hit_spec=spec, hit=crashpoints.hit_from_seed(hs, mx), action="stop")
-            a = sc.start("a", crashpoints.env_for(at_point, hit=spec, action="stop", log=sc.hits_path, tag="a"))
+            sc.rec.update(hit_spec=spec, hit=crashpoints.hit_from_seed(hs, mx), action=action)
+            a = sc.start("a", crashpoints.env_for(at_point, hit=spec, action=action, log=sc.hits_path, tag="a"))
             deadline = time.monotonic() + cfg.crash_timeout
             while not [h for h in sc.hits("a") if h.get("fire")]:
                 if time.monotonic() >= deadline or not a.alive():
                     if a.alive():
                         a.kill_and_wait(cfg.stop_timeout)
-                    return sc.fail("not_reached", "never stopped at %s" % at_point)
+                    return sc.fail("not_reached", "never fired at %s" % at_point)
                 sc.feed()
                 time.sleep(0.005)
-            a.wait_state("T", 5)
+            if action == "stop":
+                a.wait_state("T", 5)
         else:
             a = sc.start("a")
             sc.feed_for(rng.uniform(*cfg.freeze_after))
@@ -363,8 +384,9 @@ class CrashRunner:
             sc.start("b")
         sc.feed_for(frozen_for)
         sc.rec["frozen_s"] = round(time.monotonic() - t, 3)
-        a.cont_group()
-        sc.feed_for(cfg.settle_after_cont)
+        if action == "stop":
+            a.cont_group()
+            sc.feed_for(cfg.settle_after_cont)
         if not a.alive():
             sc.rec["a_exit_after_cont"] = a.poll().as_dict()
         return sc.catch_up_and_check()
@@ -383,13 +405,13 @@ class CrashRunner:
                 d = by_point.setdefault(r["point"], {})
                 d[r["outcome"]] = d.get(r["outcome"], 0) + 1
         crash_runs = [r for r in recs if r["mode"] == "crash_point"]
-        missing = [p for p in self.declared if p not in reached] if crash_runs else list(self.declared)
+        missing = [p for p in self.declared if p not in reached] if crash_runs else None   # None: mode (a) not run
         return {
             "adapter": self.adapter_name,
             "declared_points": self.declared,
             "reached_points": reached,
             "missing_points": missing,
-            "coverage": "%d/%d" % (len(self.declared) - len(missing), len(self.declared)),
+            "coverage": ("%d/%d" % (len(self.declared) - len(missing), len(self.declared))) if crash_runs else None,
             "runs": len(recs),
             "runs_by_mode": {m: sum(1 for r in recs if r["mode"] == m) for m in sorted({r["mode"] for r in recs})},
             "outcomes": outcomes,
@@ -438,7 +460,7 @@ def main(argv=None):
     if a.summary:
         runner.write_summary(a.summary)
     print(json.dumps({k: s[k] for k in ("adapter", "coverage", "runs", "outcomes", "all_passed")}))
-    return 0 if s["all_passed"] and not s["missing_points"] else 1
+    return 0 if s["all_passed"] and not s["missing_points"] else 1   # missing_points None or [] both pass
 
 
 if __name__ == "__main__":

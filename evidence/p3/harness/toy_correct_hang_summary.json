@@ -1,0 +1,55 @@
+{
+  "adapter": "toy-correct",
+  "all_passed": false,
+  "by_point": {},
+  "config": {
+    "catch_up_timeout": 2.0,
+    "crash_timeout": 20.0,
+    "freeze_after": [
+      0.1,
+      0.6
+    ],
+    "freeze_for": [
+      0.3,
+      1.2
+    ],
+    "kill_after": [
+      0.05,
+      0.8
+    ],
+    "kills": 4,
+    "max_hit": 3,
+    "max_workload_steps": 400,
+    "settle_after_cont": 0.3,
+    "stop_timeout": 10.0,
+    "workers": 4,
+    "workload_interval": 0.05
+  },
+  "coverage": null,
+  "declared_points": [
+    "toy.schema_ready",
+    "toy.begun",
+    "toy.batch_read",
+    "toy.data_written",
+    "toy.position_written",
+    "toy.committed"
+  ],
+  "failures": [
+    {
+      "mode": "hang",
+      "outcome": "no_catch_up",
+      "point": "toy.data_written",
+      "reason": "DeadlineExceeded: position None, source has 47 rows, after 2 s",
+      "seed": 1
+    }
+  ],
+  "missing_points": null,
+  "outcomes": {
+    "no_catch_up": 1
+  },
+  "reached_points": [],
+  "runs": 1,
+  "runs_by_mode": {
+    "hang": 1
+  }
+}

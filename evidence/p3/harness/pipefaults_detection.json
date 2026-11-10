@@ -1,0 +1,13 @@
+{
+  "by_kind": {
+    "cut": 296,
+    "dup": 386,
+    "flip": 405,
+    "stall": 393,
+    "truncate": 315
+  },
+  "clean": 85,
+  "detected": 915,
+  "faults_fired": 1795,
+  "seeds": 1000
+}

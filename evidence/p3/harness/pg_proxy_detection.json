@@ -1,0 +1,50 @@
+{
+  "client": {
+    "client_deadline_s": 2.0,
+    "keepalives_count": 2,
+    "keepalives_idle_s": 1,
+    "keepalives_interval_s": 1,
+    "statement_timeout_ms": 1000
+  },
+  "results": {
+    "blackhole": {
+      "both_directions_s": 2.01,
+      "both_error": "OperationalError",
+      "reply_lost_error": "OperationalError",
+      "reply_lost_s": 2.01
+    },
+    "blackhole_keepalive_only": {
+      "detected": false,
+      "socket_error": 0,
+      "waited_s": 5
+    },
+    "delay": {
+      "baseline_s": 0.0005,
+      "delay_each_way_s": 0.15,
+      "statement_s": 0.305
+    },
+    "refuse_close": {
+      "closed_error": "OperationalError",
+      "closed_then_statement_s": 0.0,
+      "refused_connect_s": 0.001,
+      "refused_error": "OperationalError"
+    },
+    "reset": {
+      "idle_error": "OperationalError",
+      "idle_then_statement_s": 0.0,
+      "in_flight_after_reset_s": 0.006,
+      "in_flight_error": "OperationalError"
+    },
+    "tls_through_proxy": {
+      "keepalive_socket_options": {
+        "SO_KEEPALIVE": 8,
+        "TCP_KEEPALIVE": 1,
+        "TCP_KEEPCNT": 2,
+        "TCP_KEEPINTVL": 1
+      },
+      "ssl": true,
+      "version": "TLSv1.3"
+    }
+  },
+  "what": "psycopg 3.3.8 through tools/netproxy to the local primary; times in seconds"
+}

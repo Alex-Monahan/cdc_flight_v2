@@ -104,6 +104,19 @@ def test_freeze_and_continue_with_a_second_instance(tmp_path):
     assert no_toy_process_left(tmp_path) == []
 
 
+def test_a_hung_instance_that_blocks_progress_is_caught(tmp_path):
+    """The toy has no take-over: an instance that hangs inside its batch keeps the DuckDB file lock, so the second
+    instance can never catch up. The runner must report that as a liveness failure (SPEC 4.5), not wait for ever."""
+    r, ledger, summary = runner(toy_adapter.CorrectToy, tmp_path, "toy_correct_hang", catch_up_timeout=2.0)
+    recs = r.run_freeze(seeds=(1,), at_points=["toy.data_written"], action="hang")
+    r.write_summary(summary)
+    assert [(rec["mode"], rec["outcome"]) for rec in recs] == [("hang", "no_catch_up")]
+    assert recs[0]["frozen_after_point"] == "toy.data_written"
+    with pytest.raises(ValueError):
+        r.run_crash_points(action="stop")
+    assert no_toy_process_left(tmp_path) == []
+
+
 class NeverToy(toy_adapter.CorrectToy):
     def crash_points(self):
         return ["toy.never"]
