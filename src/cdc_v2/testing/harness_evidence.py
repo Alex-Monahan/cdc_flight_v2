@@ -6,8 +6,9 @@ installation ``<python>``, the user's home ``~`` and the user name ``<user>``. T
 holds an absolute path under ``/Users``, ``/home``, ``/root``, ``/private``, ``/var``, ``/tmp``, ``/Volumes`` or
 ``/opt``, or the user name, is refused with `EvidenceError`.
 
-At the merge with the oracle worker's evidence writer, replace the body of `write_evidence` with a call to it; every
-harness module writes through this function only.
+After the scrub, the redaction rules of `cdc_v2.evidence` (secrets, tokens, connection strings, host names, IP
+addresses, exact values of the env files) are applied, and the text is refused if any of them still matches. This
+is the one writer of evidence files (contract C0); every harness module and test writes through it.
 """
 import getpass
 import json
@@ -90,9 +91,15 @@ def scrub_obj(obj):
 def write_evidence(path, content, append=False):
     """Write ``content`` (str, or a JSON-able object written as indented JSON) to ``path``, scrubbed and checked.
     With ``append`` a str is appended as is (a ledger line). Returns the text written."""
-    text = content if isinstance(content, str) else json.dumps(scrub_obj(content), indent=2, sort_keys=True) + "\n"
-    text = scrub(text)
+    from cdc_v2.evidence import default_redactor
+    red = default_redactor()
+    if not isinstance(content, str):
+        content = json.dumps(red.redact_obj(scrub_obj(content)), indent=2, sort_keys=True, default=str) + "\n"
+    text = red.redact(scrub(content))
     check_clean(text)
+    left = red.leftovers(text)
+    if left:
+        raise EvidenceError("evidence still matches redaction rules: %s" % ", ".join(sorted(set(left))))
     d = os.path.dirname(os.path.abspath(str(path)))
     os.makedirs(d, exist_ok=True)
     with open(path, "a" if append else "w", encoding="utf-8") as f:

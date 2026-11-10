@@ -1,0 +1,111 @@
+{
+  "drop_with_slot_in_use": {
+    "database_gone": true,
+    "slot_gone": true,
+    "slot_was_active": true
+  },
+  "motherduck_leftovers_at_check": [],
+  "private_cluster": {
+    "kill_and_recover_replica": true,
+    "port_base": 55840
+  },
+  "private_cluster_cleanup": {
+    "home_removed": true,
+    "lease_reusable": true,
+    "ports_free": true
+  },
+  "private_database_drop": {
+    "database_gone": true,
+    "logical_slot_gone": true
+  },
+  "private_databases": {
+    "cluster_ports": [
+      55520,
+      55521
+    ],
+    "isolated": true
+  },
+  "quiesce": {
+    "equal_at_first": true,
+    "first": "0/A0674E78",
+    "rounds": 67,
+    "second": "0/A083A630"
+  },
+  "wait_for_applied": {
+    "returned": "1/2000",
+    "waited_seconds": 1.77
+  },
+  "workload_replay": {
+    "config": {
+      "ddl_prob": 0.6,
+      "features": {
+        "ddl": true,
+        "deletes": true,
+        "inserts": true,
+        "keyless": true,
+        "large_txn": true,
+        "multi_row": true,
+        "multi_table": true,
+        "pk_updates": true,
+        "rollbacks": true,
+        "savepoints": true,
+        "single_row": true,
+        "toast_unchanged": true,
+        "transfers": true,
+        "truncate": true,
+        "updates": true
+      },
+      "keyed_tables": 2,
+      "large_txn_prob": 0.03,
+      "large_txn_rows": 3000,
+      "schema": "public",
+      "seed": 101,
+      "toast_bytes": 20000,
+      "transfer_accounts": 8,
+      "transfer_balance": 1000,
+      "transfer_tables": 3,
+      "truncate_prob": 0.1,
+      "txns_per_round": 25,
+      "writers": 3
+    },
+    "log_entries": {
+      "driver": 4,
+      "header": 1,
+      "quiesce": 1,
+      "setup": 1,
+      "txn": 600
+    },
+    "plan_equals_log_per_writer": true,
+    "replayed_equals_original": true,
+    "rows": {
+      "public.w_ddl1": 9022,
+      "public.w_k0": 12035,
+      "public.w_k1": 18015,
+      "public.w_nk": 110,
+      "public.w_toast": 34,
+      "public.w_xfer_0": 8,
+      "public.w_xfer_1": 8,
+      "public.w_xfer_2": 8
+    },
+    "stats": {
+      "ddl_alter_type": 1,
+      "ddl_create_table": 1,
+      "ddl_drop_column": 1,
+      "ddl_rename_column": 1,
+      "large_txn": 13,
+      "pk_chain": 28,
+      "pk_swap": 27,
+      "savepoint_rollback": 64,
+      "toast_unchanged_update": 119,
+      "transfer": 185,
+      "txn_large": 13,
+      "txn_multi_row": 73,
+      "txn_multi_table": 82,
+      "txn_pk_update": 61,
+      "txn_rollback": 69,
+      "txn_savepoint": 64,
+      "txn_single": 78,
+      "txn_transfer": 160
+    }
+  }
+}
