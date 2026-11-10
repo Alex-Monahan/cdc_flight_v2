@@ -2,7 +2,7 @@
 """Q4 cancel from inside: run B of a Flight cancels run A with MD_CANCEL_FLIGHT_RUN, using only the Flight's own
 environment (MOTHERDUCK_TOKEN, MOTHERDUCK_FLIGHT_ID, MOTHERDUCK_FLIGHT_RUN_NUMBER).
 
-    tools/with-env .venv/bin/python tools/spike/run_semantics_cancel.py [same_flight] [self] [cross_flight]
+    tools/with-env .venv/bin/python tools/spike/run_semantics_cancel.py [same_flight[:N]] [self] [cross_flight]
 
 Run A (victim): ticker mode, a row every 200 ms through MotherDuck's Postgres endpoint (server-side now()), a
 child process and a detached grandchild doing the same, handlers on every catchable signal that log the signal and
@@ -65,7 +65,7 @@ def victim_report(flight, n, cancel_call_unix):
     }
 
 
-def step_same_flight():
+def step_same_flight(suffix=""):
     a = c.run(NAME, **VICTIM)
     n = a["run_number"]
     c.wait_state(NAME, n)
@@ -83,7 +83,7 @@ def step_same_flight():
            "canceller_run": b["run_number"], "canceller_final": c.slim_run(bf),
            "canceller_timing": c.run_timing(bf, bp["first_line_unix"]), "canceller_events": bp["events"],
            "cancel_call": call, "victim": victim_report(NAME, n, call_unix)}
-    c.save("cancel_same_flight", out)
+    c.save("cancel_same_flight" + suffix, out)
 
 
 def step_self():
@@ -131,7 +131,8 @@ def main():
     c.deploy(OTHER, config=VICTIM)
     for s in steps:
         print("==", s, flush=True)
-        globals()["step_" + s]()
+        name, _, suffix = s.partition(":")  # same_flight:2 writes cancel_same_flight_2.json
+        globals()["step_" + name](*(["_" + suffix] if suffix else []))
 
 
 if __name__ == "__main__":

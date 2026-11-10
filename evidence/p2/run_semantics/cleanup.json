@@ -1,0 +1,111 @@
+{
+  "at": "2026-11-10T03:13:10.092871+00:00",
+  "database": {
+    "dropped": "cdc_v2_spike_runs_db"
+  },
+  "flights": [
+    {
+      "cancelled": [],
+      "deleted": {
+        "deleted": true,
+        "flight_id": "37e6d532-6adb-4d90-9ace-95790c23588b",
+        "flight_name": "cdc_v2_spike_runs_cancel"
+      },
+      "flight": "cdc_v2_spike_runs_cancel"
+    },
+    {
+      "cancelled": [],
+      "deleted": {
+        "deleted": true,
+        "flight_id": "ff4277ce-10e4-4d6a-b914-62213f852b59",
+        "flight_name": "cdc_v2_spike_runs_cancel2"
+      },
+      "flight": "cdc_v2_spike_runs_cancel2"
+    },
+    {
+      "cancelled": [],
+      "deleted": {
+        "deleted": true,
+        "flight_id": "8b0ddbbd-a20d-4af3-bf06-db65893abc53",
+        "flight_name": "cdc_v2_spike_runs_fail"
+      },
+      "flight": "cdc_v2_spike_runs_fail"
+    },
+    {
+      "cancelled": [],
+      "deleted": {
+        "deleted": true,
+        "flight_id": "1138fd22-cf73-42dd-89e8-02e1fa82e2d2",
+        "flight_name": "cdc_v2_spike_runs_guard_duckdb"
+      },
+      "flight": "cdc_v2_spike_runs_guard_duckdb"
+    },
+    {
+      "cancelled": [],
+      "deleted": {
+        "deleted": true,
+        "flight_id": "b1a5b67e-40eb-43bc-b8d4-d06fc22c7aeb",
+        "flight_name": "cdc_v2_spike_runs_guard_pg"
+      },
+      "flight": "cdc_v2_spike_runs_guard_pg"
+    },
+    {
+      "cancelled": [],
+      "deleted": {
+        "deleted": true,
+        "flight_id": "ac6789ea-4779-42ad-949e-8f87ba3b78cc",
+        "flight_name": "cdc_v2_spike_runs_leader"
+      },
+      "flight": "cdc_v2_spike_runs_leader"
+    },
+    {
+      "cancelled": [],
+      "deleted": {
+        "deleted": true,
+        "flight_id": "04380ba4-8d84-43f8-8e82-bed76fbf46e6",
+        "flight_name": "cdc_v2_spike_runs_maxrt"
+      },
+      "flight": "cdc_v2_spike_runs_maxrt"
+    },
+    {
+      "cancelled": [],
+      "deleted": {
+        "deleted": true,
+        "flight_id": "c5d8609e-40d4-4787-a991-94030f66da30",
+        "flight_name": "cdc_v2_spike_runs_overlap"
+      },
+      "flight": "cdc_v2_spike_runs_overlap"
+    },
+    {
+      "cancelled": [],
+      "deleted": {
+        "deleted": true,
+        "flight_id": "b1c9efb3-7629-4eac-98c6-7c816e12b106",
+        "flight_name": "cdc_v2_spike_runs_proc"
+      },
+      "flight": "cdc_v2_spike_runs_proc"
+    },
+    {
+      "cancelled": [],
+      "deleted": {
+        "deleted": true,
+        "flight_id": "40d604cf-b6a9-4a40-870c-6c117a78b67b",
+        "flight_name": "cdc_v2_spike_runs_wd"
+      },
+      "flight": "cdc_v2_spike_runs_wd"
+    },
+    {
+      "cancelled": [],
+      "deleted": {
+        "deleted": true,
+        "flight_id": "321697a2-6d74-4752-afec-f315bf94f824",
+        "flight_name": "cdc_v2_spike_runs_wd_maxrt"
+      },
+      "flight": "cdc_v2_spike_runs_wd_maxrt"
+    }
+  ],
+  "left_databases": [],
+  "left_flights": [],
+  "left_secrets": [],
+  "secrets": []
+}

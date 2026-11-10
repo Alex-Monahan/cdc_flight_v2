@@ -1,0 +1,3235 @@
+{
+  "cleared_status": {
+    "cdc_v2_spike_runs_guard_duckdb": "DISABLED",
+    "cdc_v2_spike_runs_guard_pg": "DISABLED"
+  },
+  "flights": {
+    "cdc_v2_spike_runs_guard_duckdb": {
+      "created_minus_scheduled_s": {
+        "max": -21.184,
+        "mean": -22.016,
+        "median": -22.155,
+        "min": -22.411,
+        "n": 34,
+        "p95": -21.378
+      },
+      "duplicated_minutes": [],
+      "first_seen_states": [
+        "PENDING",
+        "RUNNING"
+      ],
+      "missed_minutes": [],
+      "on_demand_runs": 0,
+      "runs": [
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:36:38.061+00:00",
+          "created_minus_scheduled_s": -21.939,
+          "ended_at": "2026-11-10T02:37:06.528+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.185,
+          "first_seen_at": "2026-11-10T02:37:03.295988+00:00",
+          "first_seen_minus_scheduled_s": 3.3,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.567,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 3474,
+            "import_s": 0.449,
+            "leader_run": 0,
+            "query_s": 0.009,
+            "run": "16",
+            "state": "leading",
+            "total_in_code_s": 2.129,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:37:03.295988+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:37:08.791366+00:00"
+            ]
+          ],
+          "run_number": 16,
+          "scheduled_at": "2026-11-10T02:37:00+00:00",
+          "scheduled_to_first_line_s": 4.343,
+          "scheduled_to_started_s": 0.8,
+          "started_at": "2026-11-10T02:37:00.8+00:00",
+          "started_to_ended_s": 5.728,
+          "started_to_first_line_s": 3.543,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:37:38.085+00:00",
+          "created_minus_scheduled_s": -21.915,
+          "ended_at": "2026-11-10T02:38:07.909+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.297,
+          "first_seen_at": "2026-11-10T02:38:02.093904+00:00",
+          "first_seen_minus_scheduled_s": 2.1,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.587,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 3472,
+            "import_s": 0.475,
+            "leader_run": 0,
+            "query_s": 0.01,
+            "run": "17",
+            "state": "leading",
+            "total_in_code_s": 2.174,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:38:02.093904+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:38:10.400530+00:00"
+            ]
+          ],
+          "run_number": 17,
+          "scheduled_at": "2026-11-10T02:38:00+00:00",
+          "scheduled_to_first_line_s": 5.612,
+          "scheduled_to_started_s": 1.187,
+          "started_at": "2026-11-10T02:38:01.187+00:00",
+          "started_to_ended_s": 6.722,
+          "started_to_first_line_s": 4.425,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:38:37.832+00:00",
+          "created_minus_scheduled_s": -22.168,
+          "ended_at": "2026-11-10T02:39:06.728+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.249,
+          "first_seen_at": "2026-11-10T02:39:03.604720+00:00",
+          "first_seen_minus_scheduled_s": 3.6,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.597,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 988,
+            "import_s": 0.477,
+            "leader_run": 0,
+            "query_s": 0.011,
+            "run": "18",
+            "state": "leading",
+            "total_in_code_s": 2.191,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:39:03.604720+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:39:09.384576+00:00"
+            ]
+          ],
+          "run_number": 18,
+          "scheduled_at": "2026-11-10T02:39:00+00:00",
+          "scheduled_to_first_line_s": 4.479,
+          "scheduled_to_started_s": 1.284,
+          "started_at": "2026-11-10T02:39:01.284+00:00",
+          "started_to_ended_s": 5.444,
+          "started_to_first_line_s": 3.195,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:39:38.816+00:00",
+          "created_minus_scheduled_s": -21.184,
+          "ended_at": "2026-11-10T02:40:07.38+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.467,
+          "first_seen_at": "2026-11-10T02:40:03.704523+00:00",
+          "first_seen_minus_scheduled_s": 3.7,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.747,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 5414,
+            "import_s": 0.517,
+            "leader_run": 0,
+            "query_s": 0.01,
+            "run": "19",
+            "state": "leading",
+            "total_in_code_s": 2.396,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:40:03.704523+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:40:08.002088+00:00"
+            ]
+          ],
+          "run_number": 19,
+          "scheduled_at": "2026-11-10T02:40:00+00:00",
+          "scheduled_to_first_line_s": 4.913,
+          "scheduled_to_started_s": 1.569,
+          "started_at": "2026-11-10T02:40:01.569+00:00",
+          "started_to_ended_s": 5.811,
+          "started_to_first_line_s": 3.344,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:40:37.753+00:00",
+          "created_minus_scheduled_s": -22.247,
+          "ended_at": "2026-11-10T02:41:06.142+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.278,
+          "first_seen_at": "2026-11-10T02:41:02.092173+00:00",
+          "first_seen_minus_scheduled_s": 2.1,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.555,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 2264,
+            "import_s": 0.488,
+            "leader_run": 0,
+            "query_s": 0.011,
+            "run": "20",
+            "state": "leading",
+            "total_in_code_s": 2.163,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:41:02.092173+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:41:07.697049+00:00"
+            ]
+          ],
+          "run_number": 20,
+          "scheduled_at": "2026-11-10T02:41:00+00:00",
+          "scheduled_to_first_line_s": 3.864,
+          "scheduled_to_started_s": 0.256,
+          "started_at": "2026-11-10T02:41:00.256+00:00",
+          "started_to_ended_s": 5.886,
+          "started_to_first_line_s": 3.608,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:41:37.592+00:00",
+          "created_minus_scheduled_s": -22.408,
+          "ended_at": "2026-11-10T02:42:05.699+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.415,
+          "first_seen_at": "2026-11-10T02:42:01.356106+00:00",
+          "first_seen_minus_scheduled_s": 1.4,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.653,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 488,
+            "import_s": 0.532,
+            "leader_run": 0,
+            "query_s": 0.015,
+            "run": "21",
+            "state": "leading",
+            "total_in_code_s": 2.315,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:42:01.356106+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:42:06.951347+00:00"
+            ]
+          ],
+          "run_number": 21,
+          "scheduled_at": "2026-11-10T02:42:00+00:00",
+          "scheduled_to_first_line_s": 3.284,
+          "scheduled_to_started_s": 1.028,
+          "started_at": "2026-11-10T02:42:01.028+00:00",
+          "started_to_ended_s": 4.671,
+          "started_to_first_line_s": 2.256,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:42:37.678+00:00",
+          "created_minus_scheduled_s": -22.322,
+          "ended_at": "2026-11-10T02:43:06.776+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.364,
+          "first_seen_at": "2026-11-10T02:43:03.030452+00:00",
+          "first_seen_minus_scheduled_s": 3.0,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.578,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 239,
+            "import_s": 0.558,
+            "leader_run": 0,
+            "query_s": 0.01,
+            "run": "22",
+            "state": "leading",
+            "total_in_code_s": 2.262,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:43:03.030452+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:43:08.823803+00:00"
+            ]
+          ],
+          "run_number": 22,
+          "scheduled_at": "2026-11-10T02:43:00+00:00",
+          "scheduled_to_first_line_s": 4.412,
+          "scheduled_to_started_s": 1.248,
+          "started_at": "2026-11-10T02:43:01.248+00:00",
+          "started_to_ended_s": 5.528,
+          "started_to_first_line_s": 3.164,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:43:37.841+00:00",
+          "created_minus_scheduled_s": -22.159,
+          "ended_at": "2026-11-10T02:44:06.636+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.339,
+          "first_seen_at": "2026-11-10T02:44:02.316121+00:00",
+          "first_seen_minus_scheduled_s": 2.3,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.614,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 3828,
+            "import_s": 0.482,
+            "leader_run": 0,
+            "query_s": 0.01,
+            "run": "23",
+            "state": "leading",
+            "total_in_code_s": 2.215,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:44:02.316121+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:44:07.927545+00:00"
+            ]
+          ],
+          "run_number": 23,
+          "scheduled_at": "2026-11-10T02:44:00+00:00",
+          "scheduled_to_first_line_s": 4.297,
+          "scheduled_to_started_s": 1.116,
+          "started_at": "2026-11-10T02:44:01.116+00:00",
+          "started_to_ended_s": 5.52,
+          "started_to_first_line_s": 3.181,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:44:37.847+00:00",
+          "created_minus_scheduled_s": -22.153,
+          "ended_at": "2026-11-10T02:45:08.293+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.453,
+          "first_seen_at": "2026-11-10T02:45:04.200330+00:00",
+          "first_seen_minus_scheduled_s": 4.2,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.641,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 4114,
+            "import_s": 0.526,
+            "leader_run": 0,
+            "query_s": 0.011,
+            "run": "24",
+            "state": "leading",
+            "total_in_code_s": 2.305,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:45:04.200330+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:45:10.102032+00:00"
+            ]
+          ],
+          "run_number": 24,
+          "scheduled_at": "2026-11-10T02:45:00+00:00",
+          "scheduled_to_first_line_s": 5.84,
+          "scheduled_to_started_s": 2.497,
+          "started_at": "2026-11-10T02:45:02.497+00:00",
+          "started_to_ended_s": 5.796,
+          "started_to_first_line_s": 3.343,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:45:37.822+00:00",
+          "created_minus_scheduled_s": -22.178,
+          "ended_at": "2026-11-10T02:46:06.202+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.123,
+          "first_seen_at": "2026-11-10T02:46:03.780758+00:00",
+          "first_seen_minus_scheduled_s": 3.8,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.5,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 795,
+            "import_s": 0.469,
+            "leader_run": 0,
+            "query_s": 0.01,
+            "run": "25",
+            "state": "leading",
+            "total_in_code_s": 2.087,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:46:03.780758+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:46:06.544534+00:00"
+            ]
+          ],
+          "run_number": 25,
+          "scheduled_at": "2026-11-10T02:46:00+00:00",
+          "scheduled_to_first_line_s": 4.079,
+          "scheduled_to_started_s": 1.781,
+          "started_at": "2026-11-10T02:46:01.781+00:00",
+          "started_to_ended_s": 4.421,
+          "started_to_first_line_s": 2.298,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:46:37.66+00:00",
+          "created_minus_scheduled_s": -22.34,
+          "ended_at": "2026-11-10T02:47:04.421+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.166,
+          "first_seen_at": "2026-11-10T02:47:02.807959+00:00",
+          "first_seen_minus_scheduled_s": 2.8,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.567,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 2775,
+            "import_s": 0.451,
+            "leader_run": 0,
+            "query_s": 0.01,
+            "run": "26",
+            "state": "leading",
+            "total_in_code_s": 2.13,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:47:02.807959+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:47:05.665878+00:00"
+            ]
+          ],
+          "run_number": 26,
+          "scheduled_at": "2026-11-10T02:47:00+00:00",
+          "scheduled_to_first_line_s": 2.255,
+          "scheduled_to_started_s": 0.394,
+          "started_at": "2026-11-10T02:47:00.394+00:00",
+          "started_to_ended_s": 4.027,
+          "started_to_first_line_s": 1.861,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:47:37.843+00:00",
+          "created_minus_scheduled_s": -22.157,
+          "ended_at": "2026-11-10T02:48:05.698+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.303,
+          "first_seen_at": "2026-11-10T02:48:02.423305+00:00",
+          "first_seen_minus_scheduled_s": 2.4,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.625,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 2663,
+            "import_s": 0.479,
+            "leader_run": 0,
+            "query_s": 0.011,
+            "run": "27",
+            "state": "leading",
+            "total_in_code_s": 2.219,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:48:02.423305+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:48:07.921958+00:00"
+            ]
+          ],
+          "run_number": 27,
+          "scheduled_at": "2026-11-10T02:48:00+00:00",
+          "scheduled_to_first_line_s": 3.395,
+          "scheduled_to_started_s": 0.639,
+          "started_at": "2026-11-10T02:48:00.639+00:00",
+          "started_to_ended_s": 5.059,
+          "started_to_first_line_s": 2.756,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:48:37.589+00:00",
+          "created_minus_scheduled_s": -22.411,
+          "ended_at": "2026-11-10T02:49:06.428+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.35,
+          "first_seen_at": "2026-11-10T02:49:04.253435+00:00",
+          "first_seen_minus_scheduled_s": 4.3,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.587,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 2008,
+            "import_s": 0.511,
+            "leader_run": 0,
+            "query_s": 0.011,
+            "run": "28",
+            "state": "leading",
+            "total_in_code_s": 2.214,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:49:04.253435+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:49:07.325802+00:00"
+            ]
+          ],
+          "run_number": 28,
+          "scheduled_at": "2026-11-10T02:49:00+00:00",
+          "scheduled_to_first_line_s": 4.078,
+          "scheduled_to_started_s": 1.849,
+          "started_at": "2026-11-10T02:49:01.849+00:00",
+          "started_to_ended_s": 4.579,
+          "started_to_first_line_s": 2.229,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:49:38.235+00:00",
+          "created_minus_scheduled_s": -21.765,
+          "ended_at": "2026-11-10T02:50:09.164+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.357,
+          "first_seen_at": "2026-11-10T02:50:05.762492+00:00",
+          "first_seen_minus_scheduled_s": 5.8,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.652,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 3444,
+            "import_s": 0.498,
+            "leader_run": 0,
+            "query_s": 0.011,
+            "run": "29",
+            "state": "leading",
+            "total_in_code_s": 2.272,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:50:05.762492+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:50:11.533558+00:00"
+            ]
+          ],
+          "run_number": 29,
+          "scheduled_at": "2026-11-10T02:50:00+00:00",
+          "scheduled_to_first_line_s": 6.807,
+          "scheduled_to_started_s": 3.341,
+          "started_at": "2026-11-10T02:50:03.341+00:00",
+          "started_to_ended_s": 5.823,
+          "started_to_first_line_s": 3.466,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:50:38.324+00:00",
+          "created_minus_scheduled_s": -21.676,
+          "ended_at": "2026-11-10T02:51:05.657+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.337,
+          "first_seen_at": "2026-11-10T02:51:02.011549+00:00",
+          "first_seen_minus_scheduled_s": 2.0,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.656,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 3809,
+            "import_s": 0.509,
+            "leader_run": 0,
+            "query_s": 0.009,
+            "run": "30",
+            "state": "leading",
+            "total_in_code_s": 2.294,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:51:02.011549+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:51:07.450657+00:00"
+            ]
+          ],
+          "run_number": 30,
+          "scheduled_at": "2026-11-10T02:51:00+00:00",
+          "scheduled_to_first_line_s": 3.32,
+          "scheduled_to_started_s": 0.648,
+          "started_at": "2026-11-10T02:51:00.648+00:00",
+          "started_to_ended_s": 5.009,
+          "started_to_first_line_s": 2.672,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:51:38.622+00:00",
+          "created_minus_scheduled_s": -21.378,
+          "ended_at": "2026-11-10T02:52:04.712+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.14,
+          "first_seen_at": "2026-11-10T02:52:01.535477+00:00",
+          "first_seen_minus_scheduled_s": 1.5,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.539,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 1487,
+            "import_s": 0.455,
+            "leader_run": 0,
+            "query_s": 0.01,
+            "run": "31",
+            "state": "leading",
+            "total_in_code_s": 2.108,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:52:01.535477+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:52:07.204717+00:00"
+            ]
+          ],
+          "run_number": 31,
+          "scheduled_at": "2026-11-10T02:52:00+00:00",
+          "scheduled_to_first_line_s": 2.572,
+          "scheduled_to_started_s": 0.429,
+          "started_at": "2026-11-10T02:52:00.429+00:00",
+          "started_to_ended_s": 4.283,
+          "started_to_first_line_s": 2.143,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:52:37.77+00:00",
+          "created_minus_scheduled_s": -22.23,
+          "ended_at": "2026-11-10T02:53:07.036+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.29,
+          "first_seen_at": "2026-11-10T02:53:03.111954+00:00",
+          "first_seen_minus_scheduled_s": 3.1,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.615,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 2421,
+            "import_s": 0.501,
+            "leader_run": 0,
+            "query_s": 0.009,
+            "run": "32",
+            "state": "leading",
+            "total_in_code_s": 2.235,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:53:03.111954+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:53:08.584407+00:00"
+            ]
+          ],
+          "run_number": 32,
+          "scheduled_at": "2026-11-10T02:53:00+00:00",
+          "scheduled_to_first_line_s": 4.746,
+          "scheduled_to_started_s": 1.238,
+          "started_at": "2026-11-10T02:53:01.238+00:00",
+          "started_to_ended_s": 5.798,
+          "started_to_first_line_s": 3.508,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:53:38.147+00:00",
+          "created_minus_scheduled_s": -21.853,
+          "ended_at": "2026-11-10T02:54:07.486+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.318,
+          "first_seen_at": "2026-11-10T02:54:01.690892+00:00",
+          "first_seen_minus_scheduled_s": 1.7,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.641,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 1421,
+            "import_s": 0.478,
+            "leader_run": 0,
+            "query_s": 0.01,
+            "run": "33",
+            "state": "leading",
+            "total_in_code_s": 2.232,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:54:01.690892+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:54:07.712648+00:00"
+            ]
+          ],
+          "run_number": 33,
+          "scheduled_at": "2026-11-10T02:54:00+00:00",
+          "scheduled_to_first_line_s": 5.168,
+          "scheduled_to_started_s": 1.026,
+          "started_at": "2026-11-10T02:54:01.026+00:00",
+          "started_to_ended_s": 6.46,
+          "started_to_first_line_s": 4.142,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:54:37.842+00:00",
+          "created_minus_scheduled_s": -22.158,
+          "ended_at": "2026-11-10T02:55:07.916+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.466,
+          "first_seen_at": "2026-11-10T02:55:01.609374+00:00",
+          "first_seen_minus_scheduled_s": 1.6,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.738,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 336,
+            "import_s": 0.516,
+            "leader_run": 0,
+            "query_s": 0.013,
+            "run": "34",
+            "state": "leading",
+            "total_in_code_s": 2.39,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:55:01.609374+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:55:10.646204+00:00"
+            ]
+          ],
+          "run_number": 34,
+          "scheduled_at": "2026-11-10T02:55:00+00:00",
+          "scheduled_to_first_line_s": 5.45,
+          "scheduled_to_started_s": 0.942,
+          "started_at": "2026-11-10T02:55:00.942+00:00",
+          "started_to_ended_s": 6.974,
+          "started_to_first_line_s": 4.508,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:55:37.608+00:00",
+          "created_minus_scheduled_s": -22.392,
+          "ended_at": "2026-11-10T02:56:06.495+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.151,
+          "first_seen_at": "2026-11-10T02:56:01.224086+00:00",
+          "first_seen_minus_scheduled_s": 1.2,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.535,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 2728,
+            "import_s": 0.453,
+            "leader_run": 0,
+            "query_s": 0.009,
+            "run": "35",
+            "state": "leading",
+            "total_in_code_s": 2.098,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:56:01.224086+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:56:06.894934+00:00"
+            ]
+          ],
+          "run_number": 35,
+          "scheduled_at": "2026-11-10T02:56:00+00:00",
+          "scheduled_to_first_line_s": 4.344,
+          "scheduled_to_started_s": 0.885,
+          "started_at": "2026-11-10T02:56:00.885+00:00",
+          "started_to_ended_s": 5.61,
+          "started_to_first_line_s": 3.459,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:56:37.908+00:00",
+          "created_minus_scheduled_s": -22.092,
+          "ended_at": "2026-11-10T02:57:10.743+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 7.302,
+          "first_seen_at": "2026-11-10T02:57:01.243324+00:00",
+          "first_seen_minus_scheduled_s": 1.2,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 6.679,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 544,
+            "import_s": 0.454,
+            "leader_run": 0,
+            "query_s": 0.01,
+            "run": "36",
+            "state": "leading",
+            "total_in_code_s": 7.248,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:57:01.243324+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:57:12.799167+00:00"
+            ]
+          ],
+          "run_number": 36,
+          "scheduled_at": "2026-11-10T02:57:00+00:00",
+          "scheduled_to_first_line_s": 3.441,
+          "scheduled_to_started_s": 0.579,
+          "started_at": "2026-11-10T02:57:00.579+00:00",
+          "started_to_ended_s": 10.164,
+          "started_to_first_line_s": 2.862,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:57:37.765+00:00",
+          "created_minus_scheduled_s": -22.235,
+          "ended_at": "2026-11-10T02:58:05.981+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.158,
+          "first_seen_at": "2026-11-10T02:58:01.285756+00:00",
+          "first_seen_minus_scheduled_s": 1.3,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.558,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 4717,
+            "import_s": 0.451,
+            "leader_run": 0,
+            "query_s": 0.009,
+            "run": "37",
+            "state": "leading",
+            "total_in_code_s": 2.122,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:58:01.285756+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:58:07.612642+00:00"
+            ]
+          ],
+          "run_number": 37,
+          "scheduled_at": "2026-11-10T02:58:00+00:00",
+          "scheduled_to_first_line_s": 3.823,
+          "scheduled_to_started_s": 0.83,
+          "started_at": "2026-11-10T02:58:00.83+00:00",
+          "started_to_ended_s": 5.151,
+          "started_to_first_line_s": 2.993,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:58:38.381+00:00",
+          "created_minus_scheduled_s": -21.619,
+          "ended_at": "2026-11-10T02:59:08.251+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.403,
+          "first_seen_at": "2026-11-10T02:59:01.852887+00:00",
+          "first_seen_minus_scheduled_s": 1.9,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.642,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 454,
+            "import_s": 0.555,
+            "leader_run": 0,
+            "query_s": 0.009,
+            "run": "38",
+            "state": "leading",
+            "total_in_code_s": 2.338,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:59:01.852887+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:59:10.893409+00:00"
+            ]
+          ],
+          "run_number": 38,
+          "scheduled_at": "2026-11-10T02:59:00+00:00",
+          "scheduled_to_first_line_s": 5.848,
+          "scheduled_to_started_s": 1.588,
+          "started_at": "2026-11-10T02:59:01.588+00:00",
+          "started_to_ended_s": 6.663,
+          "started_to_first_line_s": 4.26,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:59:38.554+00:00",
+          "created_minus_scheduled_s": -21.446,
+          "ended_at": "2026-11-10T03:00:07.19+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.671,
+          "first_seen_at": "2026-11-10T03:00:04.277075+00:00",
+          "first_seen_minus_scheduled_s": 4.3,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.859,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 3155,
+            "import_s": 0.586,
+            "leader_run": 0,
+            "query_s": 0.011,
+            "run": "39",
+            "state": "leading",
+            "total_in_code_s": 2.575,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T03:00:04.277075+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:00:10.472286+00:00"
+            ]
+          ],
+          "run_number": 39,
+          "scheduled_at": "2026-11-10T03:00:00+00:00",
+          "scheduled_to_first_line_s": 4.519,
+          "scheduled_to_started_s": 2.651,
+          "started_at": "2026-11-10T03:00:02.651+00:00",
+          "started_to_ended_s": 4.539,
+          "started_to_first_line_s": 1.868,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T03:00:37.988+00:00",
+          "created_minus_scheduled_s": -22.012,
+          "ended_at": "2026-11-10T03:01:07.759+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.234,
+          "first_seen_at": "2026-11-10T03:01:02.967370+00:00",
+          "first_seen_minus_scheduled_s": 3.0,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.573,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 5094,
+            "import_s": 0.503,
+            "leader_run": 0,
+            "query_s": 0.011,
+            "run": "40",
+            "state": "leading",
+            "total_in_code_s": 2.2,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T03:01:02.967370+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:01:08.343370+00:00"
+            ]
+          ],
+          "run_number": 40,
+          "scheduled_at": "2026-11-10T03:01:00+00:00",
+          "scheduled_to_first_line_s": 5.525,
+          "scheduled_to_started_s": 2.226,
+          "started_at": "2026-11-10T03:01:02.226+00:00",
+          "started_to_ended_s": 5.533,
+          "started_to_first_line_s": 3.299,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T03:01:38.004+00:00",
+          "created_minus_scheduled_s": -21.996,
+          "ended_at": "2026-11-10T03:02:06.879+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.184,
+          "first_seen_at": "2026-11-10T03:02:00.723826+00:00",
+          "first_seen_minus_scheduled_s": 0.7,
+          "first_seen_state": "PENDING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.567,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 2881,
+            "import_s": 0.472,
+            "leader_run": 0,
+            "query_s": 0.01,
+            "run": "41",
+            "state": "leading",
+            "total_in_code_s": 2.153,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "PENDING",
+              "2026-11-10T03:02:00.723826+00:00"
+            ],
+            [
+              "RUNNING",
+              "2026-11-10T03:02:03.751532+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:02:09.533610+00:00"
+            ]
+          ],
+          "run_number": 41,
+          "scheduled_at": "2026-11-10T03:02:00+00:00",
+          "scheduled_to_first_line_s": 4.695,
+          "scheduled_to_started_s": 0.794,
+          "started_at": "2026-11-10T03:02:00.794+00:00",
+          "started_to_ended_s": 6.085,
+          "started_to_first_line_s": 3.901,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T03:02:37.834+00:00",
+          "created_minus_scheduled_s": -22.166,
+          "ended_at": "2026-11-10T03:03:06.151+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.127,
+          "first_seen_at": "2026-11-10T03:03:00.884606+00:00",
+          "first_seen_minus_scheduled_s": 0.9,
+          "first_seen_state": "PENDING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.489,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 256,
+            "import_s": 0.461,
+            "leader_run": 0,
+            "query_s": 0.01,
+            "run": "42",
+            "state": "leading",
+            "total_in_code_s": 2.064,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "PENDING",
+              "2026-11-10T03:03:00.884606+00:00"
+            ],
+            [
+              "RUNNING",
+              "2026-11-10T03:03:03.640208+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:03:06.410353+00:00"
+            ]
+          ],
+          "run_number": 42,
+          "scheduled_at": "2026-11-10T03:03:00+00:00",
+          "scheduled_to_first_line_s": 4.024,
+          "scheduled_to_started_s": 1.01,
+          "started_at": "2026-11-10T03:03:01.01+00:00",
+          "started_to_ended_s": 5.141,
+          "started_to_first_line_s": 3.014,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T03:03:38.089+00:00",
+          "created_minus_scheduled_s": -21.911,
+          "ended_at": "2026-11-10T03:04:06.16+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.35,
+          "first_seen_at": "2026-11-10T03:04:02.862577+00:00",
+          "first_seen_minus_scheduled_s": 2.9,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.636,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 3998,
+            "import_s": 0.49,
+            "leader_run": 0,
+            "query_s": 0.011,
+            "run": "43",
+            "state": "leading",
+            "total_in_code_s": 2.263,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T03:04:02.862577+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:04:08.814129+00:00"
+            ]
+          ],
+          "run_number": 43,
+          "scheduled_at": "2026-11-10T03:04:00+00:00",
+          "scheduled_to_first_line_s": 3.81,
+          "scheduled_to_started_s": 0.491,
+          "started_at": "2026-11-10T03:04:00.491+00:00",
+          "started_to_ended_s": 5.669,
+          "started_to_first_line_s": 3.319,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T03:04:37.84+00:00",
+          "created_minus_scheduled_s": -22.16,
+          "ended_at": "2026-11-10T03:05:06.768+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.286,
+          "first_seen_at": "2026-11-10T03:05:03.324058+00:00",
+          "first_seen_minus_scheduled_s": 3.3,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.541,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 3212,
+            "import_s": 0.483,
+            "leader_run": 0,
+            "query_s": 0.011,
+            "run": "44",
+            "state": "leading",
+            "total_in_code_s": 2.147,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T03:05:03.324058+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:05:08.799314+00:00"
+            ]
+          ],
+          "run_number": 44,
+          "scheduled_at": "2026-11-10T03:05:00+00:00",
+          "scheduled_to_first_line_s": 4.482,
+          "scheduled_to_started_s": 1.054,
+          "started_at": "2026-11-10T03:05:01.054+00:00",
+          "started_to_ended_s": 5.714,
+          "started_to_first_line_s": 3.428,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T03:05:37.595+00:00",
+          "created_minus_scheduled_s": -22.405,
+          "ended_at": "2026-11-10T03:06:05.809+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.277,
+          "first_seen_at": "2026-11-10T03:06:02.565010+00:00",
+          "first_seen_minus_scheduled_s": 2.6,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.555,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 954,
+            "import_s": 0.492,
+            "leader_run": 0,
+            "query_s": 0.009,
+            "run": "45",
+            "state": "leading",
+            "total_in_code_s": 2.171,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T03:06:02.565010+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:06:08.326649+00:00"
+            ]
+          ],
+          "run_number": 45,
+          "scheduled_at": "2026-11-10T03:06:00+00:00",
+          "scheduled_to_first_line_s": 3.532,
+          "scheduled_to_started_s": 0.648,
+          "started_at": "2026-11-10T03:06:00.648+00:00",
+          "started_to_ended_s": 5.161,
+          "started_to_first_line_s": 2.884,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T03:06:37.74+00:00",
+          "created_minus_scheduled_s": -22.26,
+          "ended_at": "2026-11-10T03:07:05.597+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.218,
+          "first_seen_at": "2026-11-10T03:07:00.983245+00:00",
+          "first_seen_minus_scheduled_s": 1.0,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.545,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 4871,
+            "import_s": 0.451,
+            "leader_run": 0,
+            "query_s": 0.011,
+            "run": "46",
+            "state": "leading",
+            "total_in_code_s": 2.108,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T03:07:00.983245+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:07:06.526556+00:00"
+            ]
+          ],
+          "run_number": 46,
+          "scheduled_at": "2026-11-10T03:07:00+00:00",
+          "scheduled_to_first_line_s": 3.379,
+          "scheduled_to_started_s": 0.405,
+          "started_at": "2026-11-10T03:07:00.405+00:00",
+          "started_to_ended_s": 5.192,
+          "started_to_first_line_s": 2.974,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T03:07:38.164+00:00",
+          "created_minus_scheduled_s": -21.836,
+          "ended_at": "2026-11-10T03:08:06.453+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.236,
+          "first_seen_at": "2026-11-10T03:08:02.334479+00:00",
+          "first_seen_minus_scheduled_s": 2.3,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.585,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 4449,
+            "import_s": 0.483,
+            "leader_run": 0,
+            "query_s": 0.011,
+            "run": "47",
+            "state": "leading",
+            "total_in_code_s": 2.188,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T03:08:02.334479+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:08:07.934905+00:00"
+            ]
+          ],
+          "run_number": 47,
+          "scheduled_at": "2026-11-10T03:08:00+00:00",
+          "scheduled_to_first_line_s": 4.217,
+          "scheduled_to_started_s": 1.034,
+          "started_at": "2026-11-10T03:08:01.034+00:00",
+          "started_to_ended_s": 5.419,
+          "started_to_first_line_s": 3.183,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T03:08:37.997+00:00",
+          "created_minus_scheduled_s": -22.003,
+          "ended_at": "2026-11-10T03:09:06.049+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.198,
+          "first_seen_at": "2026-11-10T03:09:01.731001+00:00",
+          "first_seen_minus_scheduled_s": 1.7,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.585,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 2702,
+            "import_s": 0.458,
+            "leader_run": 0,
+            "query_s": 0.01,
+            "run": "48",
+            "state": "leading",
+            "total_in_code_s": 2.159,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T03:09:01.731001+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:09:07.385059+00:00"
+            ]
+          ],
+          "run_number": 48,
+          "scheduled_at": "2026-11-10T03:09:00+00:00",
+          "scheduled_to_first_line_s": 3.851,
+          "scheduled_to_started_s": 0.823,
+          "started_at": "2026-11-10T03:09:00.823+00:00",
+          "started_to_ended_s": 5.226,
+          "started_to_first_line_s": 3.028,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T03:09:38.626+00:00",
+          "created_minus_scheduled_s": -21.374,
+          "ended_at": "2026-11-10T03:10:23.209+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 2.267,
+          "first_seen_at": "2026-11-10T03:10:04.585340+00:00",
+          "first_seen_minus_scheduled_s": 4.6,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 1.599,
+            "decision": "exit_healthy",
+            "dsn_opts": "attach_mode=single",
+            "epoch": 1,
+            "heartbeat_age_ms": 1214,
+            "import_s": 0.5,
+            "leader_run": 0,
+            "query_s": 0.01,
+            "run": "49",
+            "state": "leading",
+            "total_in_code_s": 2.222,
+            "variant": "duckdb"
+          },
+          "is_scheduled": true,
+          "log_lines": 10,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T03:10:04.585340+00:00"
+            ]
+          ],
+          "run_number": 49,
+          "scheduled_at": "2026-11-10T03:10:00+00:00",
+          "scheduled_to_first_line_s": 20.942,
+          "scheduled_to_started_s": 1.859,
+          "started_at": "2026-11-10T03:10:01.859+00:00",
+          "started_to_ended_s": 21.35,
+          "started_to_first_line_s": 19.083,
+          "state": "SUCCEEDED"
+        }
+      ],
+      "scheduled_runs": 34,
+      "scheduled_to_first_line_s": {
+        "max": 20.942,
+        "mean": 4.804,
+        "median": 4.32,
+        "min": 2.255,
+        "n": 34,
+        "p95": 5.848
+      },
+      "scheduled_to_started_s": {
+        "max": 3.341,
+        "mean": 1.181,
+        "median": 1.027,
+        "min": 0.256,
+        "n": 34,
+        "p95": 2.497
+      },
+      "summary": {
+        "connect_s": {
+          "max": 6.679,
+          "mean": 1.753,
+          "median": 1.587,
+          "min": 1.489,
+          "n": 34,
+          "p95": 1.747
+        },
+        "cost_per_day_usd_if_billed_started_to_ended": 1.455,
+        "decisions": [
+          "exit_healthy"
+        ],
+        "first_line_to_ended_s": {
+          "max": 7.302,
+          "mean": 2.44,
+          "median": 2.288,
+          "min": 2.123,
+          "n": 34,
+          "p95": 2.467
+        },
+        "in_code_s": {
+          "max": 7.248,
+          "mean": 2.364,
+          "median": 2.207,
+          "min": 2.064,
+          "n": 34,
+          "p95": 2.396
+        },
+        "runs": 34,
+        "started_to_ended_s": {
+          "max": 21.35,
+          "mean": 6.063,
+          "median": 5.53,
+          "min": 4.027,
+          "n": 34,
+          "p95": 6.974
+        },
+        "started_to_first_line_s": {
+          "max": 19.083,
+          "mean": 3.623,
+          "median": 3.189,
+          "min": 1.861,
+          "n": 34,
+          "p95": 4.425
+        },
+        "succeeded": 34
+      }
+    },
+    "cdc_v2_spike_runs_guard_pg": {
+      "created_minus_scheduled_s": {
+        "max": -17.504,
+        "mean": -20.099,
+        "median": -20.046,
+        "min": -29.777,
+        "n": 34,
+        "p95": -18.573
+      },
+      "duplicated_minutes": [],
+      "first_seen_states": [
+        "PENDING",
+        "RUNNING",
+        "SUCCEEDED"
+      ],
+      "missed_minutes": [],
+      "on_demand_runs": 0,
+      "runs": [
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:36:40.043+00:00",
+          "created_minus_scheduled_s": -19.957,
+          "ended_at": "2026-11-10T02:37:02.387+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.516,
+          "first_seen_at": "2026-11-10T02:37:00.896945+00:00",
+          "first_seen_minus_scheduled_s": 0.9,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.287,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 4435,
+            "leader_run": "0",
+            "query_s": 0.018,
+            "run": "11",
+            "state": "leading",
+            "total_in_code_s": 0.465,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:37:00.896945+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:37:03.656322+00:00"
+            ]
+          ],
+          "run_number": 11,
+          "scheduled_at": "2026-11-10T02:37:00+00:00",
+          "scheduled_to_first_line_s": 1.871,
+          "scheduled_to_started_s": 0.59,
+          "started_at": "2026-11-10T02:37:00.59+00:00",
+          "started_to_ended_s": 1.797,
+          "started_to_first_line_s": 1.281,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:37:39.821+00:00",
+          "created_minus_scheduled_s": -20.179,
+          "ended_at": "2026-11-10T02:38:02.467+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.499,
+          "first_seen_at": "2026-11-10T02:38:02.443410+00:00",
+          "first_seen_minus_scheduled_s": 2.4,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.295,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 3218,
+            "leader_run": "0",
+            "query_s": 0.018,
+            "run": "12",
+            "state": "leading",
+            "total_in_code_s": 0.475,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:38:02.443410+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:38:05.262548+00:00"
+            ]
+          ],
+          "run_number": 12,
+          "scheduled_at": "2026-11-10T02:38:00+00:00",
+          "scheduled_to_first_line_s": 1.968,
+          "scheduled_to_started_s": 0.887,
+          "started_at": "2026-11-10T02:38:00.887+00:00",
+          "started_to_ended_s": 1.58,
+          "started_to_first_line_s": 1.081,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:38:39.6+00:00",
+          "created_minus_scheduled_s": -20.4,
+          "ended_at": "2026-11-10T02:39:02.962+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.642,
+          "first_seen_at": "2026-11-10T02:39:01.140756+00:00",
+          "first_seen_minus_scheduled_s": 1.1,
+          "first_seen_state": "PENDING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.356,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 2259,
+            "leader_run": "0",
+            "query_s": 0.023,
+            "run": "13",
+            "state": "leading",
+            "total_in_code_s": 0.531,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "PENDING",
+              "2026-11-10T02:39:01.140756+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:39:04.064620+00:00"
+            ]
+          ],
+          "run_number": 13,
+          "scheduled_at": "2026-11-10T02:39:00+00:00",
+          "scheduled_to_first_line_s": 2.32,
+          "scheduled_to_started_s": 1.232,
+          "started_at": "2026-11-10T02:39:01.232+00:00",
+          "started_to_ended_s": 1.73,
+          "started_to_first_line_s": 1.088,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:39:41.268+00:00",
+          "created_minus_scheduled_s": -18.732,
+          "ended_at": "2026-11-10T02:40:06.031+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 1.244,
+          "first_seen_at": "2026-11-10T02:40:04.516642+00:00",
+          "first_seen_minus_scheduled_s": 4.5,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.964,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 4049,
+            "leader_run": "0",
+            "query_s": 0.027,
+            "run": "14",
+            "state": "leading",
+            "total_in_code_s": 1.17,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:40:04.516642+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:40:08.419167+00:00"
+            ]
+          ],
+          "run_number": 14,
+          "scheduled_at": "2026-11-10T02:40:00+00:00",
+          "scheduled_to_first_line_s": 4.787,
+          "scheduled_to_started_s": 2.573,
+          "started_at": "2026-11-10T02:40:02.573+00:00",
+          "started_to_ended_s": 3.458,
+          "started_to_first_line_s": 2.214,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:40:40.392+00:00",
+          "created_minus_scheduled_s": -19.608,
+          "ended_at": "2026-11-10T02:41:01.954+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.528,
+          "first_seen_at": "2026-11-10T02:41:02.546916+00:00",
+          "first_seen_minus_scheduled_s": 2.5,
+          "first_seen_state": "SUCCEEDED",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.299,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 3234,
+            "leader_run": "0",
+            "query_s": 0.02,
+            "run": "15",
+            "state": "leading",
+            "total_in_code_s": 0.477,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:41:02.546916+00:00"
+            ]
+          ],
+          "run_number": 15,
+          "scheduled_at": "2026-11-10T02:41:00+00:00",
+          "scheduled_to_first_line_s": 1.426,
+          "scheduled_to_started_s": 0.283,
+          "started_at": "2026-11-10T02:41:00.283+00:00",
+          "started_to_ended_s": 1.671,
+          "started_to_first_line_s": 1.143,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:41:39.444+00:00",
+          "created_minus_scheduled_s": -20.556,
+          "ended_at": "2026-11-10T02:42:02.696+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.57,
+          "first_seen_at": "2026-11-10T02:42:01.767985+00:00",
+          "first_seen_minus_scheduled_s": 1.8,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.356,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 2659,
+            "leader_run": "0",
+            "query_s": 0.016,
+            "run": "16",
+            "state": "leading",
+            "total_in_code_s": 0.544,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:42:01.767985+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:42:04.574595+00:00"
+            ]
+          ],
+          "run_number": 16,
+          "scheduled_at": "2026-11-10T02:42:00+00:00",
+          "scheduled_to_first_line_s": 2.126,
+          "scheduled_to_started_s": 1.03,
+          "started_at": "2026-11-10T02:42:01.03+00:00",
+          "started_to_ended_s": 1.666,
+          "started_to_first_line_s": 1.096,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:42:40.247+00:00",
+          "created_minus_scheduled_s": -19.753,
+          "ended_at": "2026-11-10T02:43:02.916+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.53,
+          "first_seen_at": "2026-11-10T02:43:03.451064+00:00",
+          "first_seen_minus_scheduled_s": 3.5,
+          "first_seen_state": "SUCCEEDED",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.266,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 1478,
+            "leader_run": "0",
+            "query_s": 0.016,
+            "run": "17",
+            "state": "leading",
+            "total_in_code_s": 0.437,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:43:03.451064+00:00"
+            ]
+          ],
+          "run_number": 17,
+          "scheduled_at": "2026-11-10T02:43:00+00:00",
+          "scheduled_to_first_line_s": 2.386,
+          "scheduled_to_started_s": 1.447,
+          "started_at": "2026-11-10T02:43:01.447+00:00",
+          "started_to_ended_s": 1.469,
+          "started_to_first_line_s": 0.939,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:43:39.999+00:00",
+          "created_minus_scheduled_s": -20.001,
+          "ended_at": "2026-11-10T02:44:02.764+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.52,
+          "first_seen_at": "2026-11-10T02:44:02.661592+00:00",
+          "first_seen_minus_scheduled_s": 2.7,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.3,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 5130,
+            "leader_run": "0",
+            "query_s": 0.016,
+            "run": "18",
+            "state": "leading",
+            "total_in_code_s": 0.477,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:44:02.661592+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:44:05.504310+00:00"
+            ]
+          ],
+          "run_number": 18,
+          "scheduled_at": "2026-11-10T02:44:00+00:00",
+          "scheduled_to_first_line_s": 2.244,
+          "scheduled_to_started_s": 1.12,
+          "started_at": "2026-11-10T02:44:01.12+00:00",
+          "started_to_ended_s": 1.644,
+          "started_to_first_line_s": 1.124,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:44:40.801+00:00",
+          "created_minus_scheduled_s": -19.199,
+          "ended_at": "2026-11-10T02:45:06.534+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.642,
+          "first_seen_at": "2026-11-10T02:45:04.623479+00:00",
+          "first_seen_minus_scheduled_s": 4.6,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.304,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 2386,
+            "leader_run": "0",
+            "query_s": 0.015,
+            "run": "19",
+            "state": "leading",
+            "total_in_code_s": 0.525,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:45:04.623479+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:45:07.680986+00:00"
+            ]
+          ],
+          "run_number": 19,
+          "scheduled_at": "2026-11-10T02:45:00+00:00",
+          "scheduled_to_first_line_s": 5.892,
+          "scheduled_to_started_s": 3.538,
+          "started_at": "2026-11-10T02:45:03.538+00:00",
+          "started_to_ended_s": 2.996,
+          "started_to_first_line_s": 2.354,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:45:39.742+00:00",
+          "created_minus_scheduled_s": -20.258,
+          "ended_at": "2026-11-10T02:46:04.044+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.53,
+          "first_seen_at": "2026-11-10T02:46:01.418101+00:00",
+          "first_seen_minus_scheduled_s": 1.4,
+          "first_seen_state": "PENDING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.265,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 3678,
+            "leader_run": "0",
+            "query_s": 0.016,
+            "run": "20",
+            "state": "leading",
+            "total_in_code_s": 0.44,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "PENDING",
+              "2026-11-10T02:46:01.418101+00:00"
+            ],
+            [
+              "RUNNING",
+              "2026-11-10T02:46:04.164889+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:46:06.872611+00:00"
+            ]
+          ],
+          "run_number": 20,
+          "scheduled_at": "2026-11-10T02:46:00+00:00",
+          "scheduled_to_first_line_s": 3.514,
+          "scheduled_to_started_s": 1.597,
+          "started_at": "2026-11-10T02:46:01.597+00:00",
+          "started_to_ended_s": 2.447,
+          "started_to_first_line_s": 1.917,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:46:39.603+00:00",
+          "created_minus_scheduled_s": -20.397,
+          "ended_at": "2026-11-10T02:47:03.612+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.5,
+          "first_seen_at": "2026-11-10T02:47:03.224747+00:00",
+          "first_seen_minus_scheduled_s": 3.2,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.284,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 1964,
+            "leader_run": "0",
+            "query_s": 0.018,
+            "run": "21",
+            "state": "leading",
+            "total_in_code_s": 0.466,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:47:03.224747+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:47:06.028176+00:00"
+            ]
+          ],
+          "run_number": 21,
+          "scheduled_at": "2026-11-10T02:47:00+00:00",
+          "scheduled_to_first_line_s": 3.112,
+          "scheduled_to_started_s": 1.15,
+          "started_at": "2026-11-10T02:47:01.15+00:00",
+          "started_to_ended_s": 2.462,
+          "started_to_first_line_s": 1.962,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:47:39.841+00:00",
+          "created_minus_scheduled_s": -20.159,
+          "ended_at": "2026-11-10T02:48:03.578+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.484,
+          "first_seen_at": "2026-11-10T02:48:02.772549+00:00",
+          "first_seen_minus_scheduled_s": 2.8,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.267,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 583,
+            "leader_run": "0",
+            "query_s": 0.017,
+            "run": "22",
+            "state": "leading",
+            "total_in_code_s": 0.443,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:48:02.772549+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:48:05.599978+00:00"
+            ]
+          ],
+          "run_number": 22,
+          "scheduled_at": "2026-11-10T02:48:00+00:00",
+          "scheduled_to_first_line_s": 3.094,
+          "scheduled_to_started_s": 1.037,
+          "started_at": "2026-11-10T02:48:01.037+00:00",
+          "started_to_ended_s": 2.541,
+          "started_to_first_line_s": 2.057,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:48:39.261+00:00",
+          "created_minus_scheduled_s": -20.739,
+          "ended_at": "2026-11-10T02:49:04.304+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.518,
+          "first_seen_at": "2026-11-10T02:49:01.892748+00:00",
+          "first_seen_minus_scheduled_s": 1.9,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.276,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 5120,
+            "leader_run": "0",
+            "query_s": 0.018,
+            "run": "23",
+            "state": "leading",
+            "total_in_code_s": 0.466,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:49:01.892748+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:49:07.660528+00:00"
+            ]
+          ],
+          "run_number": 23,
+          "scheduled_at": "2026-11-10T02:49:00+00:00",
+          "scheduled_to_first_line_s": 3.786,
+          "scheduled_to_started_s": 1.807,
+          "started_at": "2026-11-10T02:49:01.807+00:00",
+          "started_to_ended_s": 2.497,
+          "started_to_first_line_s": 1.979,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:49:40.564+00:00",
+          "created_minus_scheduled_s": -19.436,
+          "ended_at": "2026-11-10T02:50:02.058+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.52,
+          "first_seen_at": "2026-11-10T02:50:00.612427+00:00",
+          "first_seen_minus_scheduled_s": 0.6,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.26,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 1508,
+            "leader_run": "0",
+            "query_s": 0.018,
+            "run": "24",
+            "state": "leading",
+            "total_in_code_s": 0.435,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:50:00.612427+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:50:03.291699+00:00"
+            ]
+          ],
+          "run_number": 24,
+          "scheduled_at": "2026-11-10T02:50:00+00:00",
+          "scheduled_to_first_line_s": 1.538,
+          "scheduled_to_started_s": 0.41,
+          "started_at": "2026-11-10T02:50:00.41+00:00",
+          "started_to_ended_s": 1.648,
+          "started_to_first_line_s": 1.128,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:50:40.221+00:00",
+          "created_minus_scheduled_s": -19.779,
+          "ended_at": "2026-11-10T02:51:02.652+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.573,
+          "first_seen_at": "2026-11-10T02:51:02.341318+00:00",
+          "first_seen_minus_scheduled_s": 2.3,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.294,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 746,
+            "leader_run": "0",
+            "query_s": 0.018,
+            "run": "25",
+            "state": "leading",
+            "total_in_code_s": 0.477,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:51:02.341318+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:51:05.096634+00:00"
+            ]
+          ],
+          "run_number": 25,
+          "scheduled_at": "2026-11-10T02:51:00+00:00",
+          "scheduled_to_first_line_s": 2.079,
+          "scheduled_to_started_s": 1.039,
+          "started_at": "2026-11-10T02:51:01.039+00:00",
+          "started_to_ended_s": 1.613,
+          "started_to_first_line_s": 1.04,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:51:41.771+00:00",
+          "created_minus_scheduled_s": -18.229,
+          "ended_at": "2026-11-10T02:52:03.852+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.565,
+          "first_seen_at": "2026-11-10T02:52:02.005232+00:00",
+          "first_seen_minus_scheduled_s": 2.0,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.28,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 542,
+            "leader_run": "0",
+            "query_s": 0.028,
+            "run": "26",
+            "state": "leading",
+            "total_in_code_s": 0.463,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:52:02.005232+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:52:07.866789+00:00"
+            ]
+          ],
+          "run_number": 26,
+          "scheduled_at": "2026-11-10T02:52:00+00:00",
+          "scheduled_to_first_line_s": 3.287,
+          "scheduled_to_started_s": 1.211,
+          "started_at": "2026-11-10T02:52:01.211+00:00",
+          "started_to_ended_s": 2.641,
+          "started_to_first_line_s": 2.076,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:52:39.664+00:00",
+          "created_minus_scheduled_s": -20.336,
+          "ended_at": "2026-11-10T02:53:02.685+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.5,
+          "first_seen_at": "2026-11-10T02:53:03.585979+00:00",
+          "first_seen_minus_scheduled_s": 3.6,
+          "first_seen_state": "SUCCEEDED",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.288,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 3237,
+            "leader_run": "0",
+            "query_s": 0.02,
+            "run": "27",
+            "state": "leading",
+            "total_in_code_s": 0.47,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:53:03.585979+00:00"
+            ]
+          ],
+          "run_number": 27,
+          "scheduled_at": "2026-11-10T02:53:00+00:00",
+          "scheduled_to_first_line_s": 2.185,
+          "scheduled_to_started_s": 1.231,
+          "started_at": "2026-11-10T02:53:01.231+00:00",
+          "started_to_ended_s": 1.454,
+          "started_to_first_line_s": 0.954,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:53:30.223+00:00",
+          "created_minus_scheduled_s": -29.777,
+          "ended_at": "2026-11-10T02:54:02.359+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.53,
+          "first_seen_at": "2026-11-10T02:54:02.141241+00:00",
+          "first_seen_minus_scheduled_s": 2.1,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.3,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 1419,
+            "leader_run": "0",
+            "query_s": 0.019,
+            "run": "28",
+            "state": "leading",
+            "total_in_code_s": 0.484,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:54:02.141241+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:54:05.293299+00:00"
+            ]
+          ],
+          "run_number": 28,
+          "scheduled_at": "2026-11-10T02:54:00+00:00",
+          "scheduled_to_first_line_s": 1.829,
+          "scheduled_to_started_s": 0.724,
+          "started_at": "2026-11-10T02:54:00.724+00:00",
+          "started_to_ended_s": 1.635,
+          "started_to_first_line_s": 1.105,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:54:40.483+00:00",
+          "created_minus_scheduled_s": -19.517,
+          "ended_at": "2026-11-10T02:55:04.765+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.517,
+          "first_seen_at": "2026-11-10T02:55:05.057271+00:00",
+          "first_seen_minus_scheduled_s": 5.1,
+          "first_seen_state": "SUCCEEDED",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.286,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 2317,
+            "leader_run": "0",
+            "query_s": 0.018,
+            "run": "29",
+            "state": "leading",
+            "total_in_code_s": 0.472,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:55:05.057271+00:00"
+            ]
+          ],
+          "run_number": 29,
+          "scheduled_at": "2026-11-10T02:55:00+00:00",
+          "scheduled_to_first_line_s": 4.248,
+          "scheduled_to_started_s": 3.182,
+          "started_at": "2026-11-10T02:55:03.182+00:00",
+          "started_to_ended_s": 1.583,
+          "started_to_first_line_s": 1.066,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:55:39.908+00:00",
+          "created_minus_scheduled_s": -20.092,
+          "ended_at": "2026-11-10T02:56:03.833+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.516,
+          "first_seen_at": "2026-11-10T02:56:01.668433+00:00",
+          "first_seen_minus_scheduled_s": 1.7,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.284,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 5224,
+            "leader_run": "0",
+            "query_s": 0.026,
+            "run": "30",
+            "state": "leading",
+            "total_in_code_s": 0.477,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:56:01.668433+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:56:04.556421+00:00"
+            ]
+          ],
+          "run_number": 30,
+          "scheduled_at": "2026-11-10T02:56:00+00:00",
+          "scheduled_to_first_line_s": 3.317,
+          "scheduled_to_started_s": 1.321,
+          "started_at": "2026-11-10T02:56:01.321+00:00",
+          "started_to_ended_s": 2.512,
+          "started_to_first_line_s": 1.996,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:56:39.919+00:00",
+          "created_minus_scheduled_s": -20.081,
+          "ended_at": "2026-11-10T02:57:03.767+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.534,
+          "first_seen_at": "2026-11-10T02:57:01.606147+00:00",
+          "first_seen_minus_scheduled_s": 1.6,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.283,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 3793,
+            "leader_run": "0",
+            "query_s": 0.018,
+            "run": "31",
+            "state": "leading",
+            "total_in_code_s": 0.454,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:57:01.606147+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:57:04.409351+00:00"
+            ]
+          ],
+          "run_number": 31,
+          "scheduled_at": "2026-11-10T02:57:00+00:00",
+          "scheduled_to_first_line_s": 3.233,
+          "scheduled_to_started_s": 1.205,
+          "started_at": "2026-11-10T02:57:01.205+00:00",
+          "started_to_ended_s": 2.562,
+          "started_to_first_line_s": 2.028,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:57:39.435+00:00",
+          "created_minus_scheduled_s": -20.565,
+          "ended_at": "2026-11-10T02:58:02.665+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.524,
+          "first_seen_at": "2026-11-10T02:58:01.742102+00:00",
+          "first_seen_minus_scheduled_s": 1.7,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.304,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 1385,
+            "leader_run": "0",
+            "query_s": 0.023,
+            "run": "32",
+            "state": "leading",
+            "total_in_code_s": 0.482,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:58:01.742102+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:58:04.878828+00:00"
+            ]
+          ],
+          "run_number": 32,
+          "scheduled_at": "2026-11-10T02:58:00+00:00",
+          "scheduled_to_first_line_s": 2.141,
+          "scheduled_to_started_s": 0.878,
+          "started_at": "2026-11-10T02:58:00.878+00:00",
+          "started_to_ended_s": 1.787,
+          "started_to_first_line_s": 1.263,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:58:40.883+00:00",
+          "created_minus_scheduled_s": -19.117,
+          "ended_at": "2026-11-10T02:59:02.91+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.541,
+          "first_seen_at": "2026-11-10T02:59:02.486572+00:00",
+          "first_seen_minus_scheduled_s": 2.5,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.286,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 248,
+            "leader_run": "0",
+            "query_s": 0.019,
+            "run": "33",
+            "state": "leading",
+            "total_in_code_s": 0.457,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T02:59:02.486572+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T02:59:05.238448+00:00"
+            ]
+          ],
+          "run_number": 33,
+          "scheduled_at": "2026-11-10T02:59:00+00:00",
+          "scheduled_to_first_line_s": 2.369,
+          "scheduled_to_started_s": 1.396,
+          "started_at": "2026-11-10T02:59:01.396+00:00",
+          "started_to_ended_s": 1.514,
+          "started_to_first_line_s": 0.973,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T02:59:42.496+00:00",
+          "created_minus_scheduled_s": -17.504,
+          "ended_at": "2026-11-10T03:00:19.085+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.563,
+          "first_seen_at": "2026-11-10T03:00:14.209917+00:00",
+          "first_seen_minus_scheduled_s": 14.2,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.297,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 4832,
+            "leader_run": "0",
+            "query_s": 0.019,
+            "run": "34",
+            "state": "leading",
+            "total_in_code_s": 0.48,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T03:00:14.209917+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:00:20.304933+00:00"
+            ]
+          ],
+          "run_number": 34,
+          "scheduled_at": "2026-11-10T03:00:00+00:00",
+          "scheduled_to_first_line_s": 18.522,
+          "scheduled_to_started_s": 12.496,
+          "started_at": "2026-11-10T03:00:12.496+00:00",
+          "started_to_ended_s": 6.589,
+          "started_to_first_line_s": 6.026,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T03:00:40.243+00:00",
+          "created_minus_scheduled_s": -19.757,
+          "ended_at": "2026-11-10T03:01:05.156+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.505,
+          "first_seen_at": "2026-11-10T03:01:03.310447+00:00",
+          "first_seen_minus_scheduled_s": 3.3,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.283,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 2493,
+            "leader_run": "0",
+            "query_s": 0.018,
+            "run": "35",
+            "state": "leading",
+            "total_in_code_s": 0.474,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T03:01:03.310447+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:01:09.181914+00:00"
+            ]
+          ],
+          "run_number": 35,
+          "scheduled_at": "2026-11-10T03:01:00+00:00",
+          "scheduled_to_first_line_s": 4.651,
+          "scheduled_to_started_s": 2.694,
+          "started_at": "2026-11-10T03:01:02.694+00:00",
+          "started_to_ended_s": 2.462,
+          "started_to_first_line_s": 1.957,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T03:01:39.764+00:00",
+          "created_minus_scheduled_s": -20.236,
+          "ended_at": "2026-11-10T03:02:03.626+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.525,
+          "first_seen_at": "2026-11-10T03:02:01.214458+00:00",
+          "first_seen_minus_scheduled_s": 1.2,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.274,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 4673,
+            "leader_run": "0",
+            "query_s": 0.017,
+            "run": "36",
+            "state": "leading",
+            "total_in_code_s": 0.446,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T03:02:01.214458+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:02:07.062877+00:00"
+            ]
+          ],
+          "run_number": 36,
+          "scheduled_at": "2026-11-10T03:02:00+00:00",
+          "scheduled_to_first_line_s": 3.101,
+          "scheduled_to_started_s": 1.126,
+          "started_at": "2026-11-10T03:02:01.126+00:00",
+          "started_to_ended_s": 2.5,
+          "started_to_first_line_s": 1.975,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T03:02:39.676+00:00",
+          "created_minus_scheduled_s": -20.324,
+          "ended_at": "2026-11-10T03:03:15.45+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.535,
+          "first_seen_at": "2026-11-10T03:03:01.255680+00:00",
+          "first_seen_minus_scheduled_s": 1.3,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.294,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 4385,
+            "leader_run": "0",
+            "query_s": 0.019,
+            "run": "37",
+            "state": "leading",
+            "total_in_code_s": 0.465,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T03:03:01.255680+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:03:18.556789+00:00"
+            ]
+          ],
+          "run_number": 37,
+          "scheduled_at": "2026-11-10T03:03:00+00:00",
+          "scheduled_to_first_line_s": 14.915,
+          "scheduled_to_started_s": 0.816,
+          "started_at": "2026-11-10T03:03:00.816+00:00",
+          "started_to_ended_s": 14.634,
+          "started_to_first_line_s": 14.099,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T03:03:40.33+00:00",
+          "created_minus_scheduled_s": -19.67,
+          "ended_at": "2026-11-10T03:04:03.441+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.503,
+          "first_seen_at": "2026-11-10T03:04:03.206483+00:00",
+          "first_seen_minus_scheduled_s": 3.2,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.302,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 1338,
+            "leader_run": "0",
+            "query_s": 0.017,
+            "run": "38",
+            "state": "leading",
+            "total_in_code_s": 0.478,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T03:04:03.206483+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:04:06.101256+00:00"
+            ]
+          ],
+          "run_number": 38,
+          "scheduled_at": "2026-11-10T03:04:00+00:00",
+          "scheduled_to_first_line_s": 2.938,
+          "scheduled_to_started_s": 0.955,
+          "started_at": "2026-11-10T03:04:00.955+00:00",
+          "started_to_ended_s": 2.486,
+          "started_to_first_line_s": 1.983,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T03:04:40.621+00:00",
+          "created_minus_scheduled_s": -19.379,
+          "ended_at": "2026-11-10T03:05:04.178+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.653,
+          "first_seen_at": "2026-11-10T03:05:00.648900+00:00",
+          "first_seen_minus_scheduled_s": 0.6,
+          "first_seen_state": "PENDING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.288,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 645,
+            "leader_run": "0",
+            "query_s": 0.018,
+            "run": "39",
+            "state": "leading",
+            "total_in_code_s": 0.54,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "PENDING",
+              "2026-11-10T03:05:00.648900+00:00"
+            ],
+            [
+              "RUNNING",
+              "2026-11-10T03:05:03.741533+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:05:06.416979+00:00"
+            ]
+          ],
+          "run_number": 39,
+          "scheduled_at": "2026-11-10T03:05:00+00:00",
+          "scheduled_to_first_line_s": 3.525,
+          "scheduled_to_started_s": 1.046,
+          "started_at": "2026-11-10T03:05:01.046+00:00",
+          "started_to_ended_s": 3.132,
+          "started_to_first_line_s": 2.479,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T03:05:39.593+00:00",
+          "created_minus_scheduled_s": -20.407,
+          "ended_at": "2026-11-10T03:06:01.994+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.537,
+          "first_seen_at": "2026-11-10T03:06:03.085769+00:00",
+          "first_seen_minus_scheduled_s": 3.1,
+          "first_seen_state": "SUCCEEDED",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.297,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 2269,
+            "leader_run": "0",
+            "query_s": 0.019,
+            "run": "40",
+            "state": "leading",
+            "total_in_code_s": 0.469,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:06:03.085769+00:00"
+            ]
+          ],
+          "run_number": 40,
+          "scheduled_at": "2026-11-10T03:06:00+00:00",
+          "scheduled_to_first_line_s": 1.457,
+          "scheduled_to_started_s": 0.548,
+          "started_at": "2026-11-10T03:06:00.548+00:00",
+          "started_to_ended_s": 1.446,
+          "started_to_first_line_s": 0.909,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T03:06:39.677+00:00",
+          "created_minus_scheduled_s": -20.323,
+          "ended_at": "2026-11-10T03:07:03.521+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.541,
+          "first_seen_at": "2026-11-10T03:07:01.370534+00:00",
+          "first_seen_minus_scheduled_s": 1.4,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.287,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 2818,
+            "leader_run": "0",
+            "query_s": 0.023,
+            "run": "41",
+            "state": "leading",
+            "total_in_code_s": 0.463,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T03:07:01.370534+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:07:06.962659+00:00"
+            ]
+          ],
+          "run_number": 41,
+          "scheduled_at": "2026-11-10T03:07:00+00:00",
+          "scheduled_to_first_line_s": 2.98,
+          "scheduled_to_started_s": 0.97,
+          "started_at": "2026-11-10T03:07:00.97+00:00",
+          "started_to_ended_s": 2.551,
+          "started_to_first_line_s": 2.01,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T03:07:39.989+00:00",
+          "created_minus_scheduled_s": -20.011,
+          "ended_at": "2026-11-10T03:08:03.362+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.501,
+          "first_seen_at": "2026-11-10T03:08:02.710614+00:00",
+          "first_seen_minus_scheduled_s": 2.7,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.278,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 1368,
+            "leader_run": "0",
+            "query_s": 0.018,
+            "run": "42",
+            "state": "leading",
+            "total_in_code_s": 0.467,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T03:08:02.710614+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:08:05.597443+00:00"
+            ]
+          ],
+          "run_number": 42,
+          "scheduled_at": "2026-11-10T03:08:00+00:00",
+          "scheduled_to_first_line_s": 2.861,
+          "scheduled_to_started_s": 0.785,
+          "started_at": "2026-11-10T03:08:00.785+00:00",
+          "started_to_ended_s": 2.577,
+          "started_to_first_line_s": 2.076,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T03:08:39.683+00:00",
+          "created_minus_scheduled_s": -20.317,
+          "ended_at": "2026-11-10T03:09:16.032+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.528,
+          "first_seen_at": "2026-11-10T03:09:02.189430+00:00",
+          "first_seen_minus_scheduled_s": 2.2,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.281,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 2442,
+            "leader_run": "0",
+            "query_s": 0.023,
+            "run": "43",
+            "state": "leading",
+            "total_in_code_s": 0.462,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T03:09:02.189430+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:09:19.333517+00:00"
+            ]
+          ],
+          "run_number": 43,
+          "scheduled_at": "2026-11-10T03:09:00+00:00",
+          "scheduled_to_first_line_s": 15.504,
+          "scheduled_to_started_s": 1.202,
+          "started_at": "2026-11-10T03:09:01.202+00:00",
+          "started_to_ended_s": 14.83,
+          "started_to_first_line_s": 14.302,
+          "state": "SUCCEEDED"
+        },
+        {
+          "cancelled_at": null,
+          "created_at": "2026-11-10T03:09:41.427+00:00",
+          "created_minus_scheduled_s": -18.573,
+          "ended_at": "2026-11-10T03:10:05.682+00:00",
+          "exit_code": 0,
+          "first_line_to_ended_s": 0.559,
+          "first_seen_at": "2026-11-10T03:10:04.963219+00:00",
+          "first_seen_minus_scheduled_s": 5.0,
+          "first_seen_state": "RUNNING",
+          "flight_version": 2,
+          "guard": {
+            "connect_s": 0.277,
+            "decision": "exit_healthy",
+            "epoch": "1",
+            "heartbeat_age_ms": 563,
+            "leader_run": "0",
+            "query_s": 0.018,
+            "run": "44",
+            "state": "leading",
+            "total_in_code_s": 0.454,
+            "variant": "pgwire"
+          },
+          "is_scheduled": true,
+          "log_lines": 5,
+          "observed_transitions": [
+            [
+              "RUNNING",
+              "2026-11-10T03:10:04.963219+00:00"
+            ],
+            [
+              "SUCCEEDED",
+              "2026-11-10T03:10:08.203996+00:00"
+            ]
+          ],
+          "run_number": 44,
+          "scheduled_at": "2026-11-10T03:10:00+00:00",
+          "scheduled_to_first_line_s": 5.123,
+          "scheduled_to_started_s": 2.415,
+          "started_at": "2026-11-10T03:10:02.415+00:00",
+          "started_to_ended_s": 3.267,
+          "started_to_first_line_s": 2.708,
+          "state": "SUCCEEDED"
+        }
+      ],
+      "scheduled_runs": 34,
+      "scheduled_to_first_line_s": {
+        "max": 18.522,
+        "mean": 4.127,
+        "median": 3.037,
+        "min": 1.426,
+        "n": 34,
+        "p95": 14.915
+      },
+      "scheduled_to_started_s": {
+        "max": 12.496,
+        "mean": 1.645,
+        "median": 1.138,
+        "min": 0.283,
+        "n": 34,
+        "p95": 3.182
+      },
+      "summary": {
+        "connect_s": {
+          "max": 0.964,
+          "mean": 0.31,
+          "median": 0.287,
+          "min": 0.26,
+          "n": 34,
+          "p95": 0.356
+        },
+        "cost_per_day_usd_if_billed_started_to_ended": 0.73,
+        "decisions": [
+          "exit_healthy"
+        ],
+        "first_line_to_ended_s": {
+          "max": 1.244,
+          "mean": 0.559,
+          "median": 0.529,
+          "min": 0.484,
+          "n": 34,
+          "p95": 0.642
+        },
+        "in_code_s": {
+          "max": 1.17,
+          "mean": 0.494,
+          "median": 0.469,
+          "min": 0.435,
+          "n": 34,
+          "p95": 0.54
+        },
+        "runs": 34,
+        "started_to_ended_s": {
+          "max": 14.83,
+          "mean": 3.041,
+          "median": 2.462,
+          "min": 1.446,
+          "n": 34,
+          "p95": 6.589
+        },
+        "started_to_first_line_s": {
+          "max": 14.302,
+          "mean": 2.482,
+          "median": 1.96,
+          "min": 0.909,
+          "n": 34,
+          "p95": 6.026
+        },
+        "succeeded": 34
+      }
+    }
+  },
+  "observe_minutes": 34.0,
+  "schedule_cleared_at": "2026-11-10T03:10:24.049920+00:00",
+  "schedule_set_at": {
+    "cdc_v2_spike_runs_guard_duckdb": "2026-11-10T02:36:19.502567+00:00",
+    "cdc_v2_spike_runs_guard_pg": "2026-11-10T02:36:19.966511+00:00"
+  }
+}
