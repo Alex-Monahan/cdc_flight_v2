@@ -70,6 +70,12 @@ inside the process before a value is buffered on disk or sent anywhere); the lon
 - Logs go through `logging` with structured fields; no value of a source row is ever logged (SPEC 8.3).
 - Every persisted change row is ordered by (commit position, `seq`); `seq` alone orders rows only inside one
   transaction (it starts at 0 again with every engine instance).
+- **Destination names.** The source table `s.t` is the table `s.t` of the destination database: the same schema
+  name and the same table name, always as quoted identifiers (Postgres `public` is the destination schema
+  `public`; nothing is put into `main`). Everything of ours lives in schemas whose names start with `_cdc`.
+  DuckDB compares identifiers without regard to case: a source schema whose name starts with `_cdc` in any
+  case, and schemas or tables whose names differ only by case, are not replicated in P3 and are reported by the
+  code that meets them; the discovery wave of P4 decides their rule.
 
 ### C1 Crash points and fault sites (package H)
 
@@ -428,7 +434,21 @@ As delivered by package X; its report defines the interface, and this section is
   table; the stream lane moves `swap_ready → done`, or back to `catching_up` when the rest of the log has an
   unresolved key.
 - A slot finding (V) sets the applied position to the slot's `confirmed_flush_lsn` (or the new slot's consistent
-  point) and enacts a backfill of every CDC table, in one stream-lane transaction (design section 8).
+  point) and enacts a backfill of every CDC table, in one stream-lane transaction (design section 8). The
+  function that does it belongs to S, because S owns `_cdc.stream_state`:
+  `stream.reposition(tx, position, tables, cause)` — the position set (in any direction), a backfill request
+  enacted for each table with `P0` = that position (after a gap), the alert, all in `tx`. V calls it for a
+  finding; S calls it for a message that fails again and again at one position (SPEC 4.3, last line); P4 calls it
+  for the lag rule of SPEC 3.6.
+- The stream component starts its engine only through the attach step (design section 8):
+  `attach(ctx, deadline) -> Attached(engine, facts, finding)`. V builds it. Until V is merged, S ships a
+  minimal one behind the same signature: fence row read, slot facts read, a holder of our slot terminated,
+  engine started at the applied position, and any finding other than "continuous" stops the stream with an alert
+  instead of being enacted.
+- A table whose `SCHEMA` frame no longer agrees with its destination table (a schema change at the source) is
+  sent through a backfill in P3: from the first transaction that carries the new version, its changes are not
+  applied to the visible table, and a backfill request (after a gap) is enacted in that group. The schema wave of
+  P4 replaces this by a change in place (design 6.5).
 - S runs a group again after `Conflict`, a bounded number of times, building its statements again when the
   conflict came from a DDL (a swap changes the catalog).
 - A table that fails to apply `apply.max_table_attempts` times (default 3) leaves the stream: state `quarantined`,
@@ -441,6 +461,24 @@ As delivered by package X; its report defines the interface, and this section is
   deadline, and not after it. Slot creation, the attach step after a take-over, a commit in flight and the wait
   for a replica to reach `P0` are declared this way.
 - Until package S delivers the supervisor, package L builds against this interface with a stand-in of its own.
+
+### C12 Pipeline process (packages S, L)
+
+- The bootstrap starts the pipeline as `python -m cdc_v2.pipeline <configuration file>` in its own session
+  (design section 5). The environment carries `CDC_V2_EPOCH`, `CDC_V2_RUN_ID`, `CDC_V2_FLIGHT_ID`,
+  `CDC_V2_RUN_NUMBER`, `CDC_V2_TICK_FD` (an inherited descriptor) and the secrets of the run. No secret is an
+  argument.
+- Tick: after every successful heartbeat the pipeline writes one byte to the tick descriptor without blocking; a
+  full pipe is not an error. The bootstrap needs nothing else from the pipeline while it runs.
+- Exit status of the pipeline, passed on by the bootstrap: `0` only after a committed release (planned
+  hand-over); `10` when the run was superseded (`FenceLost`, or a heartbeat that changed no row); any other
+  value is a failure.
+- Inside the pipeline, `cdc_v2.leader` (L) owns the heartbeat thread, the tick, the one reaction to `FenceLost`
+  and the hand-over clock; `cdc_v2.supervisor` (S) owns progress and the restart of components; the stream
+  component (S) offers `finish_current_group(deadline)` for the hand-over. `cdc_v2.pipeline` (S) is the process
+  that wires them, runs the migrations as leader and starts the components.
+- Whichever of S and L is merged second joins the two in a short follow-up round, with a test in which the real
+  bootstrap starts the real pipeline under `LocalPlatform`.
 
 ## 3. Test tiers used in P3
 

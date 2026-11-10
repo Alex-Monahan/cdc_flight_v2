@@ -5,7 +5,7 @@ Read `docs/tasks/README.md` first; its rules bind you.
 You build what makes "one leader" true (SPEC 4.2, R18): the bootstrap `flights/cdc_v2/main.py` with the guard
 decision and the take-over, the heartbeat and the hard exit, the planned hand-over and the release, the leader
 machine, and the platform interface with its local simulator. Design: `docs/design/core.md` sections 1, 4 and 5.
-Contracts: `docs/design/p3_plan.md` C0, C1, C4, C5, C6, C11, and 6.2 "L". This is a core-correctness package:
+Contracts: `docs/design/p3_plan.md` C0, C1, C4, C5, C6, C11, C12, and 6.2 "L". This is a core-correctness package:
 every other package relies on the promise that a run which is not the leader cannot commit, and that a leader
 which stopped making progress is replaced.
 
@@ -66,7 +66,8 @@ beyond the `duckdb` client. In order:
 5. **Clone and artifacts**: the repository at the pinned commit, the pinned JRE and jars
    (`src/cdc_v2/artifacts.py` exists). For local tiers a local source path replaces the clone (C6) and the
    artifact step can be switched off. No secret appears in an argument, a log line or an error message.
-6. **Start the pipeline** with `start_new_session=True`, passing the epoch, the run identity and the tick pipe.
+6. **Start the pipeline** with `start_new_session=True`, passing the epoch, the run identity and the tick pipe
+   exactly as C12 says (command, environment, tick, exit status).
 7. **Watch**: read ticks; use no network and no MotherDuck connection from here on. No tick for the hard-exit
    age (default 60 s) ⇒ `SIGKILL` to the pipeline's process group, then `os._exit(1)`. Pipeline exit ⇒ exit with
    its status. The watch must not be able to hang itself: no lock shared with a thread that can block, no
