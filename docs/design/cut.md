@@ -1583,7 +1583,7 @@ The text below replaces section 7.2 of `docs/design/core.md` as it stands on `ma
 section 7.2 and the rows 1 and 12 of its open points are those of `95ab8ee`), and those two rows. Changes
 against the present text are marked **[new]** or **[changed]**; the marks are not part of the text. After it
 come the changes outside 7.2. Since that commit `main` has added the rule about which tables have a key (rule K)
-to section 6 of the core design and nothing else (checked at `3140887`, and again at `ca5cc7c`, the head of
+to section 6 of the core design and nothing else (checked at `3140887`, and again at `5e57c64`, the head of
 `main` at the second short fix round): section 7 and the open points are as they were.
 
 Nothing in this text uses the start of the commit record: the pipeline does not have it (section 2).
