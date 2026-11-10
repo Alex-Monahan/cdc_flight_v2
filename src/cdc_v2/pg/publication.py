@@ -110,13 +110,14 @@ def state(conn: PgConnection, *, publication: str = DEFAULT, deadline: Deadline)
 
 
 def check(tables: Iterable[catalog.SourceTable]) -> dict[tuple[str, str], str]:
-    """Why each table cannot be added as it is (H-014, H-030). Empty when all can."""
+    """Why each table cannot be added as it is, or, for a table that is published already, why it must not be
+    streamed (H-014, H-030, the name rule). Empty when all can."""
     out = {}
     for t in tables:
         if t.persistence != "permanent":
             out[t.qualified] = "%s table: no WAL for its rows, cannot be published" % t.persistence
             continue
-        p = t.replica_identity_problem
+        p = t.name_problem or t.replica_identity_problem
         if p:
             out[t.qualified] = p
     return out
@@ -136,8 +137,9 @@ def ensure(primary: PgConnection, tables: Iterable, *, publication: str = DEFAUL
     """Create the publication if it is missing and add the tables that are not in it. Only ever adds.
 
     `tables` are SourceTable values or (schema, name) pairs; they are read again here, and a table that cannot be
-    published as it is (no primary key and not REPLICA IDENTITY FULL, also with USING INDEX; NOTHING; an identity
-    index that is not the key; unlogged or temporary) raises `NotPublishable` before anything is added. Fix it with
+    published as it is (no primary key and not REPLICA IDENTITY FULL, also with USING INDEX; a deferrable primary
+    key and not REPLICA IDENTITY FULL; NOTHING; an identity index that is not the key; unlogged or temporary) raises
+    `NotPublishable` before anything is added. Fix it with
     `replica_identity.set_full` first; the order matters (H-014: the source's own updates fail otherwise).
 
     Returns `next_xid` = `pg_snapshot_xmax(pg_current_snapshot())` read after the change committed: the first

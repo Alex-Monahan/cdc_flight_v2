@@ -88,10 +88,13 @@ You need none of the three; if F is merged, its DDL mix is one more workload for
   the upper bound of a snapshot. Use that function; do not write a second comparison.
 - Observe on the node the stream decodes on (the standby by default). On a primary the bracket is only as good
   as what packages P and X proved there; use their rule and say so.
-- The **identity** of a table is what its destination table was built for: the OID, and per column `attnum`,
-  name and type with its modifier, and the key columns. Package B records it with the plan and stores it at the
-  swap; if something is missing there, add it through migration steps of your own. `relfilenode` is **not**
-  part of it.
+- The **identity** of a table is what its destination table was built for: the OID, and per column `attnum`, name and
+  type with its modifier, and the key columns. Package B records it with the plan and stores it at the swap; if
+  something is missing there, add it through migration steps of your own. `relfilenode` is **not** part of it. As
+  built by package K, `TableFacts.identity` also holds the replica identity, the identity index's attnums and
+  `pk_deferrable` (`pg_index.indimmediate`): `confirm` answers `changed` when one of them changed, or when the
+  catalog's `replica_identity_problem` is not `None`. A rename into a name with a `name_problem` (a `"` in the schema
+  or table name, H-051) removes the table from the publication, as a drop.
 - Write the list of commands that keep the identity (the gate must answer `same`: `TRUNCATE`, `VACUUM FULL`,
   `CLUSTER`, `REINDEX`, `SET TABLESPACE`, constraints, indexes that are not the key, owner, comment, statistics)
   and of those that change it (drop and create, rename of table, schema or column, `SET SCHEMA`, add or drop a

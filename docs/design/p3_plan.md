@@ -223,6 +223,12 @@ engine.durable(position)
 engine.stop(deadline)        # STOP, wait, then SIGKILL of the JVM; engine.kill() at any time
 ```
 
+**Tables without a key (package K, as built; `docs/design/engine.md` 4a).** A listed table's `SCHEMA` frame has
+`has_key` 0 and no key positions; its rows carry `b<i>` complete and no `k<i>`. An update or delete of a table
+without a key that arrives without an old image is a FATAL that names the table (`fatal.schema`, `fatal.table`).
+Stock Debezium 3.7.1 cannot stream a name containing `"`: measured, it stops with FATAL at every start, drops the
+table's records silently with event count 0, or delivers the rows of `"q"` as rows of `q` (H-051).
+
 The JVM stays in the process group of the pipeline, so that the bootstrap's kill of that group (design section 5)
 and a freeze of the whole tree reach it. The pipeline kills the JVM by its process id; the JVM starts no lasting
 child of its own.
@@ -486,6 +492,13 @@ section 8 says. Nothing on the source is fenced by the leader epoch, so every so
 when a deposed run repeats it: `publication.ensure` only adds, the heartbeat write is idempotent, and a slot is
 dropped only by an explicit operator action or by the enactment of a slot finding.
 
+Rule K as built (package K): `SourceTable.has_key`, `primary_key_deferrable`; `TableFacts.has_key`,
+`pk_deferrable`. For a table without a key `key` and `key_attnums` are empty and `key_source` is `None`; the
+transform's key (C3) is `key_attnums`. `shape_hash` and `diff.key_changed` cover deferrability, and
+`TableFacts.identity` includes the replica identity, the identity index's attnums and `pk_deferrable`, so the
+catalog gate (C10) sees a change from `FULL` to `DEFAULT`. `SourceTable.name_problem`: a schema or table name
+containing `"` is refused by `publication.ensure` and reported by `publication.check` (H-051).
+
 ### C8 Oracle and T1 harness (package O)
 
 Details in `docs/oracle.md`. What binds every package that writes a gate test:
@@ -573,7 +586,14 @@ As delivered by package X; its report defines the interface, and this section is
   and a table without a key whose plan has an `ambiguous` column (C3) get routing `skip` with one alert per
   table that names the reason. Their rows in the stream are counted and dropped. The mode `full_refresh` of SPEC
   3.5 that will carry the last two is built in P4; until then such a table is not replicated (on the list of
-  parts carried to P4).
+  parts carried to P4). The same holds for a table with a `name_problem` (C7, H-051): routing `skip` with one
+  alert, never in the publication; a rename into such a name removes the table from the publication (T).
+- **Rule K in the stream.** S starts every engine with the catalog's tables without a key, and restarts the
+  engine with a fresh list when a `SCHEMA` frame differs from the catalog and on T's `key_changed` (a key made
+  deferrable is a drop and re-add of the key; whether Debezium then sends a new `SCHEMA` frame was not measured).
+  A FATAL that names a table is a failure of that table: routing `skip`, an alert and quarantine at once (no loop
+  of restarts), the engine started again without it in its include list, and a backfill after a gap once
+  `replica_identity_problem` is `None` again.
 - S runs a group again after `Conflict`, a bounded number of times, building its statements again when the
   conflict came from a DDL (a swap changes the catalog).
 - A table that fails to apply `apply.max_table_attempts` times (default 3) leaves the stream: state `quarantined`,
@@ -747,28 +767,27 @@ fallback through the type's output function instead of `::text`; `lc_monetary=C`
 rule by (microseconds, offset). P9: the cost of a 200-column table (52 K rows/s in the stream here).
 
 **From the review of F (fuzzers, round 1).** Round 2 of F points the fuzzers at the real system and needs the
-following; each owner's task takes its line. S (C5, C10, with L for epoch and run): the facts for "never two
-writers" are part of the row that the batch machine appends to `_cdc.transitions` for every committed group —
-epoch, run id, previous and new applied position, first and last commit position of its source transactions and
-their count, and a sequence that gives the order of commit; no extra statement per group (SPEC 6.1; the
-round-trip budget); a backfill lane writes the same with table and chunk (B). S (C8): the applied-position
-reader. S: the spill area can be made tiny by a setting (`max_temp_directory_size` of the transform connection
-and of apply's planning database), and "spill area full" is an alert through `alerts.emit` (C4), which is the
-fuzzer's proof of effect. P (C7), E (C2) and S (C12): every source address is configurable per node, so that each
-link can pass through a proxy; MotherDuck is reached only through the `md.*` fault sites. Every owner (C1):
-crash points for the steps of design 3, the lane points of C4, take-over, release, heartbeat, slot creation,
-backfill chunk commit, pending log append and swap, each declared through `cdc_v2.crashpoints`; a point that is
-reached only on some paths says so. P (C7) and the engine's probe: one `application_name` prefix (`cdc_v2_`) for
-every SQL session of the pipeline; the replication session is named by Debezium and is found through the
-`active_pid` of `HELLO`. L (C6): the local platform starts and cancels runs and reports each run's state, start,
-end and exit code. S with D (C10, C4): the quarantine exit and `ApplyInvariantError` are alert rows. B (C10): the
-backfill request table and the `versions` observer for SPEC 3.2. V (C10, `reposition`): the enactment after a
-dropped or invalidated slot and after a promotion. Bug classes that no planted defect of round 1 stands for,
-and that round 2 must plant in the real system or show found: a wrong cut or hand-off (design 7: `R0 < P0`
-accepted, a swap before `R1` is passed, catch-up before all snapshots are passed, a table without a key read
-under several snapshots, an unsettled standby); a double apply after `CommitUnknown`; a table with a deferrable
-key applied on the keyed path (rule K); a slot that is ahead or recreated and ignored (V); a `FATAL` repeated at
-one position (SPEC 4.3).
+following; each owner's task takes its line. S (C5, C10, with L for epoch and run): the facts for "never two writers"
+are part of the row that the batch machine appends to `_cdc.transitions` for every committed group — epoch, run id,
+previous and new applied position, first and last commit position of its source transactions and their count, and a
+sequence that gives the order of commit; no extra statement per group (SPEC 6.1; the round-trip budget); a backfill
+lane writes the same with table and chunk (B). S (C8): the applied-position reader. S: the spill area can be made tiny
+by a setting (`max_temp_directory_size` of the transform connection and of apply's planning database), and "spill area
+full" is an alert through `alerts.emit` (C4), which is the fuzzer's proof of effect. P (C7), E (C2) and S (C12): every
+source address is configurable per node, so that each link can pass through a proxy; MotherDuck is reached only
+through the `md.*` fault sites. Every owner (C1): crash points for the steps of design 3, the lane points of C4,
+take-over, release, heartbeat, slot creation, backfill chunk commit, pending log append and swap, each declared
+through `cdc_v2.crashpoints`; a point that is reached only on some paths says so. P (C7) and the engine's probe: one
+`application_name` prefix (`cdc_v2_`) for every SQL session of the pipeline; the replication session is named by
+Debezium and is found through the `active_pid` of `HELLO`. L (C6): the local platform starts and cancels runs and
+reports each run's state, start, end and exit code. S with D (C10, C4): the quarantine exit and `ApplyInvariantError`
+are alert rows. B (C10): the backfill request table and the `versions` observer for SPEC 3.2. V (C10, `reposition`):
+the enactment after a dropped or invalidated slot and after a promotion. Bug classes that no planted defect of round 1
+stands for, and that round 2 must plant in the real system or show found: a wrong cut or hand-off (design 7: `R0 < P0`
+accepted, a swap before `R1` is passed, catch-up before all snapshots are passed, a table without a key read under
+several snapshots, an unsettled standby); a double apply after `CommitUnknown`; a table with a deferrable key applied
+on the keyed path (rule K), also through an engine started with an empty list of tables without a key; a slot that is
+ahead or recreated and ignored (V); a `FATAL` repeated at one position (SPEC 4.3).
 
 **The ledger of SPEC section 4 (rules of the orchestrator, 2026-11-10).** No run against the toy replicator
 counts toward a bar. The counters of a fuzzer restart from zero after any change to correctness code, and a

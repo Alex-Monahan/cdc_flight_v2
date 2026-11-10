@@ -154,14 +154,16 @@ F's consumer loop need to know what a consumer may see.
   it has a deadline and is a declared wait (C11), it does not spin and does not read. A recovery conflict
   (SQLSTATE 40001 and what package P maps to it) reads the chunk again.
 - **A table with a key**: every chunk has its own snapshot and its own cut; nothing is held between chunks.
-- **A table without a key**: one snapshot for the whole table, exported by a connection that never touches the
-  table; before anything is read, the stream must have passed the snapshot and no transaction that touches the
-  table may be `unknown` (design 7.4, C9); else another snapshot. `on_group` sees every transaction of a group;
-  decide with `docs/design/cut.md` how the stream side of the cut is recorded. A table under a steady flow of
-  small transactions must still get its snapshot: measure how many attempts it takes at the write rate of the
-  gate test, and say what happens when none succeeds (an alert, a declared wait; never a read under a doubtful
-  snapshot). The exporter's age is reported and has an alert threshold. A lost snapshot discards what was loaded
-  and starts the table again: the known limit for SPEC 3.7, to be shown as a measurement.
+- **A table without a key** (rule K: also a table whose primary key is deferrable, and a table with only a unique
+  index): one snapshot for the whole table, exported by a connection that never touches the table (it may still be
+  split into chunks by `pk_attnums` when it has a primary key, all read under that one snapshot); before anything is
+  read, the stream must have passed the snapshot and no transaction that touches the table may be `unknown` (design
+  7.4, C9); else another snapshot. `on_group` sees every transaction of a group; decide with `docs/design/cut.md` how
+  the stream side of the cut is recorded. A table under a steady flow of small transactions must still get its
+  snapshot: measure how many attempts it takes at the write rate of the gate test, and say what happens when none
+  succeeds (an alert, a declared wait; never a read under a doubtful snapshot). The exporter's age is reported and has
+  an alert threshold. A lost snapshot discards what was loaded and starts the table again: the known limit for SPEC
+  3.7, to be shown as a measurement.
 - A role that is subject to row-level security on the table is refused before the first read (H-039).
 - **Load.** A load transaction covers one or more chunks, in the loader's lane `backfill.<i>`: fence, rows into
   the new table, the chunks moved to "loaded" with `execute_one` under the condition that the backfill is still

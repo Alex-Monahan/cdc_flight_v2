@@ -1,0 +1,42 @@
+{
+  "delete_old_image": [
+    2,
+    null,
+    null
+  ],
+  "note": "an identity-only old image arrives with NULLs in the other columns and is not detectable in the engine; publication.check refuses a table without a key by rule K that is not REPLICA IDENTITY FULL",
+  "table": "no primary key, REPLICA IDENTITY USING INDEX on a unique NOT NULL column, listed",
+  "test": "tests/engine/test_engine_keys.py::test_a_listed_table_without_an_old_image",
+  "update_of_another_column": {
+    "fatal_class": "cdc_v2.engine.CdcEngine$EngineFatal",
+    "fatal_message": "update without an old image in <schema>.ri, a table without a key (seq 12)"
+  },
+  "update_of_the_identity_column": [
+    [
+      "d",
+      [
+        1,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null
+      ]
+    ],
+    [
+      "c",
+      [
+        null,
+        null,
+        null
+      ],
+      [
+        10,
+        "hidden-value-1",
+        1
+      ]
+    ]
+  ]
+}

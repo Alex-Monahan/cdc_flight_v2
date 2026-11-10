@@ -24,9 +24,11 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
@@ -76,6 +78,30 @@ public final class CdcEngine {
         long stopTimeoutMs = 15_000;
         long parentPollMs = 500;
         long statIntervalMs = 10_000;
+        // rule K: the tables without a key (cdc_v2.keyless.tables), as schema + NUL + table, the key of `tables`
+        Set<String> keyless = new HashSet<>();
+
+        /** cdc_v2.keyless.tables: every name followed by NUL (Python encode_table_names); empty for none. */
+        static Set<String> tableNames(String text) {
+            Set<String> out = new HashSet<>();
+            if (text.isEmpty()) {
+                return out;
+            }
+            if (!text.endsWith("\u0000")) {
+                throw new IllegalArgumentException("cdc_v2.keyless.tables must end with NUL");
+            }
+            String[] names = text.substring(0, text.length() - 1).split("\u0000", -1);
+            if (names.length % 2 != 0) {
+                throw new IllegalArgumentException("cdc_v2.keyless.tables must hold (schema, table) pairs");
+            }
+            for (int i = 0; i < names.length; i += 2) {
+                if (names[i].isEmpty() || names[i + 1].isEmpty()) {
+                    throw new IllegalArgumentException("cdc_v2.keyless.tables holds an empty name");
+                }
+                out.add(names[i] + "\u0000" + names[i + 1]);
+            }
+            return out;
+        }
 
         static Settings from(Map<String, String> c) {
             Settings s = new Settings();
@@ -93,6 +119,7 @@ public final class CdcEngine {
             s.stopTimeoutMs = Long.parseLong(c.getOrDefault("cdc_v2.stop.timeout.ms", "15000"));
             s.parentPollMs = Long.parseLong(c.getOrDefault("cdc_v2.parent.poll.ms", "500"));
             s.statIntervalMs = Long.parseLong(c.getOrDefault("cdc_v2.stat.interval.ms", "10000"));
+            s.keyless = tableNames(c.getOrDefault("cdc_v2.keyless.tables", ""));
             if (s.frameMaxRows < 1 || s.frameTargetBytes < 1 || s.ackMaxPending < 2
                     || s.frameMaxBytes > 0xFFFFFFFFL || s.maxValueBytes > s.frameMaxBytes - (1 << 20)
                     || s.frameTargetBytes > s.frameMaxBytes - (1 << 20)) {
@@ -1018,7 +1045,10 @@ public final class CdcEngine {
             t.unchangedPossible = new boolean[n];
             t.isKey = new boolean[n];
             List<Integer> keyPos = new ArrayList<>();
-            if (keySchema != null && keySchema.type() == Schema.Type.STRUCT) {
+            // rule K: a listed table is a table without a key whatever Debezium's key says (no key positions, the
+            // old image in b<i>, no k<i>, the old-key header ignored)
+            boolean listed = settings.keyless.contains(t.schema + "\u0000" + t.table);
+            if (!listed && keySchema != null && keySchema.type() == Schema.Type.STRUCT) {
                 for (Field kf : keySchema.fields()) {
                     Field f = rowSchema.field(kf.name());
                     if (f == null) {
@@ -1141,6 +1171,10 @@ public final class CdcEngine {
             long mySeq = seq++;
             Struct after = val.getStruct("after");
             Struct before = val.getStruct("before");
+            if (!t.hasKey && (op == 'u' || op == 'd') && before == null) {
+                throw new EngineFatal((op == 'u' ? "update" : "delete") + " without an old image in "
+                        + t.schema + "." + t.table + ", a table without a key (seq " + mySeq + ")");
+            }
             fill(t, current, mySeq, op, after, before, oldKey);
             if (current.rows > 1 && current.bytes() > settings.frameTargetBytes) {
                 // This row would make the frame too large: it goes into a frame of its own.
