@@ -478,3 +478,40 @@ def test_pii_step_seam_applies_on_both_paths():
     s = T.stream(p, pa.record_batch({"a0": pa.array([1], pa.int32()), "a1": pa.array(["abc"]),
                                      "a2": pa.array(["2.50"])}))
     assert b.equals(s) and b.column(1).to_pylist() == ["ABC"] and b.column(2).to_pylist() == [D("0.00")]
+
+
+def test_stream_fast_path_equals_the_sql_path(monkeypatch):
+    """The pyarrow path for common stream values (date, finite timestamps, numeric(p<=18,s)) gives exactly what the
+    SQL path gives; a batch with a value it does not cover takes the SQL path."""
+    from cdc_v2.transform import convert
+    t = table([col(1, "d", "date"), col(2, "ts", "timestamp"), col(3, "tz", "timestamptz"),
+               col(4, "n", "numeric", numeric_typmod(15, 2)), col(5, "s", "numeric", numeric_typmod(5, -2))])
+    p = T.plan(t, server_version_num=V18)
+    rows = pa.record_batch({"a0": pa.array([0, -2451545, R.MAX_DATE_DAYS - R.PG_EPOCH_DAYS, None], pa.int32()),
+                            "a1": pa.array([0, -(10 ** 17), R.DUCK_TS_MAX - R.PG_EPOCH_US, None], pa.int64()),
+                            "a2": pa.array([1, -1, 10 ** 18, None], pa.int64()),
+                            "a3": pa.array(["0.00", "-9999999999999.99", "12.30", None]),
+                            "a4": pa.array(["12300", "-9999900", "0", None])})
+    fast = T.Transformer()
+    out_fast = fast.stream(p, rows)
+    assert convert._fast_all(fast._compile(p, rows, "stream"), rows) is not None
+    monkeypatch.setattr(convert, "_fast_all", lambda c, r: None)
+    out_sql = T.Transformer().stream(p, rows)
+    assert out_fast.schema == out_sql.schema
+    for a, b in zip(out_fast.columns, out_sql.columns):
+        assert same_values(a, b)
+    monkeypatch.undo()
+    for special in ({"a0": pa.array([2147483647], pa.int32())}, {"a1": pa.array([2 ** 63 - 1], pa.int64())},
+                    {"a3": pa.array(["NaN"])}):
+        cols = {k: v.slice(0, 1) for k, v in zip(rows.schema.names, rows.columns)}
+        cols.update(special)
+        b = pa.record_batch(cols)
+        assert convert._fast_all(fast._compile(p, b, "stream"), b) is None
+
+
+def same_values(a, b):
+    if pa.types.is_date32(a.type):
+        return a.view(pa.int32()).equals(b.view(pa.int32()))
+    if pa.types.is_timestamp(a.type):
+        return a.view(pa.int64()).equals(b.view(pa.int64()))
+    return a.equals(b)

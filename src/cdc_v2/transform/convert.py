@@ -58,6 +58,7 @@ class _Compiled:
     src: Optional[str]                # the layered FROM source over the registered input
     misfit_exprs: tuple               # bool_or(...) per widenable column
     misfit_positions: tuple           # position per misfit expression
+    all_fast: bool = False            # every SQL column has an exact pyarrow path for its common values
 
     @property
     def sql(self) -> str:
@@ -164,7 +165,8 @@ class Transformer:
                 src = "(SELECT *, %s FROM %s)" % (", ".join(items), src)
         c = _Compiled(plan, direction, tuple(names), tuple(actions), tuple(n for n, _e in sql_cols),
                       tuple(e for _n, e in sql_cols), src, tuple(e for _p, e in misfits),
-                      tuple(p for p, _e in misfits))
+                      tuple(p for p, _e in misfits),
+                      all_fast=bool(sql_cols) and all(cv.fast for k, cv in actions if k == "sql"))
         self._cache[key] = c
         while len(self._cache) > self.settings.max_cached_queries:
             self._cache.popitem(last=False)
@@ -180,7 +182,11 @@ class Transformer:
             rows = pa.RecordBatch.from_arrays([a.cast(pa.string()) if pa.types.is_large_string(a.type) else a
                                                for a in rows.columns], names=rows.schema.names)
         c = self._compile(plan, rows, direction)
-        computed = self._execute(c, rows) if c.src is not None else {}
+        computed = None
+        if c.src is not None and c.all_fast:
+            computed = _fast_all(c, rows)            # None: a value the fast path does not cover
+        if computed is None:
+            computed = self._execute(c, rows) if c.src is not None else {}
         out = []
         for name, (kind, cv), arr in zip(c.names, c.actions, rows.columns):
             if kind == "pass":
@@ -285,6 +291,47 @@ class Transformer:
         if not ok:
             return None
         return r[0] if r else ()
+
+
+_TS_TOP = F.INT64_MAX - F.PG_EPOCH_US - 1          # below it a stream timestamp is finite and fits TIMESTAMP
+
+
+def _fast_all(c: _Compiled, rows: pa.RecordBatch):
+    """The stream's common values without DuckDB (one statement costs about a millisecond, which a one-row batch
+    cannot afford). Exact by construction; each path covers only values it handles exactly and returns None for a
+    batch with anything else (an infinity, a NaN, a timestamp beyond DuckDB's range), which then takes the SQL
+    path. The property and cross-path tests compare it with the SQL path of the backfill."""
+    names = rows.schema.names
+    out = {}
+    for name, (kind, cv) in zip(c.names, c.actions):
+        if kind != "sql":
+            continue
+        arr = rows.column(names.index(name))
+        valid = len(arr) - arr.null_count
+        try:
+            if cv.fast == "date":
+                if valid:
+                    mm = pc.min_max(arr)
+                    if mm["min"].as_py() == F.INT32_MIN or mm["max"].as_py() == F.INT32_MAX:
+                        return None
+                res = pc.add(arr, pa.scalar(F.PG_EPOCH_DAYS, pa.int32())).view(pa.date32())
+            elif cv.fast == "ts":
+                if valid:
+                    mm = pc.min_max(arr)
+                    if mm["min"].as_py() == F.INT64_MIN or mm["max"].as_py() > _TS_TOP:
+                        return None
+                res = pc.add(arr, pa.scalar(F.PG_EPOCH_US, pa.int64())).view(cv.out_type)
+            elif cv.fast == "decimal":
+                res = pc.cast(arr, cv.out_type)           # raises on NaN (the native form cannot hold it)
+            else:
+                return None
+        except (pa.ArrowInvalid, pa.ArrowNotImplementedError):
+            return None
+        u = "u" + name[1:]
+        if name.startswith("a") and u in names:          # a value under a set u<i> is never used
+            res = pc.if_else(pc.fill_null(rows.column(names.index(u)), False), pa.scalar(None, res.type), res)
+        out[name] = res
+    return out
 
 
 def _view(plan, rows, name, cv, arr):

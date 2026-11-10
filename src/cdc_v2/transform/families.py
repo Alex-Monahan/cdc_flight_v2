@@ -17,6 +17,7 @@ that breaks the contract). Neither contains a value.
 """
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from typing import Optional
 
@@ -194,6 +195,7 @@ class Conv:
     sql_type: Optional[pa.DataType] = None   # the Arrow type DuckDB returns, when `post` turns it into out_type
     post: Optional[str] = None          # 'time64' | 'timetz': reinterpret DuckDB's integer result
     view_range: Optional[tuple] = None  # view: (min, max) the input must lie in
+    fast: Optional[str] = None          # stream: an exact pyarrow path for the common values ('date', 'ts', 'decimal')
 
 
 BAD = "error('cdc_v2:bad:{c}')"
@@ -351,7 +353,11 @@ def conv(spec: TypeSpec, direction: str, form: str, in_type: pa.DataType) -> Con
             return Conv("pass", out, out)
         return _scalar_text(spec, out)
     if f == "numeric":
-        return _numeric(spec, form)
+        c = _numeric(spec, form)
+        w, sc, general = spec.numeric
+        if stream and form == "native" and not general and w <= 18:
+            c = dataclasses.replace(c, fast="decimal")
+        return c
     if f == "bytea":
         if stream:
             return Conv("pass", pa.binary(), out)
@@ -359,9 +365,12 @@ def conv(spec: TypeSpec, direction: str, form: str, in_type: pa.DataType) -> Con
                     _wrap_null("CASE WHEN starts_with({x}, '\\x') AND strlen({x}) %% 2 = 0 THEN unhex(substr({x}, 3)) "
                                "ELSE %s END" % BAD))
     if f == "date":
-        return _date_stream(out) if stream else _date_backfill(out)
+        return dataclasses.replace(_date_stream(out), fast="date") if stream else _date_backfill(out)
     if f in ("timestamp", "timestamptz"):
-        return _ts_stream(spec, form) if stream else _ts_backfill(spec, form)
+        if stream:
+            c = _ts_stream(spec, form)
+            return dataclasses.replace(c, fast="ts") if form == "native" else c
+        return _ts_backfill(spec, form)
     if f == "time":
         if stream:
             return Conv("view", pa.int64(), out, view_range=(0, DAY_US))
@@ -423,14 +432,26 @@ def _numeric(spec: TypeSpec, form: str) -> Conv:
     Never through a cast that could round: the fit is decided by the digits first."""
     w, s, general = spec.numeric
     special = "{x} IN ('NaN', 'Infinity', '-Infinity')"
+    # digits before and after the point, counted from the text (signs and the point excluded)
+    layers = (
+        (("dot", "strpos({x}, '.')"), ("len", "strlen({x})"), ("neg", "starts_with({x}, '-')")),
+        (("il", "((CASE WHEN {p}dot = 0 THEN {p}len ELSE {p}dot - 1 END) - CASE WHEN {p}neg THEN 1 ELSE 0 END)"),
+         ("fl", "(CASE WHEN {p}dot = 0 THEN 0 ELSE {p}len - {p}dot END)")),
+    )
     if general:
-        layers = ((("ip", "split_part(ltrim({x}, '-'), '.', 1)"), ("fp", "split_part({x}, '.', 2)")),)
-        fits = ("(NOT %s AND strlen(ltrim({p}ip, '0')) <= %d AND strlen(rtrim({p}fp, '0')) <= %d)"
-                % (special, w - s, s))
+        # cheap test first; the exact one (leading zeros of the integer part, trailing zeros of the fraction) only
+        # for the texts that the cheap one does not settle
+        fits = ("(NOT %s AND (CASE WHEN {p}il <= %d AND {p}fl <= %d THEN TRUE ELSE "
+                "strlen(ltrim(split_part(ltrim({x}, '-'), '.', 1), '0')) <= %d AND "
+                "strlen(rtrim(split_part({x}, '.', 2), '0')) <= %d END))" % (special, w - s, s, w - s, s))
     else:
-        layers = ()
         fits = "(NOT %s)" % special
     native = "CAST({x} AS DECIMAL(%d,%d))" % (w, s)
+    if w > 18 and s <= 17:
+        # DuckDB parses text into a DECIMAL wider than 18 digits about 50 times slower than into DECIMAL(18, s);
+        # a text whose digits fit DECIMAL(18, s) goes that way and is widened exactly
+        native = ("(CASE WHEN {p}il <= %d AND {p}fl <= %d THEN CAST(CAST({x} AS DECIMAL(18,%d)) AS DECIMAL(%d,%d)) "
+                  "ELSE %s END)" % (18 - s, s, s, w, s, native))
     return _native_or_wide(spec, form, fits, native, "{x}", layers, pa.string())
 
 
