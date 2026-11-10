@@ -1,0 +1,804 @@
+{
+  "config": {
+    "CDC_V2_RUNS_CONT_AFTER_S": "100",
+    "CDC_V2_RUNS_FREEZE": "pipeline",
+    "CDC_V2_RUNS_FREEZE_AT_S": "30",
+    "CDC_V2_RUNS_MODE": "watchdog",
+    "CDC_V2_RUNS_STALE_S": "60"
+  },
+  "flight": "cdc_v2_spike_runs_wd",
+  "variants": {
+    "killpg0": {
+      "db_events": [
+        {
+          "client_unix": 1794278188.68079,
+          "detail": {
+            "freeze": "pipeline",
+            "pgid": 37
+          },
+          "kind": "freezing",
+          "pid": 37,
+          "role": "pipeline",
+          "run_number": 4,
+          "server": "2026-11-10T02:36:28.682000+00:00",
+          "server_unix": 1794278188.682
+        }
+      ],
+      "events": [
+        {
+          "freeze": "pipeline",
+          "kind": "start",
+          "mode": "watchdog",
+          "pid": 36,
+          "role": "main",
+          "run": 4,
+          "t": 1794278156.023,
+          "v": "v1",
+          "variant": "killpg0"
+        },
+        {
+          "child_pid": 37,
+          "child_role": "pipeline",
+          "kind": "spawned",
+          "new_session": true,
+          "pid": 36,
+          "role": "main",
+          "run": 4,
+          "t": 1794278156.024,
+          "v": "v1"
+        },
+        {
+          "child_pid": 38,
+          "child_role": "helper",
+          "kind": "spawned",
+          "new_session": true,
+          "pid": 36,
+          "role": "main",
+          "run": 4,
+          "t": 1794278156.025,
+          "v": "v1"
+        },
+        {
+          "child_pid": 277,
+          "child_role": "pgrand",
+          "kind": "spawned",
+          "new_session": false,
+          "pid": 37,
+          "role": "pipeline",
+          "run": 4,
+          "t": 1794278158.658,
+          "v": "v1"
+        },
+        {
+          "kind": "tick",
+          "pid": 277,
+          "role": "pgrand",
+          "run": 4,
+          "seq": 0,
+          "t": 1794278159.43,
+          "tag": "pgrand",
+          "v": "v1"
+        },
+        {
+          "kind": "tick",
+          "pid": 277,
+          "role": "pgrand",
+          "run": 4,
+          "seq": 11,
+          "t": 1794278170.429,
+          "tag": "pgrand",
+          "v": "v1"
+        },
+        {
+          "kind": "tick",
+          "pid": 277,
+          "role": "pgrand",
+          "run": 4,
+          "seq": 22,
+          "t": 1794278181.432,
+          "tag": "pgrand",
+          "v": "v1"
+        },
+        {
+          "freeze": "pipeline",
+          "kind": "freezing",
+          "pid": 37,
+          "role": "pipeline",
+          "run": 4,
+          "t": 1794278188.731,
+          "v": "v1"
+        },
+        {
+          "age_s": 60.4,
+          "kind": "heartbeat_stale",
+          "pid": 36,
+          "role": "main",
+          "run": 4,
+          "t": 1794278249.088,
+          "v": "v1"
+        },
+        {
+          "kind": "hard_exit",
+          "pid": 36,
+          "pipeline_pgid": 37,
+          "role": "main",
+          "run": 4,
+          "t": 1794278249.088,
+          "v": "v1",
+          "variant": "killpg0"
+        }
+      ],
+      "final": {
+        "cancelled_at": null,
+        "created_at": "2026-11-10T02:35:52.937+00:00",
+        "ended_at": "2026-11-10T02:37:34.169+00:00",
+        "exit_code": 0,
+        "flight_version": 1,
+        "is_scheduled": false,
+        "run_number": 4,
+        "scheduled_at": "2026-11-10T02:35:52.892+00:00",
+        "started_at": "2026-11-10T02:35:53.589+00:00",
+        "state": "SUCCEEDED"
+      },
+      "freeze_at": "2026-11-10T02:36:28.731000+00:00",
+      "freeze_to_hard_exit_s": 60.357,
+      "freeze_to_run_terminal_s": 65.438,
+      "hard_exit_logged_at": "2026-11-10T02:37:29.088000+00:00",
+      "hard_exit_to_run_terminal_s": 5.081,
+      "heartbeat_stale_logged_at": "2026-11-10T02:37:29.088000+00:00",
+      "log_tail": [
+        "EV {\"kind\": \"spawned\", \"role\": \"main\", \"pid\": 36, \"run\": 4, \"t\": 1794278156.024, \"v\": \"v1\", \"child_role\": \"pipeline\", \"child_pid\": 37, \"new_session\": true}",
+        "EV {\"kind\": \"spawned\", \"role\": \"main\", \"pid\": 36, \"run\": 4, \"t\": 1794278156.025, \"v\": \"v1\", \"child_role\": \"helper\", \"child_pid\": 38, \"new_session\": true}",
+        "FIRST 1794278156.051",
+        "FIRST 1794278156.051",
+        "EV {\"kind\": \"spawned\", \"role\": \"pipeline\", \"pid\": 37, \"run\": 4, \"t\": 1794278158.658, \"v\": \"v1\", \"child_role\": \"pgrand\", \"child_pid\": 277, \"new_session\": false}",
+        "FIRST 1794278158.685",
+        "EV {\"kind\": \"tick\", \"role\": \"pgrand\", \"pid\": 277, \"run\": 4, \"t\": 1794278159.43, \"v\": \"v1\", \"seq\": 0, \"tag\": \"pgrand\"}",
+        "EV {\"kind\": \"tick\", \"role\": \"pgrand\", \"pid\": 277, \"run\": 4, \"t\": 1794278170.429, \"v\": \"v1\", \"seq\": 11, \"tag\": \"pgrand\"}",
+        "EV {\"kind\": \"tick\", \"role\": \"pgrand\", \"pid\": 277, \"run\": 4, \"t\": 1794278181.432, \"v\": \"v1\", \"seq\": 22, \"tag\": \"pgrand\"}",
+        "EV {\"kind\": \"freezing\", \"role\": \"pipeline\", \"pid\": 37, \"run\": 4, \"t\": 1794278188.731, \"v\": \"v1\", \"freeze\": \"pipeline\"}",
+        "EV {\"kind\": \"heartbeat_stale\", \"role\": \"main\", \"pid\": 36, \"run\": 4, \"t\": 1794278249.088, \"v\": \"v1\", \"age_s\": 60.4}",
+        "EV {\"kind\": \"hard_exit\", \"role\": \"main\", \"pid\": 36, \"run\": 4, \"t\": 1794278249.088, \"v\": \"v1\", \"variant\": \"killpg0\", \"pipeline_pgid\": 37}"
+      ],
+      "rows_written_more_than_1s_after_run_end": {},
+      "run": 4,
+      "ticks_per_role": [
+        {
+          "first_server": "2026-11-10T02:35:58.666000+00:00",
+          "first_server_unix": 1794278158.666,
+          "last_client_unix": 1794278254.05272,
+          "last_row_minus_run_end_s": -0.115,
+          "last_server": "2026-11-10T02:37:34.054000+00:00",
+          "last_server_unix": 1794278254.054,
+          "pid": 38,
+          "role": "helper",
+          "rows": 94
+        },
+        {
+          "first_server": "2026-11-10T02:35:58.674000+00:00",
+          "first_server_unix": 1794278158.674,
+          "last_client_unix": 1794278188.658265,
+          "last_row_minus_run_end_s": -65.509,
+          "last_server": "2026-11-10T02:36:28.660000+00:00",
+          "last_server_unix": 1794278188.66,
+          "pid": 37,
+          "role": "pipeline",
+          "rows": 4
+        },
+        {
+          "first_server": "2026-11-10T02:35:59.409000+00:00",
+          "first_server_unix": 1794278159.409,
+          "last_client_unix": 1794278188.4035563,
+          "last_row_minus_run_end_s": -65.764,
+          "last_server": "2026-11-10T02:36:28.405000+00:00",
+          "last_server_unix": 1794278188.405,
+          "pid": 277,
+          "role": "pgrand",
+          "rows": 30
+        }
+      ],
+      "timing": {
+        "created_minus_scheduled_s": 0.045,
+        "first_line_to_ended_s": 98.353,
+        "scheduled_to_first_line_s": 2.924,
+        "scheduled_to_started_s": 0.697,
+        "started_to_ended_s": 100.58,
+        "started_to_first_line_s": 2.227
+      }
+    },
+    "killpg1": {
+      "db_events": [
+        {
+          "client_unix": 1794278188.7773235,
+          "detail": {
+            "freeze": "pipeline",
+            "pgid": 36
+          },
+          "kind": "freezing",
+          "pid": 36,
+          "role": "pipeline",
+          "run_number": 3,
+          "server": "2026-11-10T02:36:28.779000+00:00",
+          "server_unix": 1794278188.779
+        }
+      ],
+      "events": [
+        {
+          "freeze": "pipeline",
+          "kind": "start",
+          "mode": "watchdog",
+          "pid": 35,
+          "role": "main",
+          "run": 3,
+          "t": 1794278156.008,
+          "v": "v1",
+          "variant": "killpg1"
+        },
+        {
+          "child_pid": 36,
+          "child_role": "pipeline",
+          "kind": "spawned",
+          "new_session": true,
+          "pid": 35,
+          "role": "main",
+          "run": 3,
+          "t": 1794278156.009,
+          "v": "v1"
+        },
+        {
+          "child_pid": 37,
+          "child_role": "helper",
+          "kind": "spawned",
+          "new_session": true,
+          "pid": 35,
+          "role": "main",
+          "run": 3,
+          "t": 1794278156.01,
+          "v": "v1"
+        },
+        {
+          "child_pid": 277,
+          "child_role": "pgrand",
+          "kind": "spawned",
+          "new_session": false,
+          "pid": 36,
+          "role": "pipeline",
+          "run": 3,
+          "t": 1794278158.742,
+          "v": "v1"
+        },
+        {
+          "kind": "tick",
+          "pid": 277,
+          "role": "pgrand",
+          "run": 3,
+          "seq": 0,
+          "t": 1794278159.508,
+          "tag": "pgrand",
+          "v": "v1"
+        },
+        {
+          "kind": "tick",
+          "pid": 277,
+          "role": "pgrand",
+          "run": 3,
+          "seq": 11,
+          "t": 1794278170.507,
+          "tag": "pgrand",
+          "v": "v1"
+        },
+        {
+          "kind": "tick",
+          "pid": 277,
+          "role": "pgrand",
+          "run": 3,
+          "seq": 22,
+          "t": 1794278181.506,
+          "tag": "pgrand",
+          "v": "v1"
+        },
+        {
+          "freeze": "pipeline",
+          "kind": "freezing",
+          "pid": 36,
+          "role": "pipeline",
+          "run": 3,
+          "t": 1794278188.799,
+          "v": "v1"
+        },
+        {
+          "age_s": 60.3,
+          "kind": "heartbeat_stale",
+          "pid": 35,
+          "role": "main",
+          "run": 3,
+          "t": 1794278249.103,
+          "v": "v1"
+        },
+        {
+          "kind": "hard_exit",
+          "pid": 35,
+          "pipeline_pgid": 36,
+          "role": "main",
+          "run": 3,
+          "t": 1794278249.103,
+          "v": "v1",
+          "variant": "killpg1"
+        }
+      ],
+      "final": {
+        "cancelled_at": null,
+        "created_at": "2026-11-10T02:35:52.338+00:00",
+        "ended_at": "2026-11-10T02:37:34.181+00:00",
+        "exit_code": 1,
+        "flight_version": 1,
+        "is_scheduled": false,
+        "run_number": 3,
+        "scheduled_at": "2026-11-10T02:35:52.325+00:00",
+        "started_at": "2026-11-10T02:35:53.041+00:00",
+        "state": "FAILED"
+      },
+      "freeze_at": "2026-11-10T02:36:28.799000+00:00",
+      "freeze_to_hard_exit_s": 60.304,
+      "freeze_to_run_terminal_s": 65.382,
+      "hard_exit_logged_at": "2026-11-10T02:37:29.103000+00:00",
+      "hard_exit_to_run_terminal_s": 5.078,
+      "heartbeat_stale_logged_at": "2026-11-10T02:37:29.103000+00:00",
+      "log_tail": [
+        "EV {\"kind\": \"spawned\", \"role\": \"main\", \"pid\": 35, \"run\": 3, \"t\": 1794278156.009, \"v\": \"v1\", \"child_role\": \"pipeline\", \"child_pid\": 36, \"new_session\": true}",
+        "EV {\"kind\": \"spawned\", \"role\": \"main\", \"pid\": 35, \"run\": 3, \"t\": 1794278156.01, \"v\": \"v1\", \"child_role\": \"helper\", \"child_pid\": 37, \"new_session\": true}",
+        "FIRST 1794278156.036",
+        "FIRST 1794278156.036",
+        "EV {\"kind\": \"spawned\", \"role\": \"pipeline\", \"pid\": 36, \"run\": 3, \"t\": 1794278158.742, \"v\": \"v1\", \"child_role\": \"pgrand\", \"child_pid\": 277, \"new_session\": false}",
+        "FIRST 1794278158.768",
+        "EV {\"kind\": \"tick\", \"role\": \"pgrand\", \"pid\": 277, \"run\": 3, \"t\": 1794278159.508, \"v\": \"v1\", \"seq\": 0, \"tag\": \"pgrand\"}",
+        "EV {\"kind\": \"tick\", \"role\": \"pgrand\", \"pid\": 277, \"run\": 3, \"t\": 1794278170.507, \"v\": \"v1\", \"seq\": 11, \"tag\": \"pgrand\"}",
+        "EV {\"kind\": \"tick\", \"role\": \"pgrand\", \"pid\": 277, \"run\": 3, \"t\": 1794278181.506, \"v\": \"v1\", \"seq\": 22, \"tag\": \"pgrand\"}",
+        "EV {\"kind\": \"freezing\", \"role\": \"pipeline\", \"pid\": 36, \"run\": 3, \"t\": 1794278188.799, \"v\": \"v1\", \"freeze\": \"pipeline\"}",
+        "EV {\"kind\": \"heartbeat_stale\", \"role\": \"main\", \"pid\": 35, \"run\": 3, \"t\": 1794278249.103, \"v\": \"v1\", \"age_s\": 60.3}",
+        "EV {\"kind\": \"hard_exit\", \"role\": \"main\", \"pid\": 35, \"run\": 3, \"t\": 1794278249.103, \"v\": \"v1\", \"variant\": \"killpg1\", \"pipeline_pgid\": 36}"
+      ],
+      "rows_written_more_than_1s_after_run_end": {},
+      "run": 3,
+      "ticks_per_role": [
+        {
+          "first_server": "2026-11-10T02:35:58.710000+00:00",
+          "first_server_unix": 1794278158.71,
+          "last_client_unix": 1794278254.0790362,
+          "last_row_minus_run_end_s": -0.101,
+          "last_server": "2026-11-10T02:37:34.080000+00:00",
+          "last_server_unix": 1794278254.08,
+          "pid": 37,
+          "role": "helper",
+          "rows": 94
+        },
+        {
+          "first_server": "2026-11-10T02:35:58.747000+00:00",
+          "first_server_unix": 1794278158.747,
+          "last_client_unix": 1794278188.741709,
+          "last_row_minus_run_end_s": -65.438,
+          "last_server": "2026-11-10T02:36:28.743000+00:00",
+          "last_server_unix": 1794278188.743,
+          "pid": 36,
+          "role": "pipeline",
+          "rows": 4
+        },
+        {
+          "first_server": "2026-11-10T02:35:59.474000+00:00",
+          "first_server_unix": 1794278159.474,
+          "last_client_unix": 1794278188.4674854,
+          "last_row_minus_run_end_s": -65.712,
+          "last_server": "2026-11-10T02:36:28.469000+00:00",
+          "last_server_unix": 1794278188.469,
+          "pid": 277,
+          "role": "pgrand",
+          "rows": 30
+        }
+      ],
+      "timing": {
+        "created_minus_scheduled_s": 0.013,
+        "first_line_to_ended_s": 98.377,
+        "scheduled_to_first_line_s": 3.479,
+        "scheduled_to_started_s": 0.716,
+        "started_to_ended_s": 101.14,
+        "started_to_first_line_s": 2.763
+      }
+    },
+    "osexit0": {
+      "db_events": [
+        {
+          "client_unix": 1794278188.9960227,
+          "detail": {
+            "freeze": "pipeline",
+            "pgid": 35
+          },
+          "kind": "freezing",
+          "pid": 35,
+          "role": "pipeline",
+          "run_number": 2,
+          "server": "2026-11-10T02:36:28.997000+00:00",
+          "server_unix": 1794278188.997
+        }
+      ],
+      "events": [
+        {
+          "freeze": "pipeline",
+          "kind": "start",
+          "mode": "watchdog",
+          "pid": 34,
+          "role": "main",
+          "run": 2,
+          "t": 1794278156.327,
+          "v": "v1",
+          "variant": "osexit0"
+        },
+        {
+          "child_pid": 35,
+          "child_role": "pipeline",
+          "kind": "spawned",
+          "new_session": true,
+          "pid": 34,
+          "role": "main",
+          "run": 2,
+          "t": 1794278156.328,
+          "v": "v1"
+        },
+        {
+          "child_pid": 36,
+          "child_role": "helper",
+          "kind": "spawned",
+          "new_session": true,
+          "pid": 34,
+          "role": "main",
+          "run": 2,
+          "t": 1794278156.329,
+          "v": "v1"
+        },
+        {
+          "child_pid": 276,
+          "child_role": "pgrand",
+          "kind": "spawned",
+          "new_session": false,
+          "pid": 35,
+          "role": "pipeline",
+          "run": 2,
+          "t": 1794278158.967,
+          "v": "v1"
+        },
+        {
+          "kind": "tick",
+          "pid": 276,
+          "role": "pgrand",
+          "run": 2,
+          "seq": 0,
+          "t": 1794278159.718,
+          "tag": "pgrand",
+          "v": "v1"
+        },
+        {
+          "kind": "tick",
+          "pid": 276,
+          "role": "pgrand",
+          "run": 2,
+          "seq": 10,
+          "t": 1794278169.719,
+          "tag": "pgrand",
+          "v": "v1"
+        },
+        {
+          "kind": "tick",
+          "pid": 276,
+          "role": "pgrand",
+          "run": 2,
+          "seq": 21,
+          "t": 1794278180.721,
+          "tag": "pgrand",
+          "v": "v1"
+        },
+        {
+          "freeze": "pipeline",
+          "kind": "freezing",
+          "pid": 35,
+          "role": "pipeline",
+          "run": 2,
+          "t": 1794278189.019,
+          "v": "v1"
+        },
+        {
+          "age_s": 60.4,
+          "kind": "heartbeat_stale",
+          "pid": 34,
+          "role": "main",
+          "run": 2,
+          "t": 1794278249.361,
+          "v": "v1"
+        },
+        {
+          "kind": "hard_exit",
+          "pid": 34,
+          "pipeline_pgid": 35,
+          "role": "main",
+          "run": 2,
+          "t": 1794278249.361,
+          "v": "v1",
+          "variant": "osexit0"
+        }
+      ],
+      "final": {
+        "cancelled_at": null,
+        "created_at": "2026-11-10T02:35:51.753+00:00",
+        "ended_at": "2026-11-10T02:37:34.441+00:00",
+        "exit_code": 0,
+        "flight_version": 1,
+        "is_scheduled": false,
+        "run_number": 2,
+        "scheduled_at": "2026-11-10T02:35:51.741+00:00",
+        "started_at": "2026-11-10T02:35:51.991+00:00",
+        "state": "SUCCEEDED"
+      },
+      "freeze_at": "2026-11-10T02:36:29.019000+00:00",
+      "freeze_to_hard_exit_s": 60.342,
+      "freeze_to_run_terminal_s": 65.422,
+      "hard_exit_logged_at": "2026-11-10T02:37:29.361000+00:00",
+      "hard_exit_to_run_terminal_s": 5.08,
+      "heartbeat_stale_logged_at": "2026-11-10T02:37:29.361000+00:00",
+      "log_tail": [
+        "EV {\"kind\": \"spawned\", \"role\": \"main\", \"pid\": 34, \"run\": 2, \"t\": 1794278156.328, \"v\": \"v1\", \"child_role\": \"pipeline\", \"child_pid\": 35, \"new_session\": true}",
+        "EV {\"kind\": \"spawned\", \"role\": \"main\", \"pid\": 34, \"run\": 2, \"t\": 1794278156.329, \"v\": \"v1\", \"child_role\": \"helper\", \"child_pid\": 36, \"new_session\": true}",
+        "FIRST 1794278156.356",
+        "FIRST 1794278156.356",
+        "EV {\"kind\": \"spawned\", \"role\": \"pipeline\", \"pid\": 35, \"run\": 2, \"t\": 1794278158.967, \"v\": \"v1\", \"child_role\": \"pgrand\", \"child_pid\": 276, \"new_session\": false}",
+        "FIRST 1794278158.995",
+        "EV {\"kind\": \"tick\", \"role\": \"pgrand\", \"pid\": 276, \"run\": 2, \"t\": 1794278159.718, \"v\": \"v1\", \"seq\": 0, \"tag\": \"pgrand\"}",
+        "EV {\"kind\": \"tick\", \"role\": \"pgrand\", \"pid\": 276, \"run\": 2, \"t\": 1794278169.719, \"v\": \"v1\", \"seq\": 10, \"tag\": \"pgrand\"}",
+        "EV {\"kind\": \"tick\", \"role\": \"pgrand\", \"pid\": 276, \"run\": 2, \"t\": 1794278180.721, \"v\": \"v1\", \"seq\": 21, \"tag\": \"pgrand\"}",
+        "EV {\"kind\": \"freezing\", \"role\": \"pipeline\", \"pid\": 35, \"run\": 2, \"t\": 1794278189.019, \"v\": \"v1\", \"freeze\": \"pipeline\"}",
+        "EV {\"kind\": \"heartbeat_stale\", \"role\": \"main\", \"pid\": 34, \"run\": 2, \"t\": 1794278249.361, \"v\": \"v1\", \"age_s\": 60.4}",
+        "EV {\"kind\": \"hard_exit\", \"role\": \"main\", \"pid\": 34, \"run\": 2, \"t\": 1794278249.361, \"v\": \"v1\", \"variant\": \"osexit0\", \"pipeline_pgid\": 35}"
+      ],
+      "rows_written_more_than_1s_after_run_end": {},
+      "run": 2,
+      "ticks_per_role": [
+        {
+          "first_server": "2026-11-10T02:35:58.993000+00:00",
+          "first_server_unix": 1794278158.993,
+          "last_client_unix": 1794278188.9676528,
+          "last_row_minus_run_end_s": -65.472,
+          "last_server": "2026-11-10T02:36:28.969000+00:00",
+          "last_server_unix": 1794278188.969,
+          "pid": 35,
+          "role": "pipeline",
+          "rows": 4
+        },
+        {
+          "first_server": "2026-11-10T02:35:58.996000+00:00",
+          "first_server_unix": 1794278158.996,
+          "last_client_unix": 1794278254.3293257,
+          "last_row_minus_run_end_s": -0.11,
+          "last_server": "2026-11-10T02:37:34.331000+00:00",
+          "last_server_unix": 1794278254.331,
+          "pid": 36,
+          "role": "helper",
+          "rows": 94
+        },
+        {
+          "first_server": "2026-11-10T02:35:59.687000+00:00",
+          "first_server_unix": 1794278159.687,
+          "last_client_unix": 1794278188.6813076,
+          "last_row_minus_run_end_s": -65.758,
+          "last_server": "2026-11-10T02:36:28.683000+00:00",
+          "last_server_unix": 1794278188.683,
+          "pid": 276,
+          "role": "pgrand",
+          "rows": 30
+        }
+      ],
+      "timing": {
+        "created_minus_scheduled_s": 0.012,
+        "first_line_to_ended_s": 98.32,
+        "scheduled_to_first_line_s": 4.38,
+        "scheduled_to_started_s": 0.25,
+        "started_to_ended_s": 102.45,
+        "started_to_first_line_s": 4.13
+      }
+    },
+    "osexit1": {
+      "db_events": [
+        {
+          "client_unix": 1794278187.0223904,
+          "detail": {
+            "freeze": "pipeline",
+            "pgid": 36
+          },
+          "kind": "freezing",
+          "pid": 36,
+          "role": "pipeline",
+          "run_number": 1,
+          "server": "2026-11-10T02:36:27.024000+00:00",
+          "server_unix": 1794278187.024
+        }
+      ],
+      "events": [
+        {
+          "freeze": "pipeline",
+          "kind": "start",
+          "mode": "watchdog",
+          "pid": 35,
+          "role": "main",
+          "run": 1,
+          "t": 1794278154.405,
+          "v": "v1",
+          "variant": "osexit1"
+        },
+        {
+          "child_pid": 36,
+          "child_role": "pipeline",
+          "kind": "spawned",
+          "new_session": true,
+          "pid": 35,
+          "role": "main",
+          "run": 1,
+          "t": 1794278154.406,
+          "v": "v1"
+        },
+        {
+          "child_pid": 37,
+          "child_role": "helper",
+          "kind": "spawned",
+          "new_session": true,
+          "pid": 35,
+          "role": "main",
+          "run": 1,
+          "t": 1794278154.407,
+          "v": "v1"
+        },
+        {
+          "child_pid": 276,
+          "child_role": "pgrand",
+          "kind": "spawned",
+          "new_session": false,
+          "pid": 36,
+          "role": "pipeline",
+          "run": 1,
+          "t": 1794278156.998,
+          "v": "v1"
+        },
+        {
+          "kind": "tick",
+          "pid": 276,
+          "role": "pgrand",
+          "run": 1,
+          "seq": 0,
+          "t": 1794278157.778,
+          "tag": "pgrand",
+          "v": "v1"
+        },
+        {
+          "kind": "tick",
+          "pid": 276,
+          "role": "pgrand",
+          "run": 1,
+          "seq": 11,
+          "t": 1794278168.769,
+          "tag": "pgrand",
+          "v": "v1"
+        },
+        {
+          "kind": "tick",
+          "pid": 276,
+          "role": "pgrand",
+          "run": 1,
+          "seq": 22,
+          "t": 1794278179.766,
+          "tag": "pgrand",
+          "v": "v1"
+        },
+        {
+          "freeze": "pipeline",
+          "kind": "freezing",
+          "pid": 36,
+          "role": "pipeline",
+          "run": 1,
+          "t": 1794278187.044,
+          "v": "v1"
+        },
+        {
+          "age_s": 60.5,
+          "kind": "heartbeat_stale",
+          "pid": 35,
+          "role": "main",
+          "run": 1,
+          "t": 1794278247.543,
+          "v": "v1"
+        },
+        {
+          "kind": "hard_exit",
+          "pid": 35,
+          "pipeline_pgid": 36,
+          "role": "main",
+          "run": 1,
+          "t": 1794278247.544,
+          "v": "v1",
+          "variant": "osexit1"
+        }
+      ],
+      "final": {
+        "cancelled_at": null,
+        "created_at": "2026-11-10T02:35:51.115+00:00",
+        "ended_at": "2026-11-10T02:37:32.624+00:00",
+        "exit_code": 1,
+        "flight_version": 1,
+        "is_scheduled": false,
+        "run_number": 1,
+        "scheduled_at": "2026-11-10T02:35:51.101+00:00",
+        "started_at": "2026-11-10T02:35:52.168+00:00",
+        "state": "FAILED"
+      },
+      "freeze_at": "2026-11-10T02:36:27.044000+00:00",
+      "freeze_to_hard_exit_s": 60.5,
+      "freeze_to_run_terminal_s": 65.58,
+      "hard_exit_logged_at": "2026-11-10T02:37:27.544000+00:00",
+      "hard_exit_to_run_terminal_s": 5.08,
+      "heartbeat_stale_logged_at": "2026-11-10T02:37:27.543000+00:00",
+      "log_tail": [
+        "EV {\"kind\": \"spawned\", \"role\": \"main\", \"pid\": 35, \"run\": 1, \"t\": 1794278154.406, \"v\": \"v1\", \"child_role\": \"pipeline\", \"child_pid\": 36, \"new_session\": true}",
+        "EV {\"kind\": \"spawned\", \"role\": \"main\", \"pid\": 35, \"run\": 1, \"t\": 1794278154.407, \"v\": \"v1\", \"child_role\": \"helper\", \"child_pid\": 37, \"new_session\": true}",
+        "FIRST 1794278154.433",
+        "FIRST 1794278154.433",
+        "EV {\"kind\": \"spawned\", \"role\": \"pipeline\", \"pid\": 36, \"run\": 1, \"t\": 1794278156.998, \"v\": \"v1\", \"child_role\": \"pgrand\", \"child_pid\": 276, \"new_session\": false}",
+        "FIRST 1794278157.033",
+        "EV {\"kind\": \"tick\", \"role\": \"pgrand\", \"pid\": 276, \"run\": 1, \"t\": 1794278157.778, \"v\": \"v1\", \"seq\": 0, \"tag\": \"pgrand\"}",
+        "EV {\"kind\": \"tick\", \"role\": \"pgrand\", \"pid\": 276, \"run\": 1, \"t\": 1794278168.769, \"v\": \"v1\", \"seq\": 11, \"tag\": \"pgrand\"}",
+        "EV {\"kind\": \"tick\", \"role\": \"pgrand\", \"pid\": 276, \"run\": 1, \"t\": 1794278179.766, \"v\": \"v1\", \"seq\": 22, \"tag\": \"pgrand\"}",
+        "EV {\"kind\": \"freezing\", \"role\": \"pipeline\", \"pid\": 36, \"run\": 1, \"t\": 1794278187.044, \"v\": \"v1\", \"freeze\": \"pipeline\"}",
+        "EV {\"kind\": \"heartbeat_stale\", \"role\": \"main\", \"pid\": 35, \"run\": 1, \"t\": 1794278247.543, \"v\": \"v1\", \"age_s\": 60.5}",
+        "EV {\"kind\": \"hard_exit\", \"role\": \"main\", \"pid\": 35, \"run\": 1, \"t\": 1794278247.544, \"v\": \"v1\", \"variant\": \"osexit1\", \"pipeline_pgid\": 36}"
+      ],
+      "rows_written_more_than_1s_after_run_end": {},
+      "run": 1,
+      "ticks_per_role": [
+        {
+          "first_server": "2026-11-10T02:35:57.030000+00:00",
+          "first_server_unix": 1794278157.03,
+          "last_client_unix": 1794278186.9982512,
+          "last_row_minus_run_end_s": -65.624,
+          "last_server": "2026-11-10T02:36:27+00:00",
+          "last_server_unix": 1794278187.0,
+          "pid": 36,
+          "role": "pipeline",
+          "rows": 4
+        },
+        {
+          "first_server": "2026-11-10T02:35:57.030000+00:00",
+          "first_server_unix": 1794278157.03,
+          "last_client_unix": 1794278251.7526686,
+          "last_row_minus_run_end_s": -0.87,
+          "last_server": "2026-11-10T02:37:31.754000+00:00",
+          "last_server_unix": 1794278251.754,
+          "pid": 37,
+          "role": "helper",
+          "rows": 93
+        },
+        {
+          "first_server": "2026-11-10T02:35:57.736000+00:00",
+          "first_server_unix": 1794278157.736,
+          "last_client_unix": 1794278186.730665,
+          "last_row_minus_run_end_s": -65.892,
+          "last_server": "2026-11-10T02:36:26.732000+00:00",
+          "last_server_unix": 1794278186.732,
+          "pid": 276,
+          "role": "pgrand",
+          "rows": 30
+        }
+      ],
+      "timing": {
+        "created_minus_scheduled_s": 0.014,
+        "first_line_to_ended_s": 98.431,
+        "scheduled_to_first_line_s": 3.092,
+        "scheduled_to_started_s": 1.067,
+        "started_to_ended_s": 100.456,
+        "started_to_first_line_s": 2.025
+      }
+    }
+  }
+}

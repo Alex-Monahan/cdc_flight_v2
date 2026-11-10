@@ -1,0 +1,79 @@
+{
+  "database": "cdc_v2_spike_runs_clock",
+  "dropped": true,
+  "left": [],
+  "methods": {
+    "duckdb_default_now": {
+      "statement_round_trip_s": {
+        "max": 0.19,
+        "mean": 0.113,
+        "median": 0.105,
+        "min": 0.098,
+        "n": 10,
+        "p95": 0.19
+      },
+      "stored_minus_client_clock_s": {
+        "max": 0.004,
+        "mean": 0.001,
+        "median": 0.001,
+        "min": 0.0,
+        "n": 10,
+        "p95": 0.004
+      }
+    },
+    "duckdb_get_current_timestamp": {
+      "statement_round_trip_s": {
+        "max": 0.157,
+        "mean": 0.106,
+        "median": 0.098,
+        "min": 0.092,
+        "n": 10,
+        "p95": 0.157
+      },
+      "stored_minus_client_clock_s": {
+        "max": 0.001,
+        "mean": -0.0,
+        "median": -0.0,
+        "min": -0.001,
+        "n": 10,
+        "p95": 0.001
+      }
+    },
+    "duckdb_values_now": {
+      "statement_round_trip_s": {
+        "max": 0.701,
+        "mean": 0.198,
+        "median": 0.104,
+        "min": 0.094,
+        "n": 10,
+        "p95": 0.701
+      },
+      "stored_minus_client_clock_s": {
+        "max": 0.005,
+        "mean": 0.001,
+        "median": 0.001,
+        "min": -0.0,
+        "n": 10,
+        "p95": 0.005
+      }
+    },
+    "pgwire_now": {
+      "statement_round_trip_s": {
+        "max": 0.623,
+        "mean": 0.205,
+        "median": 0.136,
+        "min": 0.096,
+        "n": 10,
+        "p95": 0.623
+      },
+      "stored_minus_client_clock_s": {
+        "max": 0.077,
+        "mean": 0.067,
+        "median": 0.066,
+        "min": 0.065,
+        "n": 10,
+        "p95": 0.077
+      }
+    }
+  }
+}

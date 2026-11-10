@@ -1,0 +1,493 @@
+{
+  "flight": "cdc_v2_spike_runs_guard_pg",
+  "observations": [
+    {
+      "at": "2026-11-10T02:48:40.411962+00:00",
+      "list_first_two": [
+        [
+          22,
+          "SUCCEEDED"
+        ],
+        [
+          21,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": "error: Catalog Error: Run 23 does not exist for Flight \"b1a5b67e-40eb-43bc-b8d4-d06fc22c7aeb\"",
+      "next_run_in_list": false,
+      "next_run_number": 23
+    },
+    {
+      "at": "2026-11-10T02:48:44.356441+00:00",
+      "list_first_two": [
+        [
+          22,
+          "SUCCEEDED"
+        ],
+        [
+          21,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": "error: Catalog Error: Run 23 does not exist for Flight \"b1a5b67e-40eb-43bc-b8d4-d06fc22c7aeb\"",
+      "next_run_in_list": false,
+      "next_run_number": 23
+    },
+    {
+      "at": "2026-11-10T02:48:48.174570+00:00",
+      "list_first_two": [
+        [
+          22,
+          "SUCCEEDED"
+        ],
+        [
+          21,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": "error: Catalog Error: Run 23 does not exist for Flight \"b1a5b67e-40eb-43bc-b8d4-d06fc22c7aeb\"",
+      "next_run_in_list": false,
+      "next_run_number": 23
+    },
+    {
+      "at": "2026-11-10T02:48:51.976311+00:00",
+      "list_first_two": [
+        [
+          22,
+          "SUCCEEDED"
+        ],
+        [
+          21,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": "error: Catalog Error: Run 23 does not exist for Flight \"b1a5b67e-40eb-43bc-b8d4-d06fc22c7aeb\"",
+      "next_run_in_list": false,
+      "next_run_number": 23
+    },
+    {
+      "at": "2026-11-10T02:48:55.808714+00:00",
+      "list_first_two": [
+        [
+          22,
+          "SUCCEEDED"
+        ],
+        [
+          21,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": "error: Catalog Error: Run 23 does not exist for Flight \"b1a5b67e-40eb-43bc-b8d4-d06fc22c7aeb\"",
+      "next_run_in_list": false,
+      "next_run_number": 23
+    },
+    {
+      "at": "2026-11-10T02:48:59.559089+00:00",
+      "list_first_two": [
+        [
+          22,
+          "SUCCEEDED"
+        ],
+        [
+          21,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": "error: Catalog Error: Run 23 does not exist for Flight \"b1a5b67e-40eb-43bc-b8d4-d06fc22c7aeb\"",
+      "next_run_in_list": false,
+      "next_run_number": 23
+    },
+    {
+      "at": "2026-11-10T02:49:03.378306+00:00",
+      "list_first_two": [
+        [
+          23,
+          "RUNNING"
+        ],
+        [
+          22,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": [
+        {
+          "created_at": "2026-11-10T02:48:39.261+00:00",
+          "is_scheduled": true,
+          "run_number": 23,
+          "scheduled_at": "2026-11-10T02:49:00+00:00",
+          "state": "RUNNING"
+        }
+      ],
+      "next_run_in_list": true,
+      "next_run_number": 23
+    },
+    {
+      "at": "2026-11-10T02:49:06.000046+00:00",
+      "list_first_two": [
+        [
+          23,
+          "SUCCEEDED"
+        ],
+        [
+          22,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": [
+        {
+          "created_at": "2026-11-10T02:48:39.261+00:00",
+          "is_scheduled": true,
+          "run_number": 23,
+          "scheduled_at": "2026-11-10T02:49:00+00:00",
+          "state": "SUCCEEDED"
+        }
+      ],
+      "next_run_in_list": true,
+      "next_run_number": 23
+    },
+    {
+      "at": "2026-11-10T02:49:08.617966+00:00",
+      "list_first_two": [
+        [
+          23,
+          "SUCCEEDED"
+        ],
+        [
+          22,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": [
+        {
+          "created_at": "2026-11-10T02:48:39.261+00:00",
+          "is_scheduled": true,
+          "run_number": 23,
+          "scheduled_at": "2026-11-10T02:49:00+00:00",
+          "state": "SUCCEEDED"
+        }
+      ],
+      "next_run_in_list": true,
+      "next_run_number": 23
+    },
+    {
+      "at": "2026-11-10T02:49:11.237243+00:00",
+      "list_first_two": [
+        [
+          23,
+          "SUCCEEDED"
+        ],
+        [
+          22,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": [
+        {
+          "created_at": "2026-11-10T02:48:39.261+00:00",
+          "is_scheduled": true,
+          "run_number": 23,
+          "scheduled_at": "2026-11-10T02:49:00+00:00",
+          "state": "SUCCEEDED"
+        }
+      ],
+      "next_run_in_list": true,
+      "next_run_number": 23
+    },
+    {
+      "at": "2026-11-10T02:49:14.060516+00:00",
+      "list_first_two": [
+        [
+          23,
+          "SUCCEEDED"
+        ],
+        [
+          22,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": [
+        {
+          "created_at": "2026-11-10T02:48:39.261+00:00",
+          "is_scheduled": true,
+          "run_number": 23,
+          "scheduled_at": "2026-11-10T02:49:00+00:00",
+          "state": "SUCCEEDED"
+        }
+      ],
+      "next_run_in_list": true,
+      "next_run_number": 23
+    },
+    {
+      "at": "2026-11-10T02:49:16.561392+00:00",
+      "list_first_two": [
+        [
+          23,
+          "SUCCEEDED"
+        ],
+        [
+          22,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": [
+        {
+          "created_at": "2026-11-10T02:48:39.261+00:00",
+          "is_scheduled": true,
+          "run_number": 23,
+          "scheduled_at": "2026-11-10T02:49:00+00:00",
+          "state": "SUCCEEDED"
+        }
+      ],
+      "next_run_in_list": true,
+      "next_run_number": 23
+    },
+    {
+      "at": "2026-11-10T02:49:40.403970+00:00",
+      "list_first_two": [
+        [
+          23,
+          "SUCCEEDED"
+        ],
+        [
+          22,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": "error: Catalog Error: Run 24 does not exist for Flight \"b1a5b67e-40eb-43bc-b8d4-d06fc22c7aeb\"",
+      "next_run_in_list": false,
+      "next_run_number": 24
+    },
+    {
+      "at": "2026-11-10T02:49:44.116674+00:00",
+      "list_first_two": [
+        [
+          23,
+          "SUCCEEDED"
+        ],
+        [
+          22,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": "error: Catalog Error: Run 24 does not exist for Flight \"b1a5b67e-40eb-43bc-b8d4-d06fc22c7aeb\"",
+      "next_run_in_list": false,
+      "next_run_number": 24
+    },
+    {
+      "at": "2026-11-10T02:49:47.802771+00:00",
+      "list_first_two": [
+        [
+          23,
+          "SUCCEEDED"
+        ],
+        [
+          22,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": "error: Catalog Error: Run 24 does not exist for Flight \"b1a5b67e-40eb-43bc-b8d4-d06fc22c7aeb\"",
+      "next_run_in_list": false,
+      "next_run_number": 24
+    },
+    {
+      "at": "2026-11-10T02:49:51.613041+00:00",
+      "list_first_two": [
+        [
+          23,
+          "SUCCEEDED"
+        ],
+        [
+          22,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": "error: Catalog Error: Run 24 does not exist for Flight \"b1a5b67e-40eb-43bc-b8d4-d06fc22c7aeb\"",
+      "next_run_in_list": false,
+      "next_run_number": 24
+    },
+    {
+      "at": "2026-11-10T02:49:55.390554+00:00",
+      "list_first_two": [
+        [
+          23,
+          "SUCCEEDED"
+        ],
+        [
+          22,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": "error: Catalog Error: Run 24 does not exist for Flight \"b1a5b67e-40eb-43bc-b8d4-d06fc22c7aeb\"",
+      "next_run_in_list": false,
+      "next_run_number": 24
+    },
+    {
+      "at": "2026-11-10T02:49:59.093937+00:00",
+      "list_first_two": [
+        [
+          23,
+          "SUCCEEDED"
+        ],
+        [
+          22,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": [
+        {
+          "created_at": "2026-11-10T02:49:40.564+00:00",
+          "is_scheduled": true,
+          "run_number": 24,
+          "scheduled_at": "2026-11-10T02:50:00+00:00",
+          "state": "PENDING"
+        }
+      ],
+      "next_run_in_list": false,
+      "next_run_number": 24
+    },
+    {
+      "at": "2026-11-10T02:50:02.728270+00:00",
+      "list_first_two": [
+        [
+          24,
+          "SUCCEEDED"
+        ],
+        [
+          23,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": [
+        {
+          "created_at": "2026-11-10T02:49:40.564+00:00",
+          "is_scheduled": true,
+          "run_number": 24,
+          "scheduled_at": "2026-11-10T02:50:00+00:00",
+          "state": "SUCCEEDED"
+        }
+      ],
+      "next_run_in_list": true,
+      "next_run_number": 24
+    },
+    {
+      "at": "2026-11-10T02:50:05.319939+00:00",
+      "list_first_two": [
+        [
+          24,
+          "SUCCEEDED"
+        ],
+        [
+          23,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": [
+        {
+          "created_at": "2026-11-10T02:49:40.564+00:00",
+          "is_scheduled": true,
+          "run_number": 24,
+          "scheduled_at": "2026-11-10T02:50:00+00:00",
+          "state": "SUCCEEDED"
+        }
+      ],
+      "next_run_in_list": true,
+      "next_run_number": 24
+    },
+    {
+      "at": "2026-11-10T02:50:07.888199+00:00",
+      "list_first_two": [
+        [
+          24,
+          "SUCCEEDED"
+        ],
+        [
+          23,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": [
+        {
+          "created_at": "2026-11-10T02:49:40.564+00:00",
+          "is_scheduled": true,
+          "run_number": 24,
+          "scheduled_at": "2026-11-10T02:50:00+00:00",
+          "state": "SUCCEEDED"
+        }
+      ],
+      "next_run_in_list": true,
+      "next_run_number": 24
+    },
+    {
+      "at": "2026-11-10T02:50:10.538831+00:00",
+      "list_first_two": [
+        [
+          24,
+          "SUCCEEDED"
+        ],
+        [
+          23,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": [
+        {
+          "created_at": "2026-11-10T02:49:40.564+00:00",
+          "is_scheduled": true,
+          "run_number": 24,
+          "scheduled_at": "2026-11-10T02:50:00+00:00",
+          "state": "SUCCEEDED"
+        }
+      ],
+      "next_run_in_list": true,
+      "next_run_number": 24
+    },
+    {
+      "at": "2026-11-10T02:50:13.252035+00:00",
+      "list_first_two": [
+        [
+          24,
+          "SUCCEEDED"
+        ],
+        [
+          23,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": [
+        {
+          "created_at": "2026-11-10T02:49:40.564+00:00",
+          "is_scheduled": true,
+          "run_number": 24,
+          "scheduled_at": "2026-11-10T02:50:00+00:00",
+          "state": "SUCCEEDED"
+        }
+      ],
+      "next_run_in_list": true,
+      "next_run_number": 24
+    },
+    {
+      "at": "2026-11-10T02:50:15.756866+00:00",
+      "list_first_two": [
+        [
+          24,
+          "SUCCEEDED"
+        ],
+        [
+          23,
+          "SUCCEEDED"
+        ]
+      ],
+      "md_get_flight_run_next": [
+        {
+          "created_at": "2026-11-10T02:49:40.564+00:00",
+          "is_scheduled": true,
+          "run_number": 24,
+          "scheduled_at": "2026-11-10T02:50:00+00:00",
+          "state": "SUCCEEDED"
+        }
+      ],
+      "next_run_in_list": true,
+      "next_run_number": 24
+    }
+  ]
+}

@@ -1,0 +1,967 @@
+{
+  "benign_config": {
+    "CDC_V2_RUNS_LEADER_END": "release",
+    "CDC_V2_RUNS_LEAD_S": "100",
+    "CDC_V2_RUNS_MODE": "leader",
+    "CDC_V2_RUNS_RELEASE_BEFORE_S": "5",
+    "CDC_V2_RUNS_STALE_S": "60",
+    "CDC_V2_RUNS_WD_EXIT": "killpg1"
+  },
+  "events": [
+    {
+      "client_unix": 1794278347.0888834,
+      "detail": {
+        "epoch": 1,
+        "prev": {
+          "age_ms": 3644720,
+          "epoch": 0,
+          "run_number": 0,
+          "state": "released"
+        }
+      },
+      "kind": "takeover",
+      "pid": 35,
+      "role": "main",
+      "run_number": 1,
+      "server": "2026-11-10T02:39:07.123000+00:00",
+      "server_unix": 1794278347.123
+    },
+    {
+      "client_unix": 1794278347.938467,
+      "detail": {
+        "end": "release",
+        "epoch": 1
+      },
+      "kind": "leading",
+      "pid": 157,
+      "role": "pipeline",
+      "run_number": 1,
+      "server": "2026-11-10T02:39:07.945000+00:00",
+      "server_unix": 1794278347.945
+    },
+    {
+      "client_unix": 1794278408.956783,
+      "detail": {
+        "age_ms": 857,
+        "epoch": 1,
+        "run_number": 1,
+        "state": "leading"
+      },
+      "kind": "guard_exit_healthy",
+      "pid": 37,
+      "role": "main",
+      "run_number": 2,
+      "server": "2026-11-10T02:40:08.986000+00:00",
+      "server_unix": 1794278408.986
+    },
+    {
+      "client_unix": 1794278455.0207114,
+      "detail": {
+        "epoch": 1
+      },
+      "kind": "released",
+      "pid": 157,
+      "role": "pipeline",
+      "run_number": 1,
+      "server": "2026-11-10T02:40:55.022000+00:00",
+      "server_unix": 1794278455.022
+    },
+    {
+      "client_unix": 1794278467.391743,
+      "detail": {
+        "epoch": 2,
+        "prev": {
+          "age_ms": 12359,
+          "epoch": 1,
+          "run_number": 1,
+          "state": "released"
+        }
+      },
+      "kind": "takeover",
+      "pid": 34,
+      "role": "main",
+      "run_number": 3,
+      "server": "2026-11-10T02:41:07.416000+00:00",
+      "server_unix": 1794278467.416
+    },
+    {
+      "client_unix": 1794278468.195722,
+      "detail": {
+        "end": "release",
+        "epoch": 2
+      },
+      "kind": "leading",
+      "pid": 155,
+      "role": "pipeline",
+      "run_number": 3,
+      "server": "2026-11-10T02:41:08.203000+00:00",
+      "server_unix": 1794278468.203
+    },
+    {
+      "client_unix": 1794278525.7692184,
+      "detail": {
+        "age_ms": 7433,
+        "epoch": 2,
+        "run_number": 3,
+        "state": "leading"
+      },
+      "kind": "guard_exit_healthy",
+      "pid": 35,
+      "role": "main",
+      "run_number": 4,
+      "server": "2026-11-10T02:42:05.797000+00:00",
+      "server_unix": 1794278525.797
+    },
+    {
+      "client_unix": 1794278575.0191748,
+      "detail": {
+        "epoch": 2
+      },
+      "kind": "released",
+      "pid": 155,
+      "role": "pipeline",
+      "run_number": 3,
+      "server": "2026-11-10T02:42:55.020000+00:00",
+      "server_unix": 1794278575.02
+    },
+    {
+      "client_unix": 1794278585.4408193,
+      "detail": {
+        "epoch": 3,
+        "prev": {
+          "age_ms": 10400,
+          "epoch": 2,
+          "run_number": 3,
+          "state": "released"
+        }
+      },
+      "kind": "takeover",
+      "pid": 35,
+      "role": "main",
+      "run_number": 5,
+      "server": "2026-11-10T02:43:05.468000+00:00",
+      "server_unix": 1794278585.468
+    },
+    {
+      "client_unix": 1794278586.3366473,
+      "detail": {
+        "end": "release",
+        "epoch": 3
+      },
+      "kind": "leading",
+      "pid": 156,
+      "role": "pipeline",
+      "run_number": 5,
+      "server": "2026-11-10T02:43:06.344000+00:00",
+      "server_unix": 1794278586.344
+    },
+    {
+      "client_unix": 1794278646.991228,
+      "detail": {
+        "age_ms": 491,
+        "epoch": 3,
+        "run_number": 5,
+        "state": "leading"
+      },
+      "kind": "guard_exit_healthy",
+      "pid": 36,
+      "role": "main",
+      "run_number": 6,
+      "server": "2026-11-10T02:44:07.016000+00:00",
+      "server_unix": 1794278647.016
+    },
+    {
+      "client_unix": 1794278695.021777,
+      "detail": {
+        "epoch": 3
+      },
+      "kind": "released",
+      "pid": 156,
+      "role": "pipeline",
+      "run_number": 5,
+      "server": "2026-11-10T02:44:55.024000+00:00",
+      "server_unix": 1794278695.024
+    },
+    {
+      "client_unix": 1794278710.2829916,
+      "detail": {
+        "epoch": 4,
+        "prev": {
+          "age_ms": 15248,
+          "epoch": 3,
+          "run_number": 5,
+          "state": "released"
+        }
+      },
+      "kind": "takeover",
+      "pid": 38,
+      "role": "main",
+      "run_number": 7,
+      "server": "2026-11-10T02:45:10.309000+00:00",
+      "server_unix": 1794278710.309
+    },
+    {
+      "client_unix": 1794278711.2108967,
+      "detail": {
+        "end": "release",
+        "epoch": 4
+      },
+      "kind": "leading",
+      "pid": 160,
+      "role": "pipeline",
+      "run_number": 7,
+      "server": "2026-11-10T02:45:11.218000+00:00",
+      "server_unix": 1794278711.218
+    },
+    {
+      "client_unix": 1794278766.9581592,
+      "detail": {
+        "age_ms": 5618,
+        "epoch": 4,
+        "run_number": 7,
+        "state": "leading"
+      },
+      "kind": "guard_exit_healthy",
+      "pid": 35,
+      "role": "main",
+      "run_number": 8,
+      "server": "2026-11-10T02:46:06.982000+00:00",
+      "server_unix": 1794278766.982
+    },
+    {
+      "client_unix": 1794278815.0170166,
+      "detail": {
+        "epoch": 4
+      },
+      "kind": "released",
+      "pid": 160,
+      "role": "pipeline",
+      "run_number": 7,
+      "server": "2026-11-10T02:46:55.018000+00:00",
+      "server_unix": 1794278815.018
+    },
+    {
+      "client_unix": 1794278825.8143096,
+      "detail": {
+        "epoch": 5,
+        "prev": {
+          "age_ms": 10785,
+          "epoch": 4,
+          "run_number": 7,
+          "state": "released"
+        }
+      },
+      "kind": "takeover",
+      "pid": 35,
+      "role": "main",
+      "run_number": 9,
+      "server": "2026-11-10T02:47:05.839000+00:00",
+      "server_unix": 1794278825.839
+    },
+    {
+      "client_unix": 1794278826.6031766,
+      "detail": {
+        "end": "run",
+        "epoch": 5
+      },
+      "kind": "leading",
+      "pid": 157,
+      "role": "pipeline",
+      "run_number": 9,
+      "server": "2026-11-10T02:47:06.609000+00:00",
+      "server_unix": 1794278826.609
+    },
+    {
+      "client_unix": 1794278886.7144902,
+      "detail": {
+        "epoch": 6,
+        "prev": {
+          "age_ms": 50044,
+          "epoch": 5,
+          "run_number": 9,
+          "state": "leading"
+        }
+      },
+      "kind": "takeover",
+      "pid": 35,
+      "role": "main",
+      "run_number": 10,
+      "server": "2026-11-10T02:48:06.739000+00:00",
+      "server_unix": 1794278886.739
+    },
+    {
+      "client_unix": 1794278886.9597476,
+      "detail": {
+        "run_number": 9,
+        "status": "CANCELLED"
+      },
+      "kind": "previous_not_running",
+      "pid": 35,
+      "role": "main",
+      "run_number": 10,
+      "server": "2026-11-10T02:48:06.962000+00:00",
+      "server_unix": 1794278886.962
+    },
+    {
+      "client_unix": 1794278887.7622435,
+      "detail": {
+        "end": "release",
+        "epoch": 6
+      },
+      "kind": "leading",
+      "pid": 156,
+      "role": "pipeline",
+      "run_number": 10,
+      "server": "2026-11-10T02:48:07.768000+00:00",
+      "server_unix": 1794278887.768
+    },
+    {
+      "client_unix": 1794278946.565465,
+      "detail": {
+        "age_ms": 8680,
+        "epoch": 6,
+        "run_number": 10,
+        "state": "leading"
+      },
+      "kind": "guard_exit_healthy",
+      "pid": 35,
+      "role": "main",
+      "run_number": 11,
+      "server": "2026-11-10T02:49:06.589000+00:00",
+      "server_unix": 1794278946.589
+    },
+    {
+      "client_unix": 1794278995.0171275,
+      "detail": {
+        "epoch": 6
+      },
+      "kind": "released",
+      "pid": 156,
+      "role": "pipeline",
+      "run_number": 10,
+      "server": "2026-11-10T02:49:55.018000+00:00",
+      "server_unix": 1794278995.018
+    },
+    {
+      "client_unix": 1794279008.1113815,
+      "detail": {
+        "epoch": 7,
+        "prev": {
+          "age_ms": 13082,
+          "epoch": 6,
+          "run_number": 10,
+          "state": "released"
+        }
+      },
+      "kind": "takeover",
+      "pid": 35,
+      "role": "main",
+      "run_number": 12,
+      "server": "2026-11-10T02:50:08.138000+00:00",
+      "server_unix": 1794279008.138
+    },
+    {
+      "client_unix": 1794279009.0476034,
+      "detail": {
+        "end": "die_child",
+        "epoch": 7
+      },
+      "kind": "leading",
+      "pid": 157,
+      "role": "pipeline",
+      "run_number": 12,
+      "server": "2026-11-10T02:50:09.054000+00:00",
+      "server_unix": 1794279009.054
+    },
+    {
+      "client_unix": 1794279049.0656478,
+      "detail": {
+        "epoch": 7
+      },
+      "kind": "pipeline_sigkill_self",
+      "pid": 157,
+      "role": "pipeline",
+      "run_number": 12,
+      "server": "2026-11-10T02:50:49.067000+00:00",
+      "server_unix": 1794279049.067
+    },
+    {
+      "client_unix": 1794279064.7458785,
+      "detail": {
+        "age_ms": 15687,
+        "epoch": 7,
+        "run_number": 12,
+        "state": "leading"
+      },
+      "kind": "guard_exit_healthy",
+      "pid": 35,
+      "role": "main",
+      "run_number": 13,
+      "server": "2026-11-10T02:51:04.773000+00:00",
+      "server_unix": 1794279064.773
+    },
+    {
+      "client_unix": 1794279125.867207,
+      "detail": {
+        "epoch": 8,
+        "prev": {
+          "age_ms": 76786,
+          "epoch": 7,
+          "run_number": 12,
+          "state": "leading"
+        }
+      },
+      "kind": "takeover",
+      "pid": 38,
+      "role": "main",
+      "run_number": 14,
+      "server": "2026-11-10T02:52:05.897000+00:00",
+      "server_unix": 1794279125.897
+    },
+    {
+      "client_unix": 1794279126.1493495,
+      "detail": {
+        "run_number": 12,
+        "status": "FAILED"
+      },
+      "kind": "previous_not_running",
+      "pid": 38,
+      "role": "main",
+      "run_number": 14,
+      "server": "2026-11-10T02:52:06.151000+00:00",
+      "server_unix": 1794279126.151
+    },
+    {
+      "client_unix": 1794279126.9733589,
+      "detail": {
+        "end": "release",
+        "epoch": 8
+      },
+      "kind": "leading",
+      "pid": 160,
+      "role": "pipeline",
+      "run_number": 14,
+      "server": "2026-11-10T02:52:06.980000+00:00",
+      "server_unix": 1794279126.98
+    },
+    {
+      "client_unix": 1794279187.408746,
+      "detail": {
+        "age_ms": 263,
+        "epoch": 8,
+        "run_number": 14,
+        "state": "leading"
+      },
+      "kind": "guard_exit_healthy",
+      "pid": 34,
+      "role": "main",
+      "run_number": 15,
+      "server": "2026-11-10T02:53:07.433000+00:00",
+      "server_unix": 1794279187.433
+    },
+    {
+      "client_unix": 1794279235.0220377,
+      "detail": {
+        "epoch": 8
+      },
+      "kind": "released",
+      "pid": 160,
+      "role": "pipeline",
+      "run_number": 14,
+      "server": "2026-11-10T02:53:55.023000+00:00",
+      "server_unix": 1794279235.023
+    },
+    {
+      "client_unix": 1794279246.0221255,
+      "detail": {
+        "epoch": 9,
+        "prev": {
+          "age_ms": 10987,
+          "epoch": 8,
+          "run_number": 14,
+          "state": "released"
+        }
+      },
+      "kind": "takeover",
+      "pid": 35,
+      "role": "main",
+      "run_number": 16,
+      "server": "2026-11-10T02:54:06.046000+00:00",
+      "server_unix": 1794279246.046
+    },
+    {
+      "client_unix": 1794279246.8202903,
+      "detail": {
+        "end": "freeze_all",
+        "epoch": 9
+      },
+      "kind": "leading",
+      "pid": 156,
+      "role": "pipeline",
+      "run_number": 16,
+      "server": "2026-11-10T02:54:06.826000+00:00",
+      "server_unix": 1794279246.826
+    },
+    {
+      "client_unix": 1794279276.8420002,
+      "detail": {
+        "epoch": 9,
+        "freeze": "all"
+      },
+      "kind": "freezing",
+      "pid": 156,
+      "role": "pipeline",
+      "run_number": 16,
+      "server": "2026-11-10T02:54:36.843000+00:00",
+      "server_unix": 1794279276.843
+    },
+    {
+      "client_unix": 1794279307.5109177,
+      "detail": {
+        "epoch": 10,
+        "prev": {
+          "age_ms": 30655,
+          "epoch": 9,
+          "run_number": 16,
+          "state": "leading"
+        }
+      },
+      "kind": "takeover",
+      "pid": 38,
+      "role": "main",
+      "run_number": 17,
+      "server": "2026-11-10T02:55:07.537000+00:00",
+      "server_unix": 1794279307.537
+    },
+    {
+      "client_unix": 1794279308.526381,
+      "detail": {
+        "run_number": 16
+      },
+      "kind": "cancelled_previous",
+      "pid": 38,
+      "role": "main",
+      "run_number": 17,
+      "server": "2026-11-10T02:55:08.528000+00:00",
+      "server_unix": 1794279308.528
+    },
+    {
+      "client_unix": 1794279309.4853835,
+      "detail": {
+        "end": "release",
+        "epoch": 10
+      },
+      "kind": "leading",
+      "pid": 160,
+      "role": "pipeline",
+      "run_number": 17,
+      "server": "2026-11-10T02:55:09.492000+00:00",
+      "server_unix": 1794279309.492
+    }
+  ],
+  "flight": "cdc_v2_spike_runs_leader",
+  "results": {
+    "cancel_outside": {
+      "cancel_called_at": "2026-11-10T02:47:23.420862+00:00",
+      "cancel_called_seconds_into_minute": 23.42,
+      "cancel_result": {
+        "canceled_count": 1
+      },
+      "cancel_to_takeover_s": 43.318,
+      "cancel_took_s": 1.013,
+      "leader_final": {
+        "cancelled_at": "2026-11-10T02:47:24.3+00:00",
+        "created_at": "2026-11-10T02:46:31.1+00:00",
+        "ended_at": null,
+        "exit_code": null,
+        "flight_version": 3,
+        "is_scheduled": true,
+        "run_number": 9,
+        "scheduled_at": "2026-11-10T02:47:00+00:00",
+        "started_at": "2026-11-10T02:47:00.395+00:00",
+        "state": "CANCELLED"
+      },
+      "leader_run": 9,
+      "leading_event_ms": 1794278826609,
+      "takeover_at": "2026-11-10T02:48:06.739000+00:00",
+      "takeover_by_run": 10,
+      "takeover_prev": {
+        "age_ms": 50044,
+        "epoch": 5,
+        "run_number": 9,
+        "state": "leading"
+      }
+    },
+    "die_child": {
+      "kill_to_run_terminal_s": 0.185,
+      "kill_to_takeover_s": 76.83,
+      "killed_seconds_into_minute": 49.07,
+      "leader_run": 12,
+      "leader_run_terminal": {
+        "cancelled_at": null,
+        "created_at": "2026-11-10T02:49:30.308+00:00",
+        "ended_at": "2026-11-10T02:50:49.252+00:00",
+        "exit_code": 1,
+        "flight_version": 5,
+        "is_scheduled": true,
+        "run_number": 12,
+        "scheduled_at": "2026-11-10T02:50:00+00:00",
+        "started_at": "2026-11-10T02:50:02.047+00:00",
+        "state": "FAILED"
+      },
+      "pipeline_killed_at": "2026-11-10T02:50:49.067000+00:00",
+      "takeover_at": "2026-11-10T02:52:05.897000+00:00",
+      "takeover_by_run": 14,
+      "takeover_prev": {
+        "age_ms": 76786,
+        "epoch": 7,
+        "run_number": 12,
+        "state": "leading"
+      }
+    },
+    "freeze_all": {
+      "cancelled_previous_event": {
+        "client_unix": 1794279308.526381,
+        "detail": {
+          "run_number": 16
+        },
+        "kind": "cancelled_previous",
+        "pid": 38,
+        "role": "main",
+        "run_number": 17,
+        "server": "2026-11-10T02:55:08.528000+00:00",
+        "server_unix": 1794279308.528
+      },
+      "freeze_to_frozen_run_terminal_s": 31.529,
+      "freeze_to_takeover_s": 30.694,
+      "frozen_at": "2026-11-10T02:54:36.843000+00:00",
+      "frozen_run_final": {
+        "cancelled_at": "2026-11-10T02:55:08.372+00:00",
+        "created_at": "2026-11-10T02:53:32.807+00:00",
+        "ended_at": null,
+        "exit_code": null,
+        "flight_version": 7,
+        "is_scheduled": true,
+        "run_number": 16,
+        "scheduled_at": "2026-11-10T02:54:00+00:00",
+        "started_at": "2026-11-10T02:54:00.978+00:00",
+        "state": "CANCELLED"
+      },
+      "frozen_seconds_into_minute": 36.84,
+      "leader_run": 16,
+      "takeover_at": "2026-11-10T02:55:07.537000+00:00",
+      "takeover_by_run": 17,
+      "takeover_prev": {
+        "age_ms": 30655,
+        "epoch": 9,
+        "run_number": 16,
+        "state": "leading"
+      }
+    },
+    "planned": {
+      "handovers": [
+        {
+          "release_to_takeover_s": 12.394,
+          "released_at": "2026-11-10T02:40:55.022000+00:00",
+          "released_by_run": 1,
+          "released_seconds_into_minute": 55.02,
+          "takeover_at": "2026-11-10T02:41:07.416000+00:00",
+          "takeover_by_run": 3,
+          "takeover_prev": {
+            "age_ms": 12359,
+            "epoch": 1,
+            "run_number": 1,
+            "state": "released"
+          }
+        },
+        {
+          "release_to_takeover_s": 10.448,
+          "released_at": "2026-11-10T02:42:55.020000+00:00",
+          "released_by_run": 3,
+          "released_seconds_into_minute": 55.02,
+          "takeover_at": "2026-11-10T02:43:05.468000+00:00",
+          "takeover_by_run": 5,
+          "takeover_prev": {
+            "age_ms": 10400,
+            "epoch": 2,
+            "run_number": 3,
+            "state": "released"
+          }
+        },
+        {
+          "release_to_takeover_s": 15.285,
+          "released_at": "2026-11-10T02:44:55.024000+00:00",
+          "released_by_run": 5,
+          "released_seconds_into_minute": 55.02,
+          "takeover_at": "2026-11-10T02:45:10.309000+00:00",
+          "takeover_by_run": 7,
+          "takeover_prev": {
+            "age_ms": 15248,
+            "epoch": 3,
+            "run_number": 5,
+            "state": "released"
+          }
+        }
+      ]
+    }
+  },
+  "runs": [
+    {
+      "cancelled_at": null,
+      "created_at": "2026-11-10T02:38:30.176+00:00",
+      "created_minus_scheduled_s": -29.824,
+      "ended_at": "2026-11-10T02:40:55.256+00:00",
+      "exit_code": 0,
+      "flight_version": 2,
+      "is_scheduled": true,
+      "run_number": 1,
+      "scheduled_at": "2026-11-10T02:39:00+00:00",
+      "scheduled_to_started_s": 1.234,
+      "started_at": "2026-11-10T02:39:01.234+00:00",
+      "started_to_ended_s": 114.022,
+      "state": "SUCCEEDED"
+    },
+    {
+      "cancelled_at": null,
+      "created_at": "2026-11-10T02:39:31.077+00:00",
+      "created_minus_scheduled_s": -28.923,
+      "ended_at": "2026-11-10T02:40:09.017+00:00",
+      "exit_code": 0,
+      "flight_version": 2,
+      "is_scheduled": true,
+      "run_number": 2,
+      "scheduled_at": "2026-11-10T02:40:00+00:00",
+      "scheduled_to_started_s": 1.867,
+      "started_at": "2026-11-10T02:40:01.867+00:00",
+      "started_to_ended_s": 7.15,
+      "state": "SUCCEEDED"
+    },
+    {
+      "cancelled_at": null,
+      "created_at": "2026-11-10T02:40:42.331+00:00",
+      "created_minus_scheduled_s": -17.669,
+      "ended_at": "2026-11-10T02:42:55.491+00:00",
+      "exit_code": 0,
+      "flight_version": 2,
+      "is_scheduled": true,
+      "run_number": 3,
+      "scheduled_at": "2026-11-10T02:41:00+00:00",
+      "scheduled_to_started_s": 0.943,
+      "started_at": "2026-11-10T02:41:00.943+00:00",
+      "started_to_ended_s": 114.548,
+      "state": "SUCCEEDED"
+    },
+    {
+      "cancelled_at": null,
+      "created_at": "2026-11-10T02:41:30.172+00:00",
+      "created_minus_scheduled_s": -29.828,
+      "ended_at": "2026-11-10T02:42:05.902+00:00",
+      "exit_code": 0,
+      "flight_version": 2,
+      "is_scheduled": true,
+      "run_number": 4,
+      "scheduled_at": "2026-11-10T02:42:00+00:00",
+      "scheduled_to_started_s": 0.24,
+      "started_at": "2026-11-10T02:42:00.24+00:00",
+      "started_to_ended_s": 5.662,
+      "state": "SUCCEEDED"
+    },
+    {
+      "cancelled_at": null,
+      "created_at": "2026-11-10T02:42:30.896+00:00",
+      "created_minus_scheduled_s": -29.104,
+      "ended_at": "2026-11-10T02:44:55.548+00:00",
+      "exit_code": 0,
+      "flight_version": 2,
+      "is_scheduled": true,
+      "run_number": 5,
+      "scheduled_at": "2026-11-10T02:43:00+00:00",
+      "scheduled_to_started_s": 0.983,
+      "started_at": "2026-11-10T02:43:00.983+00:00",
+      "started_to_ended_s": 114.565,
+      "state": "SUCCEEDED"
+    },
+    {
+      "cancelled_at": null,
+      "created_at": "2026-11-10T02:43:41.525+00:00",
+      "created_minus_scheduled_s": -18.475,
+      "ended_at": "2026-11-10T02:44:07.074+00:00",
+      "exit_code": 0,
+      "flight_version": 2,
+      "is_scheduled": true,
+      "run_number": 6,
+      "scheduled_at": "2026-11-10T02:44:00+00:00",
+      "scheduled_to_started_s": 1.599,
+      "started_at": "2026-11-10T02:44:01.599+00:00",
+      "started_to_ended_s": 5.475,
+      "state": "SUCCEEDED"
+    },
+    {
+      "cancelled_at": null,
+      "created_at": "2026-11-10T02:44:30.164+00:00",
+      "created_minus_scheduled_s": -29.836,
+      "ended_at": "2026-11-10T02:46:55.433+00:00",
+      "exit_code": 0,
+      "flight_version": 2,
+      "is_scheduled": true,
+      "run_number": 7,
+      "scheduled_at": "2026-11-10T02:45:00+00:00",
+      "scheduled_to_started_s": 1.984,
+      "started_at": "2026-11-10T02:45:01.984+00:00",
+      "started_to_ended_s": 113.449,
+      "state": "SUCCEEDED"
+    },
+    {
+      "cancelled_at": null,
+      "created_at": "2026-11-10T02:45:30.174+00:00",
+      "created_minus_scheduled_s": -29.826,
+      "ended_at": "2026-11-10T02:46:07.029+00:00",
+      "exit_code": 0,
+      "flight_version": 3,
+      "is_scheduled": true,
+      "run_number": 8,
+      "scheduled_at": "2026-11-10T02:46:00+00:00",
+      "scheduled_to_started_s": 1.781,
+      "started_at": "2026-11-10T02:46:01.781+00:00",
+      "started_to_ended_s": 5.248,
+      "state": "SUCCEEDED"
+    },
+    {
+      "cancelled_at": "2026-11-10T02:47:24.3+00:00",
+      "created_at": "2026-11-10T02:46:31.1+00:00",
+      "created_minus_scheduled_s": -28.9,
+      "ended_at": null,
+      "exit_code": null,
+      "flight_version": 3,
+      "is_scheduled": true,
+      "run_number": 9,
+      "scheduled_at": "2026-11-10T02:47:00+00:00",
+      "scheduled_to_started_s": 0.395,
+      "started_at": "2026-11-10T02:47:00.395+00:00",
+      "started_to_cancelled_s": 23.905,
+      "state": "CANCELLED"
+    },
+    {
+      "cancelled_at": null,
+      "created_at": "2026-11-10T02:47:41.432+00:00",
+      "created_minus_scheduled_s": -18.568,
+      "ended_at": "2026-11-10T02:49:56.01+00:00",
+      "exit_code": 0,
+      "flight_version": 4,
+      "is_scheduled": true,
+      "run_number": 10,
+      "scheduled_at": "2026-11-10T02:48:00+00:00",
+      "scheduled_to_started_s": 1.623,
+      "started_at": "2026-11-10T02:48:01.623+00:00",
+      "started_to_ended_s": 114.387,
+      "state": "SUCCEEDED"
+    },
+    {
+      "cancelled_at": null,
+      "created_at": "2026-11-10T02:48:31.165+00:00",
+      "created_minus_scheduled_s": -28.835,
+      "ended_at": "2026-11-10T02:49:06.646+00:00",
+      "exit_code": 0,
+      "flight_version": 5,
+      "is_scheduled": true,
+      "run_number": 11,
+      "scheduled_at": "2026-11-10T02:49:00+00:00",
+      "scheduled_to_started_s": 1.17,
+      "started_at": "2026-11-10T02:49:01.17+00:00",
+      "started_to_ended_s": 5.476,
+      "state": "SUCCEEDED"
+    },
+    {
+      "cancelled_at": null,
+      "created_at": "2026-11-10T02:49:30.308+00:00",
+      "created_minus_scheduled_s": -29.692,
+      "ended_at": "2026-11-10T02:50:49.252+00:00",
+      "exit_code": 1,
+      "flight_version": 5,
+      "is_scheduled": true,
+      "run_number": 12,
+      "scheduled_at": "2026-11-10T02:50:00+00:00",
+      "scheduled_to_started_s": 2.047,
+      "started_at": "2026-11-10T02:50:02.047+00:00",
+      "started_to_ended_s": 47.205,
+      "state": "FAILED"
+    },
+    {
+      "cancelled_at": null,
+      "created_at": "2026-11-10T02:50:30.156+00:00",
+      "created_minus_scheduled_s": -29.844,
+      "ended_at": "2026-11-10T02:51:04.86+00:00",
+      "exit_code": 0,
+      "flight_version": 6,
+      "is_scheduled": true,
+      "run_number": 13,
+      "scheduled_at": "2026-11-10T02:51:00+00:00",
+      "scheduled_to_started_s": 0.62,
+      "started_at": "2026-11-10T02:51:00.62+00:00",
+      "started_to_ended_s": 4.24,
+      "state": "SUCCEEDED"
+    },
+    {
+      "cancelled_at": null,
+      "created_at": "2026-11-10T02:51:43.437+00:00",
+      "created_minus_scheduled_s": -16.563,
+      "ended_at": "2026-11-10T02:53:55.226+00:00",
+      "exit_code": 0,
+      "flight_version": 6,
+      "is_scheduled": true,
+      "run_number": 14,
+      "scheduled_at": "2026-11-10T02:52:00+00:00",
+      "scheduled_to_started_s": 0.433,
+      "started_at": "2026-11-10T02:52:00.433+00:00",
+      "started_to_ended_s": 114.793,
+      "state": "SUCCEEDED"
+    },
+    {
+      "cancelled_at": null,
+      "created_at": "2026-11-10T02:52:31.912+00:00",
+      "created_minus_scheduled_s": -28.088,
+      "ended_at": "2026-11-10T02:53:07.557+00:00",
+      "exit_code": 0,
+      "flight_version": 7,
+      "is_scheduled": true,
+      "run_number": 15,
+      "scheduled_at": "2026-11-10T02:53:00+00:00",
+      "scheduled_to_started_s": 1.458,
+      "started_at": "2026-11-10T02:53:01.458+00:00",
+      "started_to_ended_s": 6.099,
+      "state": "SUCCEEDED"
+    },
+    {
+      "cancelled_at": "2026-11-10T02:55:08.372+00:00",
+      "created_at": "2026-11-10T02:53:32.807+00:00",
+      "created_minus_scheduled_s": -27.193,
+      "ended_at": null,
+      "exit_code": null,
+      "flight_version": 7,
+      "is_scheduled": true,
+      "run_number": 16,
+      "scheduled_at": "2026-11-10T02:54:00+00:00",
+      "scheduled_to_started_s": 0.978,
+      "started_at": "2026-11-10T02:54:00.978+00:00",
+      "started_to_cancelled_s": 67.394,
+      "state": "CANCELLED"
+    },
+    {
+      "cancelled_at": "2026-11-10T02:55:18.934+00:00",
+      "created_at": "2026-11-10T02:54:30.633+00:00",
+      "created_minus_scheduled_s": -29.367,
+      "ended_at": null,
+      "exit_code": null,
+      "flight_version": 8,
+      "is_scheduled": true,
+      "run_number": 17,
+      "scheduled_at": "2026-11-10T02:55:00+00:00",
+      "scheduled_to_started_s": 1.824,
+      "started_at": "2026-11-10T02:55:01.824+00:00",
+      "started_to_cancelled_s": 17.11,
+      "state": "CANCELLED"
+    }
+  ],
+  "schedule_cleared_at": "2026-11-10T02:55:12.886405+00:00",
+  "schedule_set_at": "2026-11-10T02:38:23.303729+00:00"
+}

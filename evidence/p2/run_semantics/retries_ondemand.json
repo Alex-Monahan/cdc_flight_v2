@@ -1,0 +1,595 @@
+{
+  "documented_create_parameters": [
+    "name",
+    "source_code",
+    "schedule_cron",
+    "requirements_txt",
+    "config",
+    "access_token_name",
+    "flight_secret_names",
+    "instance_type",
+    "max_runtime_sec",
+    "metadata"
+  ],
+  "flight": "cdc_v2_spike_runs_fail",
+  "flight_definition": {
+    "created_at": "2026-11-10T02:35:00.076+00:00",
+    "current_version": 1,
+    "flight_id": "8b0ddbbd-a20d-4af3-bf06-db65893abc53",
+    "flight_name": "cdc_v2_spike_runs_fail",
+    "owner_name": "<redacted>",
+    "schedule_cron": null,
+    "schedule_status": null,
+    "state": "ACTIVE",
+    "status": "ACTIVE",
+    "updated_at": "2026-11-10T02:35:00.747+00:00"
+  },
+  "runs": {
+    "exception": {
+      "events": [
+        {
+          "fail": "exception",
+          "kind": "start",
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+          "memory_max": "17179869184",
+          "mode": "fail",
+          "oom_group": "1",
+          "pid": 34,
+          "role": "main",
+          "run": 2,
+          "t": 1794278118.571,
+          "v": "v1"
+        }
+      ],
+      "final": {
+        "cancelled_at": null,
+        "created_at": "2026-11-10T02:35:14.233+00:00",
+        "ended_at": "2026-11-10T02:35:18.591+00:00",
+        "exit_code": 1,
+        "flight_version": 1,
+        "is_scheduled": false,
+        "run_number": 2,
+        "scheduled_at": "2026-11-10T02:35:14.222+00:00",
+        "started_at": "2026-11-10T02:35:15.191+00:00",
+        "state": "FAILED"
+      },
+      "log_lines": 18,
+      "log_tail": [
+        "Installed 1 package in 32ms",
+        " + duckdb==1.5.6",
+        "FIRST 1794278118.352",
+        "EV {\"kind\": \"start\", \"role\": \"main\", \"pid\": 34, \"run\": 2, \"t\": 1794278118.571, \"v\": \"v1\", \"mode\": \"fail\", \"fail\": \"exception\", \"oom_group\": \"1\", \"memory_max\": \"17179869184\", \"memory_events\": \"low 0\\nhigh 0\\nmax 0\\noom 0\\noom_kill 0\\noom_group_kill 0\"}",
+        "Traceback (most recent call last):",
+        "  File \"/app/./main.py\", line 705, in <module>",
+        "    main()",
+        "  File \"/app/./main.py\", line 701, in main",
+        "    MODES[MODE]()",
+        "  File \"/app/./main.py\", line 462, in mode_fail",
+        "    raise RuntimeError(\"deliberate failure (spike)\")",
+        "RuntimeError: deliberate failure (spike)"
+      ],
+      "timing": {
+        "created_minus_scheduled_s": 0.011,
+        "first_line_to_ended_s": 0.239,
+        "scheduled_to_first_line_s": 4.13,
+        "scheduled_to_started_s": 0.969,
+        "started_to_ended_s": 3.4,
+        "started_to_first_line_s": 3.161
+      }
+    },
+    "exit3": {
+      "events": [
+        {
+          "fail": "exit3",
+          "kind": "start",
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+          "memory_max": "17179869184",
+          "mode": "fail",
+          "oom_group": "1",
+          "pid": 36,
+          "role": "main",
+          "run": 1,
+          "t": 1794278107.361,
+          "v": "v1"
+        }
+      ],
+      "final": {
+        "cancelled_at": null,
+        "created_at": "2026-11-10T02:35:02.106+00:00",
+        "ended_at": "2026-11-10T02:35:07.412+00:00",
+        "exit_code": 3,
+        "flight_version": 1,
+        "is_scheduled": false,
+        "run_number": 1,
+        "scheduled_at": "2026-11-10T02:35:02.082+00:00",
+        "started_at": "2026-11-10T02:35:04.014+00:00",
+        "state": "FAILED"
+      },
+      "log_lines": 10,
+      "log_tail": [
+        "Using CPython 3.12.15",
+        "Creating virtual environment at: .venv",
+        "Resolved 1 package in 781ms",
+        "Downloading duckdb (20.6MiB)",
+        " Downloaded duckdb",
+        "Prepared 1 package in 1.33s",
+        "Installed 1 package in 34ms",
+        " + duckdb==1.5.6",
+        "FIRST 1794278107.140",
+        "EV {\"kind\": \"start\", \"role\": \"main\", \"pid\": 36, \"run\": 1, \"t\": 1794278107.361, \"v\": \"v1\", \"mode\": \"fail\", \"fail\": \"exit3\", \"oom_group\": \"1\", \"memory_max\": \"17179869184\", \"memory_events\": \"low 0\\nhigh 0\\nmax 0\\noom 0\\noom_kill 0\\noom_group_kill 0\"}"
+      ],
+      "timing": {
+        "created_minus_scheduled_s": 0.024,
+        "first_line_to_ended_s": 0.272,
+        "scheduled_to_first_line_s": 5.058,
+        "scheduled_to_started_s": 1.932,
+        "started_to_ended_s": 3.398,
+        "started_to_first_line_s": 3.126
+      }
+    },
+    "oom_child": {
+      "events": [
+        {
+          "fail": "oom_child",
+          "kind": "start",
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+          "memory_max": "17179869184",
+          "mode": "fail",
+          "oom_group": "1",
+          "pid": 35,
+          "role": "main",
+          "run": 3,
+          "t": 1794278131.627,
+          "v": "v1"
+        },
+        {
+          "child_pid": 36,
+          "child_role": "oom_child",
+          "kind": "spawned",
+          "new_session": false,
+          "pid": 35,
+          "role": "main",
+          "run": 3,
+          "t": 1794278131.628,
+          "v": "v1"
+        },
+        {
+          "kind": "start",
+          "memory_max": "17179869184",
+          "pid": 36,
+          "role": "oom_child",
+          "run": 3,
+          "t": 1794278131.684,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "1230938112",
+          "pid": 36,
+          "role": "oom_child",
+          "run": 3,
+          "t": 1794278132.412,
+          "total": 1,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "2306732032",
+          "pid": 36,
+          "role": "oom_child",
+          "run": 3,
+          "t": 1794278133.139,
+          "total": 2,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "3382878208",
+          "pid": 36,
+          "role": "oom_child",
+          "run": 3,
+          "t": 1794278133.858,
+          "total": 3,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "4458487808",
+          "pid": 36,
+          "role": "oom_child",
+          "run": 3,
+          "t": 1794278134.581,
+          "total": 4,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "5534326784",
+          "pid": 36,
+          "role": "oom_child",
+          "run": 3,
+          "t": 1794278135.301,
+          "total": 5,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "6610186240",
+          "pid": 36,
+          "role": "oom_child",
+          "run": 3,
+          "t": 1794278136.019,
+          "total": 6,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "7686025216",
+          "pid": 36,
+          "role": "oom_child",
+          "run": 3,
+          "t": 1794278136.738,
+          "total": 7,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "8761892864",
+          "pid": 36,
+          "role": "oom_child",
+          "run": 3,
+          "t": 1794278137.46,
+          "total": 8,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "9837731840",
+          "pid": 36,
+          "role": "oom_child",
+          "run": 3,
+          "t": 1794278138.179,
+          "total": 9,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "10913669120",
+          "pid": 36,
+          "role": "oom_child",
+          "run": 3,
+          "t": 1794278138.902,
+          "total": 10,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "11989270528",
+          "pid": 36,
+          "role": "oom_child",
+          "run": 3,
+          "t": 1794278139.624,
+          "total": 11,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "13065306112",
+          "pid": 36,
+          "role": "oom_child",
+          "run": 3,
+          "t": 1794278140.346,
+          "total": 12,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "14141120512",
+          "pid": 36,
+          "role": "oom_child",
+          "run": 3,
+          "t": 1794278141.069,
+          "total": 13,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "15216852992",
+          "pid": 36,
+          "role": "oom_child",
+          "run": 3,
+          "t": 1794278141.788,
+          "total": 14,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "16292630528",
+          "pid": 36,
+          "role": "oom_child",
+          "run": 3,
+          "t": 1794278142.509,
+          "total": 15,
+          "v": "v1"
+        }
+      ],
+      "final": {
+        "cancelled_at": null,
+        "created_at": "2026-11-10T02:35:26.143+00:00",
+        "ended_at": "2026-11-10T02:35:47.803+00:00",
+        "exit_code": 137,
+        "flight_version": 1,
+        "is_scheduled": false,
+        "run_number": 3,
+        "scheduled_at": "2026-11-10T02:35:26.078+00:00",
+        "started_at": "2026-11-10T02:35:28.258+00:00",
+        "state": "FAILED"
+      },
+      "log_lines": 28,
+      "log_tail": [
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"oom_child\", \"pid\": 36, \"run\": 3, \"t\": 1794278134.581, \"v\": \"v1\", \"total\": 4, \"memory_current\": \"4458487808\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"oom_child\", \"pid\": 36, \"run\": 3, \"t\": 1794278135.301, \"v\": \"v1\", \"total\": 5, \"memory_current\": \"5534326784\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"oom_child\", \"pid\": 36, \"run\": 3, \"t\": 1794278136.019, \"v\": \"v1\", \"total\": 6, \"memory_current\": \"6610186240\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"oom_child\", \"pid\": 36, \"run\": 3, \"t\": 1794278136.738, \"v\": \"v1\", \"total\": 7, \"memory_current\": \"7686025216\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"oom_child\", \"pid\": 36, \"run\": 3, \"t\": 1794278137.46, \"v\": \"v1\", \"total\": 8, \"memory_current\": \"8761892864\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"oom_child\", \"pid\": 36, \"run\": 3, \"t\": 1794278138.179, \"v\": \"v1\", \"total\": 9, \"memory_current\": \"9837731840\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"oom_child\", \"pid\": 36, \"run\": 3, \"t\": 1794278138.902, \"v\": \"v1\", \"total\": 10, \"memory_current\": \"10913669120\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"oom_child\", \"pid\": 36, \"run\": 3, \"t\": 1794278139.624, \"v\": \"v1\", \"total\": 11, \"memory_current\": \"11989270528\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"oom_child\", \"pid\": 36, \"run\": 3, \"t\": 1794278140.346, \"v\": \"v1\", \"total\": 12, \"memory_current\": \"13065306112\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"oom_child\", \"pid\": 36, \"run\": 3, \"t\": 1794278141.069, \"v\": \"v1\", \"total\": 13, \"memory_current\": \"14141120512\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"oom_child\", \"pid\": 36, \"run\": 3, \"t\": 1794278141.788, \"v\": \"v1\", \"total\": 14, \"memory_current\": \"15216852992\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"oom_child\", \"pid\": 36, \"run\": 3, \"t\": 1794278142.509, \"v\": \"v1\", \"total\": 15, \"memory_current\": \"16292630528\"}"
+      ],
+      "timing": {
+        "created_minus_scheduled_s": 0.065,
+        "first_line_to_ended_s": 16.38,
+        "scheduled_to_first_line_s": 5.345,
+        "scheduled_to_started_s": 2.18,
+        "started_to_ended_s": 19.545,
+        "started_to_first_line_s": 3.165
+      }
+    },
+    "oom_main": {
+      "events": [
+        {
+          "fail": "oom_main",
+          "kind": "start",
+          "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+          "memory_max": "17179869184",
+          "mode": "fail",
+          "oom_group": "1",
+          "pid": 35,
+          "role": "main",
+          "run": 4,
+          "t": 1794278159.021,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "1222410240",
+          "pid": 35,
+          "role": "main",
+          "run": 4,
+          "t": 1794278159.752,
+          "total": 1,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "2298408960",
+          "pid": 35,
+          "role": "main",
+          "run": 4,
+          "t": 1794278160.483,
+          "total": 2,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "3374149632",
+          "pid": 35,
+          "role": "main",
+          "run": 4,
+          "t": 1794278161.211,
+          "total": 3,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "4450209792",
+          "pid": 35,
+          "role": "main",
+          "run": 4,
+          "t": 1794278161.939,
+          "total": 4,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "5525991424",
+          "pid": 35,
+          "role": "main",
+          "run": 4,
+          "t": 1794278162.694,
+          "total": 5,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "6601830400",
+          "pid": 35,
+          "role": "main",
+          "run": 4,
+          "t": 1794278163.424,
+          "total": 6,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "7677710336",
+          "pid": 35,
+          "role": "main",
+          "run": 4,
+          "t": 1794278164.143,
+          "total": 7,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "8753590272",
+          "pid": 35,
+          "role": "main",
+          "run": 4,
+          "t": 1794278164.875,
+          "total": 8,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "9829220352",
+          "pid": 35,
+          "role": "main",
+          "run": 4,
+          "t": 1794278165.619,
+          "total": 9,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "10905071616",
+          "pid": 35,
+          "role": "main",
+          "run": 4,
+          "t": 1794278166.346,
+          "total": 10,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "11980869632",
+          "pid": 35,
+          "role": "main",
+          "run": 4,
+          "t": 1794278167.075,
+          "total": 11,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "13056708608",
+          "pid": 35,
+          "role": "main",
+          "run": 4,
+          "t": 1794278167.803,
+          "total": 12,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "14132809728",
+          "pid": 35,
+          "role": "main",
+          "run": 4,
+          "t": 1794278168.528,
+          "total": 13,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "15208624128",
+          "pid": 35,
+          "role": "main",
+          "run": 4,
+          "t": 1794278169.247,
+          "total": 14,
+          "v": "v1"
+        },
+        {
+          "kind": "allocated_gib",
+          "memory_current": "16284463104",
+          "pid": 35,
+          "role": "main",
+          "run": 4,
+          "t": 1794278169.968,
+          "total": 15,
+          "v": "v1"
+        }
+      ],
+      "final": {
+        "cancelled_at": null,
+        "created_at": "2026-11-10T02:35:55.336+00:00",
+        "ended_at": "2026-11-10T02:36:15.964+00:00",
+        "exit_code": 137,
+        "flight_version": 1,
+        "is_scheduled": false,
+        "run_number": 4,
+        "scheduled_at": "2026-11-10T02:35:55.29+00:00",
+        "started_at": "2026-11-10T02:35:56.013+00:00",
+        "state": "FAILED"
+      },
+      "log_lines": 25,
+      "log_tail": [
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"main\", \"pid\": 35, \"run\": 4, \"t\": 1794278161.939, \"v\": \"v1\", \"total\": 4, \"memory_current\": \"4450209792\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"main\", \"pid\": 35, \"run\": 4, \"t\": 1794278162.694, \"v\": \"v1\", \"total\": 5, \"memory_current\": \"5525991424\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"main\", \"pid\": 35, \"run\": 4, \"t\": 1794278163.424, \"v\": \"v1\", \"total\": 6, \"memory_current\": \"6601830400\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"main\", \"pid\": 35, \"run\": 4, \"t\": 1794278164.143, \"v\": \"v1\", \"total\": 7, \"memory_current\": \"7677710336\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"main\", \"pid\": 35, \"run\": 4, \"t\": 1794278164.875, \"v\": \"v1\", \"total\": 8, \"memory_current\": \"8753590272\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"main\", \"pid\": 35, \"run\": 4, \"t\": 1794278165.619, \"v\": \"v1\", \"total\": 9, \"memory_current\": \"9829220352\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"main\", \"pid\": 35, \"run\": 4, \"t\": 1794278166.346, \"v\": \"v1\", \"total\": 10, \"memory_current\": \"10905071616\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"main\", \"pid\": 35, \"run\": 4, \"t\": 1794278167.075, \"v\": \"v1\", \"total\": 11, \"memory_current\": \"11980869632\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"main\", \"pid\": 35, \"run\": 4, \"t\": 1794278167.803, \"v\": \"v1\", \"total\": 12, \"memory_current\": \"13056708608\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"main\", \"pid\": 35, \"run\": 4, \"t\": 1794278168.528, \"v\": \"v1\", \"total\": 13, \"memory_current\": \"14132809728\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"main\", \"pid\": 35, \"run\": 4, \"t\": 1794278169.247, \"v\": \"v1\", \"total\": 14, \"memory_current\": \"15208624128\"}",
+        "EV {\"kind\": \"allocated_gib\", \"role\": \"main\", \"pid\": 35, \"run\": 4, \"t\": 1794278169.968, \"v\": \"v1\", \"total\": 15, \"memory_current\": \"16284463104\"}"
+      ],
+      "timing": {
+        "created_minus_scheduled_s": 0.046,
+        "first_line_to_ended_s": 17.149,
+        "scheduled_to_first_line_s": 3.525,
+        "scheduled_to_started_s": 0.723,
+        "started_to_ended_s": 19.951,
+        "started_to_first_line_s": 2.802
+      }
+    }
+  },
+  "started_by_driver": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "watch_4_min": [
+    {
+      "at": "2026-11-10T02:36:52.247599+00:00",
+      "runs_not_started_by_driver": []
+    },
+    {
+      "at": "2026-11-10T02:37:22.647125+00:00",
+      "runs_not_started_by_driver": []
+    },
+    {
+      "at": "2026-11-10T02:37:53.121835+00:00",
+      "runs_not_started_by_driver": []
+    },
+    {
+      "at": "2026-11-10T02:38:23.459367+00:00",
+      "runs_not_started_by_driver": []
+    },
+    {
+      "at": "2026-11-10T02:38:54.070669+00:00",
+      "runs_not_started_by_driver": []
+    },
+    {
+      "at": "2026-11-10T02:39:24.542092+00:00",
+      "runs_not_started_by_driver": []
+    },
+    {
+      "at": "2026-11-10T02:39:55.018062+00:00",
+      "runs_not_started_by_driver": []
+    },
+    {
+      "at": "2026-11-10T02:40:25.421258+00:00",
+      "runs_not_started_by_driver": []
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "final": {
+    "cancelled_at": null,
+    "created_at": "2026-11-10T02:35:21.122+00:00",
+    "ended_at": "2026-11-10T02:41:29.493+00:00",
+    "exit_code": 0,
+    "flight_version": 3,
+    "is_scheduled": false,
+    "run_number": 2,
+    "scheduled_at": "2026-11-10T02:35:21.105+00:00",
+    "started_at": "2026-11-10T02:35:21.988+00:00",
+    "state": "SUCCEEDED"
+  },
+  "log_lines": [
+    {
+      "line": "Using CPython 3.12.15",
+      "reported_at": "2026-11-10T02:35:22.54+00:00"
+    },
+    {
+      "line": "Creating virtual environment at: .venv",
+      "reported_at": "2026-11-10T02:35:22.54+00:00"
+    },
+    {
+      "line": "Resolved 1 package in 779ms",
+      "reported_at": "2026-11-10T02:35:23.584+00:00"
+    },
+    {
+      "line": "Downloading duckdb (20.6MiB)",
+      "reported_at": "2026-11-10T02:35:23.776+00:00"
+    },
+    {
+      "line": "Prepared 1 package in 1.55s",
+      "reported_at": "2026-11-10T02:35:25.229+00:00"
+    },
+    {
+      "line": "Installed 1 package in 34ms",
+      "reported_at": "2026-11-10T02:35:25.229+00:00"
+    },
+    {
+      "line": "FIRST 1794278125.225",
+      "reported_at": "2026-11-10T02:35:25.229+00:00"
+    },
+    {
+      "line": "EV {\"kind\": \"start\", \"role\": \"main\", \"pid\": 34, \"run\": 2, \"t\": 1794278127.423, \"v\": \"v1\", \"mode\": \"silent\", \"silent_s\": 360.0}",
+      "reported_at": "2026-11-10T02:35:27.424+00:00"
+    },
+    {
+      "line": "EV {\"kind\": \"end\", \"role\": \"main\", \"pid\": 34, \"run\": 2, \"t\": 1794278489.392, \"v\": \"v1\", \"silent_for_s\": 364.2}",
+      "reported_at": "2026-11-10T02:41:29.403+00:00"
+    }
+  ],
+  "run": 2,
+  "silent_seconds": 360,
+  "ticks": [
+    {
+      "first_server": "2026-11-10T02:35:27.449000+00:00",
+      "first_server_unix": 1794278127.449,
+      "last_client_unix": 1794278484.3730414,
+      "last_server": "2026-11-10T02:41:24.374000+00:00",
+      "last_server_unix": 1794278484.374,
+      "pid": 34,
+      "role": "main",
+      "rows": 72
+    }
+  ],
+  "timing": {
+    "created_minus_scheduled_s": 0.017,
+    "first_line_to_ended_s": 364.268,
+    "scheduled_to_first_line_s": 4.12,
+    "scheduled_to_started_s": 0.883,
+    "started_to_ended_s": 367.505,
+    "started_to_first_line_s": 3.237
+  }
+}

@@ -1,0 +1,358 @@
+{
+  "cancel_call": {
+    "call_client_unix": 1794278416.247575,
+    "call_server_unix": 1794278416.246,
+    "flight_id": "37e6d532-6adb-4d90-9ace-95790c23588b",
+    "kind": "cancel_result",
+    "ok": true,
+    "pid": 36,
+    "result": [
+      [
+        "1"
+      ]
+    ],
+    "returned_client_unix": 1794278416.9122128,
+    "role": "main",
+    "run": 4,
+    "run_number": 3,
+    "t": 1794278416.912,
+    "took_s": 0.665,
+    "v": "v1"
+  },
+  "canceller_events": [
+    {
+      "kind": "start",
+      "mode": "canceller",
+      "own_flight_id": "37e6d532-6adb-4d90-9ace-95790c23588b",
+      "pid": 36,
+      "role": "main",
+      "run": 4,
+      "t": 1794278416.03,
+      "target": "others",
+      "v": "v1"
+    },
+    {
+      "kind": "listed_runs",
+      "pid": 36,
+      "role": "main",
+      "run": 4,
+      "runs": [
+        {
+          "is_scheduled": false,
+          "run_number": 4,
+          "scheduled_at": "2026-11-10 02:40:09.752+00",
+          "started_at": "2026-11-10 02:40:10.632+00",
+          "status": "RUNNING"
+        },
+        {
+          "is_scheduled": false,
+          "run_number": 3,
+          "scheduled_at": "2026-11-10 02:38:00.893+00",
+          "started_at": "2026-11-10 02:38:02.829+00",
+          "status": "RUNNING"
+        },
+        {
+          "is_scheduled": false,
+          "run_number": 2,
+          "scheduled_at": "2026-11-10 02:35:48.726+00",
+          "started_at": "2026-11-10 02:35:49.447+00",
+          "status": "FAILED"
+        },
+        {
+          "is_scheduled": false,
+          "run_number": 1,
+          "scheduled_at": "2026-11-10 02:33:40.789+00",
+          "started_at": "2026-11-10 02:33:41.221+00",
+          "status": "CANCELLED"
+        }
+      ],
+      "t": 1794278416.246,
+      "v": "v1"
+    },
+    {
+      "call_client_unix": 1794278416.247575,
+      "call_server_unix": 1794278416.246,
+      "flight_id": "37e6d532-6adb-4d90-9ace-95790c23588b",
+      "kind": "cancel_result",
+      "ok": true,
+      "pid": 36,
+      "result": [
+        [
+          "1"
+        ]
+      ],
+      "returned_client_unix": 1794278416.9122128,
+      "role": "main",
+      "run": 4,
+      "run_number": 3,
+      "t": 1794278416.912,
+      "took_s": 0.665,
+      "v": "v1"
+    },
+    {
+      "cancelled_at": "2026-11-10 02:40:16.773+00",
+      "ended_at": null,
+      "exit_code": null,
+      "kind": "target_state",
+      "pid": 36,
+      "role": "main",
+      "run": 4,
+      "run_number": 3,
+      "status": "CANCELLED",
+      "t": 1794278417.353,
+      "v": "v1"
+    },
+    {
+      "kind": "end",
+      "pid": 36,
+      "role": "main",
+      "run": 4,
+      "t": 1794278417.37,
+      "v": "v1"
+    }
+  ],
+  "canceller_final": {
+    "cancelled_at": null,
+    "created_at": "2026-11-10T02:40:09.766+00:00",
+    "ended_at": "2026-11-10T02:40:17.472+00:00",
+    "exit_code": 0,
+    "flight_version": 2,
+    "is_scheduled": false,
+    "run_number": 4,
+    "scheduled_at": "2026-11-10T02:40:09.752+00:00",
+    "started_at": "2026-11-10T02:40:10.632+00:00",
+    "state": "SUCCEEDED"
+  },
+  "canceller_run": 4,
+  "canceller_timing": {
+    "created_minus_scheduled_s": 0.014,
+    "first_line_to_ended_s": 3.913,
+    "scheduled_to_first_line_s": 3.807,
+    "scheduled_to_started_s": 0.88,
+    "started_to_ended_s": 6.84,
+    "started_to_first_line_s": 2.927
+  },
+  "roles_ticking_before_cancel": [
+    "child",
+    "grandchild",
+    "main"
+  ],
+  "victim": {
+    "after_signal_commit_attempts_stdout": [],
+    "cancelled_at_minus_cancel_call_s": 0.525,
+    "db_events": [
+      {
+        "client_unix": 1794278288.4531248,
+        "detail": {
+          "caught_signals": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63,
+            64
+          ],
+          "first_line_unix": 1794278285.9690795,
+          "mode": "ticker",
+          "pgid": 32,
+          "version": "v1"
+        },
+        "kind": "start",
+        "pid": 35,
+        "role": "main",
+        "run_number": 3,
+        "server": "2026-11-10T02:38:08.479000+00:00",
+        "server_unix": 1794278288.479
+      },
+      {
+        "client_unix": 1794278289.5053902,
+        "detail": {
+          "pgid": 32,
+          "ppid": 35,
+          "sid": 1
+        },
+        "kind": "start",
+        "pid": 156,
+        "role": "child",
+        "run_number": 3,
+        "server": "2026-11-10T02:38:09.511000+00:00",
+        "server_unix": 1794278289.511
+      },
+      {
+        "client_unix": 1794278290.550156,
+        "detail": {
+          "pgid": 258,
+          "ppid": 1,
+          "sid": 258
+        },
+        "kind": "start",
+        "pid": 259,
+        "role": "grandchild",
+        "run_number": 3,
+        "server": "2026-11-10T02:38:10.556000+00:00",
+        "server_unix": 1794278290.556
+      }
+    ],
+    "final": {
+      "cancelled_at": "2026-11-10T02:40:16.773+00:00",
+      "created_at": "2026-11-10T02:38:00.905+00:00",
+      "ended_at": null,
+      "exit_code": null,
+      "flight_version": 2,
+      "is_scheduled": false,
+      "run_number": 3,
+      "scheduled_at": "2026-11-10T02:38:00.893+00:00",
+      "started_at": "2026-11-10T02:38:02.829+00:00",
+      "state": "CANCELLED"
+    },
+    "log_lines": 56,
+    "log_tail": [
+      "EV {\"kind\": \"tick\", \"role\": \"main\", \"pid\": 35, \"run\": 3, \"t\": 1794278369.808, \"v\": \"v1\", \"seq\": 405, \"tag\": \"main:v1\"}",
+      "EV {\"kind\": \"tick\", \"role\": \"child\", \"pid\": 156, \"run\": 3, \"t\": 1794278370.833, \"v\": \"v1\", \"seq\": 405, \"tag\": \"child\"}",
+      "EV {\"kind\": \"tick\", \"role\": \"grandchild\", \"pid\": 259, \"run\": 3, \"t\": 1794278371.75, \"v\": \"v1\", \"seq\": 404, \"tag\": \"grandchild\"}",
+      "EV {\"kind\": \"tick\", \"role\": \"main\", \"pid\": 35, \"run\": 3, \"t\": 1794278380.009, \"v\": \"v1\", \"seq\": 456, \"tag\": \"main:v1\"}",
+      "EV {\"kind\": \"tick\", \"role\": \"child\", \"pid\": 156, \"run\": 3, \"t\": 1794278381.032, \"v\": \"v1\", \"seq\": 456, \"tag\": \"child\"}",
+      "EV {\"kind\": \"tick\", \"role\": \"grandchild\", \"pid\": 259, \"run\": 3, \"t\": 1794278381.75, \"v\": \"v1\", \"seq\": 454, \"tag\": \"grandchild\"}",
+      "EV {\"kind\": \"tick\", \"role\": \"main\", \"pid\": 35, \"run\": 3, \"t\": 1794278390.211, \"v\": \"v1\", \"seq\": 507, \"tag\": \"main:v1\"}",
+      "EV {\"kind\": \"tick\", \"role\": \"child\", \"pid\": 156, \"run\": 3, \"t\": 1794278391.033, \"v\": \"v1\", \"seq\": 506, \"tag\": \"child\"}",
+      "EV {\"kind\": \"tick\", \"role\": \"grandchild\", \"pid\": 259, \"run\": 3, \"t\": 1794278391.951, \"v\": \"v1\", \"seq\": 505, \"tag\": \"grandchild\"}",
+      "EV {\"kind\": \"tick\", \"role\": \"main\", \"pid\": 35, \"run\": 3, \"t\": 1794278400.216, \"v\": \"v1\", \"seq\": 557, \"tag\": \"main:v1\"}",
+      "EV {\"kind\": \"tick\", \"role\": \"child\", \"pid\": 156, \"run\": 3, \"t\": 1794278401.039, \"v\": \"v1\", \"seq\": 556, \"tag\": \"child\"}",
+      "EV {\"kind\": \"tick\", \"role\": \"grandchild\", \"pid\": 259, \"run\": 3, \"t\": 1794278402.152, \"v\": \"v1\", \"seq\": 556, \"tag\": \"grandchild\"}",
+      "EV {\"kind\": \"tick\", \"role\": \"main\", \"pid\": 35, \"run\": 3, \"t\": 1794278410.406, \"v\": \"v1\", \"seq\": 608, \"tag\": \"main:v1\"}",
+      "EV {\"kind\": \"tick\", \"role\": \"child\", \"pid\": 156, \"run\": 3, \"t\": 1794278411.23, \"v\": \"v1\", \"seq\": 607, \"tag\": \"child\"}",
+      "EV {\"kind\": \"tick\", \"role\": \"grandchild\", \"pid\": 259, \"run\": 3, \"t\": 1794278412.345, \"v\": \"v1\", \"seq\": 607, \"tag\": \"grandchild\"}"
+    ],
+    "server_minus_client_clock_s": {
+      "max": 0.038,
+      "mean": 0.004,
+      "median": 0.003,
+      "min": 0.002,
+      "n": 1934,
+      "p95": 0.007
+    },
+    "signals_logged_on_stdout": [
+      {
+        "kind": "signal",
+        "pid": 156,
+        "role": "child",
+        "run": 3,
+        "signal": "SIGCHLD",
+        "t": 1794278289.536,
+        "v": "v1"
+      }
+    ],
+    "ticks_per_role": [
+      {
+        "first_server": "2026-11-10T02:38:08.783000+00:00",
+        "first_server_unix": 1794278288.783,
+        "last_client_unix": 1794278418.5809817,
+        "last_row_client_minus_cancel_call_s": 2.333,
+        "last_row_server_minus_cancel_call_s": 2.336,
+        "last_server": "2026-11-10T02:40:18.584000+00:00",
+        "last_server_unix": 1794278418.584,
+        "pid": 35,
+        "role": "main",
+        "rows": 650,
+        "rows_after_cancel_call": 12
+      },
+      {
+        "first_server": "2026-11-10T02:38:09.807000+00:00",
+        "first_server_unix": 1794278289.807,
+        "last_client_unix": 1794278418.604674,
+        "last_row_client_minus_cancel_call_s": 2.357,
+        "last_row_server_minus_cancel_call_s": 2.359,
+        "last_server": "2026-11-10T02:40:18.607000+00:00",
+        "last_server_unix": 1794278418.607,
+        "pid": 156,
+        "role": "child",
+        "rows": 645,
+        "rows_after_cancel_call": 12
+      },
+      {
+        "first_server": "2026-11-10T02:38:10.923000+00:00",
+        "first_server_unix": 1794278290.923,
+        "last_client_unix": 1794278418.5200696,
+        "last_row_client_minus_cancel_call_s": 2.272,
+        "last_row_server_minus_cancel_call_s": 2.276,
+        "last_server": "2026-11-10T02:40:18.524000+00:00",
+        "last_server_unix": 1794278418.524,
+        "pid": 259,
+        "role": "grandchild",
+        "rows": 639,
+        "rows_after_cancel_call": 12
+      }
+    ],
+    "timing": {
+      "created_minus_scheduled_s": 0.012,
+      "scheduled_to_first_line_s": 5.076,
+      "scheduled_to_started_s": 1.936,
+      "started_to_cancelled_s": 133.944,
+      "started_to_first_line_s": 3.14
+    }
+  },
+  "victim_config": {
+    "CDC_V2_RUNS_CHILDREN": "1",
+    "CDC_V2_RUNS_CHILD_S": "300",
+    "CDC_V2_RUNS_DURATION_S": "300",
+    "CDC_V2_RUNS_MODE": "ticker",
+    "CDC_V2_RUNS_ON_TERM": "ignore",
+    "CDC_V2_RUNS_TICK_S": "0.2",
+    "CDC_V2_RUNS_TICK_VIA": "pgwire"
+  },
+  "victim_run": 3
+}

@@ -1,0 +1,85 @@
+{
+  "flight": "cdc_v2_spike_runs_maxrt",
+  "results": [
+    {
+      "accepted": false,
+      "error": "Invalid Input Error: Failed to cast value: Type INT32 with value -1 can't be cast because the value is out of range for the destination type UINT32",
+      "max_runtime_sec": -1
+    },
+    {
+      "accepted": true,
+      "max_runtime_sec": 0,
+      "read_back": 0
+    },
+    {
+      "accepted": true,
+      "max_runtime_sec": 1,
+      "read_back": 1
+    },
+    {
+      "accepted": true,
+      "max_runtime_sec": 5,
+      "read_back": 5
+    },
+    {
+      "accepted": true,
+      "max_runtime_sec": 10,
+      "read_back": 10
+    },
+    {
+      "accepted": true,
+      "max_runtime_sec": 30,
+      "read_back": 30
+    },
+    {
+      "accepted": true,
+      "max_runtime_sec": 59,
+      "read_back": 59
+    },
+    {
+      "accepted": true,
+      "max_runtime_sec": 60,
+      "read_back": 60
+    },
+    {
+      "accepted": true,
+      "max_runtime_sec": 61,
+      "read_back": 61
+    },
+    {
+      "accepted": true,
+      "max_runtime_sec": 120,
+      "read_back": 120
+    },
+    {
+      "accepted": true,
+      "max_runtime_sec": 3600,
+      "read_back": 3600
+    },
+    {
+      "accepted": true,
+      "max_runtime_sec": 28800,
+      "read_back": 28800
+    },
+    {
+      "accepted": true,
+      "max_runtime_sec": 28801,
+      "read_back": 28801
+    },
+    {
+      "accepted": true,
+      "max_runtime_sec": 43200,
+      "read_back": 43200
+    },
+    {
+      "accepted": true,
+      "max_runtime_sec": 86400,
+      "read_back": 86400
+    },
+    {
+      "accepted": true,
+      "max_runtime_sec": 604800,
+      "read_back": 604800
+    }
+  ]
+}

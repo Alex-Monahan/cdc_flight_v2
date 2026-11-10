@@ -1,0 +1,262 @@
+{
+  "db_events": [
+    {
+      "client_unix": 1794278128.2975018,
+      "detail": {
+        "mode": "orphan",
+        "stdout": "devnull"
+      },
+      "kind": "start",
+      "pid": 35,
+      "role": "main",
+      "run_number": 3,
+      "server": "2026-11-10T02:35:28.321000+00:00",
+      "server_unix": 1794278128.321
+    },
+    {
+      "client_unix": 1794278129.0588155,
+      "detail": {
+        "pgid": 32,
+        "ppid": 35,
+        "sid": 1
+      },
+      "kind": "start",
+      "pid": 155,
+      "role": "child",
+      "run_number": 3,
+      "server": "2026-11-10T02:35:29.065000+00:00",
+      "server_unix": 1794278129.065
+    },
+    {
+      "client_unix": 1794278129.9259007,
+      "detail": {
+        "pgid": 258,
+        "ppid": 1,
+        "sid": 258
+      },
+      "kind": "start",
+      "pid": 259,
+      "role": "grandchild",
+      "run_number": 3,
+      "server": "2026-11-10T02:35:29.932000+00:00",
+      "server_unix": 1794278129.932
+    },
+    {
+      "client_unix": 1794278148.3910663,
+      "detail": {
+        "procs": [
+          {
+            "comm": "tower-runtime-e",
+            "pgid": 1,
+            "pid": 1,
+            "ppid": 0,
+            "state": "S"
+          },
+          {
+            "comm": "uv",
+            "pgid": 32,
+            "pid": 32,
+            "ppid": 1,
+            "state": "S"
+          },
+          {
+            "comm": "python",
+            "pgid": 32,
+            "pid": 35,
+            "ppid": 32,
+            "state": "R"
+          },
+          {
+            "comm": "python",
+            "pgid": 32,
+            "pid": 155,
+            "ppid": 35,
+            "state": "S"
+          },
+          {
+            "comm": "python",
+            "pgid": 258,
+            "pid": 259,
+            "ppid": 1,
+            "state": "S"
+          }
+        ]
+      },
+      "kind": "main_exit",
+      "pid": 35,
+      "role": "main",
+      "run_number": 3,
+      "server": "2026-11-10T02:35:48.392000+00:00",
+      "server_unix": 1794278148.392
+    }
+  ],
+  "events": [
+    {
+      "child_pid": 155,
+      "child_role": "child",
+      "kind": "spawned",
+      "new_session": false,
+      "pid": 35,
+      "role": "main",
+      "run": 3,
+      "t": 1794278128.347,
+      "v": "v1"
+    },
+    {
+      "kind": "main_exiting",
+      "pid": 35,
+      "procs": [
+        {
+          "comm": "tower-runtime-e",
+          "pgid": 1,
+          "pid": 1,
+          "ppid": 0,
+          "state": "S"
+        },
+        {
+          "comm": "uv",
+          "pgid": 32,
+          "pid": 32,
+          "ppid": 1,
+          "state": "S"
+        },
+        {
+          "comm": "python",
+          "pgid": 32,
+          "pid": 35,
+          "ppid": 32,
+          "state": "R"
+        },
+        {
+          "comm": "python",
+          "pgid": 32,
+          "pid": 155,
+          "ppid": 35,
+          "state": "S"
+        },
+        {
+          "comm": "python",
+          "pgid": 258,
+          "pid": 259,
+          "ppid": 1,
+          "state": "S"
+        }
+      ],
+      "role": "main",
+      "run": 3,
+      "t": 1794278148.351,
+      "v": "v1"
+    }
+  ],
+  "final": {
+    "cancelled_at": null,
+    "created_at": "2026-11-10T02:35:21.277+00:00",
+    "ended_at": "2026-11-10T02:35:48.54+00:00",
+    "exit_code": 0,
+    "flight_version": 3,
+    "is_scheduled": false,
+    "run_number": 3,
+    "scheduled_at": "2026-11-10T02:35:21.264+00:00",
+    "started_at": "2026-11-10T02:35:22.224+00:00",
+    "state": "SUCCEEDED"
+  },
+  "log_tail": [
+    "Creating virtual environment at: .venv",
+    "Resolved 1 package in 547ms",
+    "Downloading duckdb (20.6MiB)",
+    " Downloaded duckdb",
+    "Prepared 1 package in 1.52s",
+    "Installed 1 package in 33ms",
+    " + duckdb==1.5.6",
+    "FIRST 1794278126.219",
+    "EV {\"kind\": \"spawned\", \"role\": \"main\", \"pid\": 35, \"run\": 3, \"t\": 1794278128.347, \"v\": \"v1\", \"child_role\": \"child\", \"child_pid\": 155, \"new_session\": false}",
+    "EV {\"kind\": \"main_exiting\", \"role\": \"main\", \"pid\": 35, \"run\": 3, \"t\": 1794278148.351, \"v\": \"v1\", \"procs\": [{\"pid\": 1, \"ppid\": 0, \"pgid\": 1, \"state\": \"S\", \"comm\": \"tower-runtime-e\"}, {\"pid\": 32, \"ppid\": 1, \"pgid\": 32, \"state\": \"S\", \"comm\": \"uv\"}, {\"pid\": 35, \"ppid\": 32, \"pgid\": 32, \"state\": \"R\", \"comm\": \"python\"}, {\"pid\": 155, \"ppid\": 35, \"pgid\": 32, \"state\": \"S\", \"comm\": \"python\"}, {\"pid\": 259, \"ppid\": 1, \"pgid\": 258, \"state\": \"S\", \"comm\": \"python\"}]}"
+  ],
+  "main_exit_logged_at": "2026-11-10T02:35:48.351000+00:00",
+  "process_table_at_main_exit": [
+    {
+      "comm": "tower-runtime-e",
+      "pgid": 1,
+      "pid": 1,
+      "ppid": 0,
+      "state": "S"
+    },
+    {
+      "comm": "uv",
+      "pgid": 32,
+      "pid": 32,
+      "ppid": 1,
+      "state": "S"
+    },
+    {
+      "comm": "python",
+      "pgid": 32,
+      "pid": 35,
+      "ppid": 32,
+      "state": "R"
+    },
+    {
+      "comm": "python",
+      "pgid": 32,
+      "pid": 155,
+      "ppid": 35,
+      "state": "S"
+    },
+    {
+      "comm": "python",
+      "pgid": 258,
+      "pid": 259,
+      "ppid": 1,
+      "state": "S"
+    }
+  ],
+  "run": 3,
+  "run_end_minus_main_exit_s": 0.189,
+  "stdout_of_children": "devnull",
+  "ticks_per_role": [
+    {
+      "first_server": "2026-11-10T02:35:28.349000+00:00",
+      "first_server_unix": 1794278128.349,
+      "last_client_unix": 1794278148.3477745,
+      "last_row_server_minus_main_exit_s": -0.001,
+      "last_row_server_minus_run_end_s": -0.19,
+      "last_server": "2026-11-10T02:35:48.350000+00:00",
+      "last_server_unix": 1794278148.35,
+      "pid": 35,
+      "role": "main",
+      "rows": 21
+    },
+    {
+      "first_server": "2026-11-10T02:35:29.106000+00:00",
+      "first_server_unix": 1794278129.106,
+      "last_client_unix": 1794278148.1044552,
+      "last_row_server_minus_main_exit_s": -0.245,
+      "last_row_server_minus_run_end_s": -0.434,
+      "last_server": "2026-11-10T02:35:48.106000+00:00",
+      "last_server_unix": 1794278148.106,
+      "pid": 155,
+      "role": "child",
+      "rows": 20
+    },
+    {
+      "first_server": "2026-11-10T02:35:29.962000+00:00",
+      "first_server_unix": 1794278129.962,
+      "last_client_unix": 1794278147.960181,
+      "last_row_server_minus_main_exit_s": -0.39,
+      "last_row_server_minus_run_end_s": -0.579,
+      "last_server": "2026-11-10T02:35:47.961000+00:00",
+      "last_server_unix": 1794278147.961,
+      "pid": 259,
+      "role": "grandchild",
+      "rows": 19
+    }
+  ],
+  "timing": {
+    "created_minus_scheduled_s": 0.013,
+    "first_line_to_ended_s": 22.321,
+    "scheduled_to_first_line_s": 4.955,
+    "scheduled_to_started_s": 0.96,
+    "started_to_ended_s": 26.316,
+    "started_to_first_line_s": 3.995
+  }
+}
