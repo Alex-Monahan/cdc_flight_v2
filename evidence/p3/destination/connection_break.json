@@ -1,9 +1,11 @@
 {
-  "command": "tools/with-env uv run -q pytest -q -m md tests/destination",
+  "command": "see results.<key>.command (each result names the run that wrote it)",
   "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
   "results": {
     "fault_sites_in_a_child": {
-      "date_utc": "2026-11-10 08:56",
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py",
+      "commit": "7193b39",
+      "date_utc": "2026-11-10 20:26",
       "sites": {
         "md.commit": {
           "check": {
@@ -22,7 +24,7 @@
             "intend:9-12",
             "done:9-12"
           ],
-          "seconds_until_caught_up": 3.88,
+          "seconds_until_caught_up": 4.4,
           "transaction_at_the_fault_committed": false
         },
         "md.commit_reply": {
@@ -42,7 +44,7 @@
             "intend:15-15",
             "done:15-15"
           ],
-          "seconds_until_caught_up": 0.68,
+          "seconds_until_caught_up": 0.76,
           "transaction_at_the_fault_committed": true
         },
         "md.execute": {
@@ -61,7 +63,7 @@
             "intend:3-6",
             "done:3-6"
           ],
-          "seconds_until_caught_up": 1.36,
+          "seconds_until_caught_up": 1.37,
           "transaction_at_the_fault_committed": false
         },
         "md.fence": {
@@ -81,7 +83,7 @@
             "intend:6-9",
             "done:6-9"
           ],
-          "seconds_until_caught_up": 1.6,
+          "seconds_until_caught_up": 1.68,
           "transaction_at_the_fault_committed": false
         }
       }
@@ -111,12 +113,12 @@
             "signal": null,
             "signal_name": null
           },
-          "ms_of_first_error_after_process_start": 8307,
+          "ms_of_first_error_after_process_start": 8778,
           "proxy_connections_accepted": 2,
           "proxy_connections_reset": 0,
           "recovered_by_itself": true,
           "rows_of_the_child": 6,
-          "seconds_from_lifting_to_exit": 4.8,
+          "seconds_from_lifting_to_exit": 5.2,
           "transaction_at_the_break_committed": false,
           "what": "nothing passes in either direction from the next statement on; the proxy passes again 8 s later (what it held is then delivered)"
         },
@@ -143,12 +145,12 @@
             "signal": null,
             "signal_name": null
           },
-          "ms_of_first_error_after_process_start": 11915,
+          "ms_of_first_error_after_process_start": 12567,
           "proxy_connections_accepted": 4,
           "proxy_connections_reset": 2,
           "recovered_by_itself": true,
           "rows_of_the_child": 6,
-          "seconds_from_lifting_to_exit": 6.7,
+          "seconds_from_lifting_to_exit": 7.0,
           "transaction_at_the_break_committed": true,
           "what": "the COMMIT reaches MotherDuck, nothing comes back; after the child's error the connections are reset and the proxy passes again"
         },
@@ -175,12 +177,12 @@
             "signal": null,
             "signal_name": null
           },
-          "ms_of_first_error_after_process_start": 11925,
+          "ms_of_first_error_after_process_start": 12490,
           "proxy_connections_accepted": 2,
           "proxy_connections_reset": 0,
           "recovered_by_itself": true,
           "rows_of_the_child": 6,
-          "seconds_from_lifting_to_exit": 4.7,
+          "seconds_from_lifting_to_exit": 5.0,
           "transaction_at_the_break_committed": true,
           "what": "the COMMIT is held by the proxy; 4 s after the child's error the proxy passes again and delivers what it held: the late COMMIT and the statements of the child's next attempt"
         },
@@ -198,8 +200,8 @@
           ],
           "events": [
             "error:CommitUnknown",
-            "intend:27-30",
-            "done:27-30",
+            "intend:30-30",
+            "done:30-30",
             "exit:0"
           ],
           "exit": {
@@ -207,13 +209,13 @@
             "signal": null,
             "signal_name": null
           },
-          "ms_of_first_error_after_process_start": 12290,
+          "ms_of_first_error_after_process_start": 12546,
           "proxy_connections_accepted": 4,
           "proxy_connections_reset": 2,
           "recovered_by_itself": true,
           "rows_of_the_child": 6,
-          "seconds_from_lifting_to_exit": 6.9,
-          "transaction_at_the_break_committed": false,
+          "seconds_from_lifting_to_exit": 7.0,
+          "transaction_at_the_break_committed": true,
           "what": "the COMMIT is held by the proxy; after the child's error the connections are reset, so the COMMIT is never delivered"
         },
         "reset": {
@@ -240,7 +242,7 @@
           "proxy_connections_reset": 2,
           "recovered_by_itself": true,
           "rows_of_the_child": 6,
-          "seconds_from_lifting_to_exit": 4.5,
+          "seconds_from_lifting_to_exit": 4.6,
           "transaction_at_the_break_committed": "committed normally, no error",
           "what": "every TCP connection of the child is reset (RST) while its transaction is open; then the proxy passes again and the child goes on"
         }
@@ -251,7 +253,9 @@
         "stmt_deadline": 4,
         "tx_deadline": 8
       },
-      "date_utc": "2026-11-10 09:24",
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py",
+      "commit": "7193b39",
+      "date_utc": "2026-11-10 20:27",
       "proxy": {
         "accepted": 15,
         "closed_by_fault": 0,

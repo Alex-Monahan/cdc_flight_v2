@@ -1,9 +1,11 @@
 {
-  "command": "tools/with-env uv run -q pytest -q -m md tests/destination",
+  "command": "see results.<key>.command (each result names the run that wrote it)",
   "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
   "results": {
     "old_run_stands_before_commit": {
-      "date_utc": "2026-11-10 09:56",
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md.py",
+      "commit": "7193b39",
+      "date_utc": "2026-11-10 19:54",
       "old_run_gets": "CommitUnknown",
       "old_transaction_committed": false,
       "take_over_with_the_interrupt": {
@@ -13,57 +15,61 @@
         "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
         "listed": 2,
         "result": "won",
-        "seconds": 1.071,
+        "seconds": 1.345,
         "unknown": 0
       },
       "take_over_without_the_interrupt": {
-        "attempts": 9,
-        "conflicts": 9,
+        "attempts": 8,
+        "conflicts": 8,
         "interrupted": 0,
         "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
         "listed": 0,
         "result": "TakeoverFailed after 5 s",
-        "seconds": 5.257,
+        "seconds": 5.524,
         "unknown": 0
       },
       "what": "the old run's stream-lane transaction has run its fence statement and stands before COMMIT"
     },
     "open_transaction_holds_a_leader_row": {
-      "date_utc": "2026-11-10 09:56",
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md.py",
+      "commit": "7193b39",
+      "date_utc": "2026-11-10 19:53",
       "old_run_at_its_next_statement": "ConnectionLost",
       "old_run_at_its_next_transaction": "FenceLost",
       "take_over_with_the_interrupt": {
-        "attempts": 3,
-        "conflicts": 2,
+        "attempts": 2,
+        "conflicts": 1,
         "interrupted": 1,
         "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
-        "listed": 4,
+        "listed": 2,
         "result": "won",
-        "seconds": 1.931,
+        "seconds": 1.471,
         "unknown": 0
       },
       "take_over_without_the_interrupt": {
-        "attempts": 10,
-        "conflicts": 10,
+        "attempts": 8,
+        "conflicts": 8,
         "interrupted": 0,
         "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
         "listed": 0,
         "result": "TakeoverFailed after 6 s",
-        "seconds": 6.48,
+        "seconds": 6.685,
         "unknown": 0
       },
       "what": "the old run's control-lane transaction has updated the heartbeat row and stays open"
     },
     "open_transaction_holds_only_data_rows": {
-      "date_utc": "2026-11-10 09:56",
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md.py",
+      "commit": "7193b39",
+      "date_utc": "2026-11-10 19:53",
       "interrupt_earlier": {
         "interrupted": 1,
         "listed": 2
       },
       "new_run_after_the_interrupt": {
-        "conflicts": 3,
+        "conflicts": 1,
         "pause_between_tries_s": 0.1,
-        "row_free_after_s": 1.28
+        "row_free_after_s": 0.65
       },
       "new_run_updating_the_same_row": "Conflict until md.interrupt_earlier(conn, new_epoch) ran",
       "old_run_at_its_next_statement": "ConnectionLost",
@@ -74,21 +80,25 @@
         "last_error": null,
         "listed": 0,
         "result": "won without a conflict",
-        "seconds": 0.375,
+        "seconds": 0.567,
         "unknown": 0
       },
       "what": "the old run's stream-lane transaction has updated a data row and stays open"
     },
     "replaced_connection_interrupted_by_id": {
-      "date_utc": "2026-11-10 09:51",
-      "interrupt_statement_ms": 76.3,
-      "next_transaction_with_connect_interrupt_and_registration_ms": 487.5,
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md.py",
+      "commit": "7193b39",
+      "date_utc": "2026-11-10 19:53",
+      "interrupt_statement_ms": 86.6,
+      "next_transaction_with_connect_interrupt_and_registration_ms": 776.5,
       "old_connection_still_held_a_transaction": false,
       "what": "a lane transaction loses its connection before COMMIT (fault site md.fence); the next transaction of the lane connects again, interrupts the old server connection by id and updates the same row"
     },
     "what_the_server_answers": {
-      "begin_alone_took_ms": 0.4,
-      "date_utc": "2026-11-10 09:56",
+      "begin_alone_took_ms": 0.9,
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md.py",
+      "commit": "7193b39",
+      "date_utc": "2026-11-10 19:55",
       "reading": "BEGIN is not sent to the server. The server lists a connection only while it has a statement in flight or a transaction with at least one statement, and an interrupt answers true in exactly those states. So the count `interrupted` of md.interrupt_earlier is the number of connections that held something, not the number of connections that are still alive, and a registered id of an idle connection cannot be told from one that is gone",
       "states": {
         "a statement that interrupts its own connection": {
@@ -126,7 +136,7 @@
         "statement in flight": {
           "interrupt_answers": true,
           "listed": 1,
-          "statement_ended_after_s": 0.32,
+          "statement_ended_after_s": 0.36,
           "user_agent_carries_the_marker": true
         },
         "the client's next statement": {
@@ -134,9 +144,9 @@
           "error": "TransactionException: TransactionContext Error: transaction already rolled back: Connection Error: interrupted by user"
         },
         "the same transaction after the interrupt, before the client sent anything": {
-          "a_second_interrupt_answered_true": 4,
+          "a_second_interrupt_answered_true": 5,
           "next_transaction_on_the_same_row_began_after_s": [
-            0.07,
+            0.08,
             0.08,
             0.08,
             0.08

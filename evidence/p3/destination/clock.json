@@ -1,10 +1,10 @@
 {
-  "command": "tools/with-env uv run -q pytest -q -m md tests/destination",
+  "command": "see results.<key>.command (each result names the run that wrote it)",
   "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
   "results": {
     "where_evaluated": {
       "bare_select": {
-        "max_ms": 2.1,
+        "max_ms": 2.8,
         "median_ms": 0.8,
         "min_ms": 0.3,
         "n": 30,
@@ -13,13 +13,15 @@
       "bare_select_value_inside_the_clients_own_send_receive_window": "30 of 30",
       "clock_sql": "uuid_extract_timestamp(uuidv7())",
       "clock_us_sql": {
-        "max_ms": 79.5,
-        "median_ms": 74.3,
-        "min_ms": 71.9,
+        "max_ms": 84.6,
+        "median_ms": 77.5,
+        "min_ms": 74.3,
         "n": 30,
-        "p90_ms": 77.9
+        "p90_ms": 83.1
       },
-      "date_utc": "2026-11-10 08:25",
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md.py",
+      "commit": "7193b39",
+      "date_utc": "2026-11-10 19:49",
       "plans": {
         "bare select": {
           "operators": [

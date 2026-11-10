@@ -1,9 +1,11 @@
 {
-  "command": "tools/with-env uv run -q pytest -q -m md tests/destination",
+  "command": "see results.<key>.command (each result names the run that wrote it)",
   "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
   "results": {
     "arrow_types": {
-      "date_utc": "2026-11-10 11:47",
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_again.py",
+      "commit": "7193b39",
+      "date_utc": "2026-11-10 20:00",
       "registered_as": [
         "UUID",
         "JSON",
@@ -27,14 +29,18 @@
       ]
     },
     "drop_schema_cascade": {
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_again.py",
+      "commit": "7193b39",
       "committed_value": 0,
-      "date_utc": "2026-11-10 11:47",
+      "date_utc": "2026-11-10 20:00",
       "error": "CommitUnknown",
       "message": "the outcome of COMMIT is unknown (TransactionException)",
       "schemas_left": 0
     },
     "merge_and_truncate": {
-      "date_utc": "2026-11-10 11:57",
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_again.py",
+      "commit": "7193b39",
+      "date_utc": "2026-11-10 20:01",
       "merge_returns": null,
       "rows_after_merge": [
         [
@@ -91,12 +97,16 @@
           true
         ]
       ],
-      "date_utc": "2026-11-10 11:47",
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_again.py",
+      "commit": "7193b39",
+      "date_utc": "2026-11-10 20:00",
       "what": "kind of statement, class of the client's error, its text names the value"
     },
     "settings_scope": {
       "arrow_type_of_uuid": "extension<arrow.uuid>",
-      "date_utc": "2026-11-10 11:48",
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_again.py",
+      "commit": "7193b39",
+      "date_utc": "2026-11-10 20:01",
       "lane_after_a_global_change": [
         "UTC",
         true

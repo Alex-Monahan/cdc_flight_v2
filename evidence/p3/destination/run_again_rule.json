@@ -1,5 +1,5 @@
 {
-  "command": "tools/with-env uv run -q pytest -q -m md tests/destination",
+  "command": "see results.<key>.command (each result names the run that wrote it)",
   "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
   "results": {
     "naive_control": {
@@ -68,7 +68,9 @@
           "second_copy_read_position": 3
         }
       },
-      "date_utc": "2026-11-10 09:12",
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py",
+      "commit": "7193b39",
+      "date_utc": "2026-11-10 20:25",
       "kill_later_ms": 60,
       "second_copy_follows_the_rule": false
     },
@@ -129,7 +131,9 @@
           "second_copy_read_position": 3
         }
       },
-      "date_utc": "2026-11-10 09:11",
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py",
+      "commit": "7193b39",
+      "date_utc": "2026-11-10 20:24",
       "kill_later_ms": 60,
       "second_copy_follows_the_rule": true
     }

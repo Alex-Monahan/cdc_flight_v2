@@ -1,0 +1,1117 @@
+{
+  "command": "see results.<key>.command (each result names the run that wrote it)",
+  "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
+  "results": {
+    "black_hole": {
+      "bounds_s": {
+        "commit": 4.5,
+        "connect": 3.5,
+        "fence": 2.5,
+        "register": 2.5,
+        "statement": 2.5
+      },
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_fix_round.py",
+      "commit": "7193b39",
+      "date_utc": "2026-11-10 20:10",
+      "freed_after_heal_s": 1.0,
+      "phases": [
+        {
+          "error": null,
+          "ev": "warm",
+          "gen": 1,
+          "md_background": 0,
+          "md_open_connections": 1,
+          "md_waiting_calls": 0,
+          "phase": "warm",
+          "seconds": 0.567,
+          "t_test": 1.93,
+          "threads": 2
+        },
+        {
+          "error": "DeadlineExceeded",
+          "ev": "statement",
+          "md_background": 3,
+          "md_open_connections": 2,
+          "md_waiting_calls": 2,
+          "message": "lane stream: a statement",
+          "phase": "statement",
+          "seconds": 2.515,
+          "t_test": 4.44,
+          "threads": 4
+        },
+        {
+          "error": null,
+          "ev": "warm",
+          "gen": 2,
+          "md_background": 0,
+          "md_open_connections": 1,
+          "md_waiting_calls": 0,
+          "phase": "statement.recover",
+          "seconds": 0.763,
+          "t_test": 5.21,
+          "threads": 2
+        },
+        {
+          "error": "DeadlineExceeded",
+          "ev": "fence",
+          "md_background": 3,
+          "md_open_connections": 2,
+          "md_waiting_calls": 2,
+          "message": "lane stream: the fence statement",
+          "phase": "fence",
+          "seconds": 2.598,
+          "t_test": 7.81,
+          "threads": 4
+        },
+        {
+          "error": null,
+          "ev": "warm",
+          "gen": 3,
+          "md_background": 0,
+          "md_open_connections": 1,
+          "md_waiting_calls": 0,
+          "phase": "fence.recover",
+          "seconds": 0.832,
+          "t_test": 8.64,
+          "threads": 2
+        },
+        {
+          "error": "CommitUnknown",
+          "ev": "commit",
+          "md_background": 3,
+          "md_open_connections": 2,
+          "md_waiting_calls": 2,
+          "message": "lane stream: the outcome of COMMIT is unknown (no answer within the deadline and the grace period)",
+          "phase": "commit",
+          "seconds": 4.514,
+          "t_test": 13.16,
+          "threads": 4
+        },
+        {
+          "error": null,
+          "ev": "warm",
+          "gen": 4,
+          "md_background": 0,
+          "md_open_connections": 1,
+          "md_waiting_calls": 0,
+          "phase": "commit.recover",
+          "seconds": 0.84,
+          "t_test": 14.0,
+          "threads": 2
+        },
+        {
+          "error": "DeadlineExceeded",
+          "ev": "connect",
+          "md_background": 2,
+          "md_open_connections": 2,
+          "md_waiting_calls": 1,
+          "message": "connecting to the destination (extra)",
+          "phase": "connect",
+          "seconds": 3.513,
+          "t_test": 17.52,
+          "threads": 4
+        },
+        {
+          "error": null,
+          "ev": "warm",
+          "gen": 4,
+          "md_background": 0,
+          "md_open_connections": 1,
+          "md_waiting_calls": 0,
+          "phase": "connect.recover",
+          "seconds": 0.249,
+          "t_test": 17.77,
+          "threads": 2
+        },
+        {
+          "error": "DeadlineExceeded",
+          "ev": "register",
+          "md_background": 3,
+          "md_open_connections": 3,
+          "md_waiting_calls": 2,
+          "message": "lane backfill.0: registration: INSERT",
+          "phase": "register",
+          "seconds": 2.519,
+          "t_test": 20.37,
+          "threads": 5
+        },
+        {
+          "error": null,
+          "ev": "warm",
+          "gen": 4,
+          "md_background": 0,
+          "md_open_connections": 1,
+          "md_waiting_calls": 0,
+          "phase": "register.recover",
+          "seconds": 0.243,
+          "t_test": 20.62,
+          "threads": 2
+        },
+        {
+          "error": "DeadlineExceeded",
+          "ev": "repeat",
+          "i": 0,
+          "md_background": 3,
+          "md_open_connections": 2,
+          "md_waiting_calls": 2,
+          "message": "lane stream: a statement",
+          "phase": "repeat",
+          "seconds": 2.518,
+          "t_test": 23.14,
+          "threads": 4
+        },
+        {
+          "error": "DeadlineExceeded",
+          "ev": "repeat",
+          "i": 1,
+          "md_background": 5,
+          "md_open_connections": 3,
+          "md_waiting_calls": 3,
+          "message": "connecting to the destination (stream)",
+          "phase": "repeat",
+          "seconds": 3.519,
+          "t_test": 26.66,
+          "threads": 6
+        },
+        {
+          "error": "ConnectionLost",
+          "ev": "repeat",
+          "i": 2,
+          "md_background": 5,
+          "md_open_connections": 3,
+          "md_waiting_calls": 3,
+          "message": "connection stream: 2 calls that were given up still wait for the destination (at most 2); no new connection until one returns",
+          "phase": "repeat",
+          "seconds": 0.0,
+          "t_test": 26.66,
+          "threads": 6
+        },
+        {
+          "error": "ConnectionLost",
+          "ev": "repeat",
+          "i": 3,
+          "md_background": 5,
+          "md_open_connections": 3,
+          "md_waiting_calls": 3,
+          "message": "connection stream: 2 calls that were given up still wait for the destination (at most 2); no new connection until one returns",
+          "phase": "repeat",
+          "seconds": 0.0,
+          "t_test": 26.66,
+          "threads": 6
+        },
+        {
+          "error": "ConnectionLost",
+          "ev": "repeat",
+          "i": 4,
+          "md_background": 5,
+          "md_open_connections": 3,
+          "md_waiting_calls": 3,
+          "message": "connection stream: 2 calls that were given up still wait for the destination (at most 2); no new connection until one returns",
+          "phase": "repeat",
+          "seconds": 0.0,
+          "t_test": 26.66,
+          "threads": 6
+        },
+        {
+          "error": "ConnectionLost",
+          "ev": "repeat",
+          "i": 5,
+          "md_background": 5,
+          "md_open_connections": 3,
+          "md_waiting_calls": 3,
+          "message": "connection stream: 2 calls that were given up still wait for the destination (at most 2); no new connection until one returns",
+          "phase": "repeat",
+          "seconds": 0.0,
+          "t_test": 26.66,
+          "threads": 6
+        },
+        {
+          "error": "ConnectionLost",
+          "ev": "repeat",
+          "i": 6,
+          "md_background": 5,
+          "md_open_connections": 3,
+          "md_waiting_calls": 3,
+          "message": "connection stream: 2 calls that were given up still wait for the destination (at most 2); no new connection until one returns",
+          "phase": "repeat",
+          "seconds": 0.0,
+          "t_test": 26.66,
+          "threads": 6
+        },
+        {
+          "error": "ConnectionLost",
+          "ev": "repeat",
+          "i": 7,
+          "md_background": 5,
+          "md_open_connections": 3,
+          "md_waiting_calls": 3,
+          "message": "connection stream: 2 calls that were given up still wait for the destination (at most 2); no new connection until one returns",
+          "phase": "repeat",
+          "seconds": 0.0,
+          "t_test": 26.66,
+          "threads": 6
+        },
+        {
+          "error": "ConnectionLost",
+          "ev": "repeat",
+          "i": 8,
+          "md_background": 5,
+          "md_open_connections": 3,
+          "md_waiting_calls": 3,
+          "message": "connection stream: 2 calls that were given up still wait for the destination (at most 2); no new connection until one returns",
+          "phase": "repeat",
+          "seconds": 0.0,
+          "t_test": 26.66,
+          "threads": 6
+        },
+        {
+          "error": "ConnectionLost",
+          "ev": "repeat",
+          "i": 9,
+          "md_background": 5,
+          "md_open_connections": 3,
+          "md_waiting_calls": 3,
+          "message": "connection stream: 2 calls that were given up still wait for the destination (at most 2); no new connection until one returns",
+          "phase": "repeat",
+          "seconds": 0.0,
+          "t_test": 26.66,
+          "threads": 6
+        },
+        {
+          "error": "ConnectionLost",
+          "ev": "repeat",
+          "i": 10,
+          "md_background": 5,
+          "md_open_connections": 3,
+          "md_waiting_calls": 3,
+          "message": "connection stream: 2 calls that were given up still wait for the destination (at most 2); no new connection until one returns",
+          "phase": "repeat",
+          "seconds": 0.0,
+          "t_test": 26.66,
+          "threads": 6
+        },
+        {
+          "error": "ConnectionLost",
+          "ev": "repeat",
+          "i": 11,
+          "md_background": 5,
+          "md_open_connections": 3,
+          "md_waiting_calls": 3,
+          "message": "connection stream: 2 calls that were given up still wait for the destination (at most 2); no new connection until one returns",
+          "phase": "repeat",
+          "seconds": 0.0,
+          "t_test": 26.66,
+          "threads": 6
+        },
+        {
+          "ev": "monitor",
+          "md_background": 5,
+          "md_open_connections": 3,
+          "md_waiting_calls": 3,
+          "phase": "monitor_still_blackholed",
+          "t": 0.0,
+          "t_test": 26.66,
+          "threads": 6
+        },
+        {
+          "ev": "monitor",
+          "md_background": 5,
+          "md_open_connections": 3,
+          "md_waiting_calls": 3,
+          "phase": "monitor_still_blackholed",
+          "t": 5.0,
+          "t_test": 31.67,
+          "threads": 6
+        },
+        {
+          "ev": "monitor",
+          "last": true,
+          "md_background": 5,
+          "md_open_connections": 3,
+          "md_waiting_calls": 3,
+          "phase": "monitor_still_blackholed",
+          "t": 10.0,
+          "t_test": 36.68,
+          "threads": 6
+        },
+        {
+          "event": "healed",
+          "t_test": 36.68
+        },
+        {
+          "ev": "monitor",
+          "md_background": 5,
+          "md_open_connections": 3,
+          "md_waiting_calls": 3,
+          "phase": "monitor_after_heal",
+          "t": 0.0,
+          "t_test": 36.68,
+          "threads": 6
+        },
+        {
+          "ev": "monitor",
+          "md_background": 0,
+          "md_open_connections": 0,
+          "md_waiting_calls": 0,
+          "phase": "monitor_after_heal",
+          "t": 1.0,
+          "t_test": 37.68,
+          "threads": 1
+        },
+        {
+          "ev": "monitor",
+          "last": true,
+          "md_background": 0,
+          "md_open_connections": 0,
+          "md_waiting_calls": 0,
+          "phase": "monitor_after_heal",
+          "t": 1.0,
+          "t_test": 37.68,
+          "threads": 1
+        },
+        {
+          "error": null,
+          "ev": "final",
+          "gen": 5,
+          "md_background": 0,
+          "md_open_connections": 1,
+          "md_waiting_calls": 0,
+          "phase": "final",
+          "seconds": 0.778,
+          "t_test": 38.46,
+          "threads": 2
+        },
+        {
+          "ev": "quit",
+          "idle": true,
+          "md_background": 0,
+          "md_open_connections": 0,
+          "md_waiting_calls": 0,
+          "phase": "quit",
+          "t_test": 38.47,
+          "threads": 1
+        }
+      ],
+      "repeat_failed_at_once": 10,
+      "repeat_given_up": 2,
+      "threads_during_repeat": [
+        4,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "waiting_calls_during_repeat": [
+        2,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3
+      ],
+      "what": "a lane whose network path answers nothing (NetProxy blackhole, both directions); child settings: statement 2 s, block 4 s, grace 0.5 s, connect 3 s (1 attempt), max_waiting_calls 2"
+    },
+    "takeover_at_every_point": {
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_fix_round.py",
+      "commit": "7193b39",
+      "date_utc": "2026-11-10 20:12",
+      "records": [
+        {
+          "after": {
+            "fence_epochs": [
+              3
+            ],
+            "fence_stream": {
+              "epoch": 3,
+              "n": 2
+            },
+            "heartbeat_epoch": 3,
+            "leader": {
+              "epoch": 3,
+              "run_id": "new-9dd6fe2694d1",
+              "state": "leading"
+            }
+          },
+          "before": {
+            "fence_epochs": [
+              2
+            ],
+            "fence_stream": {
+              "epoch": 2,
+              "n": 2
+            },
+            "heartbeat_epoch": 2,
+            "leader": {
+              "epoch": 2,
+              "run_id": "old-9dd6fe2694d1",
+              "state": "leading"
+            }
+          },
+          "old_block": "FenceLost: lane stream: epoch 2 no longer leads (the fence statement changed 0 rows)",
+          "old_lane_next": "FenceLost: lane stream: epoch 2 no longer leads (the fence statement changed 0 rows)",
+          "old_listed_before_commit": false,
+          "old_trace": null,
+          "point": "in_block",
+          "shape": "nothing",
+          "takeover": {
+            "attempts": 1,
+            "conflicts": 0,
+            "interrupted": 0,
+            "last_error": null,
+            "listed": 0,
+            "seconds": 0.513,
+            "unknown": 0
+          },
+          "verdict": "pass"
+        },
+        {
+          "after": {
+            "fence_epochs": [
+              5
+            ],
+            "fence_stream": {
+              "epoch": 5,
+              "n": 3
+            },
+            "heartbeat_epoch": 5,
+            "leader": {
+              "epoch": 5,
+              "run_id": "new-b97d55d79161",
+              "state": "leading"
+            }
+          },
+          "before": {
+            "fence_epochs": [
+              4
+            ],
+            "fence_stream": {
+              "epoch": 4,
+              "n": 3
+            },
+            "heartbeat_epoch": 4,
+            "leader": {
+              "epoch": 4,
+              "run_id": "old-b97d55d79161",
+              "state": "leading"
+            }
+          },
+          "old_block": "FenceLost: lane stream: epoch 4 no longer leads (the fence statement changed 0 rows)",
+          "old_lane_next": "FenceLost: lane stream: epoch 4 no longer leads (the fence statement changed 0 rows)",
+          "old_listed_before_commit": null,
+          "old_trace": null,
+          "point": "in_block",
+          "shape": "nothing",
+          "takeover": {
+            "attempts": 1,
+            "conflicts": 0,
+            "interrupted": 0,
+            "last_error": null,
+            "listed": 0,
+            "seconds": 0.523,
+            "unknown": 0
+          },
+          "verdict": "pass"
+        },
+        {
+          "after": {
+            "fence_epochs": [
+              7
+            ],
+            "fence_stream": {
+              "epoch": 7,
+              "n": 4
+            },
+            "heartbeat_epoch": 7,
+            "leader": {
+              "epoch": 7,
+              "run_id": "new-cd27254260ce",
+              "state": "leading"
+            }
+          },
+          "before": {
+            "fence_epochs": [
+              6
+            ],
+            "fence_stream": {
+              "epoch": 6,
+              "n": 4
+            },
+            "heartbeat_epoch": 6,
+            "leader": {
+              "epoch": 6,
+              "run_id": "old-cd27254260ce",
+              "state": "leading"
+            }
+          },
+          "old_block": "CommitUnknown: lane stream: the outcome of COMMIT is unknown (TransactionException (Connection Error))",
+          "old_lane_next": "FenceLost: lane stream: epoch 6 no longer leads (the fence row has another epoch)",
+          "old_listed_before_commit": false,
+          "old_trace": null,
+          "point": "fenced",
+          "shape": "nothing",
+          "takeover": {
+            "attempts": 3,
+            "conflicts": 2,
+            "interrupted": 2,
+            "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
+            "listed": 4,
+            "seconds": 2.168,
+            "unknown": 0
+          },
+          "verdict": "pass"
+        },
+        {
+          "after": {
+            "fence_epochs": [
+              9
+            ],
+            "fence_stream": {
+              "epoch": 9,
+              "n": 5
+            },
+            "heartbeat_epoch": 9,
+            "leader": {
+              "epoch": 9,
+              "run_id": "new-d78b7ac28887",
+              "state": "leading"
+            }
+          },
+          "before": {
+            "fence_epochs": [
+              8
+            ],
+            "fence_stream": {
+              "epoch": 8,
+              "n": 5
+            },
+            "heartbeat_epoch": 8,
+            "leader": {
+              "epoch": 8,
+              "run_id": "old-d78b7ac28887",
+              "state": "leading"
+            }
+          },
+          "old_block": "CommitUnknown: lane stream: the outcome of COMMIT is unknown (TransactionException (Connection Error))",
+          "old_lane_next": "FenceLost: lane stream: epoch 8 no longer leads (the fence row has another epoch)",
+          "old_listed_before_commit": null,
+          "old_trace": null,
+          "point": "fenced",
+          "shape": "nothing",
+          "takeover": {
+            "attempts": 2,
+            "conflicts": 1,
+            "interrupted": 1,
+            "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
+            "listed": 2,
+            "seconds": 1.275,
+            "unknown": 0
+          },
+          "verdict": "pass"
+        },
+        {
+          "after": {
+            "fence_epochs": [
+              11
+            ],
+            "fence_stream": {
+              "epoch": 11,
+              "n": 6
+            },
+            "heartbeat_epoch": 11,
+            "leader": {
+              "epoch": 11,
+              "run_id": "new-fdf8ffac4e4f",
+              "state": "leading"
+            }
+          },
+          "before": {
+            "fence_epochs": [
+              10
+            ],
+            "fence_stream": {
+              "epoch": 10,
+              "n": 6
+            },
+            "heartbeat_epoch": 10,
+            "leader": {
+              "epoch": 10,
+              "run_id": "old-fdf8ffac4e4f",
+              "state": "leading"
+            }
+          },
+          "old_block": "CommitUnknown: lane stream: the outcome of COMMIT is unknown (TransactionException (Connection Error))",
+          "old_lane_next": "FenceLost: lane stream: epoch 10 no longer leads (the fence row has another epoch)",
+          "old_listed_before_commit": false,
+          "old_trace": null,
+          "point": "commit_sent",
+          "shape": "nothing",
+          "takeover": {
+            "attempts": 3,
+            "conflicts": 2,
+            "interrupted": 1,
+            "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
+            "listed": 4,
+            "seconds": 2.063,
+            "unknown": 0
+          },
+          "verdict": "pass"
+        },
+        {
+          "after": {
+            "fence_epochs": [
+              13
+            ],
+            "fence_stream": {
+              "epoch": 13,
+              "n": 7
+            },
+            "heartbeat_epoch": 13,
+            "leader": {
+              "epoch": 13,
+              "run_id": "new-6433d7186b58",
+              "state": "leading"
+            }
+          },
+          "before": {
+            "fence_epochs": [
+              12
+            ],
+            "fence_stream": {
+              "epoch": 12,
+              "n": 7
+            },
+            "heartbeat_epoch": 12,
+            "leader": {
+              "epoch": 12,
+              "run_id": "old-6433d7186b58",
+              "state": "leading"
+            }
+          },
+          "old_block": "CommitUnknown: lane stream: the outcome of COMMIT is unknown (TransactionException (Connection Error))",
+          "old_lane_next": "FenceLost: lane stream: epoch 12 no longer leads (the fence row has another epoch)",
+          "old_listed_before_commit": null,
+          "old_trace": null,
+          "point": "commit_sent",
+          "shape": "nothing",
+          "takeover": {
+            "attempts": 3,
+            "conflicts": 2,
+            "interrupted": 2,
+            "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
+            "listed": 4,
+            "seconds": 2.051,
+            "unknown": 0
+          },
+          "verdict": "pass"
+        },
+        {
+          "after": {
+            "fence_epochs": [
+              15
+            ],
+            "fence_stream": {
+              "epoch": 15,
+              "n": 9
+            },
+            "heartbeat_epoch": 15,
+            "leader": {
+              "epoch": 15,
+              "run_id": "new-02ec3149f910",
+              "state": "leading"
+            }
+          },
+          "before": {
+            "fence_epochs": [
+              14
+            ],
+            "fence_stream": {
+              "epoch": 14,
+              "n": 8
+            },
+            "heartbeat_epoch": 14,
+            "leader": {
+              "epoch": 14,
+              "run_id": "old-02ec3149f910",
+              "state": "leading"
+            }
+          },
+          "old_block": "OK",
+          "old_lane_next": "FenceLost: lane stream: epoch 14 no longer leads (the fence statement changed 0 rows)",
+          "old_listed_before_commit": null,
+          "old_trace": null,
+          "point": "committed",
+          "shape": "nothing",
+          "takeover": {
+            "attempts": 1,
+            "conflicts": 0,
+            "interrupted": 0,
+            "last_error": null,
+            "listed": 0,
+            "seconds": 0.502,
+            "unknown": 0
+          },
+          "verdict": "pass"
+        },
+        {
+          "after": {
+            "fence_epochs": [
+              17
+            ],
+            "fence_stream": {
+              "epoch": 17,
+              "n": 11
+            },
+            "heartbeat_epoch": 17,
+            "leader": {
+              "epoch": 17,
+              "run_id": "new-b0dd2e166b2d",
+              "state": "leading"
+            }
+          },
+          "before": {
+            "fence_epochs": [
+              16
+            ],
+            "fence_stream": {
+              "epoch": 16,
+              "n": 10
+            },
+            "heartbeat_epoch": 16,
+            "leader": {
+              "epoch": 16,
+              "run_id": "old-b0dd2e166b2d",
+              "state": "leading"
+            }
+          },
+          "old_block": "OK",
+          "old_lane_next": "FenceLost: lane stream: epoch 16 no longer leads (the fence statement changed 0 rows)",
+          "old_listed_before_commit": null,
+          "old_trace": null,
+          "point": "committed",
+          "shape": "nothing",
+          "takeover": {
+            "attempts": 1,
+            "conflicts": 0,
+            "interrupted": 0,
+            "last_error": null,
+            "listed": 0,
+            "seconds": 0.47,
+            "unknown": 0
+          },
+          "verdict": "pass"
+        },
+        {
+          "after": {
+            "fence_epochs": [
+              19
+            ],
+            "fence_stream": {
+              "epoch": 19,
+              "n": 12
+            },
+            "heartbeat_epoch": 19,
+            "leader": {
+              "epoch": 19,
+              "run_id": "new-bb0c11032203",
+              "state": "leading"
+            }
+          },
+          "before": {
+            "fence_epochs": [
+              18
+            ],
+            "fence_stream": {
+              "epoch": 18,
+              "n": 12
+            },
+            "heartbeat_epoch": 18,
+            "leader": {
+              "epoch": 18,
+              "run_id": "old-bb0c11032203",
+              "state": "leading"
+            }
+          },
+          "old_block": "CommitUnknown: lane stream: the outcome of COMMIT is unknown (TransactionException (Connection Error))",
+          "old_lane_next": "FenceLost: lane stream: epoch 18 no longer leads (the fence row has another epoch)",
+          "old_listed_before_commit": false,
+          "old_trace": 0,
+          "point": "fenced",
+          "shape": "row",
+          "takeover": {
+            "attempts": 3,
+            "conflicts": 2,
+            "interrupted": 1,
+            "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
+            "listed": 4,
+            "seconds": 2.116,
+            "unknown": 0
+          },
+          "verdict": "pass"
+        },
+        {
+          "after": {
+            "fence_epochs": [
+              21
+            ],
+            "fence_stream": {
+              "epoch": 21,
+              "n": 13
+            },
+            "heartbeat_epoch": 21,
+            "leader": {
+              "epoch": 21,
+              "run_id": "new-5d05d9b8787a",
+              "state": "leading"
+            }
+          },
+          "before": {
+            "fence_epochs": [
+              20
+            ],
+            "fence_stream": {
+              "epoch": 20,
+              "n": 13
+            },
+            "heartbeat_epoch": 20,
+            "leader": {
+              "epoch": 20,
+              "run_id": "old-5d05d9b8787a",
+              "state": "leading"
+            }
+          },
+          "old_block": "CommitUnknown: lane stream: the outcome of COMMIT is unknown (TransactionException (Connection Error))",
+          "old_lane_next": "FenceLost: lane stream: epoch 20 no longer leads (the fence row has another epoch)",
+          "old_listed_before_commit": null,
+          "old_trace": 0,
+          "point": "fenced",
+          "shape": "transition",
+          "takeover": {
+            "attempts": 3,
+            "conflicts": 2,
+            "interrupted": 1,
+            "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
+            "listed": 4,
+            "seconds": 2.067,
+            "unknown": 0
+          },
+          "verdict": "pass"
+        },
+        {
+          "after": {
+            "fence_epochs": [
+              23
+            ],
+            "fence_stream": {
+              "epoch": 23,
+              "n": 14
+            },
+            "heartbeat_epoch": 23,
+            "leader": {
+              "epoch": 23,
+              "run_id": "new-d0a767a6f7f6",
+              "state": "leading"
+            }
+          },
+          "before": {
+            "fence_epochs": [
+              22
+            ],
+            "fence_stream": {
+              "epoch": 22,
+              "n": 14
+            },
+            "heartbeat_epoch": 22,
+            "leader": {
+              "epoch": 22,
+              "run_id": "old-d0a767a6f7f6",
+              "state": "leading"
+            }
+          },
+          "old_block": "CommitUnknown: lane stream: the outcome of COMMIT is unknown (TransactionException (Connection Error))",
+          "old_lane_next": "FenceLost: lane stream: epoch 22 no longer leads (the fence row has another epoch)",
+          "old_listed_before_commit": false,
+          "old_trace": 0,
+          "point": "fenced",
+          "shape": "ddl_only",
+          "takeover": {
+            "attempts": 3,
+            "conflicts": 2,
+            "interrupted": 2,
+            "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
+            "listed": 4,
+            "seconds": 2.059,
+            "unknown": 0
+          },
+          "verdict": "pass"
+        },
+        {
+          "after": {
+            "fence_epochs": [
+              25
+            ],
+            "fence_stream": {
+              "epoch": 25,
+              "n": 15
+            },
+            "heartbeat_epoch": 25,
+            "leader": {
+              "epoch": 25,
+              "run_id": "new-c393292e6a94",
+              "state": "leading"
+            }
+          },
+          "before": {
+            "fence_epochs": [
+              24
+            ],
+            "fence_stream": {
+              "epoch": 24,
+              "n": 15
+            },
+            "heartbeat_epoch": 24,
+            "leader": {
+              "epoch": 24,
+              "run_id": "old-c393292e6a94",
+              "state": "leading"
+            }
+          },
+          "old_block": "CommitUnknown: lane stream: the outcome of COMMIT is unknown (TransactionException (Connection Error))",
+          "old_lane_next": "FenceLost: lane stream: epoch 24 no longer leads (the fence row has another epoch)",
+          "old_listed_before_commit": null,
+          "old_trace": 0,
+          "point": "fenced",
+          "shape": "other_schema_rows",
+          "takeover": {
+            "attempts": 3,
+            "conflicts": 2,
+            "interrupted": 2,
+            "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
+            "listed": 4,
+            "seconds": 2.066,
+            "unknown": 0
+          },
+          "verdict": "pass"
+        },
+        {
+          "after": {
+            "fence_epochs": [
+              27
+            ],
+            "fence_stream": {
+              "epoch": 27,
+              "n": 16
+            },
+            "heartbeat_epoch": 27,
+            "leader": {
+              "epoch": 27,
+              "run_id": "new-cfb352760986",
+              "state": "leading"
+            }
+          },
+          "before": {
+            "fence_epochs": [
+              26
+            ],
+            "fence_stream": {
+              "epoch": 26,
+              "n": 16
+            },
+            "heartbeat_epoch": 26,
+            "leader": {
+              "epoch": 26,
+              "run_id": "old-cfb352760986",
+              "state": "leading"
+            }
+          },
+          "old_block": "CommitUnknown: lane stream: the outcome of COMMIT is unknown (TransactionException (Connection Error))",
+          "old_lane_next": "FenceLost: lane stream: epoch 26 no longer leads (the fence row has another epoch)",
+          "old_listed_before_commit": false,
+          "old_trace": 0,
+          "point": "fenced",
+          "shape": "returning",
+          "takeover": {
+            "attempts": 2,
+            "conflicts": 1,
+            "interrupted": 1,
+            "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
+            "listed": 2,
+            "seconds": 1.281,
+            "unknown": 0
+          },
+          "verdict": "pass"
+        },
+        {
+          "after": {
+            "fence_epochs": [
+              29
+            ],
+            "fence_stream": {
+              "epoch": 29,
+              "n": 17
+            },
+            "heartbeat_epoch": 29,
+            "leader": {
+              "epoch": 29,
+              "run_id": "new-6fb06b232fe2",
+              "state": "leading"
+            }
+          },
+          "before": {
+            "fence_epochs": [
+              28
+            ],
+            "fence_stream": {
+              "epoch": 28,
+              "n": 17
+            },
+            "heartbeat_epoch": 28,
+            "leader": {
+              "epoch": 28,
+              "run_id": "old-6fb06b232fe2",
+              "state": "leading"
+            }
+          },
+          "old_block": "CommitUnknown: lane stream: the outcome of COMMIT is unknown (TransactionException (Connection Error))",
+          "old_lane_next": "FenceLost: lane stream: epoch 28 no longer leads (the fence row has another epoch)",
+          "old_listed_before_commit": null,
+          "old_trace": 0,
+          "point": "fenced",
+          "shape": "registered_relation",
+          "takeover": {
+            "attempts": 3,
+            "conflicts": 2,
+            "interrupted": 2,
+            "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
+            "listed": 4,
+            "seconds": 2.059,
+            "unknown": 0
+          },
+          "verdict": "pass"
+        }
+      ],
+      "rounds": 14,
+      "verdicts": {
+        "pass": 14
+      }
+    }
+  },
+  "versions": {
+    "duckdb_client": "1.5.6",
+    "platform": "Darwin arm64",
+    "python": "3.13.1"
+  },
+  "what": "The fix round of package D on MotherDuck: a black-holed network path, and the take-over at every point"
+}

@@ -1,5 +1,5 @@
 {
-  "command": "tools/with-env uv run -q pytest -q -m md tests/destination",
+  "command": "see results.<key>.command (each result names the run that wrote it)",
   "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
   "results": {
     "kill_at_commit_sent": {
@@ -29,9 +29,9 @@
           "victims": 4
         },
         "100": {
-          "client_saw_the_answer": 4,
+          "client_saw_the_answer": 3,
           "commit_landed": 4,
-          "landed_without_an_answer_seen": 0,
+          "landed_without_an_answer_seen": 1,
           "rows": [
             3,
             3,
@@ -113,7 +113,9 @@
           "victims": 4
         }
       },
-      "date_utc": "2026-11-10 10:05",
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py",
+      "commit": "7193b39",
+      "date_utc": "2026-11-10 20:23",
       "delays_ms": [
         0,
         10,
@@ -135,7 +137,7 @@
       },
       "killed_commits_that_did_not_land": 4,
       "killed_commits_that_landed": 32,
-      "landed_without_an_answer_seen": 17,
+      "landed_without_an_answer_seen": 18,
       "repetitions_per_delay": 4,
       "rows_of_the_final_run": 12,
       "victims": 36

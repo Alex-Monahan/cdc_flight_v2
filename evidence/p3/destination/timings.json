@@ -1,61 +1,65 @@
 {
-  "command": "tools/with-env uv run -q pytest -q -m md tests/destination",
+  "command": "see results.<key>.command (each result names the run that wrote it)",
   "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
   "results": {
     "connect": {
-      "date_utc": "2026-11-10 08:23",
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md.py",
+      "commit": "7193b39",
+      "date_utc": "2026-11-10 19:49",
       "seconds": [
-        0.082,
-        0.078,
-        0.076,
-        0.079,
-        0.081
+        0.106,
+        0.088,
+        0.089,
+        0.104,
+        0.094
       ],
       "what": "md.connect() five times in one process, one after the other, to a database that this process already has open (the fixture connected once before); each call includes SET TimeZone, reading the connection id and one statement on the server"
     },
     "lane_transaction": {
       "begin": {
-        "max_ms": 0.3,
+        "max_ms": 0.2,
         "median_ms": 0.2,
         "min_ms": 0.1,
         "n": 25,
         "p90_ms": 0.2
       },
       "clock_reading": {
-        "max_ms": 122.2,
-        "median_ms": 79.1,
-        "min_ms": 77.1,
+        "max_ms": 92.2,
+        "median_ms": 77.9,
+        "min_ms": 75.4,
         "n": 25,
-        "p90_ms": 85.4
+        "p90_ms": 82.2
       },
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md.py",
+      "commit": "7193b39",
       "commit_after_fence": {
-        "max_ms": 85.6,
-        "median_ms": 80.5,
-        "min_ms": 78.0,
+        "max_ms": 90.7,
+        "median_ms": 79.9,
+        "min_ms": 77.8,
         "n": 25,
-        "p90_ms": 82.4
+        "p90_ms": 84.5
       },
-      "date_utc": "2026-11-10 08:12",
+      "date_utc": "2026-11-10 19:49",
       "empty_lane_transaction": {
-        "max_ms": 161.7,
-        "median_ms": 155.3,
-        "min_ms": 153.4,
+        "max_ms": 208.2,
+        "median_ms": 160.9,
+        "min_ms": 153.3,
         "n": 25,
-        "p90_ms": 157.7
+        "p90_ms": 171.2
       },
       "fence_statement": {
-        "max_ms": 80.1,
-        "median_ms": 76.3,
-        "min_ms": 74.1,
+        "max_ms": 90.3,
+        "median_ms": 78.0,
+        "min_ms": 74.4,
         "n": 25,
-        "p90_ms": 77.5
+        "p90_ms": 83.9
       },
       "lane_transaction_with_one_update": {
-        "max_ms": 249.3,
-        "median_ms": 234.9,
-        "min_ms": 228.2,
+        "max_ms": 324.4,
+        "median_ms": 238.9,
+        "min_ms": 232.5,
         "n": 25,
-        "p90_ms": 240.1
+        "p90_ms": 258.7
       },
       "what": "one process, one connection, 25 repetitions each; an empty lane transaction is BEGIN, the fence statement and COMMIT; the parts were measured on a plain client connection with the same texts"
     }

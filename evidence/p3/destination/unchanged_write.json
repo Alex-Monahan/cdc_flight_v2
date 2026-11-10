@@ -1,0 +1,71 @@
+{
+  "command": "tools/with-env uv run python tests/destination/probes/probe_unchanged_write.py 6",
+  "date_utc": "2026-11-10 20:33",
+  "local": {
+    "control: a changed epoch, then take-over as designed": {
+      "both_committed": 0,
+      "rounds": 6
+    },
+    "fence, then take-over as built": {
+      "both_committed": 0,
+      "rounds": 6
+    },
+    "fence, then take-over as designed (4.5)": {
+      "both_committed": 6,
+      "rounds": 6
+    },
+    "registration as built, then take-over as built": {
+      "both_committed": 0,
+      "rounds": 6
+    },
+    "registration first form, then take-over as designed": {
+      "both_committed": 6,
+      "rounds": 6
+    },
+    "take-over as built, then fence": {
+      "both_committed": 0,
+      "rounds": 6
+    },
+    "take-over as built, then registration as built": {
+      "both_committed": 0,
+      "rounds": 6
+    }
+  },
+  "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build; times are indications only",
+  "motherduck": {
+    "control: a changed epoch, then take-over as designed": {
+      "both_committed": 0,
+      "rounds": 6
+    },
+    "fence, then take-over as built": {
+      "both_committed": 0,
+      "rounds": 6
+    },
+    "fence, then take-over as designed (4.5)": {
+      "both_committed": 6,
+      "rounds": 6
+    },
+    "registration as built, then take-over as built": {
+      "both_committed": 0,
+      "rounds": 6
+    },
+    "registration first form, then take-over as designed": {
+      "both_committed": 6,
+      "rounds": 6
+    },
+    "take-over as built, then fence": {
+      "both_committed": 0,
+      "rounds": 6
+    },
+    "take-over as built, then registration as built": {
+      "both_committed": 0,
+      "rounds": 6
+    }
+  },
+  "versions": {
+    "duckdb_client": "1.5.6",
+    "platform": "Darwin arm64",
+    "python": "3.13.1"
+  },
+  "what": "F0: a write of an unchanged value into a column without updates is not seen by a later writer (both_committed counts the rounds in which both transactions committed; 0 means they excluded each other)"
+}

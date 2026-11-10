@@ -212,12 +212,13 @@ apply (section 14.1). The tests named here without a file are in `tests/destinat
   ```sql
   BEGIN;
   INSERT INTO _cdc.connections (epoch, lane, connection_id, registered_at) VALUES (?, ?, ?::UUID, <md clock>);
-  UPDATE _cdc.fence SET epoch = epoch WHERE lane = ? AND epoch = ?;      -- exactly one row, else FenceLost
+  UPDATE _cdc.fence SET n = n + 1 WHERE lane = ? AND epoch = ?;          -- exactly one row, else FenceLost
+  UPDATE _cdc.fence SET n = n - 1 WHERE lane = ? AND epoch = ?;          -- the counter stays as it was
   COMMIT;
   ```
 
-  The `UPDATE` writes the column that a take-over writes, so a registration and a take-over cannot both
-  commit: a registration whose transaction began before the take-over committed gets `Conflict`, one that
+  The `UPDATE`s write the counter `n` with a changed value, and a take-over writes `n` too (section 14.4), so a
+  registration and a take-over cannot both commit: a registration whose transaction began before the take-over committed gets `Conflict`, one that
   begins after it gets `FenceLost`, and one that commits first is in the list when the new leader interrupts
   the earlier epochs. Until the fix round the registration was one `INSERT … SELECT … FROM _cdc.leader WHERE
   epoch = ?` in autocommit: it read the leader row and wrote only `_cdc.connections`, so on MotherDuck one that
@@ -230,6 +231,10 @@ apply (section 14.1). The tests named here without a file are in `tests/destinat
   connection is then given up, so the next call registers a new one
   (`test_review.py::test_registration_writes_the_id_of_the_connection_that_runs_it`). The `COMMIT` passes the
   fault sites `md.commit` and `md.commit_reply` like every `COMMIT`.
+- The first form of the fix round wrote `SET epoch = epoch`. A write of an unchanged value is not recorded
+  after a checkpoint (section 14.4), so that form still let a registration commit after a take-over
+  (`test_fix_round.py::test_a_registration_right_after_a_checkpoint_cannot_commit_after_a_take_over`, with the
+  negative control).
 - A registration holds the fence row of its lane until it commits. A take-over meets it as a conflict and
   cannot interrupt it (its row is not in the list yet); a registration that is frozen there delays a take-over
   until MotherDuck ends its transaction (about 29 s, section 8.3). And a registration that commits while a
@@ -354,9 +359,11 @@ state.read(conn_or_tx, CHUNK, (table_id, 0))        # the stored state, or None
 - **The facts of a group** (fix round, item 1): `transition(…, cause, *, detail=None, values=None,
   expect=None)` and `create(…, values=None, detail=None)`. `values` sets more columns in the same conditional
   `UPDATE` (`state.NOW` for MotherDuck's clock). `expect` adds `AND col IS NOT DISTINCT FROM ?` for each column,
-  and the `UPDATE` writes those columns too (with their new value, or with themselves), so a concurrent writer
-  of them conflicts; with `expect` a count of 0 rolls the transaction back and raises `Conflict` (the run-again
-  rule of C4). `detail` follows the value rules of alert fields (`state.check_fields`; identifiers, positions,
+  and the `UPDATE` writes those columns too (with their new value, or with themselves). A concurrent writer of
+  an expected column conflicts only with a transition that changes the column: a write of an unchanged value is
+  not always recorded (section 14.4), so a column that must exclude another writer gets its new value in
+  `values` (the stream's position always does). With `expect` a count of 0 rolls the transaction back and
+  raises `Conflict` (the run-again rule of C4). `detail` follows the value rules of alert fields (`state.check_fields`; identifiers, positions,
   counts and durations only) and is stored as JSON. The stream's group is then two statements: the `UPDATE` of
   its position with `expect` on the previous value, and the `INSERT` of the log row
   (`test_fix_round.py::test_values_and_expect_in_the_same_conditional_update`).
@@ -449,7 +456,7 @@ alerts.resolve(tx, alerts.dedup_key("table_quarantined", {"table_id": 16385}, ("
 
 | Step | What the layer does | Fault site | Crash point |
 |---|---|---|---|
-| 1 | On a new client connection: connect and set the two session settings; interrupt the server connection it replaces, by id; register in `_cdc.connections` (a transaction of its own: `BEGIN`, the `INSERT`, the `UPDATE` of the lane's fence row, `COMMIT`; section 2.3) | `md.connect`, `md.execute`, `md.commit`, `md.commit_reply` | |
+| 1 | On a new client connection: connect and set the two session settings; interrupt the server connection it replaces, by id; register in `_cdc.connections` (a transaction of its own: `BEGIN`, the `INSERT`, two `UPDATE`s of the lane's fence row, `COMMIT`; section 2.3) | `md.connect`, `md.execute`, `md.commit`, `md.commit_reply` | |
 | 2 | `BEGIN` | `md.execute` | |
 | 3 | The caller's statements | `md.execute` | |
 | 4 | The fence statement; it must change exactly one row. Its deadline is the statement deadline (and never more than what is left of the block) | `md.fence` | `<lane>.fenced` after it |
@@ -461,7 +468,7 @@ alerts.resolve(tx, alerts.dedup_key("table_quarantined", {"table_id": 16385}, ("
   destination refuses rolls back and raises `StatementError` (section 5). Both:
   `test_lane.py::test_an_exception_rolls_back_and_is_passed_on`.
 - What the fault site `md.execute` sees before the caller's statements. On a lane's first connection: the
-  registration's `BEGIN`, `INSERT` and `UPDATE` (its `COMMIT` passes `md.commit`), then `BEGIN`. On a connection
+  registration's `BEGIN`, `INSERT` and two `UPDATE`s (its `COMMIT` passes `md.commit`), then `BEGIN`. On a connection
   that replaces one that was given up, locally the same; on MotherDuck the interrupt of the old id comes first,
   as a statement of its own. On a registered connection: `BEGIN` only. (Locally the interrupt is a call inside
   the process and passes no fault site.)
@@ -545,8 +552,9 @@ client after 0.8 s returned after 4.16 s (`error_mapping.json`, key `raw_texts`,
    (`test_review.py::test_an_old_connection_id_that_the_destination_refuses_does_not_block_the_lane_for_ever`).
    Test: `test_lane.py::test_a_replaced_connection_is_interrupted_by_id_before_the_new_one_is_used`,
    `test_lane.py::test_the_interrupt_of_a_replaced_connection_runs_on_the_new_connection`; on MotherDuck
-   `registry_takeover.json`, key `replaced_connection_interrupted_by_id` (the interrupt statement took 76 ms; the
-   next transaction with connect, interrupt and registration took 488 ms).
+   `registry_takeover.json`, key `replaced_connection_interrupted_by_id` (the interrupt statement took 76 to 87 ms;
+   the next transaction with connect, interrupt and registration took 488 ms on `88e0cf1` and 777 ms on
+   `7193b39`, where the registration is a transaction of its own of three statements).
 
 `Connection.abort()` does steps 2 to 4 at once from any thread; the thread that is using the connection gets
 `ConnectionLost`, or `CommitUnknown` inside `COMMIT` (`test_lane.py::test_abort_from_another_thread_ends_the_call_at_once`).
@@ -746,15 +754,23 @@ UPDATE _cdc.fence SET n = n + 1, epoch = ? WHERE lane = ? AND epoch = ?      -- 
 ```
 
 With it, every order ends with exactly one of the two committed, with either take-over text, 5 of 5 rounds
-each, locally and on MotherDuck (same file, rows `n_and_epoch_parameter (as built)`). The seeded regression
+each, locally and on MotherDuck (same file, rows `n_and_epoch_parameter (as built)`). **That was not enough**:
+right after a checkpoint the `epoch` that the fence statement writes is an unchanged value, which is not
+recorded, and a take-over that writes the epoch alone commits next to the old transaction (F0, section 14.4).
+Since the fix round the take-over also writes the counter `n` of every fence row (`n + 1`, then `n - 1`), which
+the fence statement changes; the two meet on `n` in every order. The seeded regression
 test is `test_lane.py::test_conflicts_are_per_column_which_is_why_the_fence_statement_writes_the_epoch`; it
 also keeps the failing pair as a negative control. The process tests of section 8 run every interleaving that
 the crash points allow against it.
 
-**Rule for every caller.** A statement that must conflict with another writer **writes the columns that its
-condition reads** (`SET state = 'b' … WHERE state = 'a'` does; `SET pos = ? … WHERE pos = ?` does;
-`SET n = n + 1 … WHERE epoch = ?` does not). `state.transition` and the version row of the migrations follow
-it.
+**Rule for every caller.** A statement that must conflict with another writer **writes, with a changed value,
+a column that the other writer also writes with a changed value** (`SET state = 'b' … WHERE state = 'a'` does;
+`SET pos = ? … WHERE pos = ?` does; `SET n = n + 1 … WHERE epoch = ?` does only against a writer of `n`). A
+write of an unchanged value (`SET epoch = epoch`, `SET epoch = ?` with the value it has, a transition from a
+state to itself) is **not recorded** by DuckDB 1.5.6 or MotherDuck when the column has had no update since the
+table was written or checkpointed, and another writer then does not conflict with it (fix round, F0; section
+14.4). `state.transition` changes its state column, the migrations change their version, and the stream moves
+its position, so they follow the rule.
 
 The same rule applies to the leader row and the heartbeat row of package L. This package did not test those
 statements. By the finding, the heartbeat statement of design 4.3 (it writes `beat_at`, `progress_at`, `phase`
@@ -787,18 +803,19 @@ connections of the test itself, always filtered by their own ids (`registry_take
 - A statement in flight ends 0.1 to 0.32 s after the interrupt.
 - **The rows of an interrupted transaction stay held for a moment after the interrupt answered true.** A writer
   that comes right after the interrupt can still get a conflict. It must try again. Measured: a lane that
-  wrote the row right after `interrupt_earlier` had returned got 3 conflicts, and committed 1.28 s after the
-  interrupt (`registry_takeover.json`, key `open_transaction_holds_only_data_rows`). A take-over that
+  wrote the row right after `interrupt_earlier` had returned got 1 to 3 conflicts, and committed 0.65 to 1.28 s
+  after the interrupt (`registry_takeover.json`, key `open_transaction_holds_only_data_rows`; the ranges are
+  over the runs of 2026-11-10 on `88e0cf1` and on `7193b39`). A take-over that
   interrupts needs 1 or 2 further attempts (the table below, and section 8).
 
 What a take-over meets (`registry_takeover.json`; one process, lanes as the old run; the old run's client is
-alive, so nothing ends its transaction but the interrupt):
+alive, so nothing ends its transaction but the interrupt; ranges over the runs on `88e0cf1` and `7193b39`):
 
 | The old run's open transaction | Take-over with the interrupt | Without the interrupt |
 |---|---|---|
-| has updated the heartbeat row | won at the 3rd attempt after 2 conflicts, 1.93 s | `TakeoverFailed` after 10 conflicts in 6.5 s |
-| has run its fence statement and stands before `COMMIT` | won at the 2nd attempt after 1 conflict, 1.07 s; the old run gets `CommitUnknown`; nothing committed | `TakeoverFailed` after 9 conflicts in 5.3 s |
-| holds only data rows | won at once, 0.38 s; nothing listed, nothing interrupted | the same |
+| has updated the heartbeat row | won at the 2nd or 3rd attempt after 1 or 2 conflicts, 1.47 to 1.93 s | `TakeoverFailed` after 8 to 10 conflicts in 6.5 to 6.7 s |
+| has run its fence statement and stands before `COMMIT` | won at the 2nd attempt after 1 conflict, 1.07 to 1.35 s; the old run gets `CommitUnknown`; nothing committed | `TakeoverFailed` after 8 or 9 conflicts in 5.3 to 5.5 s |
+| holds only data rows | won at once, 0.38 to 0.57 s; nothing listed, nothing interrupted | the same |
 
 The last row matters: **a take-over that meets no conflict interrupts nothing**, and the old run's open
 transaction keeps holding its data rows. The new run then gets `Conflict` on those rows until somebody
@@ -832,21 +849,22 @@ against MotherDuck. In every case of this section the check passed: 0 doubles, c
 
 `test_two_runs_with_different_epochs_at_every_point`; `two_process.json`, key `different_epochs`. The old run
 is frozen at a point of its second transaction for 6.5 to 8.6 s. A newcomer starts, takes over, applies
-everything and ends. Then the old run goes on.
+everything and ends. Then the old run goes on. Numbers are ranges over the recorded runs on `88e0cf1` and
+`7193b39`.
 
 | Old run frozen at | Take-over | Newcomer before its first commit | Old run, when it goes on |
 |---|---|---|---|
-| `sut.begun` (it only read) | at once, 0.41 s; the call after the take-over interrupted 1 | no error | `ConnectionLost`, then `FenceLost` |
-| `sut.written` | at once, 0.39 s; the call after the take-over interrupted 1 | no error | `ConnectionLost`, then `FenceLost` |
-| `sut.moved` | at once; the call after the take-over interrupted 1 | 1 `Conflict` | `ConnectionLost`, then `FenceLost` |
-| `stream.fenced` | 3rd attempt after 2 conflicts, 1.84 s | no error | `CommitUnknown`, then `FenceLost` |
-| `stream.commit_sent` | 3rd attempt after 2 conflicts, 1.74 s | no error | `CommitUnknown`, then `FenceLost` |
-| `stream.committed` | at once, 0.39 s | no error | its commit stands; `FenceLost` at its next transaction |
+| `sut.begun` (it only read) | at once, 0.41 to 0.51 s; the call after the take-over interrupted 1 | no error | `ConnectionLost`, then `FenceLost` |
+| `sut.written` | at once, 0.39 to 0.50 s; the call after the take-over interrupted 1 | no error | `ConnectionLost`, then `FenceLost` |
+| `sut.moved` | at once; the call after the take-over interrupted 1 | 0 or 1 `Conflict` | `ConnectionLost`, then `FenceLost` |
+| `stream.fenced` | 3rd attempt after 2 conflicts, 1.84 to 2.19 s | no error | `CommitUnknown`, then `FenceLost` |
+| `stream.commit_sent` | 3rd attempt after 2 conflicts, 1.74 to 2.24 s | no error | `CommitUnknown`, then `FenceLost` |
+| `stream.committed` | at once, 0.39 to 0.50 s | no error | its commit stands; `FenceLost` at its next transaction |
 
 - The old run never committed after the take-over. Its transaction at the first five points left no row.
 - The old run ended with exit code 3 (`FenceLost`) 0.56 to 3.05 s after SIGCONT; 2.98 and 3.05 s in the two
   `CommitUnknown` cases, in which the SUT waits 2.5 s before it reads again.
-- At `sut.moved` the newcomer got one `Conflict` although the interrupt had answered: the rows of an
+- At `sut.moved` the newcomer got one `Conflict` (in one of the two runs) although the interrupt had answered: the rows of an
   interrupted transaction stay held for a moment (section 7).
 - At `stream.fenced` and `stream.commit_sent` the old run's `COMMIT` is the first thing it sends after the
   interrupt. So the layer reports `CommitUnknown` although nothing was committed; the SUT reads again and then
@@ -858,13 +876,16 @@ Two processes that use one lane with one epoch are a programming error. The fenc
 both, and the run-again rule holds as well. `test_two_processes_with_the_same_epoch`; `two_process.json`, key
 `same_epoch`.
 
-- Both free, 30 events: one process made 8 data transactions (24 rows, 1 `Conflict`), the other 2 (6 rows,
-  6 `Conflict`s).
+- Both free, 30 events: one process made 8 data transactions (24 rows, 1 or 2 `Conflict`s), the other 2 (6
+  rows, 6 `Conflict`s); which one was which changed between the runs.
 - The first frozen at `sut.begun` or `sut.written` of its second transaction: the second applied everything.
   The first got `Conflict` when it went on.
 - The first frozen at `sut.moved`, `stream.fenced` or `stream.commit_sent` (it holds the position row): the
-  second got 3 `Conflict`s and committed nothing while the first was frozen. The first committed when it went
-  on. Without a take-over nobody interrupts the first.
+  second got 3 or 4 `Conflict`s and committed nothing while the first was frozen. The first committed when it
+  went on, in the runs on `88e0cf1` and `7193b39`. In the run on `e671405`, under the load of two campaigns at
+  once, the second process applied the events at `sut.moved` and the first got an error when it went on:
+  MotherDuck had ended its frozen transaction (the lease of section 8.3); exactly-once held. The test accepts
+  both. Without a take-over nobody interrupts the first.
 - The first frozen at `stream.committed`: no error.
 
 At T0 the same is `test_lane.py::test_same_lane_same_epoch_twice_never_commits_both` and
@@ -881,12 +902,12 @@ With the interrupt (key `with_interrupt`):
 
 | Old run holds | Old run is | Take-over | Newcomer's first commit after the take-over | Old run gets |
 |---|---|---|---|---|
-| fence row | frozen | 3rd attempt, 2 conflicts, 1.74 s | 0.94 s | `CommitUnknown`, then `FenceLost` |
-| fence row | killed | 3rd attempt, 2 conflicts, 1.83 s | 0.93 s | |
-| fence row | slow | 3rd attempt, 2 conflicts, 1.83 s | 1.01 s | `CommitUnknown`, then `FenceLost` |
-| position row | frozen | at once, 0.39 s; the call after it interrupted 1 | 0.90 s | `ConnectionLost`, then `FenceLost` |
-| position row | killed | at once, 0.40 s; the call after it interrupted 1 | 0.96 s | |
-| position row | slow | at once, 0.40 s; the call after it interrupted 1 | 0.91 s | `ConnectionLost`, then `FenceLost` |
+| fence row | frozen | 3rd attempt, 2 conflicts, 1.74 to 2.71 s | 0.94 to 1.68 s | `CommitUnknown`, then `FenceLost` |
+| fence row | killed | 2nd or 3rd attempt, 1 or 2 conflicts, 1.39 to 1.83 s | 0.93 to 1.21 s | |
+| fence row | slow | 3rd attempt, 2 conflicts, 1.83 to 2.73 s | 1.01 to 1.59 s | `CommitUnknown`, then `FenceLost` |
+| position row | frozen | at once, 0.39 to 0.58 s; the call after it interrupted 1 | 0.90 to 1.32 s | `ConnectionLost`, then `FenceLost` |
+| position row | killed | at once, 0.40 to 0.49 s; the call after it interrupted 1 | 0.96 to 1.22 s | |
+| position row | slow | at once, 0.40 to 0.66 s; the call after it interrupted 1 | 0.91 to 1.38 s | `ConnectionLost`, then `FenceLost` |
 
 No transaction of the old run committed (0 rows) in the six cases.
 
@@ -895,19 +916,19 @@ control: it shows what the interrupt is for.
 
 | Old run holds | Old run is | Take-over | Newcomer's first commit after the take-over | Old run gets |
 |---|---|---|---|---|
-| fence row | frozen | 49th attempt, 48 conflicts, **28.98 s** | 0.77 s | `DeadlineExceeded` (its block deadline had passed), then `FenceLost` |
-| fence row | killed | 50th attempt, 49 conflicts, **29.32 s** | 0.75 s | |
-| fence row | slow | 24th attempt, 23 conflicts, 14.41 s | nothing was left to apply | it committed two more transactions (4 rows) before the take-over won, then `FenceLost` |
-| position row | frozen | at once, 0.39 s | **28.66 s**, after 50 `Conflict`s | `DeadlineExceeded`, then `FenceLost` |
-| position row | killed | at once, 0.40 s | **28.97 s**, after 48 `Conflict`s | |
-| position row | slow | at once, 0.38 s | 12.99 s, after 22 `Conflict`s | `FenceLost` when its block ended; nothing committed |
+| fence row | frozen | 41st to 49th attempt, 40 to 48 conflicts, **28.93 to 28.98 s** | 0.77 to 1.11 s | `DeadlineExceeded` (its block deadline had passed), then `FenceLost` |
+| fence row | killed | 40th to 50th attempt, 39 to 49 conflicts, **28.67 to 29.32 s** | 0.75 to 1.11 s | |
+| fence row | slow | 19th to 24th attempt, 18 to 23 conflicts, 14.16 to 14.41 s | nothing was left to apply | it committed two more transactions (4 rows) before the take-over won, then `FenceLost` |
+| position row | frozen | at once, 0.39 to 0.47 s | **28.59 to 28.66 s**, after 47 to 50 `Conflict`s | `DeadlineExceeded`, then `FenceLost` |
+| position row | killed | at once, 0.40 to 0.49 s | **28.00 to 28.97 s**, after 45 to 48 `Conflict`s | |
+| position row | slow | at once, 0.38 to 0.52 s | 12.46 to 12.99 s, after 20 to 22 `Conflict`s | `FenceLost` when its block ended; nothing committed |
 
 What this shows:
 
 - **MotherDuck ends the open transaction of a frozen or killed client after about 29 s.** This agrees with
   `docs/spike/md_semantics.md` (lease 32 s for a paused client; rows locked 29.4 to 29.9 s after SIGKILL).
-- With the interrupt a take-over takes 0.4 s when it meets no conflict and about 1.8 s when it does. The
-  newcomer's first commit comes about 0.9 to 1.0 s after the take-over.
+- With the interrupt a take-over takes 0.4 to 0.7 s when it meets no conflict and 1.4 to 2.7 s when it does.
+  The newcomer's first commit comes 0.9 to 1.7 s after the take-over.
 - A take-over that meets no conflict interrupts nothing (section 7). Without the call after the take-over the
   new leader's lanes are blocked on the old run's rows for up to 29 s. They are never wrong: the lanes get
   `Conflict` and try again.
@@ -925,17 +946,18 @@ each, 36 victims. After every victim the check ran, and a successor that follows
 |---|---|---|
 | 0 ms | 0 of 4 | |
 | 10, 20, 40, 60 ms | 4 of 4 each | 4 of 4 each |
-| 80 ms | 4 of 4 | 1 of 4 |
-| 100, 150, 300 ms | 4 of 4 each | 0 of 4 each |
+| 80 ms | 4 of 4 | 0 or 1 of 4 |
+| 100 ms | 4 of 4 | 0 or 1 of 4 |
+| 150, 300 ms | 4 of 4 each | 0 of 4 each |
 
-**32 of 36 killed commits landed, 4 did not.** 17 landed without the client having seen the answer: these
-are the cases in which a run cannot know. The result was exactly-once after every one of the 36 victims; at
-the end the counter was 108 with 0 doubles.
+**32 of 36 killed commits landed, 4 did not**, in every run. **16 to 18** landed without the client having seen
+the answer: these are the cases in which a run cannot know. The result was exactly-once after every one of the
+36 victims; at the end the counter was 108 with 0 doubles.
 
-The edge lies near one round trip (about 80 ms, section 11) and moves a little from run to run: the run
-before this one had 0 of 4 at 80 ms, 16 in all (the earlier version of `commit_unknown.json` in the
-history of the repository). The last run before delivery had 0 of 4 at 80 ms again, 16 in all
-(`final_runs.json`, key `last_md_run_against_the_committed_files`).
+The edge lies near one round trip (about 80 ms, section 11) and moves a little from run to run. The counts over
+the recorded runs: 16 (two runs on `88e0cf1` and before it, 0 of 4 at 80 ms), 17 (1 of 4 at 80 ms) and 18 on
+`7193b39` (1 of 4 at 80 ms and 1 of 4 at 100 ms; `commit_unknown.json`; the earlier files are in the history
+of the repository and in `final_runs.json`).
 
 A real lost answer (section 9, case `commit_answer_lost`) gives the same: the layer raises `CommitUnknown`, the
 commit had landed, the SUT read again and applied nothing twice.
@@ -994,11 +1016,11 @@ point. Only the child uses the proxy; nothing else on the machine is touched.
 |---|---|---|---|
 | `reset` | resets every TCP connection of the child while its transaction is open (at `sut.written`), then passes again | **no error**; the transaction committed normally | yes |
 | `blackhole_statement` | passes nothing from the next statement on; passes again 8 s later | `DeadlineExceeded` | no |
-| `commit_never_arrives` | holds the `COMMIT`; after the child's error the connections are reset | `CommitUnknown` | no |
+| `commit_never_arrives` | holds the `COMMIT`; after the child's error the connections are reset | `CommitUnknown` | no in the runs on `88e0cf1` and before; **yes** in the runs on `e671405` and `7193b39`: the client delivered the held `COMMIT` on a new connection after the reset. Either outcome is right for `CommitUnknown`; the test asserts the error only |
 | `commit_answer_lost` | lets the `COMMIT` through, passes nothing back | `CommitUnknown` | **yes** |
 | `commit_delivered_late` | holds the `COMMIT`; 4 s after the child's error it delivers it, and the statements of the child's next attempt behind it | `CommitUnknown` | **yes**, late |
 
-In all five the child recovered by itself and ended with exit code 0, 4.5 to 6.9 s after the fault was
+In all five the child recovered by itself and ended with exit code 0, 4.5 to 7.0 s after the fault was
 lifted. 4 s of that is the time the SUT waits for new events before it ends. The check passed (0 doubles).
 
 What this shows:
@@ -1026,8 +1048,33 @@ source.
 | random kills (3 seeds, 3 kills each) | 3 | 3 |
 | freeze with SIGSTOP and a second instance that takes over (3 seeds) | 3 | 3 |
 
-**42 of 42 passed; 9 of 9 lane crash points were reached.** The run took 234 s and created and dropped 42
+**42 of 42 passed; 9 of 9 lane crash points were reached.** The run took 234 to 268 s and created and dropped 42
 databases. At T0 `tests/destination/test_sut.py` runs the SUT on a local file.
+
+### 9.4 A network path that answers nothing (fix round, items 6 and 15)
+
+`test_md_fix_round.py::test_a_black_holed_path_bounds_every_call_and_the_calls_left_waiting`; `fix_round.json`, key
+`black_hole` (`blackhole.json` points there). A child (`blackhole_child.py`) reaches MotherDuck only through the
+harness `NetProxy` and the relay of section 9.2; the proxy passes nothing in either direction from a chosen
+moment on. Child settings: statement 2 s, block 4 s, grace 0.5 s, connect 3 s (one attempt), roll-back 1 s,
+`max_waiting_calls` 2. Copied from the second reviewer's `e3_blackhole.py`, whose numbers on `9e389cc` are next to
+these.
+
+| Step that meets the black hole | The caller got after (7193b39) | On 9e389cc | Error |
+|---|---|---|---|
+| a statement | 2.52 s | 2.52 s | `DeadlineExceeded` |
+| the fence statement | 2.60 s | 4.50 s (the block's deadline) | `DeadlineExceeded` |
+| `COMMIT` | 4.51 s (the block's deadline, by design) | 4.51 s | `CommitUnknown` |
+| connect | 3.51 s | 3.51 s | `DeadlineExceeded` |
+| the registration | 2.52 s | 4.51 s (the block's deadline) | `DeadlineExceeded` |
+| 12 more attempts of the lane, the path still black-holed | the first 2: 2.52 s and 3.52 s (`DeadlineExceeded`); the other 10: at once, 0.0 s (`ConnectionLost`, "2 calls that were given up still wait") | 3.5 s each, `DeadlineExceeded` every time | |
+
+- Threads of the child during the 12 attempts: 4, then 6, then 6 for the last 10 (on `9e389cc`: 4 growing by 2
+  per attempt to 26). `md.waiting_calls()` 2, then 3 (two calls and one interrupt through a short-lived
+  connection); `md.open_connections()` counted 2 to 3 (on `9e389cc` it showed 1 throughout).
+- After the path passed again everything was freed within about 1 s (on `9e389cc` within 10 s); the next
+  transaction of the lane worked; at the end no thread and no connection of the layer was left.
+- Every call returned within its bound plus at most 0.1 s.
 
 ## 10. The clock
 
@@ -1053,17 +1100,19 @@ databases. At T0 `tests/destination/test_sut.py` runs the SUT on a local file.
 ## 11. Timings on MotherDuck
 
 Indications from a laptop, one process, 25 repetitions each, other workers running on the same machine
-(`timings.json`):
+(`timings.json`; ranges over the runs on `88e0cf1` and `7193b39`). Since the fix round the first transaction of a
+new client connection costs three more round trips (the registration is a transaction of its own, section 2.3);
+later transactions of the connection cost the same as before:
 
 | What | Median | p90 |
 |---|---|---|
-| `md.connect()` to a database that the process has open | 76 to 82 ms (5 calls) | |
+| `md.connect()` to a database that the process has open | 76 to 106 ms (5 calls a run) | |
 | `BEGIN` | 0.2 ms | 0.2 ms |
-| the fence statement | 76.3 ms | 77.5 ms |
-| `COMMIT` after the fence statement | 80.5 ms | 82.4 ms |
-| an empty lane transaction | 155.3 ms | 157.7 ms |
-| a lane transaction with one `UPDATE` | 234.9 ms | 240.1 ms |
-| reading the clock | 79.1 ms | 85.4 ms |
+| the fence statement | 76.3 to 78.0 ms | 77.5 to 83.9 ms |
+| `COMMIT` after the fence statement | 79.9 to 80.5 ms | 82.4 to 84.5 ms |
+| an empty lane transaction | 155.3 to 160.9 ms | 157.7 to 171.2 ms |
+| a lane transaction with one `UPDATE` | 234.9 to 238.9 ms | 240.1 to 258.7 ms |
+| reading the clock | 77.9 to 79.1 ms | 82.2 to 85.4 ms |
 
 One statement is one round trip of about 75 to 80 ms from this machine. The fence costs one round trip per
 transaction. `docs/spike/md_semantics.md` measured 8 ms per round trip from a Flight.
@@ -1249,6 +1298,10 @@ the test that holds it. Tests without a file name are in `tests/destination/test
     starters (section 2.7; item 14).
 45. **Marker `d_full`** for the rest of the full test matrices of this package (section 16; item 7). It is
     registered in `tests/destination/conftest.py`, because this package does not edit `pyproject.toml`.
+46. **The take-over writes the fence rows' counter `n`** (`n + 1`, then `n - 1`), and the registration writes
+    `n` of its lane's fence row the same way (F0, section 14.4). Design 4.5 writes only the epoch; C4's
+    replacement sentence for the fence statement stands, and needs this sentence next to it: "The take-over
+    also writes `n` of every fence row with a changed value and puts it back."
 
 **Added with the merge of the transform (package Y)**
 
@@ -1288,6 +1341,14 @@ says, what was measured, and where the evidence is.
 5. **No column `connection_ids`** (contract note 18): the take-over text of design 4.5 and contract C4 differ.
 6. **An error of `COMMIT` cannot be "passed on unchanged after the roll-back"** as C4 says for other errors
    (contract note 12): after `COMMIT` was sent a roll-back decides nothing.
+24. **(Fix round, F0) The fence of design 4.2 with the take-over of design 4.5 lets two runs commit.** DuckDB
+    1.5.6 and MotherDuck do not record a write of an unchanged value into a column that has had no update
+    since the table was written or checkpointed. After a checkpoint the fence statement's write of the unchanged
+    epoch is such a write, so a take-over that writes the epoch alone does not conflict with an old run's open
+    transaction, and both commit, data included (section 14.4). The take-over must also write the fence rows'
+    counter `n` with a changed value (`n + 1`, then `n - 1`), and every exclusion must rest on a changed value
+    (section 6). This changes the take-over text of design 4.5 (package L) and the rule "write the columns your
+    condition reads" of finding 1.
 
 **MotherDuck or the client library behaves differently from what the spike report says, or the report is silent**
 
@@ -1437,11 +1498,14 @@ Open after the review, and what became of it in the fix round (section 14.3):
 Two reviews of the delivery `9e389cc`: the coordinator's ("merge after named fixes", items 1 to 7) and a second
 reviewer's, who attacked the layer with programs of its own (items 8 to 16, its findings F0 to F8). Every item
 has a test that fails on the code of `9e389cc`: the new tests were run against that code (the tree of the test
-commit `611dd93` with `src` of `9e389cc`; `fix_round_old_code.json`). 48 of the 56 new tests and seeded cases
-failed there. The 8 that passed: the permanent test of item 8 (4 cases; F0 did not recur on the old code
-either), 3 seeded cases of `test_how_an_exception_is_sorted` that guard texts the old rules already sorted
-right, and `test_a_child_row_created_from_two_lanes_is_created_with_a_transition_of_its_parent`, which shows the
-callers' rule of item 3 (it holds on the old code too). The tests without a file are in `test_fix_round.py`.
+commit `7193b39` with `src` of `9e389cc`; `fix_round_old_code.json`). 50 of the 59 new tests and seeded cases
+failed there. The 9 that passed: the take-over at every point in a destination in memory (4 cases: there the
+fence row always has updates, so F0 cannot arise; F0 shows on MotherDuck and after a checkpoint), the test of
+DuckDB's own behaviour that causes F0, 3 seeded cases of `test_how_an_exception_is_sorted` that guard texts the
+old rules already sorted right, and `test_a_child_row_created_from_two_lanes_is_created_with_a_transition_of_its_parent`,
+which shows the callers' rule of item 3 (it holds on the old code too). The shape of F0 itself, a take-over at
+`stream.fenced` right after a checkpoint on a local file, committed the old block after the take-over in 5 of 5
+rounds on `9e389cc` and in 0 of 5 on `7193b39` (same file, key `f0_on_the_old_code_after_a_checkpoint`). The tests without a file are in `test_fix_round.py`.
 
 | Item | What was wrong | What was done | Tests |
 |---|---|---|---|
@@ -1452,7 +1516,7 @@ callers' rule of item 3 (it holds on the old code too). The tests without a file
 | 5 | The evidence files named a command that had not run and no commit | each result names its command and commit (`conftest.run_command`, `run_commit`); one recorded run per MotherDuck file (section 16) | |
 | 6 | The threads of a retired connection could not be counted from outside | `md.waiting_calls()` (section 4) | with item 15 |
 | 7 | The full matrices made the default run slow | marker `d_full` (section 16) | |
-| 8 (F0) | In 1 of 30 runs a take-over at `stream.fenced` returned and the old empty block then reported a successful `COMMIT` | a campaign that tells a breach from an OK that committed nothing (section 14.4); a permanent test | `test_a_take_over_at_every_point_of_a_lane_transaction_keeps_the_fence`, `test_md_fix_round.py::test_a_take_over_at_every_point_of_a_lane_transaction_on_motherduck` |
+| 8 (F0) | In 1 of 30 runs a take-over at `stream.fenced` returned and the old empty block then reported a successful `COMMIT` | **a breach of SPEC 4.2**: both committed. Found by a campaign (section 14.4), caused by DuckDB not recording a write of an unchanged value after a checkpoint; fixed by a take-over and a registration that write the fence counter `n` | `test_duckdb_does_not_record_a_write_of_an_unchanged_value_after_a_checkpoint`, `test_a_take_over_right_after_a_checkpoint_keeps_the_fence`, `test_a_registration_right_after_a_checkpoint_cannot_commit_after_a_take_over`, `test_a_take_over_at_every_point_of_a_lane_transaction_keeps_the_fence`, `test_md_fix_round.py::test_a_take_over_at_every_point_of_a_lane_transaction_on_motherduck`, `fence_campaign.py` |
 | 9 (F1) | `Transaction conflict: …` was `StatementError` | `Conflict` (section 5) | `test_errors.py::test_every_transaction_conflict_text_that_motherduck_gave_is_a_conflict`, `test_ddl_on_one_lane_while_another_lane_writes_is_a_conflict_and_runs_again` |
 | 10 (F2) | Transport words inside other errors (48 of 168 texts) | the programming family by class; gRPC codes in capitals, whole words (section 5) | `test_errors.py::test_every_misleading_text_that_motherduck_gave_is_refused_not_retried`, `test_errors.py::test_the_misleading_statements_on_local_duckdb_are_refused_not_retried`, `test_the_misleading_statements_through_the_layer_are_refused` |
 | 11 (F3) | `IOException` was transport by its class | transport only by a phrase (section 5) | `test_a_missing_file_is_refused_and_not_a_lost_connection` |
@@ -1463,11 +1527,14 @@ callers' rule of item 3 (it holds on the old code too). The tests without a file
 | 16 (F8) | `RETURNING b AS "Count"` with text was `StatementError` | never read as a count (section 2.2) | `test_a_returning_column_named_count_that_holds_text_is_no_count` |
 
 Changes that the fix round made to tests of the first delivery: the tests that counted the statements of a
-lane's first transaction now count the registration as `BEGIN`, `INSERT`, `UPDATE` and `COMMIT`
+lane's first transaction now count the registration as `BEGIN`, `INSERT`, two `UPDATE`s and `COMMIT`
 (`test_lane.py::test_an_unclassified_error_after_commit_was_sent_is_commit_unknown`, the lost-connection matrix,
 `test_alerts.py::test_emit_now_passes_on_what_it_cannot_decide`,
 `test_review.py::test_registration_writes_the_id_of_the_connection_that_runs_it`, and in
-`test_md_procs.py` the slow commit of `takeover_case`, which now skips the registration's `COMMIT`); the test of
+`test_md_procs.py` the slow commit of `takeover_case`, which now skips the registration's `COMMIT`); in
+`test_md_procs.py` two assertions of outcomes the layer does not promise, which a run under load contradicted
+(section 14.4); `test_lane.py::test_conflicts_are_per_column_which_is_why_the_fence_statement_writes_the_epoch`
+uses the take-over as design 4.5 writes it for its negative control (`as_designed=True`); the test of
 two creators on two lanes became the two tests of item 3; the known limit of the head rule moved to a class
 outside the programming family; `InvalidInputException("Connection already closed")`, which no client path
 raises (a closed connection is `ConnectionException`), is no longer sorted as transport.
@@ -1475,6 +1542,62 @@ raises (a closed connection is `ConnectionException`), is no longer sorted as tr
 Not this package's, for information (the second reviewer's E1): a swap (`DROP` and rename) on one lane and a
 committed `INSERT` of another lane into the dropped table both commit, and the insert is lost with the table.
 A DDL that drops a table does not conflict with a committed write of another lane to it (section 15).
+
+### 14.4 F0: a take-over and an old run's transaction both committed
+
+**What the second reviewer saw.** In 1 of 30 rounds of `e1d_shapes.py` (an empty block, a take-over at
+`stream.fenced`) the take-over returned and the old block's `COMMIT` then returned success. The fence row was not
+recorded, so it could not say whether both had committed or MotherDuck had answered OK for nothing.
+
+**How it was told apart** (`tests/destination/fence_campaign.py`). The fence row's counter `n` grows only when
+a transaction of the lane commits, and the take-over does not touch it in design 4.5. So between a read before the
+old block and a read after it, `n` grows by one exactly when the old block committed. Every round records the
+fence row, every fence epoch, the leader row, the heartbeat's epoch, the old block's own trace (a row, a
+transition) and both answers, and checks them (the module text). A diagnostic copy also read the committed fence
+row and the server's listing of the old connection at the crash point, before the take-over started.
+
+| Run (MotherDuck) | Code | Rounds | of them the reviewer's case (`nothing@fenced`) | Breaches |
+|---|---|---|---|---|
+| 1 (stopped at the pause) | `b7b02dd` (the fix round's first code; the take-over as designed) | 393 | 197 | 0 |
+| diagnostic | `e671405` (as designed) | 232 | 232 | 1 |
+| 2 (stopped when the cause was found) | `e671405` (as designed) | 681 | 341 | 8 (3 `nothing@fenced`, 3 `registered_relation@fenced`, 1 `transition@fenced`, 1 `row@fenced`) |
+| 3 | `7193b39` (the fix) | RUN3_ROUNDS | RUN3_MAIN | RUN3_BREACHES |
+
+**What it is: both committed.** In the diagnostic breach, at the crash point the committed `n` was the old value
+and the server listed the old connection with its transaction open; the take-over then met **no** conflict (1
+attempt, 0.37 s) and committed; the old block's `COMMIT` returned OK and `n` grew. Every breach of runs 2 and the
+diagnostic had a take-over with 0 conflicts, and every round that passed at `fenced` or `commit_sent` had at least
+one. In 5 of the 8 breaches of run 2 the old block had written data (a row, a transition, a registered relation),
+and that data was committed after the take-over. This is a breach of SPEC 4.2. (Answer OK for a transaction that
+committed nothing was never seen.)
+
+**Why.** DuckDB 1.5.6 does not record a write of an **unchanged value** into a column that has had no update
+since the table was written or checkpointed; another transaction that then writes the column does not conflict
+with it. With a changed value, or after an earlier update of the column, the conflict is detected. Local DuckDB
+shows it deterministically
+(`test_fix_round.py::test_duckdb_does_not_record_a_write_of_an_unchanged_value_after_a_checkpoint`), and so does
+MotherDuck on a fresh table: the fence statement against the take-over as designed, 6 of 6 both committed; the
+registration of the first form of item 2 (`SET epoch = epoch`) against it, 6 of 6; the control with a changed
+value, 0 of 6 (`tests/destination/probes/probe_unchanged_write.py`, `unchanged_write.json`, local and MotherDuck
+alike). The fence statement writes the unchanged `epoch` on purpose (section 6), and the
+take-over of design 4.5 writes `epoch` alone. The fence row normally has updates (every take-over and every
+lane transaction writes it), so the hole opens only after MotherDuck checkpoints: about 1 round in 100 in run 2,
+under the load of other tests; run 1 had none in 393.
+
+**The fix.** The take-over also writes the counter `n` of every fence row with a changed value and puts it back in
+the same transaction (`UPDATE _cdc.fence SET epoch = :seen + 1, n = n + 1` and `UPDATE _cdc.fence SET n = n - 1`;
+`cdc_v2.testing.destination.TAKEOVER_FENCE_SQL`, `TAKEOVER_FENCE_RESTORE_SQL`). The fence statement always
+changes `n`, so the two meet on `n` in every order and after any checkpoint: on MotherDuck on a fresh table 0 of 6
+rounds with both committed, in both orders, and the same for the registration (`unchanged_write.json`); locally after a checkpoint 5 of 5, against 5 of 5 breaches with the code of
+`9e389cc` (`fix_round_old_code.json`). The registration writes `n + 1` and `n - 1` the same way (section 2.3).
+`seq` stays without gaps, because `n` is unchanged by both. Tests: the two "right after a checkpoint" tests of
+`test_fix_round.py`, each with its negative control; the campaign's run 3 above.
+
+**What it means for the rest of the design** (finding 24): every exclusion by a write-write conflict must rest on a
+changed value (section 6). Package L's take-over must write `n` as above (design 4.5 does not), its heartbeat and
+release write changed values already. A transition from a state to itself, and an `expect` on a column the
+transition does not change, do not exclude a concurrent writer after a checkpoint (section 2.5). The leadership
+fuzzer should take over at `<lane>.fenced` and right after a `CHECKPOINT`.
 
 ## 15. What the callers must know
 
@@ -1487,7 +1610,9 @@ For packages A, L, S, V, B and the integrator. Each line is backed by the sectio
   literal. Any other `duckdb.connect` outside the layer, and any SQL text there that attaches a database or
   names `md:`, fails the static tests (contract note 37, finding 23). The destination is reached with
   `md.connect` only.
-- **Write the columns your condition reads** when the statement must conflict with another writer (section 6).
+- **Write the columns your condition reads, with a changed value,** when the statement must conflict with
+  another writer; a write of an unchanged value is not seen by the other writer after a checkpoint (section 6,
+  section 14.4).
 - Follow the run-again rule of C4: read what the transaction depends on inside the transaction, and move it
   with `execute_one` and a condition on what was read. Section 8.5 shows what happens without it.
 - After `CommitUnknown`: wait about 2.5 s, then read inside a new transaction and decide by what is there. Never
@@ -1553,6 +1678,12 @@ For packages A, L, S, V, B and the integrator. Each line is backed by the sectio
 
 **Package L (leader, take-over, heartbeat)**
 
+- **The take-over must write the counter `n` of every fence row** with a changed value and put it back in the
+  same transaction: `UPDATE _cdc.fence SET epoch = :seen + 1, n = n + 1` and `UPDATE _cdc.fence SET n = n - 1`
+  (section 14.4; `cdc_v2.testing.destination.TAKEOVER_FENCE_SQL` and `TAKEOVER_FENCE_RESTORE_SQL`). With the
+  text of design 4.5 (`SET epoch = :seen + 1` alone) an old run's transaction commits after the take-over
+  whenever MotherDuck has just checkpointed the fence table. The bootstrap's copy of the statements needs the
+  names `register_fence` and `register_fence_restore` too (`schema.NAMED_STATEMENTS`).
 - The take-over must try again after a conflict that follows an interrupt: 1 or 2 further attempts were seen
   (section 7).
 - Call `md.interrupt_earlier(conn, new_epoch)` once more **after** the take-over won (finding 2).
@@ -1586,36 +1717,39 @@ For packages A, L, S, V, B and the integrator. Each line is backed by the sectio
 
 ## 16. How to run the suites
 
-**The default run** needs no network: `uv run -q pytest -q`. On 2026-11-10, on this branch with `origin/main`
-merged (commit `cc81a76`): 878 passed, 4 skipped, 370 deselected in 73 s. The tests of this package alone
-(`uv run -q pytest -q tests/destination`): 327 passed, 112 deselected in 17 s. Both are in `final_runs.json`.
+**The default run** needs no network: `uv run -q pytest -q`. On 2026-11-10, on commit `7193b39`: 997 passed, 4
+skipped, 431 deselected in 77 s. The tests of this package alone (`uv run -q pytest -q tests/destination`):
+385 passed, 139 deselected in 22 s. Both are in `final_runs.json`.
+
+**The rest of the full matrices** (marker `d_full`, fix round item 7): the default run keeps one case per fault
+site of the deadline matrix of `test_lane.py` (the case of `BEGIN` is left out), the door of
+`test_state.py::test_every_pair_of_the_example_machines` (the job is left out), and the empty block at every point
+of `test_fix_round.py::test_a_take_over_at_every_point_of_a_lane_transaction_keeps_the_fence` (the other six
+shapes are left out). They run with `uv run -q pytest -q -m d_full tests/destination` (8 tests, 3 s). A
+MotherDuck run (`-m md`) keeps them. The marker is registered in `tests/destination/conftest.py`.
 
 **The MotherDuck tests** (marker `md`) need the token that `tools/with-env` supplies. They create and drop only
-databases named `cdc_v2_t_d_<random>`. Leave `CDC_V2_MD_PREFIX` unset or set it to `cdc_v2_t_d_`. The command
-that the evidence files record is `tools/with-env uv run -q pytest -q -m md tests/destination`.
-`pyproject.toml` already passes `-q` to pytest, so that command prints no line with the counts; the commands
-below leave the second `-q` out.
+databases named `cdc_v2_t_d_<random>`. Leave `CDC_V2_MD_PREFIX` unset or set it to `cdc_v2_t_d_`. Every result
+in an evidence file names the command that wrote it and the commit (`commit`, with `+changes` when the files the
+tests use differ from it; fix round, item 5). One recorded run per file, without `-k`, on commit `7193b39`
+(the commit delivered differs from it only in documents, evidence files and one new probe program):
 
-| Command | Tests | Last run (2026-11-10) |
-|---|---|---|
-| `tools/with-env uv run -q pytest -m md tests/destination/test_md.py` | 31: what MotherDuck answers, deadlines, the registry, the clock, timings | 31 passed in 308 s |
-| `tools/with-env uv run -q pytest -m md tests/destination/test_md_again.py` | 71: the T0 tests of lanes, leader tables, migrations, state, alerts and the points from the review of apply, with a MotherDuck database | 71 passed in 597 s, as two runs chosen with `-k` (28 in 199 s and 43 in 399 s) |
-| `tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py` | 10: real processes (sections 8 and 9) | 10 passed in 1071 s, as six runs chosen with `-k` (95 to 308 s each) |
+| Command | Tests | Recorded run (2026-11-10 UTC) | Earlier runs |
+|---|---|---|---|
+| `tools/with-env uv run -q pytest -m md tests/destination/test_md.py` | 31: what MotherDuck answers, deadlines, the registry, the clock, timings | 31 passed in 358 s | 31 passed in 308 s (`88e0cf1`), 327 s (`e671405`) |
+| `tools/with-env uv run -q pytest -m md tests/destination/test_md_again.py` | 88: the T0 tests of lanes, leader tables, migrations, state, alerts, the points from the review of apply and the fix round, with a MotherDuck database | 88 passed in 893 s | 71 passed in 597 s in two `-k` runs (`88e0cf1`); 88 passed in 777 s (`e671405`) |
+| `tools/with-env uv run -q pytest -m md tests/destination/test_md_fix_round.py` | 2: the black-holed path (section 9.4), the take-over at every point (14 rounds) | 2 passed in 113 s | 2 passed in 101 s (`e671405`) |
+| `tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py` | 10: real processes (sections 8 and 9) | 10 passed in 1212 s | 10 passed in 1071 s in six `-k` runs (`88e0cf1`); 8 passed and 2 failed in 1080 s (`e671405`; section 14.3) |
 
-All 112 passed (`final_runs.json`, key `md_runs`). The whole of `test_md_procs.py` takes about 18 minutes in
-one run, and `test_md_again.py` about 10. The six runs of `test_md_procs.py` were, by `-k`:
-`different_epochs or same_epoch`, `middle_of_an_open_transaction`, `commit_outcome_unknown`,
-`run_again_rule or by_fault_sites`, `real_connection_break`, `crash_runner`. The two `-k` expressions for
-`test_md_again.py` were not written down; the counts of the two runs (28 run and 43 left out, 43 run and 28
-left out) are in the evidence.
+**The campaign of item 8**: `tools/with-env uv run python tests/destination/fence_campaign.py --rounds 1040 --log
+<file>` (about 3 to 5 s a round; its summary goes to `fence_campaign.json`; SIGTERM stops it and drops its
+database). **The probe of its cause**: `tools/with-env uv run python tests/destination/probes/probe_unchanged_write.py`
+writes `unchanged_write.json`.
 
-These runs were made on commit `88e0cf1`. After them the branch took `origin/main` twice (the transform of
-package Y, then documents) and changed one file of its own, `tests/destination/test_static.py`, a test of the
-default run (finding 23). Between `88e0cf1` and `cc81a76` no other file differs among those that the md tests
-use: `src/cdc_v2/md`, `src/cdc_v2/state`, `src/cdc_v2/alerts.py`, `src/cdc_v2/testing`, the shared modules for
-deadlines, crash points and fault sites, `tests/destination`, `tests/conftest.py`, `tools`, `pyproject.toml`
-and `uv.lock` (`git diff --stat 88e0cf1 cc81a76 -- <these paths>`). So the md tests were not run again on
-`cc81a76`.
+**Numbers that vary.** Times, the counts of conflicts, attempts and interrupts, which process won a race, and how
+many killed commits landed without an answer move from run to run; the tests assert only what the layer
+promises and record the rest. Where this document gives such a number from more than one run, it gives the
+range and names the runs.
 
 **After a run** no test database may be left. This reads only the ledger (section 2.7) and prints `[]`:
 
@@ -1628,20 +1762,3 @@ A name that it prints belongs to a run that was killed. Drop it with
 writes `fence_columns.json`.
 
 **The document of the state machines**: `uv run python -m cdc_v2.state > docs/state_machines.md`.
-
-**The numbers in this document** are the ones in `evidence/p3/destination/`, each file with the date of its
-run (all on 2026-11-10, before the last run). The md tests write these files again at every run. Times and the
-counts of conflicts move from run to run; the tests assert only what the layer promises and record the rest.
-
-The files that the last run wrote were compared with the committed ones, value by value, and then not kept.
-The comparison is in `final_runs.json` (key `last_md_run_against_the_committed_files`):
-
-- `crash_summary.json` and `fence_columns.json` did not differ. `crash_ledger.jsonl` had 42 lines again.
-- `commit_unknown.json`: 16 instead of 17 commits landed without the client having seen the answer; the
-  difference is one kill at 80 ms (section 8.4).
-- `error_mapping.json`, `from_apply.json`, `run_again_rule.json`, `crash_runner.json`, `connection_break.json`,
-  `clock.json`, `deadlines.json` and `timings.json` differed only in dates and durations. The classes, labels
-  and texts of the error mapping were the same.
-- `two_process.json`, `takeover_open_tx.json`, `registry_takeover.json` and `leader_tables_concurrent.json`
-  differed also in which process won a race and in the counts of conflicts, attempts and interrupts. These are
-  the values that the tests record and do not assert.

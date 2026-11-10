@@ -1,9 +1,11 @@
 {
-  "command": "tools/with-env uv run -q pytest -q -m md tests/destination",
+  "command": "see results.<key>.command (each result names the run that wrote it)",
   "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
   "results": {
     "starters_at_once": {
-      "date_utc": "2026-11-10 08:17",
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md.py",
+      "commit": "7193b39",
+      "date_utc": "2026-11-10 19:54",
       "processes": {
         "per_round": [
           {
@@ -13,24 +15,6 @@
               0
             ],
             "retries": [
-              1,
-              0,
-              0
-            ],
-            "rows": [
-              1,
-              18,
-              18,
-              1
-            ]
-          },
-          {
-            "exit_codes": [
-              0,
-              0,
-              0
-            ],
-            "retries": [
               0,
               1,
               1
@@ -49,9 +33,27 @@
               0
             ],
             "retries": [
-              1,
               0,
+              0,
+              0
+            ],
+            "rows": [
+              1,
+              18,
+              18,
               1
+            ]
+          },
+          {
+            "exit_codes": [
+              0,
+              0,
+              0
+            ],
+            "retries": [
+              0,
+              0,
+              0
             ],
             "rows": [
               1,
@@ -86,8 +88,64 @@
         "per_round": [
           {
             "retries_or_error": [
+              1,
               0,
               1,
+              1
+            ],
+            "rows": [
+              1,
+              18,
+              18,
+              1
+            ]
+          },
+          {
+            "retries_or_error": [
+              1,
+              1,
+              0,
+              1
+            ],
+            "rows": [
+              1,
+              18,
+              18,
+              1
+            ]
+          },
+          {
+            "retries_or_error": [
+              1,
+              1,
+              0,
+              1
+            ],
+            "rows": [
+              1,
+              18,
+              18,
+              1
+            ]
+          },
+          {
+            "retries_or_error": [
+              1,
+              0,
+              0,
+              0
+            ],
+            "rows": [
+              1,
+              18,
+              18,
+              1
+            ]
+          },
+          {
+            "retries_or_error": [
+              1,
+              0,
               1,
               1
             ],
@@ -114,23 +172,9 @@
           },
           {
             "retries_or_error": [
+              1,
               0,
-              1,
-              1,
-              1
-            ],
-            "rows": [
-              1,
-              18,
-              18,
-              1
-            ]
-          },
-          {
-            "retries_or_error": [
               0,
-              1,
-              1,
               1
             ],
             "rows": [
@@ -144,8 +188,22 @@
             "retries_or_error": [
               1,
               1,
-              0,
+              1,
+              0
+            ],
+            "rows": [
+              1,
+              18,
+              18,
               1
+            ]
+          },
+          {
+            "retries_or_error": [
+              1,
+              1,
+              1,
+              0
             ],
             "rows": [
               1,
@@ -184,65 +242,9 @@
           },
           {
             "retries_or_error": [
-              0,
-              1,
-              1,
-              1
-            ],
-            "rows": [
-              1,
-              18,
-              18,
-              1
-            ]
-          },
-          {
-            "retries_or_error": [
-              0,
-              1,
-              1,
-              1
-            ],
-            "rows": [
-              1,
-              18,
-              18,
-              1
-            ]
-          },
-          {
-            "retries_or_error": [
-              0,
-              1,
-              1,
-              1
-            ],
-            "rows": [
-              1,
-              18,
-              18,
-              1
-            ]
-          },
-          {
-            "retries_or_error": [
-              1,
-              1,
-              1,
-              0
-            ],
-            "rows": [
-              1,
-              18,
-              18,
-              1
-            ]
-          },
-          {
-            "retries_or_error": [
-              1,
               1,
               0,
+              1,
               1
             ],
             "rows": [
