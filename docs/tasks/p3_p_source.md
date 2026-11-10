@@ -62,8 +62,10 @@ heartbeat. Contract: `docs/design/p3_plan.md` C0, C1, C7. Packages Y (transform)
   report is near, read its sections on HELLO, HEARTBEAT and MESSAGE frames, and name any disagreement.
 
 - **From the review of package E.** A table without a primary key must have `REPLICA IDENTITY FULL` before it is
-  published, also when it has `REPLICA IDENTITY USING INDEX`: Debezium gives such a table no key, and the engine
-  would carry an incomplete old image. `publication.ensure` and the catalog observation report it.
+  published, also when it has `REPLICA IDENTITY USING INDEX`: the engine would carry an incomplete old image.
+  `publication.ensure` and the catalog observation report it. (Corrected after package K: Debezium does give such a
+  table a key — its unique index, also on a nullable column or a deferrable constraint — so the pipeline tells the
+  engine which tables are without a key; `docs/design/engine.md` 4a.)
 - The heartbeat table is in the publication (it is what makes an idle slot advance and what the stream's marker rule
   of SPEC 4.6 watches).
 - `slot.facts` returns the server's `wal_sender_timeout`. It bounds how long a black-holed replication connection
