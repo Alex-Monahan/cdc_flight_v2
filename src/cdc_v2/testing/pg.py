@@ -1,12 +1,15 @@
 """Isolated Postgres sources for tier-T1 tests, built on tools/localpg.
 
-* `shared_cluster()` - the development cluster under ~/.cache/cdc_flight_v2/pg (primary 55432, replica 55433). It is
-  shared with other workers, so only `up`, `status`, `conninfo`, `sql` and `logs` are ever run on it; `localpg()`
-  refuses everything else for that home.
+* `fixture_cluster()` - the cluster on which the T1 fixtures create private databases: the home named by
+  `CDC_V2_PG_HOME`, built on `CDC_V2_PG_PORT_BASE` if it does not exist yet (docs/design/p3_plan.md section 4).
+  The default home (~/.cache/cdc_flight_v2/pg, ports 55432/55433) is used only with `CDC_V2_T1_SHARED=1` (the
+  orchestrator's gate runs); without a named home and without that switch, `fixture_cluster()` refuses with a
+  message that says what to export. On the default home only `up`, `status`, `conninfo`, `sql` and `logs` are ever
+  run; `localpg()` refuses everything else for it.
 * `PrivateDatabase` - a database `cdc_v2_t_<random>` on a cluster, created and dropped by the test.
 * `PrivateCluster` - a primary and replica of its own (own home, own port block) for destructive drills. The port base
   comes from `PortLease`, which takes an exclusive lock file under ~/.cache/cdc_flight_v2/ports/, so parallel test
-  processes never share a block. Blocks start at 55520 and step by 8.
+  processes never share a block. Blocks: 55840-56095, 32 blocks of 8.
 """
 from __future__ import annotations
 
@@ -26,11 +29,14 @@ from typing import Optional
 REPO = Path(__file__).resolve().parents[3]
 LOCALPG = REPO / "tools" / "localpg"
 CACHE = Path(os.environ.get("CDC_V2_CACHE", Path.home() / ".cache" / "cdc_flight_v2"))
-SHARED_HOME = Path(os.environ.get("CDC_V2_PG_HOME", CACHE / "pg")).expanduser()
+SHARED_HOME = (CACHE / "pg").expanduser()          # the default home: gate runs only (CDC_V2_T1_SHARED=1)
 SHARED_BASE = 55432
-PRIVATE_BASE = 55520
+PRIVATE_BASE = 55840
 PRIVATE_STEP = 8
-PRIVATE_BLOCKS = 32                       # 55520 .. 55775
+PRIVATE_BLOCKS = 32                       # 55840 .. 56095
+# Fixed port ranges that the leased blocks must miss (docs/design/p3_plan.md section 4); a default-run test checks it.
+FIXED_RANGES = [(55432, 55439, "default home"), (55440, 55459, "TCP proxies"), (55460, 55467, "localpg self-tests"),
+                (55500, 55509, "throughput spike"), (55600, 55607, "cut stress"), (55620, 55823, "package homes")]
 DB_PREFIX = "cdc_v2_t_"
 # Commands that change or stop a cluster. Never run on the shared home: other workers use it at the same time.
 SHARED_FORBIDDEN = {"down", "reset", "kill", "promote", "remove", "set", "unset", "follow", "add-standby"}
@@ -40,14 +46,33 @@ class HarnessError(Exception):
     pass
 
 
+def fixture_home() -> tuple:
+    """(home, port base or None) of the cluster the T1 fixtures use, from the environment (see module docstring)."""
+    named = os.environ.get("CDC_V2_PG_HOME")
+    shared = os.environ.get("CDC_V2_T1_SHARED") == "1"
+    base = os.environ.get("CDC_V2_PG_PORT_BASE")
+    if named and Path(named).expanduser().resolve() != SHARED_HOME.resolve():
+        return Path(named).expanduser(), int(base) if base else None
+    if shared:
+        return SHARED_HOME, SHARED_BASE
+    raise HarnessError("T1 fixtures need a cluster of their own: export CDC_V2_PG_HOME=~/.cache/cdc_flight_v2/pg-<pkg> "
+                       "and CDC_V2_PG_PORT_BASE=<your base> (docs/design/p3_plan.md section 4), and "
+                       "CDC_V2_MD_PREFIX=cdc_v2_t_<pkg>_. The default home is used only with CDC_V2_T1_SHARED=1 "
+                       "(gate runs of the orchestrator).")
+
+
 def localpg(*args: str, home: Optional[Path] = None, port_base: Optional[int] = None, timeout: int = 600,
             check: bool = True) -> subprocess.CompletedProcess:
     home = Path(home or SHARED_HOME).expanduser()
     cmd = next((a for a in args if not a.startswith("-")), "")
-    if home.resolve() == SHARED_HOME.resolve() and cmd in SHARED_FORBIDDEN:
-        raise HarnessError("refusing `localpg %s` on the shared development cluster" % cmd)
+    protected = {SHARED_HOME.resolve()}
+    if os.environ.get("CDC_V2_PG_HOME"):
+        protected.add(Path(os.environ["CDC_V2_PG_HOME"]).expanduser().resolve())
+    if home.resolve() in protected and cmd in SHARED_FORBIDDEN:
+        raise HarnessError("refusing `localpg %s` on the cluster of the T1 fixtures (use private_cluster)" % cmd)
     env = {k: v for k, v in os.environ.items() if not k.startswith("PG")}
     env["CDC_V2_PG_HOME"] = str(home)
+    env.pop("CDC_V2_PG_PORT_BASE", None)                 # the base is passed explicitly, or comes from the home
     argv = [str(LOCALPG), "--home", str(home)]
     if port_base is not None:
         argv += ["--port-base", str(port_base)]
@@ -124,11 +149,20 @@ class Cluster:
         raise HarnessError("replica did not reach %s within %.0f s" % (target, timeout))
 
 
-def shared_cluster(ensure_up: bool = True) -> Cluster:
-    """The shared development cluster; `localpg up` is a no-op when it already runs."""
+def fixture_cluster(ensure_up: bool = True) -> Cluster:
+    """The cluster of the T1 fixtures (fixture_home()); `localpg up` builds it on its port base if needed and is a
+    no-op when it already runs."""
+    home, base = fixture_home()
+    if home.resolve() != SHARED_HOME.resolve() and (home / "state.json").exists():
+        base = None                                      # a built home knows its base; localpg refuses another
     if ensure_up:
-        localpg("up")
-    return Cluster(SHARED_HOME)
+        localpg("up", home=home, port_base=base)
+    return Cluster(home, base)
+
+
+def shared_cluster(ensure_up: bool = True) -> Cluster:
+    """Kept for callers of the first version: the same as fixture_cluster()."""
+    return fixture_cluster(ensure_up)
 
 
 def new_db_name() -> str:
@@ -144,8 +178,12 @@ class PrivateDatabase:
         if not self.name.startswith(DB_PREFIX) or not self.name.replace("_", "").isalnum():
             raise HarnessError("test databases are named %s<hex>" % DB_PREFIX)
         cluster.sql('CREATE DATABASE "%s"' % self.name)
-        cluster.sql('GRANT ALL ON DATABASE "%s" TO cdc_v2_runtime' % self.name)
-        cluster.sql("GRANT ALL ON SCHEMA public TO cdc_v2_runtime", db=self.name)
+        try:
+            cluster.sql('GRANT ALL ON DATABASE "%s" TO cdc_v2_runtime' % self.name)
+            cluster.sql("GRANT ALL ON SCHEMA public TO cdc_v2_runtime", db=self.name)
+        except BaseException:
+            self.drop()
+            raise
 
     def params(self, role: str = "admin", node: str = "primary") -> dict:
         return self.cluster.params(role, node, self.name)
@@ -161,10 +199,20 @@ class PrivateDatabase:
         return Source(**self.params(role, node))
 
     def drop(self) -> None:
-        for node in [n["name"] for n in self.cluster.info["nodes"]]:
+        """Drop the logical slots of this database on every node (terminating a session that holds one first:
+        a slot in use cannot be dropped, and its database then cannot be dropped either), then the database."""
+        for node in [n["name"] for n in self.cluster.info["nodes"] if n.get("running", True)]:
             with contextlib.suppress(Exception):
-                for (slot,) in self.cluster.sql(
-                        "SELECT slot_name FROM pg_replication_slots WHERE database = %s", (self.name,), node=node):
+                for slot, pid in self.cluster.sql(
+                        "SELECT slot_name, active_pid FROM pg_replication_slots WHERE database = %s",
+                        (self.name,), node=node):
+                    if pid:
+                        self.cluster.sql("SELECT pg_terminate_backend(%s)", (pid,), node=node)
+                        deadline = time.monotonic() + 10
+                        while time.monotonic() < deadline and self.cluster.sql(
+                                "SELECT active FROM pg_replication_slots WHERE slot_name = %s", (slot,),
+                                node=node)[0][0]:
+                            time.sleep(0.05)
                     self.cluster.sql("SELECT pg_drop_replication_slot(%s)", (slot,), node=node)
         self.cluster.sql('DROP DATABASE IF EXISTS "%s" WITH (FORCE)' % self.name)
 

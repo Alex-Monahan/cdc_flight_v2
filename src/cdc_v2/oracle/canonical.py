@@ -526,9 +526,9 @@ def pg_canon(col_sql: str, t: PgColumnType, ctx: Ctx = Ctx()) -> str:
     """SQL (Postgres): canonical text of a non-NULL value of column type t (NULL stays NULL)."""
     rule = t.rule
     if not t.is_array:
-        return "(CASE WHEN %s IS NULL THEN NULL ELSE coalesce(%s, '!null') END)" % (col_sql, rule.pg(col_sql, ctx))
+        return "(CASE WHEN %s IS NULL THEN NULL ELSE coalesce(%s, '!null-pg') END)" % (col_sql, rule.pg(col_sql, ctx))
     e = "_e"
-    elem = "coalesce(%s, '!null')" % rule.pg(e, ctx)
+    elem = "coalesce(%s, '!null-pg')" % rule.pg(e, ctx)
     body = ("coalesce(array_dims({c}), '') || '{{' || array_to_string(ARRAY(SELECT {tok} FROM unnest({c}) "
             "WITH ORDINALITY AS _u({e}, _i) ORDER BY _i), ',') || '}}'").format(c=col_sql, tok=_token_pg(elem, e), e=e)
     return "(CASE WHEN %s IS NULL THEN NULL ELSE %s END)" % (col_sql, body)
@@ -537,7 +537,7 @@ def pg_canon(col_sql: str, t: PgColumnType, ctx: Ctx = Ctx()) -> str:
 def md_canon(col_sql: str, t: PgColumnType, md_type: MdType, depth: int = 0) -> str:
     """SQL (DuckDB): canonical text of a value of destination type md_type, for a source column of type t."""
     if not t.is_array:
-        return "(CASE WHEN %s IS NULL THEN NULL ELSE coalesce(%s, '!null') END)" % (
+        return "(CASE WHEN %s IS NULL THEN NULL ELSE coalesce(%s, '!null-md') END)" % (
             col_sql, t.rule.md_or_never(col_sql, md_type))
     if md_type.base != "LIST":
         return "(CASE WHEN %s IS NULL THEN NULL ELSE %s END)" % (col_sql, _never(md_type, col_sql))
@@ -551,7 +551,7 @@ def md_canon(col_sql: str, t: PgColumnType, md_type: MdType, depth: int = 0) -> 
     for _ in range(len(dims) - 1):
         flat = "flatten(%s)" % flat
     v = "_x%d" % depth
-    elem = "coalesce(%s, '!null')" % t.rule.md_or_never(v, leaf)
+    elem = "coalesce(%s, '!null-md')" % t.rule.md_or_never(v, leaf)
     dims_sql = " || ".join(dims)
     body = ("(CASE WHEN len({c}) = 0 THEN '' ELSE {dims} END) || '{{' || array_to_string(list_transform({flat}, "
             "lambda {v}: {tok}), ',') || '}}'").format(c=col_sql, dims=dims_sql, flat=flat, v=v, tok=_token_md(elem, v))

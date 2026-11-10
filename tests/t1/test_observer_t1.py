@@ -8,6 +8,7 @@ import pytest
 
 from cdc_v2.oracle import OracleConfig, compare
 from cdc_v2.testing import loader
+from cdc_v2.testing.md import STAND_IN_SLOT, write_stand_in_position
 from cdc_v2.testing.observer import TransfersObserver, apply_transfers
 from cdc_v2.testing.workload import Features, Workload, WorkloadConfig, read_log
 
@@ -29,19 +30,24 @@ def test_observer_catches_a_split_transaction(source_db, dest_db, tmp_path, evid
 
     # 1. whole transactions: no violation, and the destination equals the source afterwards
     wl.run(1)
+    q1 = wl.quiesce()
     good = transfers_of_round(log, 0)
     obs = TransfersObserver(dest_db.connect, tables, total).start()
     apply_transfers(dest_db.conn, good)
     rep_good = obs.stop()
-    eq = compare(source_db.source(), dest_db.destination(), OracleConfig())
+    write_stand_in_position(dest_db.conn, q1)
+    eq = compare(source_db.source(), dest_db.destination(), OracleConfig(), position=q1, slot_name=STAND_IN_SLOT)
 
     # 2. every source transaction split into two destination commits, one second apart
     wl.run(1)
+    q2 = wl.quiesce()
     bad = transfers_of_round(log, 1)
     obs = TransfersObserver(dest_db.connect, tables, total).start()
     apply_transfers(dest_db.conn, bad, split=True, pause=1.0)
     rep_bad = obs.stop()
-    eq_after = compare(source_db.source(), dest_db.destination(), OracleConfig())
+    write_stand_in_position(dest_db.conn, q2)
+    eq_after = compare(source_db.source(), dest_db.destination(), OracleConfig(), position=q2,
+                       slot_name=STAND_IN_SLOT)
     wl.close()
 
     evidence("p3/oracle").write_json("observer", {

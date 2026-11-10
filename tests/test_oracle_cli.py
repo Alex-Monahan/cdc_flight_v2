@@ -51,3 +51,8 @@ def test_errors_exit_2_without_echoing_the_password(home, capsys):
 def test_destination_outside_the_project_is_refused(home, capsys):
     rc = cli.main(["--source-port", "55432", "--source-db", "x", "--dest-db", "other_db", "--pg-home", str(home)])
     assert rc == cli.EXIT_ERROR and "cdc_v2_" in capsys.readouterr().err
+
+
+def test_a_position_is_required(home, capsys):
+    rc = cli.main(["--source-port", "55432", "--source-db", "x", "--dest-db", "cdc_v2_t_x", "--pg-home", str(home)])
+    assert rc == cli.EXIT_ERROR and "unpositioned" in capsys.readouterr().err

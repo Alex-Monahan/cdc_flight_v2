@@ -51,25 +51,58 @@ def test_port_lease_held_by_another_process(tmp_path):
 
 
 @pytest.mark.parametrize("cmd", sorted(tpg.SHARED_FORBIDDEN))
-def test_shared_cluster_refuses_disruptive_commands(cmd):
+def test_fixture_clusters_refuse_disruptive_commands(cmd, monkeypatch, tmp_path):
     with pytest.raises(tpg.HarnessError, match="refusing"):
-        tpg.localpg(cmd, "replica")
+        tpg.localpg(cmd, "replica")                                # the default home
+    monkeypatch.setenv("CDC_V2_PG_HOME", str(tmp_path / "pg-x"))
+    with pytest.raises(tpg.HarnessError, match="refusing"):
+        tpg.localpg(cmd, "replica", home=tmp_path / "pg-x")        # the named fixture home
 
 
-def test_private_blocks_start_at_55520():
-    assert tpg.PRIVATE_BASE == 55520 and tpg.PRIVATE_STEP == 8
-    assert tpg.private_home(55528).name == "pg-t1-55528"
+def test_leased_range_misses_every_fixed_range():
+    lo = tpg.PRIVATE_BASE
+    hi = tpg.PRIVATE_BASE + tpg.PRIVATE_BLOCKS * tpg.PRIVATE_STEP - 1
+    assert (lo, hi, tpg.PRIVATE_STEP) == (55840, 56095, 8)
+    expected = {(55432, 55439), (55440, 55459), (55460, 55467), (55500, 55509), (55600, 55607), (55620, 55823)}
+    assert {(a, b) for a, b, _ in tpg.FIXED_RANGES} == expected
+    for a, b, what in tpg.FIXED_RANGES:
+        assert b < lo or a > hi, "leased range overlaps %s" % what
+    assert tpg.private_home(55848).name == "pg-t1-55848"
+
+
+def test_fixture_home_needs_a_named_home_or_the_gate_switch(monkeypatch, tmp_path):
+    for v in ("CDC_V2_PG_HOME", "CDC_V2_PG_PORT_BASE", "CDC_V2_T1_SHARED"):
+        monkeypatch.delenv(v, raising=False)
+    with pytest.raises(tpg.HarnessError, match="CDC_V2_PG_HOME"):
+        tpg.fixture_home()
+    monkeypatch.setenv("CDC_V2_T1_SHARED", "1")
+    assert tpg.fixture_home() == (tpg.SHARED_HOME, 55432)
+    monkeypatch.delenv("CDC_V2_T1_SHARED")
+    monkeypatch.setenv("CDC_V2_PG_HOME", str(tmp_path / "pg-o"))
+    monkeypatch.setenv("CDC_V2_PG_PORT_BASE", "55520")
+    assert tpg.fixture_home() == (tmp_path / "pg-o", 55520)
+    monkeypatch.setenv("CDC_V2_PG_HOME", str(tpg.SHARED_HOME))       # naming the default home is not enough
+    with pytest.raises(tpg.HarnessError):
+        tpg.fixture_home()
 
 
 @pytest.mark.parametrize("name", ["cdc_v2_x", "my_db", "cdc_v2_t_", "cdc_v2_t_A", "cdc_v2_t_x;drop", ""])
-def test_md_names_outside_the_test_prefix_are_refused(name):
+def test_md_names_outside_the_test_prefix_are_refused(name, monkeypatch):
+    monkeypatch.delenv("CDC_V2_MD_PREFIX", raising=False)
     with pytest.raises(tmd.DestinationError):
         tmd.check_name(name)
 
 
-def test_md_new_names():
+def test_md_prefix_from_the_environment(monkeypatch):
+    monkeypatch.setenv("CDC_V2_MD_PREFIX", "cdc_v2_t_o_")
     n = tmd.new_name()
-    assert tmd.check_name(n) == n and n.startswith("cdc_v2_t_")
+    assert n.startswith("cdc_v2_t_o_") and tmd.check_name(n) == n
+    with pytest.raises(tmd.DestinationError):
+        tmd.check_name("cdc_v2_t_s_abc")                           # another package's database
+    for bad in ("cdc_v2_x_", "cdc_v2_t_o", "other_"):
+        monkeypatch.setenv("CDC_V2_MD_PREFIX", bad)
+        with pytest.raises(tmd.DestinationError):
+            tmd.prefix()
 
 
 def test_pg_test_database_names():

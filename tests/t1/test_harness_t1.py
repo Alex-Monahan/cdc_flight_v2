@@ -6,11 +6,13 @@ import time
 import psycopg
 import pytest
 
-from cdc_v2.oracle import OracleConfig, compare, format_lsn, parse_lsn, wait_for_applied
-from cdc_v2.oracle.position import PositionTimeout
+from cdc_v2 import lsn
+from cdc_v2.deadline import Deadline, DeadlineExceeded
+from cdc_v2.oracle import OracleConfig, PositionNotReached, compare, wait_for_applied
 from cdc_v2.testing import loader
 from cdc_v2.testing import md as tmd
 from cdc_v2.testing import pg as tpg
+from cdc_v2.testing.md import STAND_IN_SLOT, write_stand_in_position
 from cdc_v2.testing.workload import Features, Workload, WorkloadConfig, per_writer_statements, read_log, replay
 
 pytestmark = [pytest.mark.t1, pytest.mark.timeout(900)]
@@ -109,8 +111,10 @@ def test_workload_replay_reproduces_the_source(make_source_db, dest_db, tmp_path
     seen = replay(log, b.connect)
     # the same seed, planned without a database, gives the same statements per writer
     same_plan = per_writer_statements(Workload(cfg).plan(8)) == per_writer_statements(read_log(log))
+    q = lsn.parse(b.sql("SELECT pg_current_wal_insert_lsn()::text")[0][0])
     loader.load_database(a.params(), dest_db.conn)
-    r = compare(b.source(), dest_db.destination(), OracleConfig(chunk_rows=200))
+    write_stand_in_position(dest_db.conn, q)
+    r = compare(b.source(), dest_db.destination(), OracleConfig(chunk_rows=200), position=q, slot_name=STAND_IN_SLOT)
     rows = {t.source: t.source_rows for t in r.tables}
     FACTS["workload_replay"] = {"config": cfg.to_dict(), "stats": dict(wl.stats), "log_entries": dict(seen),
                                 "plan_equals_log_per_writer": same_plan, "replayed_equals_original": r.equal,
@@ -136,43 +140,40 @@ def test_quiesce_points_in_continuous_mode(source_db, dest_db, tmp_path):
     assert source_db.sql(q) == before                     # nothing is written while paused
     # a stand-in for the pipeline: copy the quiesced source, record its position, wait for it, compare
     loader.load_database(source_db.params(), dest_db.conn)
-    dest_db.conn.execute("CREATE SCHEMA _cdc")
-    dest_db.conn.execute("CREATE TABLE _cdc.stream_state (slot VARCHAR, applied_lsn VARCHAR)")
-    dest_db.conn.execute("INSERT INTO _cdc.stream_state VALUES ('stand_in', ?)", [lsn1])
-    assert wait_for_applied(dest_db.conn, lsn1, timeout=30) == parse_lsn(lsn1)
-    r = compare(source_db.source(), dest_db.destination(), OracleConfig())
+    write_stand_in_position(dest_db.conn, lsn1)
+    assert wait_for_applied(dest_db.conn, lsn1, Deadline.after(30), STAND_IN_SLOT) == lsn1
+    r = compare(source_db.source(), dest_db.destination(), OracleConfig(), position=lsn1, slot_name=STAND_IN_SLOT)
     wl.resume()
     time.sleep(0.5)
     lsn2 = wl.pause()
     wl.stop()
     wl.close()
-    FACTS["quiesce"] = {"first": lsn1, "second": lsn2, "equal_at_first": r.equal, "rounds": wl.round}
+    FACTS["quiesce"] = {"first": lsn.format(lsn1), "second": lsn.format(lsn2), "equal_at_first": r.equal,
+                        "rounds": wl.round}
     assert r.equal, r.summary()
-    assert parse_lsn(lsn2) > parse_lsn(lsn1)
+    assert lsn2 > lsn1
 
 
 def test_wait_for_applied_on_motherduck(dest_db):
-    c = dest_db.conn
-    c.execute("CREATE SCHEMA _cdc")
-    c.execute("CREATE TABLE _cdc.stream_state (slot VARCHAR, applied_lsn VARCHAR)")
-    c.execute("INSERT INTO _cdc.stream_state VALUES ('s', '0/100')")
+    write_stand_in_position(dest_db.conn, 0x100, slot_name="s")
+    write_stand_in_position(dest_db.conn, 1 << 40, slot_name="another_slot")     # must not count for "s"
     target = (1 << 32) + 0x2000
 
     def advance():
         time.sleep(1.5)
         w = dest_db.connect()
-        w.execute("UPDATE _cdc.stream_state SET applied_lsn = ? WHERE slot = 's'", [format_lsn(target)])
+        w.execute("UPDATE _cdc.stream_state SET applied_lsn = ? WHERE slot_name = 's'", [target])
         w.close()
 
     t = threading.Thread(target=advance)
     t0 = time.monotonic()
     t.start()
-    got = wait_for_applied(dest_db.connect(), "1/2000", timeout=60, poll=0.2)
+    got = wait_for_applied(dest_db.connect(), target, Deadline.after(60), "s", poll=0.2)
     waited = time.monotonic() - t0
     t.join()
-    with pytest.raises(PositionTimeout):
-        wait_for_applied(dest_db.connect(), "2/0", timeout=1.0, poll=0.2)
-    FACTS["wait_for_applied"] = {"returned": format_lsn(got), "waited_seconds": round(waited, 2)}
+    with pytest.raises(DeadlineExceeded):
+        wait_for_applied(dest_db.connect(), 2 << 32, Deadline.after(1.0), "s", poll=0.2)
+    FACTS["wait_for_applied"] = {"returned": lsn.format(got), "waited_seconds": round(waited, 2)}
     assert got == target and waited >= 1.4
 
 
@@ -180,4 +181,48 @@ def test_no_test_database_is_left_on_motherduck_by_earlier_runs():
     """Ledger entries of databases that were created and never dropped (checked by attaching each by name)."""
     left = tmd.leftovers()
     FACTS["motherduck_leftovers_at_check"] = left
-    assert all(n.startswith("cdc_v2_t_") for n in left)
+    assert all(n.startswith(tmd.prefix()) for n in left)
+
+
+def test_lost_last_transaction_on_a_lagging_standby_is_not_equal(private_cluster, dest_db, evidence):
+    """Contract C8: the comparison is tied to the position Q. The pipeline loses the last transaction T but reports
+    Q as applied; the standby has not replayed T yet. Without the position both sides lack T and the oracle would say
+    EQUAL; with it the comparison is refused until the standby has replayed Q, and then reports the loss."""
+    c = private_cluster
+    db = tpg.PrivateDatabase(c)
+    try:
+        db.sql("CREATE TABLE t (id int PRIMARY KEY, v text)")
+        db.sql("INSERT INTO t SELECT g, 'v' || g FROM generate_series(1, 10) g")
+        c.wait_replica_caught_up()
+        loader.load_database(db.params(), dest_db.conn)                 # the pipeline applied the first ten rows
+        c.sql("SELECT pg_wal_replay_pause()", role="bootstrap", node="replica")
+        db.sql("INSERT INTO t VALUES (11, 'lost')")                       # T: committed on the primary ...
+        q = lsn.parse(db.sql("SELECT pg_current_wal_insert_lsn()::text")[0][0])
+        write_stand_in_position(dest_db.conn, q)                          # ... and lost by the pipeline
+        replica = db.source(node="replica")
+        unpositioned = compare(replica, dest_db.destination(), OracleConfig(), unpositioned=True)
+        t0 = time.monotonic()
+        with pytest.raises(PositionNotReached, match="standby replayed only") as refused:
+            compare(replica, dest_db.destination(), OracleConfig(position_wait_s=3), position=q,
+                    slot_name=STAND_IN_SLOT)
+        waited = time.monotonic() - t0
+        c.sql("SELECT pg_wal_replay_resume()", role="bootstrap", node="replica")
+        after = compare(replica, dest_db.destination(), OracleConfig(position_wait_s=30), position=q,
+                        slot_name=STAND_IN_SLOT)
+        evidence("p3/oracle").write_json("lost_transaction", {
+            "what": "the last source transaction is lost by a stand-in pipeline that still reports its position; "
+                    "the oracle reads a standby whose replay is paused (private cluster)",
+            "position": lsn.format(q),
+            "unpositioned_on_lagging_standby": {"equal": unpositioned.equal,
+                                                "note": "the hazard: both sides lack the lost row"},
+            "positioned_on_lagging_standby": {"refused": str(refused.value), "seconds": round(waited, 1)},
+            "positioned_after_replay": {"equal": after.equal, "source_position": after.source_position,
+                                        "destination_position": after.destination_position,
+                                        "missing_rows": after.tables[0].missing_rows,
+                                        "sample": after.tables[0].sample["missing"]}})
+        assert unpositioned.equal                                        # what the oracle said before the fix
+        assert not after.equal and after.tables[0].missing_rows == 1
+        assert after.tables[0].sample["missing"][0]["id"] == "11"
+    finally:
+        c.sql("SELECT pg_wal_replay_resume()", role="bootstrap", node="replica")
+        db.drop()

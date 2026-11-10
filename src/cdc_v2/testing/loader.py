@@ -17,6 +17,8 @@ import tempfile
 from pathlib import Path
 from typing import Iterable, Optional
 
+from cdc_v2.deadline import Deadline
+from cdc_v2.oracle import mdexec
 from cdc_v2.oracle.catalog import SourceColumn, SourceTable, read_source
 from cdc_v2.oracle.canonical import quote_ident
 
@@ -104,14 +106,16 @@ def _import_column(name: str, col: SourceColumn, md: str) -> str:
 
 
 def load_table(pg_conn, md_conn, table: SourceTable, numeric_mode: str = "union", dest_schema: Optional[str] = None,
-               dest_name: Optional[str] = None, tmp_dir: Optional[str] = None) -> int:
+               dest_name: Optional[str] = None, tmp_dir: Optional[str] = None,
+               statement_seconds: float = 600.0) -> int:
     """Create the destination table (replacing it) and copy every row. Returns the row count."""
     schema, name = dest_schema or table.schema, dest_name or table.name
     types = [md_type(c, numeric_mode) for c in table.columns]
-    md_conn.execute("CREATE SCHEMA IF NOT EXISTS %s" % quote_ident(schema))
-    md_conn.execute("CREATE OR REPLACE TABLE %s.%s (%s)" % (
+    d = Deadline.after(statement_seconds)
+    mdexec.execute(md_conn, "CREATE SCHEMA IF NOT EXISTS %s" % quote_ident(schema), deadline=d, fetch=None)
+    mdexec.execute(md_conn, "CREATE OR REPLACE TABLE %s.%s (%s)" % (
         quote_ident(schema), quote_ident(name),
-        ", ".join("%s %s" % (quote_ident(c.name), t) for c, t in zip(table.columns, types))))
+        ", ".join("%s %s" % (quote_ident(c.name), t) for c, t in zip(table.columns, types))), deadline=d, fetch=None)
     keys = ["c%d" % i for i in range(len(table.columns))]
     exports = ", ".join(_export_column(c, t) for c, t in zip(table.columns, types))
     tmp = Path(tmp_dir) if tmp_dir else TMP
@@ -131,8 +135,9 @@ def load_table(pg_conn, md_conn, table: SourceTable, numeric_mode: str = "union"
         if n:
             cols = "{%s}" % ", ".join("'%s': 'VARCHAR'" % k for k in keys)
             imports = ", ".join(_import_column(k, c, t) for k, c, t in zip(keys, table.columns, types))
-            md_conn.execute("INSERT INTO %s.%s SELECT %s FROM read_json(?, format='newline_delimited', columns=%s)"
-                            % (quote_ident(schema), quote_ident(name), imports, cols), [path])
+            mdexec.execute(md_conn, "INSERT INTO %s.%s SELECT %s FROM read_json(?, format='newline_delimited', "
+                           "columns=%s)" % (quote_ident(schema), quote_ident(name), imports, cols), [path],
+                           deadline=Deadline.after(statement_seconds), fetch=None, what="loader insert")
     finally:
         Path(path).unlink(missing_ok=True)
     return n

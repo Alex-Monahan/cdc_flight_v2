@@ -15,6 +15,9 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
+from cdc_v2.deadline import Deadline
+from cdc_v2.oracle import mdexec
+
 
 def sum_query(tables: list, schema: str = "public", column: str = "balance") -> str:
     parts = ['(SELECT coalesce(sum("%s"), 0) FROM "%s"."%s")' % (column, schema, t) for t in tables]
@@ -44,18 +47,20 @@ class TransfersObserver:
     """
 
     def __init__(self, connect: Callable, tables: list, expected_sum: int, schema: str = "public",
-                 interval: float = 0.0, column: str = "balance"):
+                 interval: float = 0.0, column: str = "balance", statement_seconds: float = 60.0):
         self.connect = connect
         self.sql = sum_query(tables, schema, column)
         self.report = ObserverReport(expected_sum)
         self.interval = interval
+        self.statement_seconds = statement_seconds
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._sums: set = set()
 
     def observe_once(self, conn) -> Optional[int]:
         try:
-            v = conn.execute(self.sql).fetchone()[0]
+            v = mdexec.execute(conn, self.sql, deadline=Deadline.after(self.statement_seconds), fetch="one",
+                               what="transfers observation")[0]
         except Exception as e:                       # noqa: BLE001 - counted, not raised
             self.report.unavailable += 1
             if len(self.report.errors) < 5:
@@ -99,7 +104,8 @@ class TransfersObserver:
         return self.report
 
 
-def apply_transfers(md_conn, transfers: list, split: bool = False, pause: float = 0.0) -> int:
+def apply_transfers(md_conn, transfers: list, split: bool = False, pause: float = 0.0,
+                    statement_seconds: float = 120.0) -> int:
     """Apply source transfer transactions to the destination. Test helper standing in for a pipeline.
 
     transfers: statement lists (without BEGIN/COMMIT). With split=False each source transaction becomes one
@@ -112,9 +118,8 @@ def apply_transfers(md_conn, transfers: list, split: bool = False, pause: float 
         for i, g in enumerate(groups):
             if i and pause:
                 time.sleep(pause)
-            md_conn.execute("BEGIN TRANSACTION")
-            for s in g:
-                md_conn.execute(s)
-            md_conn.execute("COMMIT")
+            d = Deadline.after(statement_seconds)
+            for s in ["BEGIN TRANSACTION"] + list(g) + ["COMMIT"]:
+                mdexec.execute(md_conn, s, deadline=d, fetch=None, what="stand-in apply")
             n += 1
     return n

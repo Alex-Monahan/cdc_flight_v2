@@ -11,14 +11,26 @@ import uuid
 
 import pytest
 
-from cdc_v2.oracle import OracleConfig, PgColumnType, compare, py_canon
+from cdc_v2 import lsn
+from cdc_v2.oracle import OracleConfig, OracleError, PgColumnType, PositionNotReached, compare, py_canon
 from cdc_v2.oracle.canonical import Ctx, pg_canon
 from cdc_v2.testing import datasets, loader
+from cdc_v2.testing.md import STAND_IN_SLOT, write_stand_in_position
 
 pytestmark = [pytest.mark.t1, pytest.mark.timeout(900)]
 
 CFG = dict(chunk_rows=500, source_workers=3, min_blocks_per_range=2)
 RESULTS = []
+POS = {}          # the position Q of the loaded dataset: the source's insert position before the load
+
+
+def insert_position(db) -> int:
+    return lsn.parse(db.sql("SELECT pg_current_wal_insert_lsn()::text")[0][0])
+
+
+def at_q(**kw):
+    """compare() arguments for the loaded dataset: position Q and the stand-in slot."""
+    return dict(position=POS["q"], slot_name=STAND_IN_SLOT, **kw)
 
 
 @pytest.fixture(scope="module")
@@ -26,7 +38,9 @@ def loaded(make_source_db, make_dest_db, evidence):
     src = make_source_db()
     datasets.create_types_dataset(src)
     dst = make_dest_db()
+    POS["q"] = insert_position(src)
     counts = loader.load_database(src.params(), dst.conn)
+    write_stand_in_position(dst.conn, POS["q"])          # the loader stands in for a pipeline that applied up to Q
     yield src, dst, counts
     if len(RESULTS) < 50:                  # a partial run (-k) must not replace the evidence of a full run
         return
@@ -42,7 +56,8 @@ def run(src, dst, statements=(), **cfg):
         conn.execute("BEGIN TRANSACTION")
         for s in statements:
             conn.execute(s)
-        return compare(src.source(), dst.destination(conn=conn, in_transaction=True), OracleConfig(**dict(CFG, **cfg)))
+        return compare(src.source(), dst.destination(conn=conn, in_transaction=True), OracleConfig(**dict(CFG, **cfg)),
+                       **at_q())
     finally:
         try:
             conn.execute("ROLLBACK")
@@ -61,8 +76,10 @@ def record(name, statements, expected, result, detail):
 
 def test_equal(loaded, evidence):
     src, dst, counts = loaded
-    r = compare(src.source(), dst.destination(), OracleConfig(**CFG))
+    r = compare(src.source(), dst.destination(), OracleConfig(**CFG), **at_q())
     assert r.equal, r.summary()
+    assert r.positioned and r.position == lsn.format(POS["q"]) and r.slot_name == STAND_IN_SLOT
+    assert lsn.parse(r.source_position) >= POS["q"] and lsn.parse(r.destination_position) == POS["q"]
     assert {t.source for t in r.tables} == set(counts)
     assert all(t.source_rows == counts[t.source] == t.destination_rows for t in r.tables)
     big = table(r, "other.big")
@@ -249,7 +266,7 @@ def test_unaccepted_destination_type(loaded):
 
 def test_operations_and_staging_schemas_are_ignored(loaded):
     src, dst, _ = loaded
-    stmts = ["CREATE SCHEMA _cdc", "CREATE TABLE _cdc.stream_state (slot VARCHAR, applied_lsn VARCHAR)",
+    stmts = ["CREATE TABLE _cdc.other_state (a INTEGER)",
              "CREATE SCHEMA _cdc_stage_7", "CREATE TABLE _cdc_stage_7.t (a INTEGER)"]
     r = run(src, dst, stmts)
     record("cdc_and_staging_schemas", stmts, False, r, {"extra_tables": r.extra_tables})
@@ -263,29 +280,66 @@ def test_committed_mutation_and_restore(loaded):
     c.execute("CREATE TABLE public.saved AS SELECT * FROM public.types_k WHERE id = 4")
     c.execute("DELETE FROM public.types_k WHERE id = 4")
     try:
-        r = compare(src.source(), dst.destination(), OracleConfig(**CFG))
+        r = compare(src.source(), dst.destination(), OracleConfig(**CFG), **at_q())
         assert not r.equal and table(r, "public.types_k").missing_rows == 1
         assert r.extra_tables == ["public.saved"]
     finally:
         c.execute("INSERT INTO public.types_k SELECT * FROM public.saved")
         c.execute("DROP TABLE public.saved")
-    assert compare(src.source(), dst.destination(), OracleConfig(**CFG)).equal
+    assert compare(src.source(), dst.destination(), OracleConfig(**CFG), **at_q()).equal
 
 
 def test_table_subset_and_mapping(loaded):
     src, dst, _ = loaded
-    r = compare(src.source(), dst.destination(), OracleConfig(tables=["other.big"], **CFG))
+    r = compare(src.source(), dst.destination(), OracleConfig(tables=["other.big"], **CFG), **at_q())
     assert r.equal and [t.source for t in r.tables] == ["other.big"]
     r = compare(src.source(), dst.destination(), OracleConfig(
-        tables=["public.dups"], table_map=lambda s, t: (s, "types_k"), **CFG))
+        tables=["public.dups"], table_map=lambda s, t: (s, "types_k"), **CFG), **at_q())
     assert not r.equal                                   # dups compared against types_k: schemas differ
 
 
 def test_compare_reading_from_the_replica(loaded, shared_pg):
     src, dst, _ = loaded
     shared_pg.wait_replica_caught_up()
-    r = compare(src.source(node="replica"), dst.destination(), OracleConfig(**CFG))
-    assert r.equal and r.source_in_recovery is True
+    r = compare(src.source(node="replica"), dst.destination(), OracleConfig(**CFG), **at_q())
+    assert r.equal and r.source_in_recovery is True and lsn.parse(r.source_position) >= POS["q"]
+
+
+def test_destination_short_of_the_position_is_refused(loaded):
+    src, dst, _ = loaded
+    write_stand_in_position(dst.conn, POS["q"] - 1, slot_name="cdc_v2_o_behind")
+    try:
+        with pytest.raises(PositionNotReached, match="destination applied"):
+            compare(src.source(), dst.destination(), OracleConfig(**CFG), position=POS["q"],
+                    slot_name="cdc_v2_o_behind")
+        with pytest.raises(PositionNotReached, match="applied nothing"):
+            compare(src.source(), dst.destination(), OracleConfig(**CFG), position=POS["q"],
+                    slot_name="cdc_v2_o_no_such_slot")
+    finally:
+        dst.conn.execute("DELETE FROM _cdc.stream_state WHERE slot_name = 'cdc_v2_o_behind'")
+
+
+def test_source_short_of_the_position_is_refused(loaded):
+    src, dst, _ = loaded
+    future = insert_position(src) + (1 << 32)
+    write_stand_in_position(dst.conn, future, slot_name="cdc_v2_o_future")
+    try:
+        with pytest.raises(PositionNotReached, match="source primary"):
+            compare(src.source(), dst.destination(), OracleConfig(**CFG), position=future,
+                    slot_name="cdc_v2_o_future")
+    finally:
+        dst.conn.execute("DELETE FROM _cdc.stream_state WHERE slot_name = 'cdc_v2_o_future'")
+
+
+def test_unpositioned_result_says_so(loaded):
+    src, dst, _ = loaded
+    r = compare(src.source(), dst.destination(), OracleConfig(**CFG), unpositioned=True)
+    assert r.equal and not r.positioned and "UNPOSITIONED" in r.summary()
+
+
+def test_nothing_to_compare_is_refused(source_db, dest_db):
+    with pytest.raises(OracleError, match="no table"):
+        compare(source_db.source(), dest_db.destination(), OracleConfig(), unpositioned=True)
 
 
 # ------------------------------------------------------------------------------------------------ canonical forms
@@ -376,9 +430,8 @@ EQUAL_UPDATE_CASES = [
 def test_duckdb_update_of_an_equal_comparing_value(dest_db, evidence):
     """Records what DuckDB does when an UPDATE writes a value that compares equal to the stored one but has a
     different representation. Seen on 2026-11-10, locally and on MotherDuck: the UPDATE is skipped and the old
-    representation stays (in a table loaded in bulk on MotherDuck one -0 update was applied, so it depends on the
-    storage state). The pipeline must not rely on UPDATE for such values; DELETE + INSERT always writes the new
-    representation (asserted)."""
+    representation stays. The pipeline must not rely on UPDATE for such values; DELETE + INSERT always writes the
+    new representation (asserted)."""
     import duckdb
     out = []
     for where, conn in (("local", duckdb.connect()), ("motherduck", dest_db.conn)):
@@ -410,7 +463,8 @@ def test_command_line(loaded, shared_pg, evidence):
     src, dst, _ = loaded
     tool = Path(__file__).resolve().parents[2] / "tools" / "oracle"
     argv = [sys.executable, str(tool), "--source-port", str(shared_pg.primary_port), "--source-db", src.name,
-            "--dest-db", dst.name, "--chunk-rows", "500", "--json", "-"]
+            "--dest-db", dst.name, "--chunk-rows", "500", "--json", "-", "--position", lsn.format(POS["q"]),
+            "--slot-name", STAND_IN_SLOT]
     ok = subprocess.run(argv, capture_output=True, text=True, timeout=300)
     assert ok.returncode == 0, ok.stderr
     assert json.loads(ok.stdout)["equal"] is True
@@ -428,7 +482,25 @@ def test_command_line(loaded, shared_pg, evidence):
     assert t["missing_rows"] == 1 and t["sample"]["missing"][0]["id"] == "7"
     assert "DIFFERENT" in bad.stderr and "public.types_k" in bad.stderr
     evidence("p3/oracle").write_text("cli.txt", "$ tools/oracle --source-port %d --source-db <db> --dest-db <db> "
-                                     "--chunk-rows 500 --json -\nexit %d\n%s\n\nafter deleting row id=7 on the "
+                                     "--chunk-rows 500 --json - --position <Q> --slot-name <slot>\nexit %d\n%s\n\nafter deleting row id=7 on the "
                                      "destination:\nexit %d\n%s\n" % (shared_pg.primary_port, ok.returncode,
                                                                        ok.stderr.strip(), bad.returncode,
                                                                        bad.stderr.strip()))
+
+
+def test_domains_are_compared_by_their_base_type(source_db, dest_db):
+    for sql in ["CREATE DOMAIN d_num AS numeric(10,2)", "CREATE DOMAIN d_num2 AS d_num CHECK (VALUE > -1000)",
+                "CREATE DOMAIN d_txt AS text",
+                "CREATE TABLE dom (id int PRIMARY KEY, a d_num2, b d_txt, c d_txt[], d d_num)",
+                "INSERT INTO dom VALUES (1, 1.50, 'x', '{y,NULL}', 2), (2, NULL, '', '{}', NULL)"]:
+        source_db.sql(sql)
+    q = insert_position(source_db)
+    loader.load_database(source_db.params(), dest_db.conn)
+    write_stand_in_position(dest_db.conn, q)
+    r = compare(source_db.source(), dest_db.destination(), OracleConfig(), position=q, slot_name=STAND_IN_SLOT)
+    t = r.tables[0]
+    assert r.equal, r.summary()
+    assert t.fallback_columns == []                                   # no column fell back to text
+    dest_db.conn.execute("UPDATE dom SET a = 1.51 WHERE id = 1")
+    r = compare(source_db.source(), dest_db.destination(), OracleConfig(), position=q, slot_name=STAND_IN_SLOT)
+    assert not r.equal and list(r.tables[0].sample["different"][0]["columns"]) == ["a"]

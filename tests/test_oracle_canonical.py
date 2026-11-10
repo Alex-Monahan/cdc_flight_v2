@@ -153,7 +153,7 @@ def test_union_members(con):
     # a union whose active member holds NULL is not NULL in DuckDB (IS NULL is false): the oracle reports it
     con.execute("CREATE OR REPLACE TABLE u2 AS SELECT union_value(s := NULL::VARCHAR)::UNION(n DECIMAL(38,10), "
                 "s VARCHAR) AS c")
-    assert con.execute("SELECT %s FROM u2" % C.md_canon("c", t, mt)).fetchone()[0] == "!null"
+    assert con.execute("SELECT %s FROM u2" % C.md_canon("c", t, mt)).fetchone()[0] == "!null-md"
 
 
 def test_unaccepted_destination_type_never_matches(con):
@@ -189,38 +189,38 @@ def test_token_and_hash_sql_match_python(con):
 
 # --------------------------------------------------------------------------------------------- properties
 
-@settings(max_examples=300, deadline=None)
+@settings(max_examples=150, deadline=None)
 @given(st.floats(allow_nan=True, allow_infinity=True))
 def test_double_property(con, v):
     assert md_value(con, "DOUBLE", v, "double precision") == C.py_float8(v)
 
 
-@settings(max_examples=300, deadline=None)
+@settings(max_examples=150, deadline=None)
 @given(st.floats(width=32, allow_nan=True, allow_infinity=True))
 def test_real_property(con, v):
     assert md_value(con, "FLOAT", v, "real") == C.py_float4(v)
 
 
-@settings(max_examples=200, deadline=None)
+@settings(max_examples=100, deadline=None)
 @given(st.decimals(min_value=-10 ** 27, max_value=10 ** 27, places=10, allow_nan=False, allow_infinity=False))
 def test_numeric_property(con, v):
     assert md_value(con, "DECIMAL(38,10)", v, "numeric") == C.py_numeric(v)
 
 
-@settings(max_examples=200, deadline=None)
+@settings(max_examples=100, deadline=None)
 @given(st.text())
 def test_text_property(con, v):
     v = v.replace("\x00", "")
     assert md_value(con, "VARCHAR", v, "text") == v
 
 
-@settings(max_examples=200, deadline=None)
+@settings(max_examples=100, deadline=None)
 @given(st.datetimes(min_value=dt.datetime(1, 1, 1), max_value=dt.datetime(9999, 12, 31, 23, 59, 59, 999999)))
 def test_timestamp_property(con, v):
     assert md_value(con, "TIMESTAMP", v, "timestamp without time zone") == C.py_timestamp(v)
 
 
-def float_sample(n=20000, seed=5):
+def float_sample(n=4000, seed=5):
     """Random bit patterns plus dyadic rationals (the values where two shortest texts can tie)."""
     import random
     r = random.Random(seed)

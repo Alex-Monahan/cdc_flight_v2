@@ -5,6 +5,7 @@ import pytest
 
 from cdc_v2.oracle import canonical as C
 from cdc_v2.oracle import comparison as K
+from cdc_v2.deadline import Deadline, DeadlineExceeded
 from cdc_v2.oracle import position as P
 from cdc_v2.oracle.catalog import DestTable, SourceColumn, SourceTable
 
@@ -115,60 +116,105 @@ def test_compare_on_local_duckdb_tables_only():
 
 # --------------------------------------------------------------------------------------------- positions
 
-@pytest.mark.parametrize("text,value", [("0/0", 0), ("0/3000EE8", 0x3000EE8), ("16/B374D848", (0x16 << 32) + 0xB374D848)])
-def test_lsn_parse_format(text, value):
-    assert P.parse_lsn(text) == value
-    assert P.format_lsn(value) == text.upper() if text != "0/0" else "0/0"
-    assert P.parse_lsn(value) == value
+def test_as_position():
+    assert P.as_position("16/B374D848") == (0x16 << 32) + 0xB374D848
+    assert P.as_position(12345) == 12345 and P.as_position(None) is None
+    for bad in ("not an lsn", True):
+        with pytest.raises(ValueError):
+            P.as_position(bad)
 
 
-def test_lsn_rejects_garbage():
-    with pytest.raises(ValueError):
-        P.parse_lsn("not an lsn")
-    with pytest.raises(ValueError):
-        P.parse_lsn(True)
-
-
-def test_wait_for_applied_reads_stream_state():
-    con = duckdb.connect()
-    assert P.applied_lsn_from_stream_state(con) is None           # no _cdc schema yet
+def stream_state(con, kind="UBIGINT"):
     con.execute("CREATE SCHEMA _cdc")
-    con.execute("CREATE TABLE _cdc.stream_state (slot VARCHAR, applied_lsn VARCHAR)")
-    assert P.applied_lsn_from_stream_state(con) is None
-    con.execute("INSERT INTO _cdc.stream_state VALUES ('s1', '0/100'), ('s2', '0/80')")
-    assert P.applied_lsn_from_stream_state(con) == 0x100
+    con.execute("CREATE TABLE _cdc.stream_state (slot_name VARCHAR, applied_lsn %s)" % kind)
 
+
+def test_stand_in_reads_the_row_of_the_named_slot():
+    con = duckdb.connect()
+    assert P.stand_in_applied_position(con, "s1") is None          # no _cdc schema yet
+    stream_state(con)
+    assert P.stand_in_applied_position(con, "s1") is None          # no row yet
+    con.execute("INSERT INTO _cdc.stream_state VALUES ('s1', 256), ('s2', 4096)")
+    assert P.stand_in_applied_position(con, "s1") == 256           # not the maximum over all slots
+    con2 = duckdb.connect()
+    stream_state(con2, "VARCHAR")
+    con2.execute("INSERT INTO _cdc.stream_state VALUES ('s1', '0/100')")
+    assert P.stand_in_applied_position(con2, "s1") == 0x100
+
+
+def test_wait_for_applied_returns_when_reached():
+    con = duckdb.connect()
+    stream_state(con)
+    con.execute("INSERT INTO _cdc.stream_state VALUES ('s1', 256)")
     calls = []
 
-    def sleep(_):
-        calls.append(1)
+    def reader(c, slot):
+        calls.append(slot)
         if len(calls) == 3:
-            con.execute("UPDATE _cdc.stream_state SET applied_lsn = '0/200' WHERE slot = 's1'")
+            c.execute("UPDATE _cdc.stream_state SET applied_lsn = 512 WHERE slot_name = 's1'")
+        return P.stand_in_applied_position(c, slot)
 
-    assert P.wait_for_applied(con, "0/180", timeout=60, poll=0.0, sleep=sleep) == 0x200
-    assert len(calls) == 3
-
-
-def test_wait_for_applied_times_out_and_lookup_is_replaceable():
-    now = [0.0]
-
-    def clock():
-        return now[0]
-
-    def sleep(dt):
-        now[0] += 1.0
-
-    with pytest.raises(P.PositionTimeout):
-        P.wait_for_applied(None, "0/10", timeout=5, lookup=lambda c: 0x5, sleep=sleep, clock=clock)
-    assert P.wait_for_applied(None, 16, lookup=lambda c: 16) == 16
+    assert P.wait_for_applied(con, 384, Deadline.after(30), "s1", applied_position=reader, poll=0.0) == 512
+    assert calls == ["s1"] * 3
 
 
-def test_integer_applied_lsn_column():
+def test_wait_for_applied_raises_deadline_exceeded():
+    with pytest.raises(DeadlineExceeded):
+        P.wait_for_applied(None, 0x10, Deadline.after(0.2), "s1", applied_position=lambda c, s: 0x5, poll=0.05)
+
+
+# --------------------------------------------------------------------------------------------- the comparison API
+
+class _Fail(Exception):
+    pass
+
+
+def test_a_position_or_unpositioned_must_be_asked_for():
+    src, dst = K.Source(host="localhost", port=55432, dbname="x"), K.Destination("cdc_v2_t_x")
+    with pytest.raises(K.OracleError, match="position"):
+        K.compare(src, dst)
+    with pytest.raises(K.OracleError, match="slot_name"):
+        K.compare(src, dst, position=5)
+    with pytest.raises(K.OracleError, match="not both"):
+        K.compare(src, dst, position=5, unpositioned=True)
+
+
+def test_an_empty_table_list_is_refused():
+    src, dst = K.Source(host="localhost", port=55432, dbname="x"), K.Destination("cdc_v2_t_x")
+    with pytest.raises(K.OracleError, match="empty"):
+        K.compare(src, dst, K.OracleConfig(tables=[]), unpositioned=True)
+
+
+def test_recovery_conflicts_restart_the_comparison(monkeypatch):
+    calls = []
+
+    class Conflict(Exception):
+        sqlstate = "40001"
+
+    def once(*a):
+        calls.append(a[-1])
+        if len(calls) < 3:
+            raise Conflict()
+        return "result"
+
+    monkeypatch.setattr(K, "_compare_once", once)
+    src, dst = K.Source(host="localhost", port=55432, dbname="x"), K.Destination("cdc_v2_t_x")
+    assert K.compare(src, dst, unpositioned=True) == "result" and calls == [1, 2, 3]
+    calls.clear()
+    with pytest.raises(Conflict):
+        K.compare(src, dst, K.OracleConfig(conflict_retries=1), unpositioned=True)
+    assert calls == [1, 2]
+    monkeypatch.setattr(K, "_compare_once", lambda *a: (_ for _ in ()).throw(_Fail()))
+    with pytest.raises(_Fail):                                       # other errors are not retried
+        K.compare(src, dst, unpositioned=True)
+
+
+def test_destination_statements_have_deadlines():
+    from cdc_v2.oracle import mdexec
     con = duckdb.connect()
-    con.execute("CREATE SCHEMA _cdc")
-    con.execute("CREATE TABLE _cdc.stream_state (applied_lsn UBIGINT)")
-    con.execute("INSERT INTO _cdc.stream_state VALUES (12345)")
-    assert P.applied_lsn_from_stream_state(con) == 12345
+    with pytest.raises(DeadlineExceeded):
+        mdexec.execute(con, "SELECT count(*) FROM range(100000000000) a", deadline=Deadline.after(0.3))
+    assert mdexec.execute(con, "SELECT 42", deadline=Deadline.after(5), fetch="one") == (42,)
 
 
 # --------------------------------------------------------------------------------------------- safety

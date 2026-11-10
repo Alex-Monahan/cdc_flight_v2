@@ -28,6 +28,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterable, Optional
 
+from cdc_v2 import lsn
+
 ALPHABET = "abcdefghijklmnopqrstuvwxyz ABC'é✓_-"
 
 
@@ -158,7 +160,7 @@ class Workload:
         self._paused = threading.Event()
         self._stop = threading.Event()
         self._bg_error: Optional[BaseException] = None
-        self.last_quiesce_lsn: Optional[str] = None
+        self.last_quiesce_lsn: Optional[int] = None
 
     # ---------------------------------------------------------------- names and setup
 
@@ -608,22 +610,24 @@ class Workload:
         self.round += 1
         return {"round": self.round - 1, "txns": sum(len(p) for p in plans), "driver": step}
 
-    def quiesce(self) -> str:
-        """Between rounds every writer is idle: return the source's current WAL position."""
+    def quiesce(self) -> int:
+        """Between rounds every writer is idle: return the source's WAL insert position (an int, C0). Every
+        transaction of the workload so far ends at or before it; `compare(..., position=Q)` checks both sides."""
         with self.connect() as c:
-            lsn = c.execute("SELECT pg_current_wal_lsn()::text").fetchone()[0]
-        self.last_quiesce_lsn = lsn
-        self._write_log({"type": "quiesce", "round": self.round, "lsn": lsn})
-        return lsn
+            text = c.execute("SELECT pg_current_wal_insert_lsn()::text").fetchone()[0]
+        pos = lsn.parse(text)
+        self.last_quiesce_lsn = pos
+        self._write_log({"type": "quiesce", "round": self.round, "lsn": text})
+        return pos
 
     def run(self, rounds: int, on_quiesce: Optional[Callable[[str, int], None]] = None, quiesce_every: int = 0):
-        """Run `rounds` rounds; with quiesce_every=n, call on_quiesce(lsn, round) after every n-th round."""
+        """Run `rounds` rounds; with quiesce_every=n, call on_quiesce(position, round) after every n-th round."""
         for i in range(rounds):
             self.run_round()
             if quiesce_every and (i + 1) % quiesce_every == 0:
-                lsn = self.quiesce()
+                pos = self.quiesce()
                 if on_quiesce:
-                    on_quiesce(lsn, self.round)
+                    on_quiesce(pos, self.round)
 
     # continuous mode: rounds back to back in a background thread, paused at a round boundary
 
@@ -646,7 +650,7 @@ class Workload:
         self._bg = threading.Thread(target=loop, daemon=True)
         self._bg.start()
 
-    def pause(self, timeout: float = 300.0) -> str:
+    def pause(self, timeout: float = 300.0) -> int:
         """Let the current round finish, keep all writers idle, and return the WAL position (a quiesce point)."""
         self._pause.set()
         if not self._paused.wait(timeout):

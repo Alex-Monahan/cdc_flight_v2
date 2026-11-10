@@ -53,16 +53,31 @@ class DestTable:
         return "%s.%s" % (self.schema, self.name)
 
 
+# Domains (also domains over domains, and arrays of domains) are resolved to their base type: a domain column is
+# compared by the rule of the type it is built on. The innermost explicit type modifier wins.
 SOURCE_SQL = """
+WITH RECURSIVE used(oid) AS (
+    SELECT a.atttypid FROM pg_attribute a WHERE a.attnum > 0
+    UNION SELECT t.typelem FROM pg_attribute a JOIN pg_type t ON t.oid = a.atttypid WHERE a.attnum > 0 AND t.typelem <> 0
+), r(start, cur, mod) AS (
+    SELECT oid, oid, -1 FROM used
+    UNION ALL
+    SELECT r.start, t.typbasetype, CASE WHEN r.mod <> -1 THEN r.mod ELSE t.typtypmod END
+    FROM r JOIN pg_type t ON t.oid = r.cur WHERE t.typtype = 'd'
+), base AS (
+    SELECT r.start, r.cur AS base, r.mod FROM r JOIN pg_type t ON t.oid = r.cur WHERE t.typtype <> 'd'
+)
 SELECT n.nspname, c.relname, c.oid::bigint, c.relkind::text, a.attname, a.attnum,
-       format_type(a.atttypid, NULL), CASE WHEN t.typcategory = 'A' THEN format_type(t.typelem, NULL) END,
-       format_type(a.atttypid, a.atttypmod),
+       format_type(b.base, NULL), CASE WHEN bt.typcategory = 'A' THEN format_type(eb.base, NULL) END,
+       format_type(b.base, CASE WHEN a.atttypmod <> -1 THEN a.atttypmod ELSE b.mod END),
        CASE WHEN c.relkind = 'r' THEN pg_relation_size(c.oid) / current_setting('block_size')::int ELSE 0 END,
        c.reltuples::float8
 FROM pg_class c
 JOIN pg_namespace n ON n.oid = c.relnamespace
 JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
-JOIN pg_type t ON t.oid = a.atttypid
+JOIN base b ON b.start = a.atttypid
+JOIN pg_type bt ON bt.oid = b.base
+LEFT JOIN base eb ON eb.start = bt.typelem
 WHERE (c.relkind = 'p' OR (c.relkind = 'r' AND NOT c.relispartition))
   AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast') AND n.nspname NOT LIKE 'pg\\_temp\\_%'
   AND n.nspname NOT LIKE 'pg\\_toast\\_temp\\_%'
@@ -110,9 +125,10 @@ def read_source(cur, exclude_schemas=()) -> dict:
     return tables
 
 
-def read_dest(md_conn, ignore_schemas=MD_IGNORED_SCHEMAS) -> dict:
+def read_dest(run, ignore_schemas=MD_IGNORED_SCHEMAS) -> dict:
+    """run(sql) -> rows: executes on the destination (under the caller's deadline)."""
     tables: dict = {}
-    for schema, table, col, _idx, dtype in md_conn.execute(DEST_SQL).fetchall():
+    for schema, table, col, _idx, dtype in run(DEST_SQL):
         if matches(schema, ignore_schemas):
             continue
         t = tables.setdefault((schema, table), DestTable(schema, table))

@@ -2,9 +2,17 @@
 
 How one comparison runs:
 
+0. **Position.** A comparison is tied to a source position `Q` (from `Workload.quiesce()` / `pause()`). Before
+   the source snapshot is taken, the source must be at or past `Q`: a standby's `pg_last_wal_replay_lsn()` is
+   awaited (within `position_wait_s`), a primary's `pg_current_wal_insert_lsn()` is checked. Inside the
+   destination's read transaction its applied position (S's reader, by slot name) must be at or past `Q`; it is
+   not awaited there. Either side short of `Q` raises `PositionNotReached`: the comparison is refused, never
+   reported equal. A comparison without a position must be asked for with `unpositioned=True`; its result says so.
 1. The source is read under **one snapshot**: a coordinator transaction (`REPEATABLE READ, READ ONLY`) exports its
    snapshot, and every worker connection imports it (`SET TRANSACTION SNAPSHOT`). The destination is read inside
-   **one transaction** on one connection.
+   **one transaction** on one connection. Every MotherDuck statement has a deadline; a standby that cancels the
+   snapshot for a recovery conflict (SQLSTATE 40001) makes the whole comparison start again, a bounded number of
+   times.
 2. Catalogs of both sides are read in that snapshot and that transaction. A table or column that is missing or extra
    on the destination is a difference. Destination schemas `_cdc` and `_cdc_stage*` are ignored.
 3. **Checksum pass.** Every row is turned into a row text: the canonical form of each compared column
@@ -34,10 +42,14 @@ from collections import Counter
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Optional
 
+from cdc_v2 import lsn
+from cdc_v2.deadline import Deadline, DeadlineExceeded
+
 from . import canonical as C
+from . import mdexec
 from .catalog import (MD_IGNORED_SCHEMAS, PG_SYSTEM_SCHEMAS, DestTable, SourceTable, find_column, matches,
                       read_dest, read_source, server_version_num)
-from .position import format_lsn, parse_lsn
+from .position import AppliedPosition, stand_in_applied_position
 
 DB_NAME = re.compile(r"^cdc_v2_[a-z0-9_]+$")
 B, H = "_cdc_v2_oracle_b", "_cdc_v2_oracle_h"
@@ -45,6 +57,10 @@ B, H = "_cdc_v2_oracle_b", "_cdc_v2_oracle_h"
 
 class OracleError(Exception):
     pass
+
+
+class PositionNotReached(OracleError):
+    """The source snapshot or the destination is not at or past the position the comparison was asked for."""
 
 
 @dataclass
@@ -62,7 +78,11 @@ class OracleConfig:
     ignore_dest_schemas: tuple = MD_IGNORED_SCHEMAS
     check_extra_tables: Optional[bool] = None    # default: True when `tables` is None
     table_map: Optional[Callable[[str, str], tuple]] = None   # source (schema, table) -> destination (schema, table)
-    statement_timeout_ms: int = 3_600_000
+    statement_timeout_ms: int = 3_600_000          # Postgres statement_timeout (never more than the deadline)
+    timeout_s: float = 3_600.0                       # the whole comparison, when no deadline is passed
+    md_statement_s: float = 1_800.0                  # one MotherDuck statement
+    position_wait_s: float = 60.0                    # waiting for a standby to replay up to the position
+    conflict_retries: int = 3                        # new attempts after SQLSTATE 40001 (standby recovery conflict)
 
 
 # ------------------------------------------------------------------------------------------------ connections
@@ -102,12 +122,11 @@ class Destination:
         self.in_transaction = in_transaction
         self._own = False
 
-    def open(self):
+    def open(self, deadline: Deadline):
         if self.conn is None:
-            import duckdb
-            self.conn = duckdb.connect("md:%s?attach_mode=single" % self.database)
+            self.conn = mdexec.connect("md:%s?attach_mode=single" % self.database, deadline=deadline)
             self._own = True
-        self.conn.execute("SET TimeZone = 'UTC'")
+        mdexec.execute(self.conn, "SET TimeZone = 'UTC'", deadline=deadline, fetch=None)
         return self.conn
 
     def close(self):
@@ -150,7 +169,12 @@ class Result:
     tables: list
     missing_tables: list
     extra_tables: list
-    source_lsn: Optional[str]
+    positioned: bool                   # False only for a comparison asked for with unpositioned=True
+    position: Optional[str]            # Q, the position the comparison was asked for
+    source_position: Optional[str]     # replay (standby) or insert (primary) position read before the snapshot
+    destination_position: Optional[str]  # applied position read inside the destination's read transaction
+    slot_name: Optional[str]
+    attempts: int
     source_in_recovery: Optional[bool]
     source_server_version: Optional[int]
     rows_compared: int
@@ -163,9 +187,12 @@ class Result:
 
     def summary(self) -> str:
         bad = [t for t in self.tables if not t.equal]
-        lines = ["oracle: %s (%d tables, %d rows, %.1f s, %.0f rows/s)" % (
+        lines = ["oracle: %s (%d tables, %d rows, %.1f s, %.0f rows/s; %s)" % (
             "EQUAL" if self.equal else "DIFFERENT", len(self.tables), self.rows_compared, self.seconds,
-            self.rows_per_second)]
+            self.rows_per_second,
+            "position %s, source at %s, destination at %s" % (self.position, self.source_position,
+                                                              self.destination_position)
+            if self.positioned else "UNPOSITIONED, not a gate result")]
         for name in self.missing_tables:
             lines.append("  missing table on destination: %s" % name)
         for name in self.extra_tables:
@@ -262,21 +289,41 @@ def ctid_ranges(blocks: int, workers: int, min_blocks: int) -> list:
 class _SourceSnapshot:
     """A coordinator transaction that exports its snapshot, and a pool of worker connections that import it."""
 
-    def __init__(self, source: Source, workers: int, timeout_ms: int):
+    def __init__(self, source: Source, workers: int, timeout_ms: int, position: Optional[int],
+                 wait: Deadline):
         self.source = source
         self.timeout_ms = timeout_ms
-        self.coord = source.connect()
-        self._setup(self.coord)
-        self.coord.execute("BEGIN ISOLATION LEVEL REPEATABLE READ, READ ONLY")
-        self.snapshot = self.coord.execute("SELECT pg_export_snapshot()").fetchone()[0]
-        rec, lsn = self.coord.execute(
-            "SELECT pg_is_in_recovery(), CASE WHEN pg_is_in_recovery() THEN pg_last_wal_replay_lsn() "
-            "ELSE pg_current_wal_lsn() END::text").fetchone()
-        self.in_recovery, self.lsn = rec, lsn
-        self.version = server_version_num(self.coord)
         self.workers = []
         self._free: list = []
         self._lock = threading.Lock()
+        self.coord = source.connect()
+        try:
+            self._open(source, workers, position, wait)
+        except BaseException:
+            self.close()
+            raise
+
+    def _open(self, source, workers, position, wait):
+        self._setup(self.coord)
+        self.in_recovery = bool(self.coord.execute("SELECT pg_is_in_recovery()").fetchone()[0])
+        # the position is read before the snapshot exists: the snapshot then contains at least that much
+        while True:
+            pos = lsn.parse(self.coord.execute(
+                "SELECT (CASE WHEN pg_is_in_recovery() THEN pg_last_wal_replay_lsn() "
+                "ELSE pg_current_wal_insert_lsn() END)::text").fetchone()[0])
+            if position is None or pos >= position:
+                break
+            if not self.in_recovery:
+                raise PositionNotReached("source primary is at %s, before the position %s" % (
+                    lsn.format(pos), lsn.format(position)))
+            if wait.expired:
+                raise PositionNotReached("source standby replayed only up to %s, not the position %s" % (
+                    lsn.format(pos), lsn.format(position)))
+            time.sleep(min(0.1, wait.remaining()))
+        self.position = pos
+        self.coord.execute("BEGIN ISOLATION LEVEL REPEATABLE READ, READ ONLY")
+        self.snapshot = self.coord.execute("SELECT pg_export_snapshot()").fetchone()[0]
+        self.version = server_version_num(self.coord)
         for _ in range(max(1, workers)):
             c = source.connect()
             self._setup(c)
@@ -449,13 +496,13 @@ def _row_pass(plan: Plan, snap: "_SourceSnapshot", md, cfg: OracleConfig, res: T
     pcanon, prow, pkey, src_sql = pg
     mcanon, mrow, mkey, dst_sql = mdq
     dst = Counter()
-    cur = md.execute(hashes_sql(_inner(C.hash60_md, mrow, mkey, plan.buckets, dst_sql, "", False), batch))
-    while True:
-        rows = cur.fetchmany(100_000)
-        if not rows:
-            break
+
+    def count(rows):
         for (h,) in rows:
             dst[int(h)] += 1
+
+    md(hashes_sql(_inner(C.hash60_md, mrow, mkey, plan.buckets, dst_sql, "", False), batch), "row hashes",
+       fetch="stream", consume=count)
     lock = threading.Lock()
     missing, svals = Counter(), {}
 
@@ -478,8 +525,8 @@ def _row_pass(plan: Plan, snap: "_SourceSnapshot", md, cfg: OracleConfig, res: T
     dvals = {}
     if extra:
         want = sorted(extra)[:cfg.row_fetch_limit]
-        for r in md.execute(rows_sql(_inner(C.hash60_md, mrow, mkey, plan.buckets, dst_sql, "", True), mcanon,
-                                     plan.columns, batch, want)).fetchall():
+        for r in md(rows_sql(_inner(C.hash60_md, mrow, mkey, plan.buckets, dst_sql, "", True), mcanon,
+                             plan.columns, batch, want), "extra rows"):
             dvals.setdefault(int(r[0]), tuple(r[1:]))
     _diff_counts(plan, missing, svals, extra, dvals, res, cfg.sample_limit)
 
@@ -494,7 +541,7 @@ def _compare_table(plan: Plan, snap: _SourceSnapshot, md, cfg: OracleConfig, res
                                                             cfg.min_blocks_per_range)
     src_jobs = [pool.submit(snap.run, checksum_sql(_inner(C.hash60_pg, prow, pkey, plan.buckets, src_sql, w, False)))
                 for w in ranges]
-    dst_rows = md.execute(checksum_sql(_inner(C.hash60_md, mrow, mkey, plan.buckets, dst_sql, "", False))).fetchall()
+    dst_rows = md(checksum_sql(_inner(C.hash60_md, mrow, mkey, plan.buckets, dst_sql, "", False)), "checksums")
     sb = _merge(f.result() for f in src_jobs)
     db = _merge([dst_rows])
     res.source_rows = sum(n for n, _ in sb.values())
@@ -511,19 +558,69 @@ def _compare_table(plan: Plan, snap: _SourceSnapshot, md, cfg: OracleConfig, res
     res.equal = (not differing and not res.missing_columns and not res.extra_columns)
 
 
-def compare(source: Source, destination: Destination, config: Optional[OracleConfig] = None) -> Result:
-    """Compare source and destination; see the module docstring. Never raises for a difference, only for errors."""
+def _is_conflict(e: BaseException) -> bool:
+    """SQLSTATE 40001: on a standby, a replayed lock or vacuum cancelled our snapshot (recovery conflict)."""
+    return getattr(e, "sqlstate", None) == "40001"
+
+
+def compare(source: Source, destination: Destination, config: Optional[OracleConfig] = None, *,
+            position: Optional[int] = None, slot_name: Optional[str] = None,
+            applied_position: AppliedPosition = stand_in_applied_position, unpositioned: bool = False,
+            deadline: Optional[Deadline] = None) -> Result:
+    """Compare source and destination at `position` (see the module docstring).
+
+    Returns a Result for equal and for different data. Raises `PositionNotReached` when a side is short of the
+    position, `OracleError` for a comparison that compares nothing, and `DeadlineExceeded` when the deadline passes.
+    `position` and `slot_name` (whose applied position the destination must have reached) are required unless
+    `unpositioned=True` is given by name; an unpositioned result is never a gate result (contract C8).
+    """
     cfg = config or OracleConfig()
+    if isinstance(position, str):
+        position = lsn.parse(position)
+    if unpositioned:
+        if position is not None:
+            raise OracleError("give a position or unpositioned=True, not both")
+    elif position is None or not slot_name:
+        raise OracleError("compare() needs position=Q and slot_name (or unpositioned=True, asked for by name)")
+    if cfg.tables is not None and not cfg.tables:
+        raise OracleError("an empty table list compares nothing")
+    deadline = deadline or Deadline.after(cfg.timeout_s)
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            return _compare_once(source, destination, cfg, position, slot_name, applied_position, deadline, attempt)
+        except Exception as e:                       # noqa: BLE001 - only recovery conflicts are retried
+            if not _is_conflict(e) or attempt > cfg.conflict_retries:
+                raise
+            deadline.check("comparison retried after a recovery conflict")
+
+
+def _compare_once(source, destination, cfg, position, slot_name, applied_position, deadline, attempt) -> Result:
     t0 = time.monotonic()
-    snap = _SourceSnapshot(source, cfg.source_workers, cfg.statement_timeout_ms)
-    md = destination.open()
+    timeout_ms = int(min(cfg.statement_timeout_ms, max(1.0, deadline.remaining()) * 1000))
+    snap = _SourceSnapshot(source, cfg.source_workers, timeout_ms, position, deadline.within(cfg.position_wait_s))
+    md = None
     began = False
+
+    def run_md(sql, what="", fetch="all", **kw):
+        return mdexec.execute(md, sql, deadline=deadline.within(cfg.md_statement_s), what=what or sql[:60],
+                              fetch=fetch, **kw)
+
     try:
+        md = destination.open(deadline.within(cfg.md_statement_s))
         if not destination.in_transaction:
-            md.execute("BEGIN TRANSACTION")
+            run_md("BEGIN TRANSACTION", fetch=None)
             began = True
+        dest_pos = None
+        if position is not None:
+            with mdexec.guarded(md, deadline.within(cfg.md_statement_s), "applied position of %s" % slot_name):
+                dest_pos = applied_position(md, slot_name)
+            if dest_pos is None or dest_pos < position:
+                raise PositionNotReached("destination applied %s for slot %s, before the position %s" % (
+                    lsn.format(dest_pos) if dest_pos is not None else "nothing", slot_name, lsn.format(position)))
         src_tables = read_source(snap.coord, tuple(cfg.exclude_source_schemas) + PG_SYSTEM_SCHEMAS)
-        dst_tables = read_dest(md, cfg.ignore_dest_schemas)
+        dst_tables = read_dest(lambda sql: run_md(sql, "destination catalog"), cfg.ignore_dest_schemas)
         if cfg.tables is not None:
             wanted = set(cfg.tables)
             unknown = wanted - {"%s.%s" % k for k in src_tables}
@@ -531,6 +628,8 @@ def compare(source: Source, destination: Destination, config: Optional[OracleCon
                 raise OracleError("tables not found on the source: %s" % ", ".join(sorted(unknown)))
             src_tables = {k: v for k, v in src_tables.items() if "%s.%s" % k in wanted}
         check_extra = cfg.check_extra_tables if cfg.check_extra_tables is not None else cfg.tables is None
+        if not src_tables:
+            raise OracleError("the source has no table to compare")
         tmap = cfg.table_map or (lambda s, t: (s, t))
         results, mapped, missing_tables = [], set(), []
         with cf.ThreadPoolExecutor(max_workers=max(1, cfg.source_workers)) as pool:
@@ -546,14 +645,14 @@ def compare(source: Source, destination: Destination, config: Optional[OracleCon
                     res.source_rows = int(snap.run("SELECT count(*) FROM %s" % _qual(schema, name))[0][0])
                 else:
                     mapped.add((ds, dn))
-                    _compare_table(_plan(st, dt, cfg, res), snap, md, cfg, res, pool)
+                    _compare_table(_plan(st, dt, cfg, res), snap, run_md, cfg, res, pool)
                 res.seconds = round(time.monotonic() - tt, 3)
                 results.append(res)
         extra_tables = sorted("%s.%s" % k for k in dst_tables if k not in mapped) if check_extra else []
     finally:
         if began:
             try:
-                md.execute("ROLLBACK")
+                run_md("ROLLBACK", fetch=None)
             except Exception:                   # noqa: BLE001
                 pass
         destination.close()
@@ -563,5 +662,7 @@ def compare(source: Source, destination: Destination, config: Optional[OracleCon
     equal = all(r.equal for r in results) and not extra_tables and not missing_tables
     cfg_out = {k: v for k, v in asdict(cfg).items() if k != "table_map"}
     cfg_out["table_map"] = "custom" if cfg.table_map else "identity"
-    return Result(equal, results, missing_tables, extra_tables, snap.lsn, snap.in_recovery, snap.version, rows,
+    fmt = (lambda v: lsn.format(v) if v is not None else None)
+    return Result(equal, results, missing_tables, extra_tables, position is not None, fmt(position),
+                  fmt(snap.position), fmt(dest_pos), slot_name, attempt, snap.in_recovery, snap.version, rows,
                   round(seconds, 3), round(rows / seconds, 1) if seconds > 0 else 0.0, cfg_out)

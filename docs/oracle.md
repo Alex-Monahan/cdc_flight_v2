@@ -163,8 +163,7 @@ for the same two states (`cli.txt`).
 1. **An UPDATE to an equal-comparing value is skipped.** DuckDB skips an `UPDATE` whose new value compares equal to
    the stored value, and then keeps the **old** representation: `-0` stays `-0` after `SET x = 0`, `1 mon` stays
    `1 mon` after `SET x = INTERVAL 30 DAY`, also through `UPDATE ... FROM` (`duckdb_equal_update.json`: locally and
-   on MotherDuck, DuckDB 1.5.6). In one table that had been loaded in bulk on MotherDuck the `-0` update was
-   applied, so the behaviour depends on the storage state. `DELETE` + `INSERT` always writes the new representation.
+   on MotherDuck, DuckDB 1.5.6). `DELETE` + `INSERT` always writes the new representation.
    Core.md 6.2 step 3 applies partial images with `UPDATE ... FROM`; for real, double and interval columns such an
    update can leave the destination different from the source, and the oracle will report it. Proposed: apply rows
    with such columns by delete and insert, or make the P4 type wave test it. The oracle's mutation tests replace

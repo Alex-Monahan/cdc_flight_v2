@@ -14,7 +14,9 @@ import time
 import pytest
 
 from cdc_v2.oracle import OracleConfig, compare
+from cdc_v2 import lsn
 from cdc_v2.testing import datasets
+from cdc_v2.testing.md import STAND_IN_SLOT, write_stand_in_position
 
 pytestmark = [pytest.mark.t1, pytest.mark.timeout(3600)]
 ROWS = int(os.environ.get("CDC_V2_ORACLE_BENCH_ROWS", "0"))
@@ -30,6 +32,7 @@ def test_oracle_rate(source_db, dest_db, evidence):
         source_db.sql(datasets.lineitem_insert_sql("other.big", start, min(step, ROWS - start + 1)))
     source_db.sql("VACUUM ANALYZE other.big")
     t_src = time.monotonic() - t0
+    q = lsn.parse(source_db.sql("SELECT pg_current_wal_insert_lsn()::text")[0][0])
     pg_bytes = source_db.sql("SELECT pg_total_relation_size('other.big')")[0][0]
 
     t0 = time.monotonic()
@@ -38,13 +41,15 @@ def test_oracle_rate(source_db, dest_db, evidence):
     c.execute(datasets.lineitem_md_ddl("other.big"))
     c.execute(datasets.lineitem_md_insert_sql("other.big", 1, ROWS))
     t_dst = time.monotonic() - t0
+    write_stand_in_position(c, q)
+    at_q = dict(position=q, slot_name=STAND_IN_SLOT)
 
     cfg = OracleConfig()                                  # defaults: 100,000 rows per bucket, 4 source workers
-    r1 = compare(source_db.source(), dest_db.destination(), cfg)
+    r1 = compare(source_db.source(), dest_db.destination(), cfg, **at_q)
     assert r1.equal, r1.summary()
 
     c.execute("UPDATE other.big SET l_extendedprice = l_extendedprice + 0.01 WHERE l_orderkey = %d" % (ROWS // 2))
-    r2 = compare(source_db.source(), dest_db.destination(), cfg)
+    r2 = compare(source_db.source(), dest_db.destination(), cfg, **at_q)
     t2 = r2.tables[0]
     assert not r2.equal and (t2.missing_rows, t2.extra_rows, t2.different_rows) == (0, 0, 1)
     assert t2.differing_buckets == 1 and t2.examined_buckets == 1

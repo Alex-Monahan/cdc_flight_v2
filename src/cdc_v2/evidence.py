@@ -1,34 +1,30 @@
-"""Evidence files under evidence/<item>/, redacted before they touch the disk (SPEC §4, R23).
+"""Redaction rules for evidence and logs (SPEC §4, R23). The repository is public.
 
-The repository is public. Everything an evidence file or a test log contains goes through `Redactor.redact`, which
-removes:
+This module only redacts. The one writer of evidence files is `cdc_v2.testing.harness_evidence.write_evidence`
+(contract C0): it redacts with `default_redactor()`, then scrubs paths and the user name, then refuses to write if
+anything secret-looking is left (`Redactor.leftovers`, `harness_evidence.check_clean`).
+
+`Redactor.redact` removes:
 
 * exact values: every value of the env files (`~/.config/cdc_flight_v2/env` and `env.local`), the known secret
   variables of the environment (MotherDuck token, salt, webhook, PlanetScale and PG_* values), and values that a
-  caller registers (for example the generated passwords of a local cluster);
-* this machine's host name, the operating-system user name and the home directory path (`/Users/<name>` -> `~`);
-* tokens by pattern (JWTs, bearer tokens, `motherduck_token=...`, `password=...`), credentials in URLs, libpq
-  connection strings (`host=... user=... password=...`) and `postgres://` URIs, e-mail addresses, and host names
-  under provider domains.
-
-Usage:
-
-    ev = EvidenceWriter("p3/oracle")
-    ev.write_json("mutations", {...})
-    ev.write_text("run.log", text)
+  caller registers (for example the generated passwords of a local cluster). Values of 6 characters or more are
+  removed wherever they occur; shorter ones (3 to 5 characters, not purely digits, not an ordinary word such as
+  `main`) only as whole words;
+* the home directory (as given and as its realpath, only at a path boundary: `/Users/ab` never cuts `/Users/abc`),
+  this machine's host name and the operating-system user name;
+* tokens by pattern (JWTs, PlanetScale tokens and passwords, bearer tokens, `motherduck_token=...`,
+  `password=...`), credentials in URLs, libpq connection strings and `postgres://` URIs, e-mail addresses, IPv4 and
+  IPv6 addresses (loopback excepted), and host names under provider and private domains.
 """
 from __future__ import annotations
 
 import getpass
-import json
 import os
 import re
 import socket
 from pathlib import Path
 from typing import Any, Iterable, Optional
-
-REPO = Path(__file__).resolve().parents[2]
-EVIDENCE_ROOT = REPO / "evidence"
 
 SECRET_ENV_NAMES = ("motherduck_token", "MOTHERDUCK_TOKEN", "CDC_PII_SALT", "SLACK_WEBHOOK_URL",
                     "PLANETSCALE_ORG", "PLANETSCALE_DATABASE", "PLANETSCALE_SERVICE_TOKEN_ID",
@@ -37,31 +33,38 @@ SECRET_ENV_NAMES = ("motherduck_token", "MOTHERDUCK_TOKEN", "CDC_PII_SALT", "SLA
                     "MOTHERDUCK_SERVICE_ACCOUNT", "PGPASSWORD", "PGUSER")
 # Values too ordinary to redact wherever they appear (they would destroy unrelated text).
 COMMON_VALUES = {"postgres", "postgresql", "localhost", "127.0.0.1", "motherduck", "planetscale", "replicator",
-                 "true", "false", "verify-full", "require", "main", "disable", "prefer"}
-MIN_LEN = 6
+                 "true", "false", "verify-full", "require", "main", "disable", "prefer", "public", "admin", "test",
+                 "none", "null", "yes", "off"}
+MIN_SUBSTRING = 6          # exact values at least this long are removed wherever they occur
+MIN_WORD = 3               # shorter values (down to this length) are removed as whole words
 
 PLACEHOLDER = "<redacted>"
+_LOOPBACK = {"127.0.0.1", "0.0.0.0", "::1", "::"}
 
 PATTERNS = [
-    # JSON web tokens (MotherDuck tokens are JWTs)
-    (re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"), PLACEHOLDER),
-    # URL with credentials, and postgres URIs as a whole
-    (re.compile(r"\bpostgres(?:ql)?://[^\s'\"<>]+"), "postgres://" + PLACEHOLDER),
-    (re.compile(r"\b([a-z][a-z0-9+.-]{1,15}://)[^\s/:@'\"<>]+:[^\s/@'\"<>]+@"), r"\1" + PLACEHOLDER + "@"),
-    # key=value pairs of libpq connection strings and MotherDuck connection parameters
-    (re.compile(r"(?i)\b(host|hostaddr|user|password|passfile|sslpassword|motherduck_token|token|"
-                r"sslkey|sslcert)\s*=\s*('[^']*'|\"[^\"]*\"|[^\s&;,'\"]+)"), r"\1=" + PLACEHOLDER),
-    # "Authorization: Bearer ..." and similar
-    (re.compile(r"(?i)\b(bearer)\s+[A-Za-z0-9._~+/=-]{8,}"), r"\1 " + PLACEHOLDER),
-    # secret-looking assignments in JSON or code: "password": "...", token: ...
-    (re.compile(r"(?i)([\"']?[\w.-]*(?:password|passwd|secret|token|api[_-]?key|salt)[\w.-]*[\"']?\s*[:=]\s*)"
-                r"([\"'])(?!<redacted>)[^\"']{4,}\2"), r"\1\2" + PLACEHOLDER + r"\2"),
-    # e-mail addresses
-    (re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"), PLACEHOLDER),
-    # host names under provider and private domains
-    (re.compile(r"(?i)\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:internal|local|lan|localdomain|amazonaws\.com|"
-                r"psdb\.cloud|rds\.amazonaws\.com|compute|motherduck\.com)\b"), PLACEHOLDER),
+    ("jwt", re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"), PLACEHOLDER),
+    ("planetscale", re.compile(r"\bpscale_(?:tkn|pw|oauth|api)_[A-Za-z0-9_.-]{8,}"), PLACEHOLDER),
+    ("postgres-uri", re.compile(r"\bpostgres(?:ql)?://[^\s'\"<>]+"), "postgres://" + PLACEHOLDER),
+    ("url-credentials", re.compile(r"\b([a-z][a-z0-9+.-]{1,15}://)[^\s/:@'\"<>]+:[^\s/@'\"<>]+@"),
+     r"\1" + PLACEHOLDER + "@"),
+    ("conninfo", re.compile(r"(?i)\b(host|hostaddr|user|password|passfile|sslpassword|motherduck_token|token|"
+                            r"sslkey|sslcert)\s*=\s*('[^']*'|\"[^\"]*\"|[^\s&;,'\"]+)"), r"\1=" + PLACEHOLDER),
+    ("bearer", re.compile(r"(?i)\b(bearer)\s+[A-Za-z0-9._~+/=-]{8,}"), r"\1 " + PLACEHOLDER),
+    ("assignment", re.compile(r"(?i)([\"']?[\w.-]*(?:password|passwd|secret|token|api[_-]?key|salt)[\w.-]*[\"']?"
+                              r"\s*[:=]\s*)([\"'])(?!<redacted>)[^\"']{4,}\2"), r"\1\2" + PLACEHOLDER + r"\2"),
+    ("email", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"), PLACEHOLDER),
+    ("provider-host", re.compile(r"(?i)\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:internal|local|lan|localdomain|"
+                                 r"amazonaws\.com|psdb\.cloud|rds\.amazonaws\.com|compute|motherduck\.com)\b"),
+     PLACEHOLDER),
 ]
+_IPV4 = re.compile(r"(?<![\w.])(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?![\w.])")
+_IPV6 = re.compile(r"(?<![\w:])(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}(?![\w:])"
+                   r"|(?<![\w:])(?:[0-9A-Fa-f]{1,4}:){1,6}:(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){0,5})?(?![\w:])"
+                   r"|(?<![\w:])::(?:[0-9A-Fa-f]{1,4}:){1,6}[0-9A-Fa-f]{1,4}(?![\w:])")
+
+
+def _ip(m: "re.Match") -> str:
+    return m.group(0) if m.group(0) in _LOOPBACK else "<ip>"
 
 
 def _env_file_values(paths: Iterable[Path]) -> list:
@@ -90,7 +93,8 @@ class Redactor:
         values = set(_env_file_values(files))
         values.update(env.get(n, "") for n in SECRET_ENV_NAMES)
         values.update(extra_values)
-        self.home = home if home is not None else str(Path.home())
+        home = home if home is not None else str(Path.home())
+        self.homes = sorted({h for h in (home, os.path.realpath(home)) if h and len(h) > 1}, key=len, reverse=True)
         try:
             default_user = getpass.getuser()
         except Exception:                      # noqa: BLE001
@@ -101,28 +105,45 @@ class Redactor:
             hostnames = {h, h.split(".")[0]}
         self.hostnames = {h for h in hostnames if h and len(h) >= 3 and h.lower() not in COMMON_VALUES}
         self.values: set = set()
+        self.words: set = set()
         for v in values:
             self.add(v)
 
     def add(self, value: Optional[str]) -> None:
-        """Register one more exact value to remove (ignored when short or ordinary)."""
-        if value and len(value) >= MIN_LEN and value.lower() not in COMMON_VALUES:
+        """Register one more exact value to remove (ordinary words and pure numbers are ignored)."""
+        if not value or value.lower() in COMMON_VALUES or value.isdigit():
+            return
+        if len(value) >= MIN_SUBSTRING:
             self.values.add(value)
+        elif len(value) >= MIN_WORD:
+            self.words.add(value)
 
     def redact(self, text: Any) -> str:
         s = str(text)
         for v in sorted(self.values, key=len, reverse=True):
             if v in s:
                 s = s.replace(v, PLACEHOLDER)
-        if self.home and len(self.home) > 1:
-            s = s.replace(self.home, "~")
-        for rx, repl in PATTERNS:
+        for v in sorted(self.words, key=len, reverse=True):
+            s = re.sub(r"(?<![A-Za-z0-9_])%s(?![A-Za-z0-9_])" % re.escape(v), PLACEHOLDER, s)
+        for h in self.homes:
+            s = re.sub(re.escape(h) + r"(?![A-Za-z0-9_.-])", "~", s)
+        for _name, rx, repl in PATTERNS:
             s = rx.sub(repl, s)
+        s = _IPV4.sub(_ip, s)
+        s = _IPV6.sub(_ip, s)
         for h in sorted(self.hostnames, key=len, reverse=True):
             s = re.sub(r"(?i)(?<![A-Za-z0-9_-])%s(?![A-Za-z0-9_-])" % re.escape(h), "<host>", s)
         if self.user and len(self.user) >= 3 and self.user.lower() not in COMMON_VALUES:
             s = re.sub(r"(?<![A-Za-z0-9_])%s(?![A-Za-z0-9_])" % re.escape(self.user), "<user>", s)
         return s
+
+    def leftovers(self, text: str) -> list:
+        """Names of the rules that still match `text` (empty after `redact`); the writer refuses otherwise."""
+        found = [name for name, rx, _ in PATTERNS
+                 if any(PLACEHOLDER not in m.group(0) for m in rx.finditer(text))]
+        found += ["exact value" for v in self.values if v in text][:1]
+        found += ["ip address" for m in _IPV4.finditer(text) if m.group(0) not in _LOOPBACK][:1]
+        return found
 
     def redact_obj(self, obj: Any) -> Any:
         """Redact every string inside a JSON-like structure (keys included)."""
@@ -147,44 +168,3 @@ def default_redactor() -> Redactor:
 
 def redact(text: Any) -> str:
     return default_redactor().redact(text)
-
-
-_ITEM = re.compile(r"^[a-z0-9][a-z0-9_.-]*(/[a-z0-9][a-z0-9_.-]*)*$")
-_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
-
-
-class EvidenceWriter:
-    """Writes redacted files to evidence/<item>/. `item` is a relative path such as 'p3/oracle' or '1.3'."""
-
-    def __init__(self, item: str, root: Optional[Path] = None, redactor: Optional[Redactor] = None):
-        if not _ITEM.match(item) or ".." in item.split("/"):
-            raise ValueError("bad evidence item %r" % item)
-        self.dir = Path(root or EVIDENCE_ROOT) / item
-        self.redactor = redactor or default_redactor()
-
-    def _path(self, name: str) -> Path:
-        if not _NAME.match(name):
-            raise ValueError("bad evidence file name %r" % name)
-        self.dir.mkdir(parents=True, exist_ok=True)
-        return self.dir / name
-
-    def write_text(self, name: str, text: str) -> Path:
-        p = self._path(name)
-        body = self.redactor.redact(text)
-        p.write_text(body if body.endswith("\n") else body + "\n", encoding="utf-8")
-        return p
-
-    def write_json(self, name: str, obj: Any) -> Path:
-        if not name.endswith(".json"):
-            name += ".json"
-        p = self._path(name)
-        body = json.dumps(self.redactor.redact_obj(obj), indent=2, sort_keys=True, default=str)
-        p.write_text(self.redactor.redact(body) + "\n", encoding="utf-8")
-        return p
-
-    def append_text(self, name: str, text: str) -> Path:
-        p = self._path(name)
-        with p.open("a", encoding="utf-8") as f:
-            line = self.redactor.redact(text)
-            f.write(line if line.endswith("\n") else line + "\n")
-        return p

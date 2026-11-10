@@ -1,6 +1,6 @@
 """Command line of the oracle (`tools/oracle`). See docs/oracle.md.
 
-Exit status: 0 equal, 1 different, 2 usage or error, 3 the destination did not reach --wait-lsn in time.
+Exit status: 0 equal, 1 different, 2 usage or error, 3 a side did not reach the position (refused).
 Nothing secret is printed: the source password comes from the localpg home (or the conninfo from an environment
 variable that is named, never echoed), and all output goes through the evidence redactor.
 """
@@ -14,8 +14,12 @@ from pathlib import Path
 
 from cdc_v2.evidence import default_redactor
 
-from .comparison import Destination, OracleConfig, OracleError, Source, compare
-from .position import PositionTimeout, wait_for_applied
+from cdc_v2 import lsn
+from cdc_v2.deadline import Deadline, DeadlineExceeded
+
+from . import mdexec
+from .comparison import Destination, OracleConfig, OracleError, PositionNotReached, Source, compare
+from .position import wait_for_applied
 
 EXIT_EQUAL, EXIT_DIFFERENT, EXIT_ERROR, EXIT_TIMEOUT = 0, 1, 2, 3
 
@@ -35,8 +39,13 @@ def build_parser() -> argparse.ArgumentParser:
                         "name the port")
     d = p.add_argument_group("destination")
     d.add_argument("--dest-db", required=True, help="MotherDuck database (cdc_v2_*)")
-    d.add_argument("--wait-lsn", help="first wait until the destination has applied this WAL position (X/Y)")
-    d.add_argument("--wait-timeout", type=float, default=120.0)
+    d.add_argument("--position", help="the source position Q (X/Y) both sides must have reached; required unless "
+                                      "--unpositioned")
+    d.add_argument("--slot-name", help="slot whose applied position the destination must have reached")
+    d.add_argument("--unpositioned", action="store_true",
+                   help="compare without a position (never a gate result; the output says so)")
+    d.add_argument("--wait", type=float, default=0.0, metavar="SECONDS",
+                   help="first wait up to SECONDS until the destination has applied --position")
     o = p.add_argument_group("comparison")
     o.add_argument("--tables", help="comma-separated schema.table list (default: every user table)")
     o.add_argument("--exclude-schema", action="append", default=[], help="source schema pattern to leave out")
@@ -78,19 +87,21 @@ def main(argv=None) -> int:
     try:
         source = source_from_args(args)
         dest = Destination(args.dest_db)
-        if args.wait_lsn:
-            import duckdb
-            con = duckdb.connect("md:%s?attach_mode=single" % args.dest_db)
+        position = lsn.parse(args.position) if args.position else None
+        if args.wait and position is not None:
+            d = Deadline.after(args.wait)
+            con = mdexec.connect("md:%s?attach_mode=single" % args.dest_db, deadline=d)
             try:
-                wait_for_applied(con, args.wait_lsn, timeout=args.wait_timeout)
+                wait_for_applied(con, position, d, args.slot_name)
             finally:
                 con.close()
         cfg = OracleConfig(chunk_rows=args.chunk_rows, source_workers=args.workers, sample_limit=args.sample,
                            max_diff_buckets=args.max_diff_buckets,
                            tables=[t.strip() for t in args.tables.split(",")] if args.tables else None,
                            exclude_source_schemas=tuple(args.exclude_schema))
-        result = compare(source, dest, cfg)
-    except PositionTimeout as e:
+        result = compare(source, dest, cfg, position=position, slot_name=args.slot_name,
+                         unpositioned=args.unpositioned)
+    except (PositionNotReached, DeadlineExceeded) as e:
         print(red.redact("oracle: %s" % e), file=sys.stderr)
         return EXIT_TIMEOUT
     except Exception as e:                            # noqa: BLE001 - reported, redacted
