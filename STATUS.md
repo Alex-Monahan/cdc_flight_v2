@@ -8,9 +8,9 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
   the table). **P2 Platform spike: gate passed on 2026-11-10** — every spike is done and merged, the report
   (`docs/spike_report.md`) is complete and was sent to the owner; nothing found contradicts SPEC, so the build
   continues without waiting. **P3 Core: in progress** (table below): the fault harness and the oracle are
-  merged; the engine is in its round of fixes after two reviews; the cut is finished and reviewed (merge after
-  fixes; its round waits for a writer slot); the destination basics, the source package and the apply package are
-  being built; the task file of every package is written.
+  merged; the engine's round of fixes is finished and the coordinator checks it again before the merge; the cut
+  is in its round of fixes; the source package is finished and waits for its review; the destination basics and
+  the apply package are being built; the task file of every package is written.
 - Stage 2 (PlanetScale) cannot start: of its names only `PLANETSCALE_ORG` and `PLANETSCALE_DATABASE` are in the env
   file (checked again at the P1 gate). The service token and the connection values are owed by the owner.
 
@@ -50,16 +50,16 @@ green on T1 (local primary and standby, real MotherDuck, local JVM).
 |---|---|---|---|
 | H | Crash points, fault sites, process control, crash runner, TCP fault proxy, byte-stream relay | Opus | **merged** |
 | O | Oracle, T1 harness, evidence writer, workload generator and observer | Opus | **merged** (fix round included) |
-| X | The cut: where a snapshot lies in the stream | Fable | **finished**; review: merge after fixes (below); the fix round goes to its worker when a writer slot is free |
-| E | Engine: the JVM program around stock Debezium, frames, the Python side | Opus | both reviews say: merge after fixes (below); **fix round running** |
+| X | The cut: where a snapshot lies in the stream | Fable | review: merge after fixes (below); **fix round running** |
+| E | Engine: the JVM program around stock Debezium, frames, the Python side | Opus | **fix round finished** (below); the coordinator checks it again, then it is merged |
 | D | Destination basics: lanes, fence, deadlines, errors, `_cdc` schema, transition function, alert records | Fable | running |
 | A | Apply: the statements over a change set, keyed and keyless | Opus | running |
-| P | Source: connections, catalog and its observation, publication, slot, slot facts, timeline, heartbeat | Opus | running; first repairs `tools/localpg` for Postgres 16 |
+| P | Source: connections, catalog and its observation, publication, slot, slot facts, timeline, heartbeat | Opus | **finished** (with the repair of `tools/localpg` for Postgres 16); waits for the coordinator's review |
 | L | Leadership: guard, take-over, heartbeat, hand-over, bootstrap, platform interface | Fable | task written; after D |
 | Y | Transform: source types to destination types | Opus | task written; after E and P |
 | S | Stream: transactions, groups, commit and acknowledge, supervisor, pipeline process | Fable | task written; after E, D, A, P |
 | V | Slot continuity | Fable | task written; after S |
-| F | Fuzzers (stream, workload, fault, leadership), the consumer loop of 1.3 and 3.2 | Opus | task written; starts when a writer slot is free (H and O are merged) |
+| F | Fuzzers (stream, workload, fault, leadership), the consumer loop of 1.3 and 3.2 | Opus | task written; starts as soon as E is merged (its stream fuzzer builds on the engine's frame codec) |
 | B | Backfill and hand-off | Fable | task written; after X, S, A, P, Y |
 | T | The catalog gate, truncate, drop and recreate, the document and the test over all state machines | Opus | task written; after S, B |
 
@@ -265,13 +265,13 @@ Each in its own worktree and branch; the orchestrator merges. The P3 packages ar
 | Job | Phase | Started | Delivers |
 |---|---|---|---|
 | Package D, destination basics (Fable, xhigh). MotherDuck databases `cdc_v2_t_d_*`. No Postgres | P3 | 2026-11-10 | `src/cdc_v2/md/`, `src/cdc_v2/state/`, `src/cdc_v2/alerts.py`, `docs/design/destination.md`, `docs/state_machines.md`, `evidence/p3/destination/` |
-| Package P, the source (Opus, high). Homes `pg-p` and `pg-p2`, ports 55640–55655; the `tools/localpg` self-tests on their own home. No MotherDuck, no JVM | P3 | 2026-11-10 | first `tools/localpg` on Postgres 16; then `src/cdc_v2/pg/`, `tests/source/`, `docs/design/source.md`, `evidence/p3/source/` |
 | Package A, apply (Opus, high). MotherDuck databases `cdc_v2_t_a_*`. No Postgres, no JVM | P3 | 2026-11-10 | `apply_group`, `truncate`, the statement shapes for tables with and without a key, tests against the oracle's canonical form, cost numbers on MotherDuck |
-| Package E, fix round (Opus, high; the worker that built the engine). Home `pg-e`, ports 55620–55627. No MotherDuck | P3 | 2026-11-10 | the items listed below; then the coordinator checks it again and it is merged |
+| Package X, fix round (Fable; the worker that built the cut). Home `pg-cut`, ports 55600–55607. No MotherDuck | P3 | 2026-11-10 | the items listed below; then the coordinator checks it again and it is merged |
 
 Finished, not merged yet: **package E** (branch pushed; JVM program `jvm/src/cdc_v2/engine/`, the Python side
 `src/cdc_v2/stream/{frames,engine,jvm}.py`, `tests/engine/`, `docs/design/engine.md`, `evidence/p3/engine/`).
-Both reviews say "merge after fixes"; the fix round is with the worker that built the engine. What must change:
+Both reviews said "merge after fixes"; the fix round is finished (below) and with the coordinator. What had to
+change:
 
 - From the second review (acknowledgement path). The engine never confirmed more than it was told was durable, in
   every run. But a heartbeat could carry the commit position of a transaction not delivered yet (loss under the
@@ -287,6 +287,27 @@ Both reviews say "merge after fixes"; the fix round is with the worker that buil
 - Smaller: the hermetic tests take 16 s (to be cut); three missing cases of the event count; proxy ports through a
   parameter of the harness; the tests owed on Postgres 16 read their binaries from the environment so that they can
   be repeated once `tools/localpg` runs on 16.
+
+The fix round of package E (finished 2026-11-10; every item done except one run on the Java version the Flight
+will use — the lock of the Java runtime has an entry for Linux only, so that run is left for the Flight):
+
+- Settings that carry a guarantee are refused as extra properties in Python and checked again by the Java side at
+  start. No `HELLO` without a holder of the slot. No default host or port anywhere. `FATAL` carries positions and
+  never a source value (messages only from an allow-list; SQL errors reduced to their state code).
+- Only `END` records are held and confirmed; a `HEARTBEAT` frame has no position to acknowledge. Test: 40,000
+  single-row transactions and 2,000 message-only transactions at a 1 ms heartbeat with three kills — the slot was
+  never above the last durable position, nothing missing, nothing doubled. A pipeline that confirms one `END` too
+  early is kept in the suite as a negative control and is caught.
+- Stated bounds: on an idle source the slot reaches the last durable position within the heartbeat interval plus
+  1 s (measured 0.3 s); while the pipeline is behind, a durable position confirms an `END` at most k − 1 records
+  below it, with k ≤ max(1, 2 × lead / 4096) (60,000 transactions behind: within 15 records, in 0.7 s).
+- An interval above 2^31 hours ends the engine 1.4–1.5 s after every start, at the same event; the engine cannot
+  name the table (the failure is in Debezium's decoding thread), but it passes the transaction once the table is
+  left out. **New finding: `interval 'infinity'` and `'-infinity'` (Postgres 17 and later) do not fail — the
+  Postgres driver turns both into a zero interval, silently.** The rule for it is being decided with the
+  coordinator and goes into Decisions; until then the stream path must be taken as wrong for these two values.
+- On a black-holed connection the engine's `HEARTBEAT` frames stop after about 8 s; the server ended its sender
+  after about 60 s. The stream's task is corrected for this and for the two points above when E is merged.
 
 Its findings that reach other packages (now rules in the contracts and the tasks):
 
@@ -474,8 +495,9 @@ the exact-value layer.
 
 ## Next steps
 
-1. P3, as writer slots become free (at most four): package F, then the fix round of package X (message written).
-   Review and merge D, P, A, E and X as they report: the coordinator reviews each, D also gets a second reviewer.
+1. P3, as writer slots become free (at most four): merge E after the coordinator's re-check, then start package
+   F (it builds on the engine's frame codec). Review and merge P (finished), then D, A and X as they report: the
+   coordinator reviews each, D also gets a second reviewer.
    Then L after D, Y after E and P, S after E, D, A and P; then V, B, T in the order of the table above. When X
    merges: design 7.1–7.4 and open points 1 and 12 take its text, plan C9 is completed, and the tasks of B, S, V
    and T take the rules of the cut (settle floor, `R0 ≥ P0` for every snapshot, the tracker on a primary, timeline).

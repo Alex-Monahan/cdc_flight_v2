@@ -43,12 +43,12 @@ Nodes are named by name or by port (`localpg kill 55433`).
 | `down` | Stops every node of the home, standbys first, with a fast shutdown. If that fails it escalates to an immediate shutdown and then to SIGKILL. A frozen (SIGSTOPped) postmaster gets SIGCONT first. `down` returns only when the postmaster and all its children are gone. |
 | `reset` | Stops whatever runs under the home (found through the pid files, even without a state file), wipes the home, rebuilds it with new passwords and a new CA, and starts it. It works from any state. It refuses a non-empty directory that lacks the `.localpg-home` marker. |
 | `status [--json]` | Shows each node: running or stopped, pid, role, port, server version, timeline, current or replay LSN, WAL receiver state and replay-pause state. It also shows replication state and lag (bytes, and seconds from `pg_stat_replication`), setting overrides, and the replication slots (name, type/plugin, active, `wal_status`, failover, synced, restart LSN). |
-| `add-standby [--name N] [--from P]` | Creates a physical slot `cdc_v2_phys_<N>` on the running primary, takes a `pg_basebackup` (`-X stream -S slot`), configures the new node as a standby and starts it. The name defaults to `standby<port offset>`, on the next free port. |
+| `add-standby [--name N] [--from P]` | Creates a physical slot `cdc_v2_phys_<N>` on the running primary, takes a `pg_basebackup` (`-X stream -S slot`), configures the new node as a standby and starts it. The name defaults to `standby<port offset>`, on the next free port. The new standby inherits the upstream's overrides of the settings a standby must match (`max_connections`, `max_worker_processes`, `max_wal_senders`, `max_prepared_transactions`, `max_locks_per_transaction`). |
 | `promote <node> [--json]` | Runs `pg_ctl promote` and waits until the node accepts writes. It reports the old and new timelines. It also drops the node's physical slot on its former upstream when that upstream is running. Other standbys are not re-pointed; use `follow` for that. |
 | `follow <standby> [<upstream>]` | Points a standby at another primary, for example after a promotion. It creates a slot on the new upstream, restarts the standby and waits until it streams on the new timeline. |
 | `kill <node>` | Crash test. It sends SIGSTOP to the postmaster so that it cannot fork, collects the postmaster's children, sends SIGKILL to the children and then to the postmaster, and waits until all of them are gone. No orphaned backend survives. |
 | `remove <node>` | Stops a node, drops its slot on its upstream and deletes its data directory. Use it, for example, for an old primary after a failover drill. |
-| `set <node\|all> NAME=VALUE…` / `unset <node\|all> NAME…` | Writes per-node overrides to `localpg_overrides.conf`, reloads the node, and restarts it when a setting needs a restart (`pending_restart`). Example: `localpg set primary max_slot_wal_keep_size=64MB`. Unknown settings and settings that localpg manages (port, sockets, TLS, `primary_conninfo`) are refused. |
+| `set <node\|all> NAME=VALUE…` / `unset <node\|all> NAME…` | Writes per-node overrides to `localpg_overrides.conf`, reloads the node, and restarts it when a setting needs a restart (`pending_restart`). Example: `localpg set primary max_slot_wal_keep_size=64MB`. Unknown settings and settings that localpg manages (port, sockets, TLS, `primary_conninfo`) are refused. `unset` of a setting that needs a restart restarts the node too. When a setting that a standby must match goes up, standbys are restarted before primaries; when it goes down, primaries first, so a standby never runs with a smaller value than its primary. |
 | `conninfo [--json] [--env admin\|runtime [--node N]] [--show-passwords]` | Shows hosts, ports, database, role names, the CA path and the paths of the two password files. It prints passwords only with `--show-passwords`. `--env` prints libpq `export` lines. |
 | `sql <node> [-c SQL] [--role bootstrap\|admin\|runtime] [--db D]` | Runs SQL. The bootstrap role goes through the Unix socket. The admin and runtime roles go over TCP with `verify-full`. |
 | `logs <node> [-n N]` | Prints the end of a node's server log. |
@@ -57,12 +57,30 @@ Every subprocess has a timeout (10 s for quick tools, 60 s for SQL, 90 s for `pg
 `pg_basebackup`). Mutating commands take an exclusive lock on the home, so a second concurrent invocation waits for
 up to 300 s.
 
+## Postgres versions
+
+localpg runs the binaries of `--pg-bin` / `$CDC_V2_PG_BIN`. The local tiers use Postgres 18 (the default); Postgres
+16 is installed as well (`--pg-bin /opt/homebrew/opt/postgresql@16/bin`), on a home of its own. What depends on the
+version:
+
+- The major version of a home is the one of its data directories (`PG_VERSION`); `state.json` records it as
+  `pg_major` when the home is built. `up` (and every start) refuses binaries of another major version with exit 2
+  and a message; use the matching binaries, another home, or `reset`.
+- Settings that a version does not have are not written: `sync_replication_slots` only from 17 on. `set` refuses
+  `sync_replication_slots` and `synchronized_standby_slots` (17+) and `idle_replication_slot_timeout` (18+) on an
+  older node with exit 2 and "needs Postgres N or later", instead of an SQL error.
+- `status` reads every column of `pg_replication_slots` that the server has; `failover`, `synced`,
+  `invalidation_reason` (17+) are `null` on 16 (shown as `-`). `status --json` also reports `pg_major` (per node
+  and for the home), `bin_major` (the binaries) and `server_version_num`.
+- Failover slots (`failover = true`) and their synchronisation exist from 17 on. On 16 the self-tests that need
+  them are skipped; logical decoding on a standby and `pg_log_standby_snapshot()` exist from 16 on.
+
 ## Topology and settings
 
 - **Primary**: `wal_level = logical`. **Standbys**: they are created with `pg_basebackup` and stream through a
   physical slot (`primary_slot_name = cdc_v2_phys_<node>`) with `hot_standby_feedback = on`, so logical decoding on
-  the replica works. They also have `sync_replication_slots = on`, and their `primary_conninfo` names a database, so
-  failover slots (`failover = true`) that are created on the primary are synchronised to them (PG17+).
+  the replica works. On 17 and later they also have `sync_replication_slots = on`, and their `primary_conninfo` names a
+  database, so failover slots (`failover = true`) that are created on the primary are synchronised to them.
 - Each instance gets `shared_buffers = 128MB`, `max_connections = 50`, `max_wal_senders = 20`,
   `max_replication_slots = 20`, `max_worker_processes = 16` and `wal_retrieve_retry_interval = 1s` (the default is
   5 s; with 1 s, standbys reconnect quickly after a primary restart or crash). It listens on `localhost` (127.0.0.1 and ::1) only.
@@ -128,4 +146,9 @@ sslrootcert=<home>/tls/ca.crt passfile=<home>/secrets/pgpass
 
 ```sh
 tools/with-env uv run pytest -m localpg tests/localpg   # opt-in: the default run deselects the marker localpg
+CDC_V2_PG_BIN=/opt/homebrew/opt/postgresql@16/bin tools/with-env uv run pytest -m localpg tests/localpg
 ```
+
+Run them one at a time: they share one home (`pg-selftest`, ports 55460–55467). A run with binaries of another
+major version than the home's rebuilds the home (`reset`). On 16 the two failover-slot tests are skipped (measured
+2026-11-10: 18.6: 25 passed; 16.6: 23 passed, 2 skipped).
