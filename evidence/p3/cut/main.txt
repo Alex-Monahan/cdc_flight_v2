@@ -1,0 +1,75 @@
+   30s cuts=30883 transactions=121475 violations=0 waiting=137
+   60s cuts=58605 transactions=238926 violations=0 waiting=101
+   90s cuts=89544 transactions=360462 violations=0 waiting=102
+  120s cuts=119700 transactions=479929 violations=0 waiting=100
+  150s cuts=150390 transactions=599925 violations=0 waiting=106
+  180s cuts=180596 transactions=719685 violations=0 waiting=93
+  210s cuts=207210 transactions=836010 violations=0 waiting=166
+  240s cuts=237204 transactions=955994 violations=0 waiting=89
+  270s cuts=268515 transactions=1078020 violations=0 waiting=118
+  300s cuts=299766 transactions=1198205 violations=0 waiting=107
+  330s cuts=329444 transactions=1317950 violations=0 waiting=153
+  360s cuts=358945 transactions=1438532 violations=0 waiting=119
+  390s cuts=389549 transactions=1558525 violations=0 waiting=111
+  420s cuts=420426 transactions=1679728 violations=0 waiting=88
+  450s cuts=452573 transactions=1802262 violations=0 waiting=112
+  480s cuts=483643 transactions=1925480 violations=0 waiting=164
+  510s cuts=514178 transactions=2047345 violations=0 waiting=202
+  540s cuts=545074 transactions=2169626 violations=0 waiting=79
+  570s cuts=578467 transactions=2292702 violations=0 waiting=135
+  600s cuts=607494 transactions=2414911 violations=0 waiting=91
+  630s cuts=638456 transactions=2537449 violations=0 waiting=151
+  660s cuts=667665 transactions=2660330 violations=0 waiting=159
+  690s cuts=700926 transactions=2783742 violations=0 waiting=147
+  720s cuts=731681 transactions=2906762 violations=0 waiting=63
+  750s cuts=764016 transactions=3029701 violations=0 waiting=154
+  780s cuts=796346 transactions=3153656 violations=0 waiting=118
+  810s cuts=827309 transactions=3275789 violations=0 waiting=118
+  840s cuts=858293 transactions=3397869 violations=0 waiting=114
+  870s cuts=891702 transactions=3521283 violations=0 waiting=106
+  900s cuts=922952 transactions=3644909 violations=0 waiting=33
+  930s cuts=953503 transactions=3765948 violations=0 waiting=148
+  960s cuts=984203 transactions=3888734 violations=0 waiting=43
+  990s cuts=1017281 transactions=4011392 violations=0 waiting=147
+ 1020s cuts=1044700 transactions=4130774 violations=0 waiting=131
+ 1050s cuts=1072570 transactions=4248886 violations=0 waiting=147
+ 1080s cuts=1104181 transactions=4370757 violations=0 waiting=136
+ 1110s cuts=1133697 transactions=4490682 violations=0 waiting=160
+ 1140s cuts=1164248 transactions=4613022 violations=0 waiting=160
+ 1170s cuts=1196821 transactions=4737176 violations=0 waiting=123
+ 1200s cuts=1227691 transactions=4860594 violations=0 waiting=118
+ 1230s cuts=1258339 transactions=4983674 violations=0 waiting=102
+ 1260s cuts=1288672 transactions=5104809 violations=0 waiting=183
+ 1290s cuts=1322496 transactions=5228429 violations=0 waiting=120
+ 1320s cuts=1353031 transactions=5351711 violations=0 waiting=115
+ 1350s cuts=1385501 transactions=5474728 violations=0 waiting=134
+ 1380s cuts=1418072 transactions=5598095 violations=0 waiting=131
+ 1410s cuts=1450599 transactions=5720882 violations=0 waiting=138
+ 1440s cuts=1481791 transactions=5844435 violations=0 waiting=57
+ 1470s cuts=1516180 transactions=5967841 violations=0 waiting=150
+ 1500s cuts=1547407 transactions=6091256 violations=0 waiting=199
+ 1530s cuts=1578729 transactions=6214135 violations=0 waiting=155
+ 1560s cuts=1609211 transactions=6337348 violations=0 waiting=142
+ 1590s cuts=1642211 transactions=6460294 violations=0 waiting=185
+ 1620s cuts=1672921 transactions=6583470 violations=0 waiting=172
+ 1650s cuts=1702441 transactions=6704608 violations=0 waiting=73
+ 1680s cuts=1734360 transactions=6827444 violations=0 waiting=172
+ 1710s cuts=1765677 transactions=6949988 violations=0 waiting=162
+ 1740s cuts=1796131 transactions=7067298 violations=0 waiting=152
+ 1770s cuts=1825229 transactions=7185532 violations=0 waiting=95
+main: OK
+  Postgres 18.6 (Homebrew), 1801 s, writers plain,async,subxact,abort, disturbances none, slot on replica
+  cuts checked 1854463 (not checked 0), transactions delivered 7305063
+  violations of the sound rules: none
+  stream out of E order: 0
+  wrong rules caught (cuts): stmt_as_r0=15291, r1_inside=15291, r1_outside=31, naive_sharp=0, xmax_inside=716780, xmin_outside=847284
+  unknown set (transactions per cut)   empty     mean   max
+    base                                 0.00%    1.878   265
+    xid                                 66.93%    0.709   263
+    sharp                               68.99%    0.891   264
+    xid+sharp                           74.44%    0.631   263
+    really_visible                      70.13%    0.865   264
+  cuts_with_r0_below_received: 0
+  cuts_that_miss_a_received_transaction: 0
+  cuts_with_r0_eq_r1: 1289783
+  cuts taken the own way: 1854463, of them quiet (xmin = xmax): 1006841 (54.3%), with a violation: 0
