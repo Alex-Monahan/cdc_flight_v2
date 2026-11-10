@@ -58,12 +58,15 @@ public final class CdcEngine {
             "DURABLE applied: the END or HEARTBEAT record to acknowledge is chosen, markProcessed not called yet");
     static final String ACKED = Crash.declare("engine.acked",
             "markProcessed and markBatchFinished returned: the acknowledgement is handed to Debezium");
+    static final String FLUSH_SENT = Crash.declare("engine.flush_sent",
+            "first batch after an acknowledgement: Debezium's poll has sent the flush position to the walsender");
 
     // ---------------------------------------------------------------------------------------------------- settings
 
     static final class Settings {
         String slot = "";
         String engineId = "";
+        String probeSlot = "";   // test hook (cdc_v2.test.probe.slot): the slot the HELLO probe reads
         Long startPosition;
         long probeTimeoutMs = 30_000;
         int frameMaxRows = 65_536;
@@ -79,6 +82,7 @@ public final class CdcEngine {
             Settings s = new Settings();
             s.slot = c.getOrDefault("slot.name", "");
             s.engineId = c.getOrDefault("cdc_v2.engine.id", "");
+            s.probeSlot = c.getOrDefault("cdc_v2.test.probe.slot", s.slot);
             s.probeTimeoutMs = Long.parseLong(c.getOrDefault("cdc_v2.probe.timeout.ms", "30000"));
             String sp = c.get("cdc_v2.start.position");
             s.startPosition = sp == null || sp.isEmpty() ? null : Long.parseUnsignedLong(sp);
@@ -141,6 +145,10 @@ public final class CdcEngine {
             ReplProbe.main();
             return;
         }
+        if (args.length == 1 && args[0].equals("--held-selftest")) {
+            HeldSelftest.main();
+            return;
+        }
         if (args.length >= 1 && args[0].equals("--splitmix")) {
             for (int i = 1; i < args.length; i++) {
                 System.out.println(Long.toUnsignedString(Crash.splitmix64(Long.parseUnsignedLong(args[i]))));
@@ -195,7 +203,6 @@ public final class CdcEngine {
         Map<String, String> config;
         try {
             config = Json.parseStringObject(first.substring(7));
-            settings = Settings.from(config);
         }
         catch (RuntimeException e) {
             log("BAD_CONFIG", "class=" + e.getClass().getName());
@@ -207,7 +214,16 @@ public final class CdcEngine {
         rememberSecret(config.get("database.user"), "<user>");
         rememberSecret(config.get("database.hostname"), "<host>");
         rememberSecret(config.get("database.dbname"), "<dbname>");
-        probe = new SlotProbe(config);
+        try {
+            settings = Settings.from(config);
+            ProtectedConfig.check(config);
+            probe = new SlotProbe(config);
+        }
+        catch (RuntimeException e) {
+            fatal(e instanceof ProtectedConfig.Refused ? e : new ProtectedConfig.Refused(
+                    "cdc_v2 settings refused (" + e.getClass().getName() + ")"));
+            return;
+        }
 
         Properties props = new Properties();
         StringBuilder keys = new StringBuilder();
@@ -406,12 +422,54 @@ public final class CdcEngine {
         t.start();
     }
 
-    /** Writes a FATAL frame (class, message, cause chain; scrubbed, no row values) and halts with 1. */
+    /** Position fields of the last record handed over (framed), and the table of the record being handled. */
+    static volatile Map<String, ?> lastHandedOffset;
+    static volatile String fatalSchema = "";
+    static volatile String fatalTable = "";
+
+    /** Message prefixes of Debezium and Kafka Connect exceptions that never quote a source value. */
+    static final List<String> SAFE_PREFIXES = List.of(
+            "An exception occurred in the change event producer",
+            "Failed to start replication stream at",
+            "Failed to properly convert data value for",
+            "Error while processing event at offset",
+            "Timed out while waiting for committing task offset",
+            "Publication autocreation is disabled",
+            "Couldn't obtain encoding for database",
+            "engine stopped:");
+
+    /**
+     * A message that can be shown without risk of quoting a source value: ours (built without values), the SQLState
+     * of a SQL exception, a known safe prefix of a Debezium or Connect message (up to the first ';'), else nothing.
+     */
+    static String safeMessage(Throwable t) {
+        String m = t.getMessage();
+        if (m == null) {
+            return "";
+        }
+        if (t instanceof EngineFatal || t instanceof ProtectedConfig.Refused) {
+            return scrub(m);
+        }
+        if (t instanceof java.sql.SQLException) {
+            String state = ((java.sql.SQLException) t).getSQLState();
+            return "SQLState " + (state == null ? "unknown" : state);
+        }
+        for (String p : SAFE_PREFIXES) {
+            if (m.startsWith(p)) {
+                int cut = m.indexOf(';');
+                return scrub(cut < 0 ? m : m.substring(0, cut));
+            }
+        }
+        return "";
+    }
+
+    /** Writes a FATAL frame and halts with 1: class, safe message, cause chain, position fields of the last record
+     *  handed over, schema and table of the record being handled (empty when unknown). Never a source value. */
     static synchronized void fatal(Throwable error) {
         try {
             ByteBuf b = new ByteBuf(1024);
             b.str(error.getClass().getName());
-            b.str(scrub(error.getMessage()));
+            b.str(safeMessage(error));
             List<Throwable> causes = new ArrayList<>();
             for (Throwable c = error.getCause(); c != null && causes.size() < 16 && !causes.contains(c); c = c.getCause()) {
                 causes.add(c);
@@ -419,8 +477,11 @@ public final class CdcEngine {
             b.u16(causes.size());
             for (Throwable c : causes) {
                 b.str(c.getClass().getName());
-                b.str(scrub(c.getMessage()));
+                b.str(safeMessage(c));
             }
+            Consumer.posmap(b, lastHandedOffset);
+            b.str(fatalSchema);
+            b.str(fatalTable);
             out.frame(FrameOut.FATAL, b);
             out.flush();
         }
@@ -572,7 +633,8 @@ public final class CdcEngine {
 
         final Map<String, TableState> tables = new HashMap<>();
         final ByteBuf meta = new ByteBuf(1 << 16);
-        final ArrayDeque<Pending> pending = new ArrayDeque<>();
+        HeldEnds<RecordChangeEvent<SourceRecord>> held;
+        boolean ackedSinceLastBatch;
         RowsBuffer current;
         TableState currentTable;
         long seq;
@@ -586,8 +648,17 @@ public final class CdcEngine {
                 throws InterruptedException {
             long cpu0 = threads.getCurrentThreadCpuTime();
             try {
+                if (held == null) {
+                    held = new HeldEnds<>(settings.ackMaxPending);
+                }
                 if (!helloSent) {
                     hello();
+                }
+                if (ackedSinceLastBatch) {
+                    // Debezium's poll() that produced this batch ran performCommit() first, which sent the flush of
+                    // the previous acknowledgement to the walsender (BaseSourceTask.poll, commitOffset).
+                    ackedSinceLastBatch = false;
+                    Crash.point(FLUSH_SENT);
                 }
                 applyDurable(committer);
                 if (stopping.get()) {
@@ -596,7 +667,10 @@ public final class CdcEngine {
                 }
                 for (RecordChangeEvent<SourceRecord> e : batch) {
                     handle(e);
+                    lastHandedOffset = e.record().sourceOffset();
                 }
+                fatalSchema = "";
+                fatalTable = "";
                 flushRows();
                 ByteBuf b = new ByteBuf(32);
                 b.u32(batch.size());
@@ -634,7 +708,10 @@ public final class CdcEngine {
          * is held by this engine's walsender at this moment (a slot has one holder at a time).
          */
         void hello() throws Exception {
-            SlotProbe.Holder h = probe.holder(settings.slot);
+            SlotProbe.Holder h = probe.holder(settings.probeSlot);
+            if (h.activePid == null || h.backendStartUs == null) {
+                throw new EngineFatal("slot not held at probe");
+            }
             ByteBuf b = new ByteBuf(256);
             b.u32(FrameOut.PROTOCOL_VERSION);
             b.str(debeziumVersion);
@@ -668,11 +745,8 @@ public final class CdcEngine {
                 return;
             }
             lastDurable = p;
-            Pending best = null;
-            while (!pending.isEmpty() && Long.compareUnsigned(pending.peekFirst().ack, p) <= 0) {
-                best = pending.pollFirst();
-            }
-            pendingSize = pending.size();
+            HeldEnds.Entry<RecordChangeEvent<SourceRecord>> best = held.take(p);
+            pendingSize = held.size();
             if (best == null) {
                 return;
             }
@@ -680,28 +754,10 @@ public final class CdcEngine {
             committer.markProcessed(best.record);
             committer.markBatchFinished();
             ackedPosition = best.ack;
+            ackedSinceLastBatch = true;
             Crash.point(ACKED);
         }
 
-        void remember(long ack, RecordChangeEvent<SourceRecord> e) {
-            pending.addLast(new Pending(ack, e));
-            if (pending.size() > settings.ackMaxPending) {
-                // Thin out: keep every second entry, always the newest. Dropping an entry is safe: a later DURABLE
-                // then acknowledges an older record (the slot moves less far), never a newer one.
-                ArrayDeque<Pending> kept = new ArrayDeque<>();
-                int i = 0;
-                int n = pending.size();
-                for (Pending q : pending) {
-                    if ((i & 1) == 1 || i == n - 1) {
-                        kept.addLast(q);
-                    }
-                    i++;
-                }
-                pending.clear();
-                pending.addAll(kept);
-            }
-            pendingSize = pending.size();
-        }
 
         void checkAck(Long ack) {
             if (ack == null) {
@@ -728,7 +784,7 @@ public final class CdcEngine {
             return null;
         }
 
-        void posmap(ByteBuf b, Map<String, ?> offset) {
+        static void posmap(ByteBuf b, Map<String, ?> offset) {
             TreeMap<String, Object> sorted = new TreeMap<>();
             if (offset != null) {
                 sorted.putAll(offset);
@@ -810,6 +866,7 @@ public final class CdcEngine {
                 inTxn = true;
             }
             else if ("END".equals(status)) {
+                long endAck = HeldEnds.endAck(r.sourceOffset());     // FATAL without lsn_commit (plan C2)
                 Long count = v.getInt64("event_count");
                 b.u64(count == null ? 0 : count);
                 List<Object> cols = v.getArray("data_collections");
@@ -822,12 +879,11 @@ public final class CdcEngine {
                         b.u64(n == null ? 0 : n);
                     }
                 }
-                checkAck(ack);
+                checkAck(endAck);
                 out.frame(FrameOut.END, b);
                 inTxn = false;
-                if (ack != null) {
-                    remember(ack, e);
-                }
+                held.add(endAck, e);
+                pendingSize = held.size();
             }
             else {
                 throw new EngineFatal("unknown transaction status " + status);
@@ -836,17 +892,13 @@ public final class CdcEngine {
 
         void heartbeat(RecordChangeEvent<SourceRecord> e) throws IOException {
             flushRows();
+            // Never held, never acknowledged (plan C2): Debezium dispatches a heartbeat that already carries a
+            // transaction's commit position before that transaction's END record. Position fields for information.
             SourceRecord r = e.record();
-            Long ack = ackOf(r.sourceOffset());
-            checkAck(ack);
             ByteBuf b = new ByteBuf(128);
             b.u64(seq++);
             posmap(b, r.sourceOffset());
-            b.optU64(ack);
             out.frame(FrameOut.HEARTBEAT, b);
-            if (ack != null) {
-                remember(ack, e);
-            }
         }
 
         void truncate(SourceRecord r, Struct v) throws IOException {
@@ -1028,6 +1080,8 @@ public final class CdcEngine {
             Struct src = val.getStruct("source");
             String schema = src.getString("schema");
             String table = src.getString("table");
+            fatalSchema = schema;
+            fatalTable = table;
             Schema rowSchema = vs.field("after").schema();
             TableState t = tableFor(schema, table, rowSchema, r.keySchema());
             if (currentTable != t || current == null || current.version != t.version) {

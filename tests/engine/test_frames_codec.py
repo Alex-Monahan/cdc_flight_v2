@@ -75,9 +75,9 @@ other_frames = st.one_of(
               st.lists(st.tuples(texts, u64), max_size=3).map(tuple)),
     st.builds(F.Truncate, u64, texts, texts, posmaps),
     st.builds(F.Message, u64, texts, st.booleans(), st.binary(max_size=60), posmaps),
-    st.builds(F.Heartbeat, u64, posmaps, opt_u64),
+    st.builds(F.Heartbeat, u64, posmaps),
     st.builds(F.BatchEnd, st.integers(0, (1 << 32) - 1), opt_u64),
-    st.builds(F.Fatal, texts, texts, st.lists(st.tuples(texts, texts), max_size=3).map(tuple)),
+    st.builds(F.Fatal, texts, texts, st.lists(st.tuples(texts, texts), max_size=3).map(tuple), posmaps, texts, texts),
 )
 
 any_frame = st.one_of(other_frames, rows_frames(), schema_frames())

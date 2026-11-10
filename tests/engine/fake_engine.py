@@ -61,16 +61,18 @@ if mode == "exit":
     os._exit(3)
 if mode == "garbage":
     out.write(b"[0.8s][info] not a frame at all......")
-    time.sleep(60)
+    os._exit(0)
 if mode == "flood":
     # far more than a pipe holds: the write blocks until the reader reads
     big = T.rows("s", "t", 1, {"seq": (F.P_INT64, list(range(20000))), "op": (F.P_UTF8, ["c"] * 20000)})
-    for i in range(50):
-        out.write(enc.encode(big))
+    ftype, payload = T.encode_payload(big)          # about 300 KB per frame; a pipe holds 64 KB
+    for i in range(12):
+        out.write(T.envelope(ftype, enc.seq, payload))
+        enc.seq += 1
     with lock:
         note(flood_done=True, durables_seen=len(durables), last=durables[-1] if durables else None)
 for i in range(5):
-    out.write(enc.encode(F.Heartbeat(i, {"lsn": 100 + i}, 100 + i)))
+    out.write(enc.encode(F.Heartbeat(i, {"lsn": 100 + i})))
     out.write(enc.encode(F.BatchEnd(1, None)))
 while True:
     time.sleep(0.1)

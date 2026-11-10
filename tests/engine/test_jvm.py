@@ -122,3 +122,65 @@ def test_log_only_and_invalid_environment(artifacts, tmp_path):
         assert p.returncode != 0 and "IllegalArgumentException" in p.stderr
     p = java(artifacts, "--crash-selftest", "engine.undeclared", "1", env={"CDC_V2_CRASH_LOG": str(tmp_path / "x")})
     assert p.returncode != 0 and "not declared" in p.stderr
+
+
+def run_with_config(artifacts, props, timeout=60):
+    """Start the engine with exactly these properties (bypassing the Python checks); return (frames, exit code)."""
+    from cdc_v2.stream.engine import jvm_command, EngineSettings
+    r, w = os.pipe()
+    s = EngineSettings(host="localhost", port=55621, dbname="d", user="u", password="p")
+    script = 'exec 3>&%d %d>&- && exec "$@"' % (w, w)
+    p = subprocess.Popen(["/bin/sh", "-c", script, "x"] + jvm_command(artifacts, s), stdin=subprocess.PIPE,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, pass_fds=(w,),
+                         env={"PATH": os.environ.get("PATH", "")})
+    os.close(w)
+    p.stdin.write(("CONFIG " + json.dumps(props) + "\n").encode())
+    p.stdin.flush()
+    with os.fdopen(r, "rb") as f:
+        data = f.read()
+    err = p.stderr.read().decode()
+    p.stdin.close()
+    return F.decode_all(data), p.wait(timeout), err
+
+
+def base_props():
+    from cdc_v2.stream.engine import EngineSettings, build_properties
+    return build_properties(EngineSettings(host="localhost", port=55621, dbname="d", user="u",
+                                           password="secret-pw-xyz"), None, "e1")
+
+
+@pytest.mark.parametrize("key,value", [
+    ("skipped.operations", "t"), ("offset.storage", "org.apache.kafka.connect.storage.FileOffsetBackingStore"),
+    ("offset.flush.interval.ms", "60000"), ("lsn.flush.mode", "connector_and_driver"), ("errors.max.retries", "3"),
+    ("slot.max.retries", "6"), ("provide.transaction.metadata", "false"), ("snapshot.mode", "initial"),
+    ("publication.autocreate.mode", "all_tables"), ("converters", "other"), ("cdcv2.type", "x.Y"),
+    ("tombstones.on.delete", "true"), ("offset.mismatch.strategy", "trust_offset"), ("heartbeat.interval.ms", "0"),
+    ("heartbeat.interval.ms", "60000"), ("heartbeat.action.query", "select 1"),
+    ("replica.identity.autoset.values", "*.*:FULL"), ("read.only", "true"), ("signal.enabled.channels", "source"),
+    ("offset.commit.policy", "x"), ("offset.storage.file.filename", "/x"), ("cdcv2.extra", "1"),
+    ("database.hostname", ""), ("database.port", None), ("skipped.operations", None)])
+def test_java_refuses_a_weakened_configuration(artifacts, key, value):
+    props = base_props()
+    if value is None:
+        props.pop(key)
+    else:
+        props[key] = value
+    frames, code, err = run_with_config(artifacts, props)
+    assert code == 1 and len(frames) == 1 and isinstance(frames[0], F.Fatal), (code, frames, err[-500:])
+    msg = frames[0].message
+    assert "Refused" in frames[0].error_class and (key in msg or "database" in msg), msg
+    assert "secret-pw-xyz" not in msg and "secret-pw-xyz" not in err
+
+
+def test_java_held_list_bound_and_end_without_lsn_commit(artifacts):
+    p = java(artifacts, "--held-selftest")
+    r = json.loads(p.stdout.strip().splitlines()[-1])
+    k = r["spacing_after_60000"]
+    assert k <= 2 * 60000 // 4096 + 1 and r["held"] <= 4097
+    for t in r["takes"]:
+        if t["confirmed"] is not None:
+            assert t["confirmed"] <= t["durable"]                         # never above
+            assert t["durable"] - t["confirmed"] <= (k - 1) * 1000 + 999  # within k - 1 END records
+    assert r["takes"][0]["confirmed"] is None and r["after_empty_spacing"] == 1
+    assert r["refill_confirmed"] == 1000 * (60000 + 15)
+    assert r["end_without_lsn_commit"] == "END record without lsn_commit in its offset"

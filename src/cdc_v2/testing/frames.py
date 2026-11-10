@@ -228,7 +228,6 @@ def encode_payload(frame):
     if isinstance(frame, F.Heartbeat):
         b.u64(frame.seq)
         b.posmap(frame.positions)
-        b.opt_u64(frame.ack_position)
         return F.HEARTBEAT, bytes(b.b)
     if isinstance(frame, F.BatchEnd):
         b.u32(frame.records)
@@ -241,6 +240,9 @@ def encode_payload(frame):
         for cls, msg in frame.causes:
             b.str(cls)
             b.str(msg)
+        b.posmap(frame.positions)
+        b.str(frame.schema)
+        b.str(frame.table)
         return F.FATAL, bytes(b.b)
     raise TypeError("not a frame: %r" % (frame,))
 
@@ -481,8 +483,7 @@ def generate_one(seed):
         colls.append((name, g.u(1000)))
     out.append(F.End(seq, txid, ts, pos, ack, count, tuple(colls)))
     seq = g.u(1 << 30)
-    pos = g.posmap()
-    out.append(F.Heartbeat(seq, pos, g.opt_long()))
+    out.append(F.Heartbeat(seq, g.posmap()))
     recs = g.u(10000)
     out.append(F.BatchEnd(recs, g.opt_long()))
     cls = g.text(g.u(20))
@@ -491,7 +492,9 @@ def generate_one(seed):
     for _ in range(g.u(3)):
         a = g.text(g.u(10))
         causes.append((a, g.text(g.u(10))))
-    out.append(F.Fatal(cls, msg, tuple(causes)))
+    pos = g.posmap()
+    fs = g.text(g.u(5))
+    out.append(F.Fatal(cls, msg, tuple(causes), pos, fs, g.text(g.u(5))))
     return out
 
 

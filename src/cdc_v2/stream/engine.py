@@ -39,7 +39,25 @@ JAVA_CRASH_POINTS = {
     "engine.ack_marking": "DURABLE applied: the END or HEARTBEAT record to acknowledge is chosen, markProcessed "
                           "not called yet",
     "engine.acked": "markProcessed and markBatchFinished returned: the acknowledgement is handed to Debezium",
+    "engine.flush_sent": "first batch after an acknowledgement: Debezium's poll has sent the flush position to the "
+                         "walsender",
 }
+
+#: Debezium properties that carry a guarantee or add behaviour: `EngineSettings.extra` may not set them (plan C2,
+#: hazard H-016). Entries ending in "." are prefixes. The JVM checks the effective values again at start.
+PROTECTED_KEYS = (
+    "skipped.operations", "offset.storage", "offset.storage.", "offset.flush.interval.ms", "offset.flush.timeout.ms",
+    "offset.commit.policy", "lsn.flush.mode", "errors.max.retries", "slot.max.retries", "slot.retry.delay.ms",
+    "provide.transaction.metadata", "snapshot.mode", "publication.autocreate.mode", "publication.name",
+    "slot.name", "plugin.name", "converters", "cdcv2.", "tombstones.on.delete", "heartbeat.interval.ms",
+    "heartbeat.action.query", "replica.identity.autoset.values", "read.only", "signal.", "offset.mismatch.strategy",
+    "unavailable.value.placeholder", "decimal.handling.mode", "binary.handling.mode", "include.unknown.datatypes",
+    "record.processing.order", "database.password", "database.hostname", "database.port", "cdc_v2.",
+)
+
+
+def protected(key):
+    return any(key.startswith(k) if k.endswith(".") else key == k for k in PROTECTED_KEYS)
 
 
 class EngineFatal(Exception):
@@ -105,6 +123,11 @@ class EngineSettings:
                              "(at most 4 GiB)")
         if self.gc not in ("parallel", "g1"):
             raise ValueError("gc must be parallel or g1")
+        if not 0 < self.heartbeat_interval_ms <= 10000:
+            raise ValueError("heartbeat_interval_ms must be in 1..10000 (0 would never send HELLO on an idle source)")
+        bad = [str(k) for k, _v in self.extra if protected(str(k))]
+        if bad:
+            raise ValueError("extra may not set protected properties: %s" % ", ".join(sorted(bad)))
 
 
 def build_properties(s: EngineSettings, start_position=None, engine_id=""):
@@ -319,7 +342,8 @@ class Engine:
         if isinstance(f, F.Fatal):
             self._reap(deadline.within(5))
             raise EngineFatal(F.Fatal(self._scrub(f.error_class), self._scrub(f.message),
-                                      tuple((self._scrub(c), self._scrub(m)) for c, m in f.causes)))
+                                      tuple((self._scrub(c), self._scrub(m)) for c, m in f.causes),
+                                      f.positions, f.schema, f.table))
         problem = None
         if isinstance(f, F.Hello):
             if self.hello is not None:

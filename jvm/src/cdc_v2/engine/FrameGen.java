@@ -265,7 +265,6 @@ final class FrameGen {
         b = new ByteBuf(256);
         b.u64(u(1 << 30));
         posmap(b);
-        b.optU64(optLong());
         out.frame(FrameOut.HEARTBEAT, b);
         // BATCH_END
         b = new ByteBuf(64);
@@ -282,6 +281,9 @@ final class FrameGen {
             b.str(text(u(10)));
             b.str(text(u(10)));
         }
+        posmap(b);
+        b.str(text(u(5)));
+        b.str(text(u(5)));
         out.frame(FrameOut.FATAL, b);
     }
 

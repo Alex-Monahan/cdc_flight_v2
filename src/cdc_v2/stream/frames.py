@@ -142,9 +142,9 @@ class Message:
 
 @dataclass(frozen=True)
 class Heartbeat:
+    """Information only: the engine is alive. Never acknowledged, carries no ack_position (plan C2)."""
     seq: int
     positions: dict
-    ack_position: Optional[int]
 
 
 @dataclass(frozen=True)
@@ -156,8 +156,11 @@ class BatchEnd:
 @dataclass(frozen=True)
 class Fatal:
     error_class: str
-    message: str
+    message: str                        # only text that cannot quote a source value (docs/design/engine.md §7)
     causes: tuple                       # ((class, message), ...)
+    positions: dict = field(default_factory=dict)   # position fields of the last record handed over
+    schema: str = ""                    # the table of the record being handled, when known
+    table: str = ""
 
 
 Frame = Any
@@ -335,12 +338,13 @@ def parse_payload(ftype, payload, validate=True):
     elif ftype == MESSAGE:
         f = Message(c.u64(), c.str(), c.flag(), c.bin(), c.posmap())
     elif ftype == HEARTBEAT:
-        f = Heartbeat(c.u64(), c.posmap(), c.opt_u64())
+        f = Heartbeat(c.u64(), c.posmap())          # an ack_position would be unused bytes: EngineBroken
     elif ftype == BATCH_END:
         f = BatchEnd(c.u32(), c.opt_u64())
     elif ftype == FATAL:
         cls, msg = c.str(), c.str()
-        f = Fatal(cls, msg, tuple((c.str(), c.str()) for _ in range(c.u16())))
+        causes = tuple((c.str(), c.str()) for _ in range(c.u16()))
+        f = Fatal(cls, msg, causes, c.posmap(), c.str(), c.str())
     else:
         raise EngineBroken("unknown frame type %d" % ftype)
     c.done()

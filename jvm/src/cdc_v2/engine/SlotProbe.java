@@ -27,8 +27,14 @@ final class SlotProbe {
     private final Properties props = new Properties();
 
     SlotProbe(Map<String, String> c) {
-        url = "jdbc:postgresql://" + c.getOrDefault("database.hostname", "localhost") + ":"
-                + c.getOrDefault("database.port", "5432") + "/" + c.getOrDefault("database.dbname", "");
+        String host = c.get("database.hostname");
+        String port = c.get("database.port");
+        if (host == null || host.isBlank() || port == null || port.isBlank()) {
+            // never a default host or port: port 5432 belongs to the owner's own server
+            throw new ProtectedConfig.Refused("database.hostname and database.port are required for the slot probe");
+        }
+        url = "jdbc:postgresql://" + host.trim() + ":" + Integer.parseInt(port.trim()) + "/"
+                + c.getOrDefault("database.dbname", "");
         put(c, "database.user", "user");
         put(c, "database.password", "password");
         put(c, "database.sslmode", "sslmode");

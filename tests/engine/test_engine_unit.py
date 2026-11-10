@@ -66,7 +66,10 @@ def test_settings_refuse_the_owners_port_and_bad_limits():
 def test_frames_hello_first_and_secret_never_in_argv_or_env(fake):
     start, notes = fake
     e = start("normal")
-    got = list(e.frames(Deadline.after(3)))
+    got = []
+    end = Deadline.after(10)
+    while sum(isinstance(f, F.Heartbeat) for f in got) < 5:
+        got.append(e.next_frame(end))
     assert isinstance(got[0], F.Hello) and got[0].engine_id == e.engine_id
     assert sum(isinstance(f, F.Heartbeat) for f in got) == 5
     first = notes()[0]
@@ -81,17 +84,23 @@ def test_durable_never_blocks_while_fd3_is_full(fake):
     start, notes = fake
     e = start("flood")
     e.next_frame(Deadline.after(5))                 # HELLO; then nobody reads fd 3 for a while
-    time.sleep(0.5)
+    time.sleep(0.3)
     t0 = time.monotonic()
     for p in range(1, 20001):
         e.durable(p)
     assert time.monotonic() - t0 < 2.0              # 20,000 calls; none waits for the pipe
-    time.sleep(0.5)
+    time.sleep(0.3)
     seen = [n["durable"] for n in notes() if "durable" in n]
     assert seen and seen[-1] == 20000               # the engine read commands while its fd 3 write was blocked
     assert not any("flood_done" in n for n in notes())
-    for _ in e.frames(Deadline.after(5)):
-        pass
+    end = Deadline.after(10)
+    rows = 0
+    while rows < 12:
+        rows += isinstance(e.next_frame(end), F.Rows)
+    for _ in range(100):
+        if any("flood_done" in n for n in notes()):
+            break
+        time.sleep(0.02)
     assert any("flood_done" in n for n in notes())
 
 
@@ -125,7 +134,7 @@ def test_stop_kills_after_the_deadline(fake):
     e = start("ignore_stop")
     e.next_frame(Deadline.after(5))
     t0 = time.monotonic()
-    status = e.stop(Deadline.after(1.0))
+    status = e.stop(Deadline.after(0.5))
     assert status == -9 and time.monotonic() - t0 < 3
     assert any(n.get("stop") for n in notes())
 
@@ -168,3 +177,29 @@ def test_settings_refuse_a_frame_target_above_the_maximum():
     with pytest.raises(ValueError):
         EngineSettings(host="h", port=55621, dbname="d", user="u", password="p", frame_target_bytes=1 << 31,
                        frame_max_bytes=1 << 30, max_value_bytes=1 << 20)
+
+
+PROTECTED_EXAMPLES = ["skipped.operations", "offset.storage", "offset.storage.file.filename", "offset.flush.interval.ms",
+                      "offset.commit.policy", "lsn.flush.mode", "errors.max.retries", "slot.max.retries",
+                      "provide.transaction.metadata", "snapshot.mode", "publication.autocreate.mode", "converters",
+                      "cdcv2.type", "cdcv2.anything", "tombstones.on.delete", "heartbeat.interval.ms",
+                      "heartbeat.action.query", "replica.identity.autoset.values", "read.only",
+                      "signal.data.collection", "signal.enabled.channels", "offset.mismatch.strategy",
+                      "cdc_v2.max.value.bytes", "database.password", "slot.name"]
+
+
+@pytest.mark.parametrize("key", PROTECTED_EXAMPLES)
+def test_extra_may_not_set_a_protected_key(key):
+    with pytest.raises(ValueError, match="protected"):
+        EngineSettings(host="h", port=55621, dbname="d", user="u", password="p", extra=((key, "x"),))
+
+
+def test_extra_may_set_an_unprotected_key():
+    s = EngineSettings(host="h", port=55621, dbname="d", user="u", password="p", extra=(("poll.interval.ms", "10"),))
+    assert build_properties(s)["poll.interval.ms"] == "10"
+
+
+@pytest.mark.parametrize("ms", [0, -1, 10001])
+def test_heartbeat_interval_bounds(ms):
+    with pytest.raises(ValueError, match="heartbeat"):
+        EngineSettings(host="h", port=55621, dbname="d", user="u", password="p", heartbeat_interval_ms=ms)
