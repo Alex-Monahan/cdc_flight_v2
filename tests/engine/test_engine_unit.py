@@ -206,6 +206,36 @@ def test_extra_may_set_an_unprotected_key():
     assert build_properties(s)["poll.interval.ms"] == "10"
 
 
+ODD_NAMES = (("a.b", "t,1"), ('q"s', "MixedCase"), ("s", "x y"), ("schéma", "t'q"), ("s", "t"))
+
+
+def test_build_properties_writes_the_list_of_tables_without_a_key():
+    from cdc_v2.stream.engine import decode_table_names
+    s = EngineSettings(host="h", port=55621, dbname="d", user="u", password="p",
+                       keyless_tables=list(ODD_NAMES) + [("s", "t")])
+    p = build_properties(s)
+    assert decode_table_names(p["cdc_v2.keyless.tables"]) == tuple(sorted(set(ODD_NAMES)))
+    assert set(decode_table_names(p["cdc_v2.keyless.tables"])) == set(ODD_NAMES)
+    assert p["cdc_v2.keyless.tables"].count("\x00") == 2 * len(ODD_NAMES)
+    # through the CONFIG line (JSON) and back: exact
+    assert decode_table_names(json.loads(json.dumps(p))["cdc_v2.keyless.tables"]) == s.keyless_tables
+    assert build_properties(EngineSettings(host="h", port=55621, dbname="d", user="u",
+                                           password="p"))["cdc_v2.keyless.tables"] == ""
+
+
+@pytest.mark.parametrize("key", ["cdc_v2.keyless.tables", "cdc_v2.keyless"])
+def test_extra_may_not_override_the_list_of_tables_without_a_key(key):
+    with pytest.raises(ValueError, match="protected"):
+        EngineSettings(host="h", port=55621, dbname="d", user="u", password="p", keyless_tables=(("s", "t"),),
+                       extra=((key, ""),))
+
+
+@pytest.mark.parametrize("bad", [("s",), ("s", "t", "u"), ("", "t"), ("s", ""), ("s\x00", "t"), "st", ("s", 1)])
+def test_list_of_tables_without_a_key_refuses_what_is_not_a_name_pair(bad):
+    with pytest.raises(ValueError, match="keyless_tables"):
+        EngineSettings(host="h", port=55621, dbname="d", user="u", password="p", keyless_tables=(bad,))
+
+
 @pytest.mark.parametrize("ms", [0, -1, 10001])
 def test_heartbeat_interval_bounds(ms):
     with pytest.raises(ValueError, match="heartbeat"):

@@ -136,8 +136,9 @@ def ensure(primary: PgConnection, tables: Iterable, *, publication: str = DEFAUL
     """Create the publication if it is missing and add the tables that are not in it. Only ever adds.
 
     `tables` are SourceTable values or (schema, name) pairs; they are read again here, and a table that cannot be
-    published as it is (no primary key and not REPLICA IDENTITY FULL, also with USING INDEX; NOTHING; an identity
-    index that is not the key; unlogged or temporary) raises `NotPublishable` before anything is added. Fix it with
+    published as it is (no primary key and not REPLICA IDENTITY FULL, also with USING INDEX; a deferrable primary
+    key and not REPLICA IDENTITY FULL; NOTHING; an identity index that is not the key; unlogged or temporary) raises
+    `NotPublishable` before anything is added. Fix it with
     `replica_identity.set_full` first; the order matters (H-014: the source's own updates fail otherwise).
 
     Returns `next_xid` = `pg_snapshot_xmax(pg_current_snapshot())` read after the change committed: the first

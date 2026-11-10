@@ -108,6 +108,9 @@ class EngineSettings:
     status_update_interval_ms: int = 10000
     message_prefixes: tuple = ("cdc_v2_.*",)
     table_include: Optional[str] = None          # Debezium table.include.list (None: every published table)
+    # rule K (core design section 6): the tables without a key, as exact (schema, table) names, no patterns. The
+    # engine treats a listed table as a table without a key whatever Debezium's key says (docs/design/engine.md 4a).
+    keyless_tables: tuple = ()
     # frames and acknowledgement (docs/design/engine.md)
     frame_max_rows: int = 65536
     frame_target_bytes: int = 8 << 20
@@ -132,6 +135,13 @@ class EngineSettings:
         bad = [str(k) for k, _v in self.extra if protected(str(k))]
         if bad:
             raise ValueError("extra may not set protected properties: %s" % ", ".join(sorted(bad)))
+        pairs = []
+        for t in self.keyless_tables:
+            if (not isinstance(t, (tuple, list)) or len(t) != 2
+                    or not all(isinstance(x, str) and x and "\x00" not in x for x in t)):
+                raise ValueError("keyless_tables must hold (schema, table) pairs of non-empty names without NUL")
+            pairs.append((t[0], t[1]))
+        object.__setattr__(self, "keyless_tables", tuple(sorted(set(pairs))))
 
 
 def build_properties(s: EngineSettings, start_position=None, engine_id=""):
@@ -194,6 +204,7 @@ def build_properties(s: EngineSettings, start_position=None, engine_id=""):
         "cdc_v2.ack.max.pending": str(s.ack_max_pending),
         "cdc_v2.stop.timeout.ms": str(s.stop_timeout_ms),
         "cdc_v2.stat.interval.ms": str(s.stat_interval_ms),
+        "cdc_v2.keyless.tables": encode_table_names(s.keyless_tables),
     }
     if s.sslrootcert:
         p["database.sslrootcert"] = s.sslrootcert
@@ -204,6 +215,24 @@ def build_properties(s: EngineSettings, start_position=None, engine_id=""):
     for k, v in s.extra:
         p[str(k)] = str(v)
     return p
+
+
+def encode_table_names(pairs) -> str:
+    """(schema, table) pairs as one property value: every name followed by NUL, the one character that no Postgres
+    name can hold, so that names with dots, commas, quotes or upper-case letters travel exactly. Empty: no table."""
+    return "".join(name + "\x00" for pair in pairs for name in pair)
+
+
+def decode_table_names(text: str) -> tuple:
+    """The inverse of `encode_table_names` (the JVM does the same in Settings.from)."""
+    if text == "":
+        return ()
+    if not text.endswith("\x00"):
+        raise ValueError("table names must end with NUL")
+    names = text[:-1].split("\x00")
+    if len(names) % 2 or not all(names):
+        raise ValueError("table names must come in non-empty (schema, table) pairs")
+    return tuple((names[i], names[i + 1]) for i in range(0, len(names), 2))
 
 
 def jvm_command(artifacts, s: EngineSettings):

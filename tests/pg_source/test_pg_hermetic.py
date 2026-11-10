@@ -356,3 +356,97 @@ def test_slot_facts_holder_and_invalid():
     from dataclasses import replace
     assert replace(f, wal_status="lost").invalid and replace(f, invalidation_reason="rows_removed").invalid
     assert replace(f, conflicting=True).invalid and replace(f, active_pid=None).holder is None
+
+
+# ----------------------------------------------------------------------------------------------- rule K (package K)
+
+PKS = ("none", "immediate", "deferrable")
+IDENTITIES = ("default", "index on the key", "other index", "full", "nothing")
+
+#: (primary key, replica identity) -> (has a key by rule K, the start of the refusal or None)
+RULE_K = {
+    ("none", "default"): (False, "no primary key"), ("none", "index on the key"): (False, "no primary key"),
+    ("none", "other index"): (False, "no primary key"), ("none", "full"): (False, None),
+    ("none", "nothing"): (False, "no primary key"),
+    ("immediate", "default"): (True, None), ("immediate", "index on the key"): (True, None),
+    ("immediate", "other index"): (False, "replica identity index is not the primary key"),
+    ("immediate", "full"): (True, None), ("immediate", "nothing"): (False, "replica identity NOTHING"),
+    # a deferrable index cannot be the identity (Postgres refuses it, test_pg_keys); the rule is total anyway
+    ("deferrable", "default"): (False, "primary key is deferrable"),
+    ("deferrable", "index on the key"): (False, "primary key is deferrable"),
+    ("deferrable", "other index"): (False, "primary key is deferrable"),
+    ("deferrable", "full"): (False, None), ("deferrable", "nothing"): (False, "primary key is deferrable"),
+}
+
+
+def _replident(identity):
+    return {"index on the key": "index", "other index": "index"}.get(identity, identity)
+
+
+def source_table(pk, identity):
+    """A SourceTable as catalog.tables builds it for one (primary key, replica identity) combination."""
+    replident = _replident(identity)
+    index_is_pk = identity == "index on the key" and pk != "none"
+    keyed = catalog.has_key(pk != "none", pk == "deferrable", replident, index_is_pk)
+
+    def col(n, a):
+        return catalog.Column(attnum=a, name=n, type_oid=23, typmod=-1, type_name="integer",
+                              type=catalog.TypeInfo(oid=23, schema="pg_catalog", name="int4", kind="base", typlen=4),
+                              ndims=0, not_null=True, has_default=False, generated="", identity="", storage="plain",
+                              toastable=False)
+
+    ka = (1,) if keyed else ()
+    return catalog.SourceTable(
+        oid=1, schema="s", name="t", relfilenode=10, relkind="ordinary", is_partition=False, partition_root=None,
+        persistence="permanent", rls_enabled=False, rls_forced=False, rls_applies_to_reader=False,
+        columns=(col("id", 1), col("u", 2)), max_attnum=2, key=("id",) if ka else (), key_attnums=ka,
+        key_source="primary key" if ka else None, has_primary_key=pk != "none", replica_identity=replident,
+        replica_identity_index={"index on the key": "t_pkey", "other index": "t_u"}.get(identity),
+        replica_identity_index_is_key=index_is_pk, published=False, publication_columns=None,
+        publication_row_filter=None, primary_key_deferrable=pk == "deferrable")
+
+
+def facts(pk, identity):
+    from dataclasses import replace
+    return replace(tf(1, "t", BASE, pk=() if pk == "none" else (1,), replident=_replident(identity)),
+                   replica_identity_index_is_key=identity == "index on the key" and pk != "none",
+                   replica_identity_index_attnums={"index on the key": (1,), "other index": (2,)}.get(identity),
+                   pk_deferrable=pk == "deferrable")
+
+
+@pytest.mark.parametrize("pk", PKS)
+@pytest.mark.parametrize("identity", IDENTITIES)
+def test_rule_k_and_identity_problem_over_every_combination(pk, identity):
+    keyed, refusal = RULE_K[(pk, identity)]
+    replident = _replident(identity)
+    index_is_pk = identity == "index on the key" and pk != "none"
+    assert catalog.has_key(pk != "none", pk == "deferrable", replident, index_is_pk) is keyed
+    problem = catalog.identity_problem(pk != "none", replident, index_is_pk, pk_deferrable=pk == "deferrable")
+    t, f = source_table(pk, identity), facts(pk, identity)
+    for value in (problem, t.replica_identity_problem, f.replica_identity_problem):
+        assert (value is None) if refusal is None else value.startswith(refusal), value
+    if pk == "deferrable" and refusal:
+        assert problem == "primary key is deferrable: needs REPLICA IDENTITY FULL (replica identity is %s)" % replident
+    assert t.has_key is keyed and f.has_key is keyed
+    assert f.key_attnums == ((1,) if keyed else ())             # TableFacts follows the rule
+    assert f.identity[2] == f.key_attnums
+    if not keyed:                    # a table without a key: no key columns and no key source
+        assert t.key == () and t.key_attnums == () and t.key_source is None
+    assert publication.check([t]) == ({} if refusal is None else {("s", "t"): problem})
+
+
+def test_shape_hash_and_diff_see_a_key_that_becomes_deferrable():
+    from dataclasses import replace
+    imm, dfr = source_table("immediate", "full"), source_table("deferrable", "full")
+    assert imm.has_key and not dfr.has_key
+    assert imm.shape_hash() != dfr.shape_hash()
+    # also when a value claims the same key columns: deferrability alone changes the shape
+    same_cols = replace(dfr, key=("id",), key_attnums=(1,), key_source="primary key")
+    assert same_cols.shape_hash() != imm.shape_hash()
+    assert replace(imm, relfilenode=99).shape_hash() == imm.shape_hash()
+    assert source_table("none", "full").shape_hash() != dfr.shape_hash()
+    for old, new in ((imm, dfr), (facts("immediate", "full"), facts("deferrable", "full"))):
+        ch = catalog.diff([old], [new]).changed[0]
+        assert ch.key_changed and not ch.columns_changed and ch.replica_identity_changed is None
+        assert catalog.diff([new], [old]).changed[0].key_changed
+    assert catalog.diff([dfr], [replace(dfr)]).empty
