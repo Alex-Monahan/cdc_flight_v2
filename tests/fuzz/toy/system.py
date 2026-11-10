@@ -193,7 +193,7 @@ class ToySystem(PgSystem):
         if "features" in self.options:
             return Features(**self.options["features"])
         return Features(truncate=True, transfers=True, parent_child=True, ledger=True, large_marked=True,
-                        large_rollback=True, large_txn=True)
+                        large_rollback=True, large_txn=True, keyless_toast=True, deferrable_key=True)
 
     def supports(self, kind):
         if kind in UNSUPPORTED_FEATURES or kind in UNSUPPORTED_FAULTS:

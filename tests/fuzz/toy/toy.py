@@ -50,7 +50,7 @@ from cdc_v2.testing import frames as FE
 from cdc_v2.testing import pipefaults
 
 VARIANTS = ("correct", "ack_early", "position_apart", "split", "reorder", "no_fence", "skip_on_reconnect",
-            "swallow", "trust_frames")
+            "swallow", "trust_frames", "keyless_toast_null", "deferrable_by_key")
 
 # name -> (description, once, variants that reach it (None = all))
 POINTS = {
@@ -412,6 +412,8 @@ class Toy:
         self.events_path = cfg.get("events")
         self.spill_dir = cfg.get("spill_dir")
         self._spill_waiting = False
+        self.quarantined = set()
+        self.invariant_errors = {}
 
     # ------------------------------------------------------------------ observability
     def event(self, kind: str, **fields):
@@ -468,7 +470,8 @@ class Toy:
                         "CREATE TABLE IF NOT EXISTS _cdc.toy_fence (k INTEGER, epoch BIGINT, n BIGINT)",
                         "CREATE SEQUENCE IF NOT EXISTS _cdc.toy_log_seq",
                         "CREATE TABLE IF NOT EXISTS _cdc.toy_log (n BIGINT, epoch BIGINT, run_id VARCHAR, "
-                        "commit_lsn UBIGINT, xid BIGINT, kind VARCHAR)"]:
+                        "commit_lsn UBIGINT, xid BIGINT, kind VARCHAR)",
+                        "CREATE TABLE IF NOT EXISTS _cdc.toy_quarantine (tbl VARCHAR, quarantined_at TIMESTAMP, epoch BIGINT)"]:
                 con.execute(sql)
             if con.execute("SELECT count(*) FROM _cdc.stream_state").fetchone()[0] == 0:
                 con.execute("INSERT INTO _cdc.stream_state VALUES (?, 0, true)", [self.slot])
@@ -644,8 +647,9 @@ class Toy:
                 raise RuntimeError("source table %s not found" % t)
             key = self.sq("SELECT a.attname FROM pg_index i JOIN pg_class c ON c.oid = i.indrelid "
                           "JOIN pg_namespace ns ON ns.oid = c.relnamespace JOIN pg_attribute a ON a.attrelid = c.oid "
-                          "AND a.attnum = ANY(i.indkey) WHERE i.indisprimary AND ns.nspname = %s AND c.relname = %s",
-                          (s, n))
+                          "AND a.attnum = ANY(i.indkey) WHERE i.indisprimary AND ns.nspname = %s AND c.relname = %s"
+                          + ("" if self.variant == "deferrable_by_key" else " AND i.indimmediate"), (s, n))
+            # rule K (core design 6): a deferrable key is not a key; the variant deferrable_by_key applies it by key
             names = [c for c, _ in cols]
             meta[t] = {"columns": [(c, typ) for c, typ in cols], "types": [dd_type(typ) for _, typ in cols],
                        "key": sorted(names.index(k) for (k,) in key)}
@@ -775,6 +779,10 @@ class Toy:
         a = [row["a%d" % i] for i in range(n)]
         op = row["op"]
         if not m["key"]:
+            if op == "u" and self.variant != "keyless_toast_null":
+                for i in range(n):                 # an unchanged (TOASTed) value: the old image of FULL holds it
+                    if row.get("u%d" % i):
+                        a[i] = row["b%d" % i]
             if op in ("d", "u"):
                 b = [row["b%d" % i] for i in range(n)]
                 where, params = self._where(m, range(n), b)
@@ -841,7 +849,7 @@ class Toy:
                 applied_here = 0
                 skipped = set()
                 for t, row in txn["items"]:
-                    if t not in self.meta or t in skipped:
+                    if t not in self.meta or t in skipped or t in self.quarantined:
                         continue
                     try:
                         if conflict == (idx, t):
@@ -850,7 +858,10 @@ class Toy:
                             self.dx(con, "DELETE FROM %s" % qt(t))
                         else:
                             self.apply_row(con, t, row)
-                    except ToyConflict:
+                    except ApplyInvariantError as e:
+                        e.table = t
+                        raise
+                    except (ToyConflict, FaultInjected, duckdb.Error):
                         if self.variant != "swallow":
                             raise
                         skipped.add(t)                              # the bug: the error is ignored
@@ -1003,8 +1014,27 @@ class Toy:
             if self.advance(end):
                 crash_point("toyrep.slot_advanced")
 
+    def quarantine(self, table):
+        """A table that fails to apply max_table_attempts times leaves the stream (contract C10): recorded in a fenced
+        transaction, with an event (the alert); the stream goes on without it."""
+        con = self.dconnect()
+        try:
+            con.execute("BEGIN")
+            self.dx(con, "INSERT INTO _cdc.toy_quarantine VALUES (?, now()::TIMESTAMP, ?)", [table, self.epoch])
+            self.fence(con)
+            self.commit(con)
+        finally:
+            con.close()
+        self.quarantined.add(table)
+        self.event("quarantined", table=table)
+
     def run(self):
         self.ensure_schema()
+        con = self.dconnect()
+        try:
+            self.quarantined = {r[0] for r in con.execute("SELECT tbl FROM _cdc.toy_quarantine").fetchall()}
+        finally:
+            con.close()
         self.guard()
         if self.spill_dir:
             os.makedirs(self.spill_dir, exist_ok=True)
@@ -1026,8 +1056,21 @@ class Toy:
                 self.event("source_error", error=type(e).__name__)
                 time.sleep(backoff)
                 backoff = min(1.0, backoff * 2)
-            except (ToyConflict, FaultInjected, DestBusy, duckdb.Error, ApplyInvariantError, RuntimeError,
-                    OSError) as e:
+            except ApplyInvariantError as e:
+                self.event("retry", error="ApplyInvariantError", detail=str(e)[:100])
+                self.invariant_errors[getattr(e, "table", None)] = self.invariant_errors.get(
+                    getattr(e, "table", None), 0) + 1
+                if getattr(e, "table", None) and self.invariant_errors[e.table] >= int(
+                        self.cfg.get("max_table_attempts", 3)):
+                    try:
+                        self.quarantine(e.table)
+                    except (FenceLost, SystemExit):
+                        raise
+                    except Exception:                      # noqa: BLE001 - tried again with the next error
+                        pass
+                time.sleep(backoff)
+                backoff = min(1.0, backoff * 2)
+            except (ToyConflict, FaultInjected, DestBusy, duckdb.Error, RuntimeError, OSError) as e:
                 self.event("retry", error=type(e).__name__, detail=str(e)[:100])
                 time.sleep(backoff)
                 backoff = min(1.0, backoff * 2)

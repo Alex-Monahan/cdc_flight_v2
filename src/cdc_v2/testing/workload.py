@@ -56,6 +56,9 @@ class Features:
     ledger: bool = False             # sum(w_debit.amount) = sum(w_credit.amount): entries booked on both sides
     large_marked: bool = False       # a large insert into w_bulk plus its marker row in w_bulk_mark, one transaction
     large_rollback: bool = False     # the same large insert, rolled back (it must never be visible)
+    keyless_toast: bool = False      # w_nkt: no key, REPLICA IDENTITY FULL, a TOASTed column left unchanged by updates
+    deferrable_key: bool = False     # w_dk: deferrable primary key + FULL (rule K: a table without a key); key swaps
+                                     # in one statement, a duplicate key that lives until the old row is deleted
 
     @classmethod
     def only(cls, **on) -> "Features":
@@ -136,6 +139,8 @@ class Model:
     parents: dict = field(default_factory=dict)        # writer -> {parent id: list of child ids}
     entries: dict = field(default_factory=dict)        # writer -> {entry id: (debit ids, credit ids)}
     batches: dict = field(default_factory=dict)        # writer -> {batch id: (first index, rows)}
+    nkt: dict = field(default_factory=dict)            # writer -> set of tags of w_nkt rows
+    dk: dict = field(default_factory=dict)             # writer -> {id: v} of w_dk rows
     ddl_seq: int = 0
 
 
@@ -215,7 +220,17 @@ class Workload:
         if f.large_marked or f.large_rollback:
             s.append("CREATE TABLE %s (id bigint PRIMARY KEY, batch bigint NOT NULL, v integer)" % self.q("w_bulk"))
             s.append("CREATE TABLE %s (batch bigint PRIMARY KEY, n integer NOT NULL)" % self.q("w_bulk_mark"))
+        if f.keyless_toast:
+            s.append("CREATE TABLE %s (w integer NOT NULL, tag bigint NOT NULL, n integer NOT NULL, big text NOT NULL)"
+                     % self.q("w_nkt"))
+            s.append("ALTER TABLE %s REPLICA IDENTITY FULL" % self.q("w_nkt"))
+        if f.deferrable_key:
+            s.append("CREATE TABLE %s (id bigint PRIMARY KEY DEFERRABLE INITIALLY DEFERRED, w integer NOT NULL, "
+                     "v text NOT NULL)" % self.q("w_dk"))
+            s.append("ALTER TABLE %s REPLICA IDENTITY FULL" % self.q("w_dk"))
         for w in range(self.cfg.writers):
+            self.model.nkt[w] = set()
+            self.model.dk[w] = {}
             self.model.next_key[w] = 0
             self.model.keyless[w] = Counter()
             self.model.toast[w] = set()
@@ -233,6 +248,8 @@ class Workload:
         out += ["w_parent", "w_child"] if f.parent_child else []
         out += ["w_debit", "w_credit"] if f.ledger else []
         out += ["w_bulk", "w_bulk_mark"] if f.large_marked or f.large_rollback else []
+        out += ["w_nkt"] if f.keyless_toast else []
+        out += ["w_dk"] if f.deferrable_key else []
         return ["%s.%s" % (self.cfg.schema, t) for t in out]
 
     # ---------------------------------------------------------------- value generation
@@ -481,6 +498,46 @@ class Workload:
             B, W, w + 1, b, first, first + n - 1),
             "INSERT INTO %s (batch, n) VALUES (%d, %d)" % (M, b, n)]
 
+    def _op_nkt(self, r, w, st) -> list:
+        """A table without a key and with a TOASTed column: updates that leave the large value unchanged."""
+        tags = st.setdefault("nkt", set(self.model.nkt[w]))
+        q = self.q("w_nkt")
+        if not tags or r.random() < 0.3:
+            t = self._new_key(w)
+            tags.add(t)
+            self.stats["nkt_insert"] += 1
+            return ["INSERT INTO %s (w, tag, n, big) VALUES (%d, %d, 0, (SELECT string_agg(md5(%s || g::text), '') "
+                    "FROM generate_series(1, %d) AS g))" % (q, w, t, lit("nkt/%d/%d" % (self.cfg.seed, t)),
+                                                             max(1, self.cfg.toast_bytes // 32))]
+        t = r.choice(sorted(tags))
+        one = "ctid = (SELECT ctid FROM %s WHERE w = %d AND tag = %d LIMIT 1)" % (q, w, t)
+        if r.random() < 0.15:
+            tags.discard(t)
+            self.stats["nkt_delete"] += 1
+            return ["DELETE FROM %s WHERE %s" % (q, one)]
+        self.stats["nkt_unchanged_update"] += 1
+        return ["UPDATE %s SET n = n + 1 WHERE %s" % (q, one)]
+
+    def _op_dk(self, r, w, st) -> list:
+        """A deferrable key with FULL: swaps of two keys in one statement, and a duplicate key inserted and the old
+        row deleted before the commit (tests/pg_source/test_pg_keys.py shows both)."""
+        rows = st.setdefault("dk", dict(self.model.dk[w]))
+        q = self.q("w_dk")
+        kind = r.choice(["insert", "swap", "swap", "dup"]) if len(rows) >= 2 else "insert"
+        self.stats["dk_" + kind] += 1
+        if kind == "insert":
+            k = self._new_key(w)
+            rows[k] = "v%d" % self._new_key(w)
+            return ["INSERT INTO %s (id, w, v) VALUES (%d, %d, %s)" % (q, k, w, lit(rows[k]))]
+        a, b = r.sample(sorted(rows), 2)
+        if kind == "swap":
+            rows[a], rows[b] = rows[b], rows[a]
+            return ["UPDATE %s SET id = CASE id WHEN %d THEN %d ELSE %d END WHERE id IN (%d, %d)" % (q, a, b, a, a, b)]
+        old, new = rows[a], "v%d" % self._new_key(w)
+        rows[a] = new
+        return ["INSERT INTO %s (id, w, v) VALUES (%d, %d, %s)" % (q, a, w, lit(new)),
+                "DELETE FROM %s WHERE id = %d AND v = %s" % (q, a, lit(old))]
+
     # ---------------------------------------------------------------- transactions
 
     def _row_ops(self, r, w, st, n: int, table: Optional[str] = None) -> list:
@@ -514,7 +571,7 @@ class Workload:
             self.model.keyless[w] = st["keyless"]
         if "toast" in st:
             self.model.toast[w] = st["toast"]
-        for name in ("parents", "entries", "batches"):
+        for name in ("parents", "entries", "batches", "nkt", "dk"):
             if name in st:
                 getattr(self.model, name)[w] = st[name]
 
@@ -534,6 +591,10 @@ class Workload:
             shapes += ["family", "family"]
         if f.ledger:
             shapes += ["ledger", "ledger"]
+        if f.keyless_toast:
+            shapes += ["nkt", "nkt"]
+        if f.deferrable_key:
+            shapes += ["dk", "dk"]
         bulk = [k for k, on in (("large_marked", f.large_marked), ("large_rollback", f.large_rollback)) if on]
         if not shapes and not bulk:
             return None
@@ -577,6 +638,10 @@ class Workload:
             body = self._op_family(r, w, st)
         elif shape == "ledger":
             body = self._op_ledger(r, w, st)
+        elif shape == "nkt":
+            body = self._op_nkt(r, w, st)
+        elif shape == "dk":
+            body = self._op_dk(r, w, st)
         elif shape == "large_marked":
             body = self._op_bulk(r, w, st, rollback=False)
         elif shape == "large_rollback":
