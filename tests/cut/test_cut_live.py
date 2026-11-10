@@ -4,7 +4,7 @@
 
 They use the cut worker's private cluster through tools/localpg: home ``~/.cache/cdc_flight_v2/pg-cut``, ports
 55600-55607 (the environment variables CDC_V2_CUT_PG_HOME and CDC_V2_CUT_PG_PORT_BASE change that).  The cluster is
-started if needed and stopped again if these tests started it.  The whole module takes about two minutes; the
+started if needed and stopped again if these tests started it.  The whole module takes about one minute; the
 stress run itself 15 seconds.
 """
 
