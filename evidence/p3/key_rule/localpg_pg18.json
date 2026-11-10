@@ -1,0 +1,649 @@
+{
+  "command": "uv run pytest -m localpg tests/pg_source, with the environment variables CDC_V2_P_EVIDENCE set to 1, CDC_V2_P_EVIDENCE_DIR set to key_rule and CDC_V2_P_EVIDENCE_NAME set to this file name",
+  "machine_note": "shared 10-core laptop, up to three other workers running; indications only",
+  "major": 18,
+  "psycopg": "3.3.8",
+  "results": {
+    "bracket": {
+      "primary": {
+        "ddl": 300,
+        "observations": 131,
+        "observe_p50_s": 0.0041,
+        "violations_lower": 0,
+        "violations_upper": 0,
+        "wrong_bracket_observations": 131,
+        "wrong_bracket_violations_caught": 245
+      },
+      "primary_commit_waiting": {
+        "after_release": {
+          "lower": "0/305F908",
+          "table_visible": true,
+          "visible_xid": true
+        },
+        "commit_record_end": "0/305F908",
+        "observation_lower": "0/305F908",
+        "observation_upper": "0/305F908",
+        "table_visible": false,
+        "visible_xid": false
+      },
+      "standby": {
+        "ddl": 400,
+        "observations": 162,
+        "observe_p50_s": 0.0058,
+        "violations_lower": 0,
+        "violations_upper": 0,
+        "wrong_bracket_observations": 162,
+        "wrong_bracket_violations_caught": 298
+      }
+    },
+    "deadlines": {
+      "statement_cancel_s": 0.516
+    },
+    "errors": {
+      "recovery_conflict": {
+        "after_s": 30.5,
+        "class": "RecoveryConflict",
+        "max_standby_streaming_delay_ms": 30000,
+        "sqlstate": "40001"
+      }
+    },
+    "heartbeat": {
+      "cost": {
+        "note": "insert-position difference on an otherwise idle primary, divided by the writes; includes each transaction's commit record",
+        "rows_after_writes_two_slots": 2,
+        "table_bytes": 24576,
+        "updates_and_hot_updates": [
+          0,
+          0
+        ],
+        "wal_bytes_per_write_upper_bound": 234.2,
+        "writes": 200
+      },
+      "decoded": {
+        "beats": 4,
+        "commit_in_bracket": true,
+        "recognised_by_marker_and_xid": true,
+        "standby_lag": {
+          "bytes_behind": 136,
+          "replay_lag_s_visible_to_runtime": false,
+          "seconds_since_replayed_commit": 0.019529
+        }
+      },
+      "own_end_equals_position": {
+        "beats": 4,
+        "equal": 4
+      }
+    },
+    "invalidation": {
+      "idle_timeout_pg18": {
+        "primary_slot": {
+          "invalidation_reason": "idle_timeout",
+          "wal_status": "lost"
+        },
+        "standby_slot": {
+          "invalidation_reason": "idle_timeout",
+          "note": "a standby slot is invalidated at a restartpoint",
+          "wal_status": "lost"
+        }
+      },
+      "max_slot_wal_keep_size": {
+        "after": {
+          "conflicting": false,
+          "invalidation_reason": "wal_removed",
+          "restart_lsn": null,
+          "safe_wal_size": null,
+          "wal_status": "lost"
+        },
+        "before": {
+          "conflicting": false,
+          "invalidation_reason": null,
+          "safe_wal_size": 67108864,
+          "wal_status": "reserved"
+        }
+      }
+    },
+    "keepalive": {
+      "socket_options_macos": {
+        "SO_KEEPALIVE": true,
+        "TCP_KEEPALIVE": 30,
+        "TCP_KEEPCNT": 6,
+        "TCP_KEEPINTVL": 10
+      }
+    },
+    "keys": {
+      "catalog_follows_rule_k": {
+        "def_default": {
+          "has_key": false,
+          "has_primary_key": true,
+          "key_attnums": [],
+          "key_source": null,
+          "primary_key_deferrable": true,
+          "problem": "primary key is deferrable: needs REPLICA IDENTITY FULL (replica identity is default)",
+          "replica_identity": "default",
+          "replica_identity_index": null
+        },
+        "def_deferred_full": {
+          "has_key": false,
+          "has_primary_key": true,
+          "key_attnums": [],
+          "key_source": null,
+          "primary_key_deferrable": true,
+          "problem": null,
+          "replica_identity": "full",
+          "replica_identity_index": null
+        },
+        "def_nothing": {
+          "has_key": false,
+          "has_primary_key": true,
+          "key_attnums": [],
+          "key_source": null,
+          "primary_key_deferrable": true,
+          "problem": "primary key is deferrable: needs REPLICA IDENTITY FULL (replica identity is nothing)",
+          "replica_identity": "nothing",
+          "replica_identity_index": null
+        },
+        "def_other": {
+          "has_key": false,
+          "has_primary_key": true,
+          "key_attnums": [],
+          "key_source": null,
+          "primary_key_deferrable": true,
+          "problem": "primary key is deferrable: needs REPLICA IDENTITY FULL (replica identity is index)",
+          "replica_identity": "index",
+          "replica_identity_index": "def_other_v_key"
+        },
+        "imm": {
+          "has_key": true,
+          "has_primary_key": true,
+          "key_attnums": [
+            1
+          ],
+          "key_source": "primary key",
+          "primary_key_deferrable": false,
+          "problem": null,
+          "replica_identity": "default",
+          "replica_identity_index": null
+        },
+        "imm_full": {
+          "has_key": true,
+          "has_primary_key": true,
+          "key_attnums": [
+            1
+          ],
+          "key_source": "primary key",
+          "primary_key_deferrable": false,
+          "problem": null,
+          "replica_identity": "full",
+          "replica_identity_index": null
+        },
+        "imm_idx": {
+          "has_key": true,
+          "has_primary_key": true,
+          "key_attnums": [
+            1
+          ],
+          "key_source": "primary key",
+          "primary_key_deferrable": false,
+          "problem": null,
+          "replica_identity": "index",
+          "replica_identity_index": "imm_idx_pkey"
+        },
+        "imm_nothing": {
+          "has_key": false,
+          "has_primary_key": true,
+          "key_attnums": [],
+          "key_source": null,
+          "primary_key_deferrable": false,
+          "problem": "replica identity NOTHING: needs DEFAULT or FULL",
+          "replica_identity": "nothing",
+          "replica_identity_index": null
+        },
+        "imm_other": {
+          "has_key": false,
+          "has_primary_key": true,
+          "key_attnums": [],
+          "key_source": null,
+          "primary_key_deferrable": false,
+          "problem": "replica identity index is not the primary key: needs DEFAULT or FULL",
+          "replica_identity": "index",
+          "replica_identity_index": "imm_other_v_key"
+        },
+        "nopk_default": {
+          "has_key": false,
+          "has_primary_key": false,
+          "key_attnums": [],
+          "key_source": null,
+          "primary_key_deferrable": false,
+          "problem": "no primary key: needs REPLICA IDENTITY FULL (replica identity is default)",
+          "replica_identity": "default",
+          "replica_identity_index": null
+        },
+        "nopk_duc_full": {
+          "has_key": false,
+          "has_primary_key": false,
+          "key_attnums": [],
+          "key_source": null,
+          "primary_key_deferrable": false,
+          "problem": null,
+          "replica_identity": "full",
+          "replica_identity_index": null
+        },
+        "nopk_full": {
+          "has_key": false,
+          "has_primary_key": false,
+          "key_attnums": [],
+          "key_source": null,
+          "primary_key_deferrable": false,
+          "problem": null,
+          "replica_identity": "full",
+          "replica_identity_index": null
+        },
+        "nopk_ri_idx": {
+          "has_key": false,
+          "has_primary_key": false,
+          "key_attnums": [],
+          "key_source": null,
+          "primary_key_deferrable": false,
+          "problem": "no primary key: needs REPLICA IDENTITY FULL (replica identity is index)",
+          "replica_identity": "index",
+          "replica_identity_index": "nopk_ri_idx_u"
+        },
+        "nopk_uix_full": {
+          "has_key": false,
+          "has_primary_key": false,
+          "key_attnums": [],
+          "key_source": null,
+          "primary_key_deferrable": false,
+          "problem": null,
+          "replica_identity": "full",
+          "replica_identity_index": null
+        }
+      },
+      "deferrable_key_set_full_then_publish": {
+        "added_after_set_full": true,
+        "refused_before_set_full": [
+          "primary key is deferrable: needs REPLICA IDENTITY FULL (replica identity is default)"
+        ],
+        "source_swap_update_and_delete_after": "worked"
+      },
+      "how_a_primary_key_becomes_deferrable": {
+        "alter_constraint_deferrable": [
+          "42809",
+          "constraint \"k_pkey\" of relation \"k\" is not a foreign key constraint"
+        ],
+        "alter_constraint_not_deferrable": [
+          "42809",
+          "constraint \"k_pkey\" of relation \"k\" is not a foreign key constraint"
+        ],
+        "back_to_immediate_using_index": {
+          "has_key": true,
+          "shape_hash_equals_the_start": true,
+          "source_update": "worked"
+        },
+        "drop_and_add_deferrable": {
+          "diff_key_changed": true,
+          "diff_rewritten": false,
+          "has_key": false,
+          "key_attnums": [],
+          "new_index_oid": true,
+          "primary_key_deferrable": true,
+          "problem": "primary key is deferrable: needs REPLICA IDENTITY FULL (replica identity is default)",
+          "same_table_oid_and_relfilenode": true,
+          "shape_hash_changed": true,
+          "source_update_while_published_with_default_identity": [
+            "55000",
+            "cannot update table \"k\" because it does not have a replica identity and publishes updates"
+          ]
+        },
+        "start": {
+          "has_key": true,
+          "key_attnums": [
+            1
+          ]
+        },
+        "using_index_deferrable": {
+          "has_key": false,
+          "primary_key_deferrable": true
+        }
+      },
+      "what_postgres_lets_a_key_be": {
+        "catalog": {
+          "def_def": {
+            "identity_index": false,
+            "immediate": false,
+            "replident": "d"
+          },
+          "def_full": {
+            "identity_index": false,
+            "immediate": false,
+            "replident": "f"
+          },
+          "def_imm": {
+            "identity_index": false,
+            "immediate": false,
+            "replident": "d"
+          },
+          "def_uni": {
+            "identity_index": false,
+            "immediate": false,
+            "replident": "d"
+          },
+          "imm": {
+            "identity_index": true,
+            "immediate": true,
+            "replident": "d"
+          },
+          "imm_full": {
+            "identity_index": false,
+            "immediate": true,
+            "replident": "f"
+          }
+        },
+        "deferrable_key_full_identity_direct_swap_decoded": [
+          [
+            [
+              "O",
+              [
+                "1",
+                "a"
+              ]
+            ],
+            [
+              "N",
+              [
+                "2",
+                "a"
+              ]
+            ]
+          ],
+          [
+            [
+              "O",
+              [
+                "2",
+                "b"
+              ]
+            ],
+            [
+              "N",
+              [
+                "1",
+                "b"
+              ]
+            ]
+          ]
+        ],
+        "identity_using_a_deferrable_index": [
+          "0A000",
+          "cannot use non-immediate index \"def_uni_id\" as replica identity"
+        ],
+        "immediate_key_swap_and_shift_in_one_statement": {
+          "imm": [
+            [
+              "23505",
+              "duplicate key value violates unique constraint \"imm_pkey\""
+            ],
+            [
+              "23505",
+              "duplicate key value violates unique constraint \"imm_pkey\""
+            ]
+          ],
+          "imm_full": [
+            [
+              "23505",
+              "duplicate key value violates unique constraint \"imm_full_pkey\""
+            ],
+            [
+              "23505",
+              "duplicate key value violates unique constraint \"imm_full_pkey\""
+            ]
+          ]
+        },
+        "largest_number_of_holders_of_one_key_in_the_decoded_stream": {
+          "def_full": 2,
+          "imm": 1,
+          "imm_full": 1
+        },
+        "published_deferrable_key_default_identity": [
+          [
+            "55000",
+            "cannot update table \"def_imm\" because it does not have a replica identity and publishes updates"
+          ],
+          [
+            "55000",
+            "cannot delete from table \"def_def\" because it does not have a replica identity and publishes deletes"
+          ]
+        ]
+      }
+    },
+    "observe_cost": {
+      "1000_tables_30_columns": {
+        "primary": {
+          "observe_max_s": 0.0937,
+          "observe_p50_s": 0.0749,
+          "tables": 1000,
+          "tables_full_read_s": 0.131
+        },
+        "replica": {
+          "observe_max_s": 0.0975,
+          "observe_p50_s": 0.0767,
+          "tables": 1000,
+          "tables_full_read_s": 0.104
+        }
+      }
+    },
+    "preflight": {
+      "runtime_role_pg18": {
+        "primary": {
+          "checkpoint_next_xid": 30210,
+          "pg_control_checkpoint_callable": true,
+          "problems": []
+        },
+        "replica": {
+          "checkpoint_next_xid": 30210,
+          "pg_control_checkpoint_callable": true,
+          "problems": []
+        }
+      }
+    },
+    "proxy": {
+      "blackhole_connect_deadline_1.5_s": 2.01,
+      "blackhole_idle_in_transaction": {
+        "client_deadline_1.0_s": 1.516,
+        "server_session_gone_after_s": 2.097
+      },
+      "blackhole_statement_deadline_1.0_s": 1.508,
+      "delay_0.2_each_way_statement_s": 0.405,
+      "refused_connect_s": 0.002,
+      "reset_noticed_s": 0.0
+    },
+    "publication": {
+      "add_under_writers": {
+        "all_of_them_decoded": true,
+        "before_next_xid": 426,
+        "before_next_xid_decoded": 0,
+        "committed_writer_transactions": 864,
+        "open_across_change_note": "-1 was written before the ALTER PUBLICATION, -2 after; both were decoded",
+        "open_across_change_rows_decoded": [
+          "-1",
+          "-2"
+        ],
+        "with_xid_ge_next_xid": 438
+      }
+    },
+    "session_settings": {
+      "pinned_against_role_and_database": {
+        "overridden_at_role_and_database": [
+          "DateStyle",
+          "IntervalStyle",
+          "TimeZone",
+          "bytea_output",
+          "default_transaction_isolation",
+          "extra_float_digits",
+          "lc_monetary",
+          "lock_timeout",
+          "row_security",
+          "search_path",
+          "statement_timeout"
+        ],
+        "result": "every fixed setting held, on the primary and the standby, on SQL and replication connections"
+      }
+    },
+    "slot_create": {
+      "idle_primary_no_nudge": {
+        "deadline_s": 4,
+        "inconclusive_attempts": [],
+        "report": {
+          "creator_terminated": false,
+          "leftover": false,
+          "nudge_errors": [],
+          "nudge_method": null,
+          "nudges": 0,
+          "waited_s": 4.0
+        },
+        "returned_after_s": 4.02
+      },
+      "killed_client": {
+        "ours": {
+          "creation_was_waiting_at_kill": true,
+          "slot_exists_afterwards": false
+        },
+        "plain_negative_control": {
+          "creation_was_waiting_at_kill": true,
+          "slot_exists_afterwards": true
+        }
+      },
+      "long_transaction": {
+        "after_commit_s": 10.67,
+        "timed_out_report": {
+          "creator_terminated": false,
+          "leftover": false,
+          "next_xid": 32331,
+          "nudge_errors": [],
+          "nudge_method": "write",
+          "nudges": 10,
+          "oldest_prepared_at": null,
+          "oldest_running_xid": 32331,
+          "prepared_transactions": 0,
+          "waited_s": 6.0
+        }
+      },
+      "prepared_transaction": {
+        "after_commit_prepared_s": 8.16,
+        "timed_out_report": {
+          "creator_terminated": false,
+          "leftover": false,
+          "next_xid": 759,
+          "nudge_errors": [],
+          "nudge_method": "write",
+          "nudges": 10,
+          "oldest_prepared_at": "2026-11-10T12:58:56.747858+00:00",
+          "oldest_running_xid": 759,
+          "prepared_transactions": 1,
+          "waited_s": 6.01
+        }
+      },
+      "standby_snapshot_granted_after_idle_s": 0.04,
+      "standby_write_nudge_after_idle_s": 3.85
+    },
+    "slot_facts": {
+      "advance_seen": {
+        "confirmed_flush_moved_bytes": 13136,
+        "timeline_source_standby": "checkpoint"
+      },
+      "holder_visible_to_runtime_primary": {
+        "application_name": "pg_recvlogical",
+        "backend_start_precision": "microseconds",
+        "backend_type": "walsender",
+        "inactive_since_after_detach": true,
+        "pg_read_all_stats": false
+      },
+      "holder_visible_to_runtime_replica": {
+        "application_name": "pg_recvlogical",
+        "backend_start_precision": "microseconds",
+        "backend_type": "walsender",
+        "inactive_since_after_detach": true,
+        "pg_read_all_stats": false
+      }
+    },
+    "slot_identity": {
+      "drop_and_recreate": {
+        "catalog_xmin": {
+          "differs": true,
+          "original": 32370,
+          "recreated": 32372
+        },
+        "confirmed_flush_lsn": {
+          "differs": true,
+          "original": 567346272,
+          "recreated": 567346456
+        },
+        "inactive_since": {
+          "differs": true,
+          "original": "2026-11-10T12:57:23.777679+00:00",
+          "recreated": "2026-11-10T12:57:25.740276+00:00"
+        },
+        "restart_lsn": {
+          "differs": true,
+          "original": 567320968,
+          "recreated": 567346272
+        },
+        "safe_wal_size": {
+          "differs": false,
+          "original": null,
+          "recreated": null
+        },
+        "stats_reset": {
+          "differs": false,
+          "original": null,
+          "recreated": null
+        },
+        "total_bytes": {
+          "differs": true,
+          "original": 6700,
+          "recreated": 0
+        },
+        "total_txns": {
+          "differs": true,
+          "original": 1,
+          "recreated": 0
+        },
+        "two_phase_at": {
+          "differs": false,
+          "original": null,
+          "recreated": null
+        },
+        "wal_status": {
+          "differs": false,
+          "original": "reserved",
+          "recreated": "reserved"
+        }
+      }
+    },
+    "terminate_holder": {
+      "races": {
+        "holder_exits_itself": "nothing terminated",
+        "other_session_takes_slot": "not terminated by the stale read; terminated in the next round only without expect"
+      }
+    },
+    "timeline": {
+      "promotion": {
+        "before": "0/302ECD8",
+        "contains": {
+          "before": true,
+          "new": true,
+          "old_after": false
+        },
+        "new_timeline": "0/30309E0",
+        "old_timeline_after_switch": "0/3030DF0",
+        "runtime_role_over_replication_connection": true,
+        "switch": "0/302ECD8"
+      }
+    }
+  },
+  "server_versions": {
+    "pg-p": "PostgreSQL 18.6 (Homebrew) on aarch64-apple-darwin25.6.0, compiled by Apple clang version 21.0.0 (clang-2100.3.34.2), 64-bit",
+    "pg-p2": "PostgreSQL 18.6 (Homebrew) on aarch64-apple-darwin25.6.0, compiled by Apple clang version 21.0.0 (clang-2100.3.34.2), 64-bit"
+  },
+  "what": "package P (source) tests on a private tools/localpg pair; times in seconds"
+}

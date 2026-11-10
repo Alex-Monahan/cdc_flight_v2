@@ -1,0 +1,1509 @@
+{
+  "cases": {
+    "dpk": "deferrable primary key",
+    "duc": "no primary key, deferrable unique constraint",
+    "none": "no primary key, no unique index (control)",
+    "uix": "no primary key, unique index on a NOT NULL column",
+    "uixn": "no primary key, unique index on a nullable column"
+  },
+  "largest_number_of_rows_with_one_key_in_the_replayed_stream_with_the_list": {
+    "dpk": 2,
+    "duc": 1,
+    "none": 1,
+    "uix": 1,
+    "uixn": 1
+  },
+  "negative_control": "assert_without_a_key on the stream read without the list raised AssertionError (has_key=True) for dpk, uix, uixn and duc",
+  "operations": [
+    [
+      "dpk",
+      "insert"
+    ],
+    [
+      "dpk",
+      "update of a non-key column"
+    ],
+    [
+      "dpk",
+      "update of the key column"
+    ],
+    [
+      "dpk",
+      "delete"
+    ],
+    [
+      "uix",
+      "insert"
+    ],
+    [
+      "uix",
+      "update of a non-key column"
+    ],
+    [
+      "uix",
+      "update of the key column"
+    ],
+    [
+      "uix",
+      "delete"
+    ],
+    [
+      "uixn",
+      "insert"
+    ],
+    [
+      "uixn",
+      "update of a non-key column"
+    ],
+    [
+      "uixn",
+      "update of the key column"
+    ],
+    [
+      "uixn",
+      "delete"
+    ],
+    [
+      "duc",
+      "insert"
+    ],
+    [
+      "duc",
+      "update of a non-key column"
+    ],
+    [
+      "duc",
+      "update of the key column"
+    ],
+    [
+      "duc",
+      "delete"
+    ],
+    [
+      "none",
+      "insert"
+    ],
+    [
+      "none",
+      "update of a non-key column"
+    ],
+    [
+      "none",
+      "update of the key column"
+    ],
+    [
+      "none",
+      "delete"
+    ],
+    [
+      "dpk",
+      "rows for the swap"
+    ],
+    [
+      "dpk",
+      "direct swap"
+    ],
+    [
+      "dpk",
+      "insert a duplicate, then delete the old row"
+    ],
+    [
+      "uixn",
+      "two rows with a NULL key"
+    ],
+    [
+      "uixn",
+      "delete one of them"
+    ],
+    [
+      "m",
+      "marker"
+    ]
+  ],
+  "replica_identity": "full for every case",
+  "source_rows_at_the_end": {
+    "dpk": [
+      [
+        10,
+        "a",
+        11
+      ],
+      [
+        1,
+        "q",
+        2
+      ],
+      [
+        2,
+        "dup",
+        0
+      ]
+    ],
+    "duc": [
+      [
+        10,
+        "a",
+        11
+      ]
+    ],
+    "none": [
+      [
+        10,
+        "a",
+        11
+      ]
+    ],
+    "uix": [
+      [
+        10,
+        "a",
+        11
+      ]
+    ],
+    "uixn": [
+      [
+        10,
+        "a",
+        11
+      ],
+      [
+        null,
+        "n",
+        0
+      ]
+    ]
+  },
+  "test": "tests/engine/test_engine_keys.py::test_what_debezium_calls_a_key_and_the_list",
+  "with_list": {
+    "dpk": {
+      "has_key": false,
+      "key_flags": [
+        false,
+        false,
+        false
+      ],
+      "key_positions": [],
+      "rows": [
+        {
+          "a": [
+            1,
+            "a",
+            1
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            "b",
+            2
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            1,
+            "a",
+            11
+          ],
+          "b": [
+            1,
+            "a",
+            1
+          ],
+          "op": "u",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            null,
+            null,
+            null
+          ],
+          "b": [
+            1,
+            "a",
+            11
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            10,
+            "a",
+            11
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            null,
+            null,
+            null
+          ],
+          "b": [
+            2,
+            "b",
+            2
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            1,
+            "p",
+            1
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            "q",
+            2
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            null,
+            null,
+            null
+          ],
+          "b": [
+            1,
+            "p",
+            1
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            "p",
+            1
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            null,
+            null,
+            null
+          ],
+          "b": [
+            2,
+            "q",
+            2
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            1,
+            "q",
+            2
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            "dup",
+            0
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            null,
+            null,
+            null
+          ],
+          "b": [
+            2,
+            "p",
+            1
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        }
+      ]
+    },
+    "duc": {
+      "has_key": false,
+      "key_flags": [
+        false,
+        false,
+        false
+      ],
+      "key_positions": [],
+      "rows": [
+        {
+          "a": [
+            1,
+            "a",
+            1
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            "b",
+            2
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            1,
+            "a",
+            11
+          ],
+          "b": [
+            1,
+            "a",
+            1
+          ],
+          "op": "u",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            null,
+            null,
+            null
+          ],
+          "b": [
+            1,
+            "a",
+            11
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            10,
+            "a",
+            11
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            null,
+            null,
+            null
+          ],
+          "b": [
+            2,
+            "b",
+            2
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        }
+      ]
+    },
+    "none": {
+      "has_key": false,
+      "key_flags": [
+        false,
+        false,
+        false
+      ],
+      "key_positions": [],
+      "rows": [
+        {
+          "a": [
+            1,
+            "a",
+            1
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            "b",
+            2
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            1,
+            "a",
+            11
+          ],
+          "b": [
+            1,
+            "a",
+            1
+          ],
+          "op": "u",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            10,
+            "a",
+            11
+          ],
+          "b": [
+            1,
+            "a",
+            11
+          ],
+          "op": "u",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            null,
+            null,
+            null
+          ],
+          "b": [
+            2,
+            "b",
+            2
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        }
+      ]
+    },
+    "uix": {
+      "has_key": false,
+      "key_flags": [
+        false,
+        false,
+        false
+      ],
+      "key_positions": [],
+      "rows": [
+        {
+          "a": [
+            1,
+            "a",
+            1
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            "b",
+            2
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            1,
+            "a",
+            11
+          ],
+          "b": [
+            1,
+            "a",
+            1
+          ],
+          "op": "u",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            null,
+            null,
+            null
+          ],
+          "b": [
+            1,
+            "a",
+            11
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            10,
+            "a",
+            11
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            null,
+            null,
+            null
+          ],
+          "b": [
+            2,
+            "b",
+            2
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        }
+      ]
+    },
+    "uixn": {
+      "has_key": false,
+      "key_flags": [
+        false,
+        false,
+        false
+      ],
+      "key_positions": [],
+      "rows": [
+        {
+          "a": [
+            1,
+            "a",
+            1
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            "b",
+            2
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            1,
+            "a",
+            11
+          ],
+          "b": [
+            1,
+            "a",
+            1
+          ],
+          "op": "u",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            null,
+            null,
+            null
+          ],
+          "b": [
+            1,
+            "a",
+            11
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            10,
+            "a",
+            11
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            null,
+            null,
+            null
+          ],
+          "b": [
+            2,
+            "b",
+            2
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            null,
+            "n",
+            0
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            null,
+            "n",
+            0
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            null,
+            null,
+            null
+          ],
+          "b": [
+            null,
+            "n",
+            0
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        }
+      ]
+    }
+  },
+  "without_list": {
+    "dpk": {
+      "has_key": true,
+      "key_flags": [
+        true,
+        false,
+        false
+      ],
+      "key_positions": [
+        0
+      ],
+      "rows": [
+        {
+          "a": [
+            1,
+            "a",
+            1
+          ],
+          "k": [
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            "b",
+            2
+          ],
+          "k": [
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            1,
+            "a",
+            11
+          ],
+          "k": [
+            null
+          ],
+          "op": "u",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            1,
+            null,
+            null
+          ],
+          "k": [
+            null
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            10,
+            "a",
+            11
+          ],
+          "k": [
+            1
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            null,
+            null
+          ],
+          "k": [
+            null
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            1,
+            "p",
+            1
+          ],
+          "k": [
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            "q",
+            2
+          ],
+          "k": [
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            1,
+            null,
+            null
+          ],
+          "k": [
+            null
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            "p",
+            1
+          ],
+          "k": [
+            1
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            null,
+            null
+          ],
+          "k": [
+            null
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            1,
+            "q",
+            2
+          ],
+          "k": [
+            2
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            "dup",
+            0
+          ],
+          "k": [
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            null,
+            null
+          ],
+          "k": [
+            null
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        }
+      ]
+    },
+    "duc": {
+      "has_key": true,
+      "key_flags": [
+        true,
+        false,
+        false
+      ],
+      "key_positions": [
+        0
+      ],
+      "rows": [
+        {
+          "a": [
+            1,
+            "a",
+            1
+          ],
+          "k": [
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            "b",
+            2
+          ],
+          "k": [
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            1,
+            "a",
+            11
+          ],
+          "k": [
+            null
+          ],
+          "op": "u",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            1,
+            null,
+            null
+          ],
+          "k": [
+            null
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            10,
+            "a",
+            11
+          ],
+          "k": [
+            1
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            null,
+            null
+          ],
+          "k": [
+            null
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        }
+      ]
+    },
+    "none": {
+      "has_key": false,
+      "key_flags": [
+        false,
+        false,
+        false
+      ],
+      "key_positions": [],
+      "rows": [
+        {
+          "a": [
+            1,
+            "a",
+            1
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            "b",
+            2
+          ],
+          "b": [
+            null,
+            null,
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            1,
+            "a",
+            11
+          ],
+          "b": [
+            1,
+            "a",
+            1
+          ],
+          "op": "u",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            10,
+            "a",
+            11
+          ],
+          "b": [
+            1,
+            "a",
+            11
+          ],
+          "op": "u",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            null,
+            null,
+            null
+          ],
+          "b": [
+            2,
+            "b",
+            2
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        }
+      ]
+    },
+    "uix": {
+      "has_key": true,
+      "key_flags": [
+        true,
+        false,
+        false
+      ],
+      "key_positions": [
+        0
+      ],
+      "rows": [
+        {
+          "a": [
+            1,
+            "a",
+            1
+          ],
+          "k": [
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            "b",
+            2
+          ],
+          "k": [
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            1,
+            "a",
+            11
+          ],
+          "k": [
+            null
+          ],
+          "op": "u",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            1,
+            null,
+            null
+          ],
+          "k": [
+            null
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            10,
+            "a",
+            11
+          ],
+          "k": [
+            1
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            null,
+            null
+          ],
+          "k": [
+            null
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        }
+      ]
+    },
+    "uixn": {
+      "has_key": true,
+      "key_flags": [
+        true,
+        false,
+        false
+      ],
+      "key_positions": [
+        0
+      ],
+      "rows": [
+        {
+          "a": [
+            1,
+            "a",
+            1
+          ],
+          "k": [
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            "b",
+            2
+          ],
+          "k": [
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            1,
+            "a",
+            11
+          ],
+          "k": [
+            null
+          ],
+          "op": "u",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            1,
+            null,
+            null
+          ],
+          "k": [
+            null
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            10,
+            "a",
+            11
+          ],
+          "k": [
+            1
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            2,
+            null,
+            null
+          ],
+          "k": [
+            null
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            null,
+            "n",
+            0
+          ],
+          "k": [
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            null,
+            "n",
+            0
+          ],
+          "k": [
+            null
+          ],
+          "op": "c",
+          "u": [
+            false
+          ]
+        },
+        {
+          "a": [
+            null,
+            null,
+            null
+          ],
+          "k": [
+            null
+          ],
+          "op": "d",
+          "u": [
+            false
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -435,6 +435,27 @@ def test_rule_k_and_identity_problem_over_every_combination(pk, identity):
     assert publication.check([t]) == ({} if refusal is None else {("s", "t"): problem})
 
 
+def test_build_tables_reads_indimmediate():
+    """The row handling of catalog.tables: pg_index.indimmediate of the primary key decides (rule K)."""
+    def table(oid, replident):
+        return (oid, "s", "t%d" % oid, oid * 10, "r", False, "p", False, False, False, replident, None, 2)
+    cols = [(oid, a, n, 23, -1, "integer", 0, True, False, "", "", "p") for oid in (1, 2, 3, 4)
+            for a, n in ((1, "id"), (2, "u"))]
+    keys = [(1, 11, True, False, "t1_pkey", [1], True),        # immediate primary key, DEFAULT
+            (2, 21, True, False, "t2_pkey", [1], False),       # deferrable primary key, FULL
+            (3, 31, True, False, "t3_pkey", [1], False),       # deferrable primary key, DEFAULT
+            (4, 41, False, True, "t4_u", [2], True)]           # no primary key, USING INDEX
+    got = {t.oid: t for t in catalog._build_tables([table(1, "d"), table(2, "f"), table(3, "d"), table(4, "i")],
+                                                   cols, keys, [], {}, {})}
+    assert (got[1].has_key, got[1].key_attnums, got[1].key_source, got[1].primary_key_deferrable) == (
+        True, (1,), "primary key", False)
+    for oid in (2, 3, 4):
+        assert (got[oid].has_key, got[oid].key, got[oid].key_attnums, got[oid].key_source) == (False, (), (), None)
+    assert got[2].primary_key_deferrable and got[2].replica_identity_problem is None
+    assert got[3].replica_identity_problem.startswith("primary key is deferrable")
+    assert got[4].replica_identity_index == "t4_u" and got[4].replica_identity_problem.startswith("no primary key")
+
+
 def test_shape_hash_and_diff_see_a_key_that_becomes_deferrable():
     from dataclasses import replace
     imm, dfr = source_table("immediate", "full"), source_table("deferrable", "full")

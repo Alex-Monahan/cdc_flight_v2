@@ -234,7 +234,8 @@ name and type is a drop of one `attnum` and an add of another, never a rename.
   `DELETE`, SQLSTATE 55000), and with `REPLICA IDENTITY FULL` it is the only table shape whose stream can show two
   rows with one key.
 - **How a key becomes deferrable or immediate on an existing table** (`test_how_a_primary_key_becomes_deferrable`,
-  Postgres 16.6 and 18.6, evidence `evidence/p3/key_rule/source_keys_pg16.json` and `source_keys_pg18.json`).
+  Postgres 16.6 and 18.6, evidence `evidence/p3/key_rule/localpg_pg16.json` and `localpg_pg18.json`, section
+  `keys`).
   `ALTER TABLE … ALTER CONSTRAINT <pkey> [NOT] DEFERRABLE` is refused on both versions (42809, "constraint … is not
   a foreign key constraint"). The only way is to drop the primary key and add a new one, which can be one
   statement: `ALTER TABLE t DROP CONSTRAINT t_pkey, ADD PRIMARY KEY (id) DEFERRABLE`, or `… ADD CONSTRAINT t_pkey
@@ -560,8 +561,8 @@ CDC_V2_P_EVIDENCE=1 CDC_V2_P_EVIDENCE_NAME=replica_identity_keys_pg18.json … t
 ```
 
 Package K (rule K) writes its evidence to `evidence/p3/key_rule/`: the variable `CDC_V2_P_EVIDENCE_DIR` names a
-directory under `evidence/p3` (here `key_rule`), and the file names are `source_keys_pg18.json`,
-`source_keys_pg16.json` (only `test_pg_keys.py`) and `localpg_pg18.json`, `localpg_pg16.json` (the whole suite).
+directory under `evidence/p3` (here `key_rule`); the files are `localpg_pg18.json` and `localpg_pg16.json` (the
+whole suite, run with `CDC_V2_P_EVIDENCE_NAME` set to that name).
 
 The `localpg` suite builds or starts its own pairs through `tools/localpg`, runs ≈ 9–11 minutes per version (the
 recovery-conflict test waits 30 s; slot-creation tests wait for an idle primary, 26 s each), removes every schema,

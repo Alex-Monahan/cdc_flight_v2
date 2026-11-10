@@ -231,7 +231,8 @@ engine which tables are without a key.
   repeats; each name non-empty and without NUL. It travels as the one property `cdc_v2.keyless.tables`: every name
   followed by a NUL character (`encode_table_names`), the one character no Postgres name can hold, so names with
   a dot, a comma, a quote, a space, upper-case or non-ASCII letters arrive exactly (`test_build_properties_writes_
-  the_list_of_tables_without_a_key`). An empty value is an empty list. `extra` cannot set it (every `cdc_v2.` key
+  the_list_of_tables_without_a_key`; through the real JVM, 9 names in `test_a_listed_table_with_an_odd_name`,
+  below). An empty value is an empty list. `extra` cannot set it (every `cdc_v2.` key
   is protected; `test_extra_may_not_override_the_list_of_tables_without_a_key`), and the JVM refuses a malformed
   value with FATAL (`test_java_refuses_a_malformed_list_of_tables_without_a_key`, 6 cases).
 - **A listed table** is a table without a key whatever Debezium's key says: its `SCHEMA` frame has `has_key` 0, no
@@ -240,7 +241,8 @@ engine which tables are without a key.
   Debezium's key decides.
 - **No old image.** An update or delete of a table without a key (listed, or keyless to Debezium) that arrives
   without any old image stops the engine with FATAL `update without an old image in <schema>.<table>, a table
-  without a key (seq n)` (never a value). pgoutput sends no old image for an update that does not change an
+  without a key (seq n)` (never a value; measured for an update; pgoutput always sends at least the identity
+  columns for a delete, so the delete branch is a guard only). pgoutput sends no old image for an update that does not change an
   identity column under `DEFAULT` or `USING INDEX`. An old image that holds only the identity columns (a delete, or
   an update of an identity column, under `USING INDEX` or `DEFAULT`) arrives with NULLs in the other columns and
   cannot be told from real NULLs in the engine; the prevention is `publication.check`, which refuses every table
@@ -278,7 +280,18 @@ it before the engine sees it; event count 2, section 9); a table Debezium alread
 Both shapes carry complete old and new images; the changelog of P4 shows the shape that arrives.
 
 Negative control: the check "a stream without a key, whose replay equals the source" fails on the stream read
-without the list for cases 1–4 (asserted in every run of the test).
+without the list for cases 1–4, at its `has_key` assertion (asserted in every run of the test).
+
+**Names.** `test_a_listed_table_with_an_odd_name` (9 names: a dot, a comma, a double quote inside or at the end,
+upper case with a space, and mixtures such as `Odd.Name, q`): each listed table with a deferrable key arrives as a
+table without a key and replays to the source's rows; not listed, it is keyed. **Stock Debezium 3.7.1 itself
+cannot stream some names, with or without the list** (`test_names_stock_debezium_cannot_stream`,
+`evidence/p3/key_rule/engine_bad_name_*.json`): a table name that starts with a double quote (`"b`) or has a
+double quote after a space (`x "q"`, `Odd.Name, "q"`) stops streaming with FATAL (`IllegalArgumentException` in
+Debezium's change event producer, at every start); a name that is wholly in double quotes (`"q"`) is **silently
+dropped**: its transactions arrive as BEGIN and END with event count 0, no SCHEMA, no rows, so the event-count
+check of section 9 does not see the loss. This is not a defect of the list; it needs a prevention outside the
+engine (open point for the orchestrator: refuse or exclude such names at discovery, before they are published).
 
 ## 5. Acknowledgement
 

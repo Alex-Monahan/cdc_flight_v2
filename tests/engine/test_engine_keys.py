@@ -16,6 +16,14 @@ from stream_helpers import Collector, evidence
 
 pytestmark = [pytest.mark.jvm, pytest.mark.localpg, pytest.mark.timeout(600)]
 
+#: table names that travel exactly through the list and through stock Debezium
+ODD_NAMES = {"dot": "a.b", "comma": "a,b", "quote": 'a"b', "upper case and space": "Mixed Case",
+             "dot and quote": 'a."b', "comma and quote": 'a,"b', "space and quote": 'a "b', "quote at the end": 'a"',
+             "dot comma space upper": "Odd.Name, q"}
+#: table names stock Debezium 3.7.1 cannot stream, with or without the list: (what happens, the name)
+BAD_NAMES = {"quote at the start": ("fatal", '"b'), "space then a quoted part": ("fatal", 'x "q"'),
+             "dot comma space quoted part": ("fatal", 'Odd.Name, "q"'), "quoted whole name": ("dropped", '"q"')}
+
 #: section 3 of docs/tasks/p3_k_key_rule.md: name -> (what it is, DDL)
 CASES = {
     "dpk": ("deferrable primary key",
@@ -152,6 +160,53 @@ def test_a_listed_table_without_an_old_image(pair, scenario, artifacts):
                 "FULL"})
 
 
+def odd_scenario(pair, scenario, artifacts, name):
+    qn = '"%s"' % name.replace('"', '""')
+    sc = scenario("create table {s}.%s (id int primary key deferrable, v text, u int)" % qn,
+                  "alter table {s}.%s replica identity full" % qn)
+    sc.pair_artifacts = artifacts
+    with pair.connect(pair.primary_port) as c:
+        for _what, sql in OPERATIONS:
+            c.execute(sql.format(t="%s.%s" % (sc.schema, qn)))
+    return sc
+
+
+@pytest.mark.parametrize("kind", sorted(ODD_NAMES))
+def test_a_listed_table_with_an_odd_name(pair, scenario, artifacts, kind):
+    """The list carries the exact name through the CONFIG line into the JVM: a listed table with a deferrable key
+    and this name arrives as a table without a key, and its replay gives the source's rows."""
+    name = ODD_NAMES[kind]
+    sc = odd_scenario(pair, scenario, artifacts, name)
+    col = run_engine(sc, lambda c: len(c.rows_of(name)) >= 6, keyless_tables=((sc.schema, name),))
+    assert_without_a_key(col, name, [(10, "a", 11)])
+    unlisted = run_engine(sc, lambda c: len(c.rows_of(name)) >= 6)
+    assert schema_frame(unlisted, name).has_key                       # Debezium's key, without the list
+    evidence("engine_odd_name_%s.json" % kind.replace(" ", "_"), {
+        "test": "tests/engine/test_engine_keys.py::test_a_listed_table_with_an_odd_name[%s]" % kind,
+        "name": name, "listed": "table without a key, replay equals the source", "not listed": "keyed"})
+
+
+@pytest.mark.parametrize("kind", sorted(BAD_NAMES))
+def test_names_stock_debezium_cannot_stream(pair, scenario, artifacts, kind):
+    """Measured, not ours to fix (SPEC R2: stock Debezium): table names with a double quote at the start of the
+    name or of a space-separated part make Debezium's streaming fail (FATAL, IllegalArgumentException); a name
+    that is wholly quoted ('"q"') is silently dropped: its transactions arrive with event count 0."""
+    what, name = BAD_NAMES[kind]
+    sc = odd_scenario(pair, scenario, artifacts, name)
+    if what == "fatal":
+        with pytest.raises(EngineFatal) as e:
+            run_engine(sc, lambda c: False)
+        assert "IllegalArgumentException" in str(e.value)
+        seen = {"fatal": e.value.frame.error_class, "cause": [c for c, _m in e.value.frame.causes]}
+    else:
+        col = run_engine(sc, lambda c: len(c.txns) >= 4)
+        assert [t.end.event_count for t in col.txns[:4]] == [0, 0, 0, 0] and not col.schemas
+        seen = {"transactions": 4, "event_counts": [0, 0, 0, 0], "rows": 0, "schema_frames": 0}
+    evidence("engine_bad_name_%s.json" % kind.replace(" ", "_"), {
+        "test": "tests/engine/test_engine_keys.py::test_names_stock_debezium_cannot_stream[%s]" % kind,
+        "name": name, "outcome": what, **seen})
+
+
 def test_what_debezium_calls_a_key_and_the_list(pair, scenario, artifacts):
     sc = scenario(*[ddl for _what, ddl in CASES.values()],
                   *["alter table {s}.%s replica identity full" % t for t in CASES],
@@ -194,7 +249,7 @@ def test_what_debezium_calls_a_key_and_the_list(pair, scenario, artifacts):
                            ("d", 2, None)], (t, ops)
         assert d["rows"][3]["a"] == [1, None, None], t
         # negative control: the check for a stream without a key fails for these tables when the list is left out
-        with pytest.raises(AssertionError):
+        with pytest.raises(AssertionError, match="has_key=True"):
             assert_without_a_key(without, t, source[t])
     nul = [r for r in out["without_list"]["uixn"]["rows"] if r["a"][1] == "n" or r["a"] == [None] * 3]
     assert [(r["op"], r["a"]) for r in nul] == [("c", [None, "n", 0]), ("c", [None, "n", 0]),
@@ -225,5 +280,7 @@ def test_what_debezium_calls_a_key_and_the_list(pair, scenario, artifacts):
         "operations": [[t, what] for t, what, _sql in statements],
         "source_rows_at_the_end": {t: [list(r) for r in v] for t, v in source.items()},
         "largest_number_of_rows_with_one_key_in_the_replayed_stream_with_the_list": worst,
-        "negative_control": "assert_without_a_key(dpk) on the stream read without the list raised AssertionError",
+        "negative_control": "assert_without_a_key on the stream read without the list raised AssertionError "
+                            "(has_key=True) for dpk, uix, uixn and duc",
+
         **out})
