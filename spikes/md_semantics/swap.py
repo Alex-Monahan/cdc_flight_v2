@@ -198,7 +198,7 @@ def txn_reader_test(ev: Evidence, rounds: int, start_v: int) -> int:
     return start_v + rounds * 6
 
 
-def long_scan_test(ev: Evidence, swaps: int, rows: int, start_v: int) -> None:
+def long_scan_test(ev: Evidence, swaps: int, rows: int, start_v: int, mult: int = 8) -> None:
     """Big version tables; a reader runs a multi-second scan while the writer swaps."""
     con = connect(DB)
     con.execute("DROP TABLE IF EXISTS t_staging")
@@ -214,10 +214,10 @@ def long_scan_test(ev: Evidence, swaps: int, rows: int, start_v: int) -> None:
     while not stop.is_set():
         t0 = time.time()
         try:
-            r = con.execute("SELECT count(*), sum(id), min(ver), max(ver), "
-                            "count(DISTINCT md5(pad || id::VARCHAR || m::VARCHAR)) FROM t, range(8) mm(m)").fetchone()
-            ok = (r[0] == 8 * rows and r[1] == 8 * (rows * (rows - 1) // 2) and r[2] == r[3]
-                  and r[4] == 8 * rows)
+            r = con.execute(f"SELECT count(*), sum(id), min(ver), max(ver), "
+                            f"count(DISTINCT md5(pad || id::VARCHAR || m::VARCHAR)) FROM t, range({mult}) mm(m)").fetchone()
+            ok = (r[0] == mult * rows and r[1] == mult * (rows * (rows - 1) // 2) and r[2] == r[3]
+                  and r[4] == mult * rows)
             k = "consistent" if ok else f"INCONSISTENT {r}"
         except Exception as e:
             k = "error: " + err_class(e)
@@ -314,9 +314,10 @@ def main() -> None:
     ap.add_argument("--variant-swaps", type=int, default=300)
     ap.add_argument("--long-rows", type=int, default=5_000_000)
     ap.add_argument("--long-swaps", type=int, default=15)
+    ap.add_argument("--scan-mult", type=int, default=8, help="each long scan processes rows x this")
     ap.add_argument("--only", default="")
     a = ap.parse_args()
-    ev = Evidence("swap" + ("_" + a.only.replace(",", "_") if a.only else ""))
+    ev = Evidence("swap" + ("_" + a.only.replace(",", "_") if a.only else "") + (f"_x{a.scan_mult}" if a.scan_mult != 8 else ""))
     create_db(DB)
     try:
         v = 10
@@ -332,7 +333,7 @@ def main() -> None:
         if want("txn_reader"):
             v = txn_reader_test(ev, 10, v)
         if want("long_scan"):
-            long_scan_test(ev, a.long_swaps, a.long_rows, v + 1)
+            long_scan_test(ev, a.long_swaps, a.long_rows, v + 1, a.scan_mult)
     finally:
         drop_db(DB)
         ev.log("database dropped")

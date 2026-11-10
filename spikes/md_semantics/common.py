@@ -46,11 +46,38 @@ def evidence_dir() -> Path:
     return p
 
 
+def cgroup_cpus() -> int | None:
+    """CPU quota of the container (a Flight reports 8 CPUs to os.cpu_count() but its cgroup allows 2)."""
+    try:
+        quota, period = Path("/sys/fs/cgroup/cpu.max").read_text().split()
+        if quota != "max":
+            return max(1, int(int(quota) / int(period)))
+    except Exception:
+        pass
+    return None
+
+
 def _config() -> dict:
-    return {
+    cfg = {
         "memory_limit": os.environ.get("CDC_V2_MEMORY_LIMIT", "4GB"),
         "temp_directory": str(tmp_dir() / "duckdb_tmp"),
     }
+    if cgroup_cpus():
+        cfg["threads"] = cgroup_cpus()
+    return cfg
+
+
+def cpu_seconds() -> float:
+    """User + system CPU seconds of this process and its waited-for children."""
+    import resource
+    s, c = resource.getrusage(resource.RUSAGE_SELF), resource.getrusage(resource.RUSAGE_CHILDREN)
+    return s.ru_utime + s.ru_stime + c.ru_utime + c.ru_stime
+
+
+def peak_rss_mb(children: bool = False) -> float:
+    import resource
+    r = resource.getrusage(resource.RUSAGE_CHILDREN if children else resource.RUSAGE_SELF).ru_maxrss
+    return round(r / (1024 * 1024) if sys.platform == "darwin" else r / 1024, 1)
 
 
 def check_name(db: str) -> str:
