@@ -168,3 +168,92 @@ At `run.max_runtime` (default 7 h 30 min) the leader finishes the group in fligh
 `state = 'released'` in a fenced transaction, closes the slot connection and exits 0, timed to finish about 5 s
 before a minute boundary. The next scheduled run takes over by 4.5 without interrupting or cancelling anything.
 `max_runtime_sec` of the Flight is set above `run.max_runtime` as a coarse backstop only.
+
+## 5. Bootstrap (`main.py`)
+
+1. Guard decision (4.4). If the run is not to lead, exit.
+2. Take over (4.5). Start a start-up heartbeat thread that writes `phase = 'starting'` every 10 s, with a start-up
+   deadline (`run.startup_timeout`, default 180 s); past the deadline the bootstrap exits non-zero.
+3. Clone the repository at the pinned commit; fetch and verify the pinned JRE and jars (`src/cdc_v2/artifacts.py`).
+4. Start the pipeline with `start_new_session=True`, passing the epoch and a tick pipe. Stop the start-up
+   heartbeat thread once the pipeline has sent its first tick.
+5. Watch: the bootstrap reads ticks and uses no network and no MotherDuck connection. No tick for 60 s ⇒
+   `SIGKILL` to the pipeline's process group, then `os._exit(1)`. Pipeline exit ⇒ exit with its status.
+
+The run ends when `main.py` exits, and the platform then destroys everything in it; measured, a frozen pipeline's
+run ended 65 s after the freeze. A frozen bootstrap is bounded by the next run's guard (30 s stale heartbeat, then
+take-over and cancel).
+
+## 6. Apply
+
+### 6.1 Staging
+
+The engine sends change records as Arrow record batches, one stream per table. Each row carries:
+
+| Column | Meaning |
+|---|---|
+| `_seq` | order of arrival; commit order, then order inside the transaction |
+| `_commit_lsn` | commit end LSN of the source transaction |
+| `_op` | `c`, `u`, `d` (TRUNCATE and schema changes travel on the control stream, section 6.5) |
+| key columns | key of the row the record addresses; for a key change Debezium sends a delete and a create |
+| value columns | new image |
+| before columns | old image, only for tables without a key (`REPLICA IDENTITY FULL`) |
+| `_unchanged` | list of columns whose value is an unchanged TOAST placeholder |
+
+The pipeline appends the batches to staging tables in MotherDuck, in a schema that is private to the leader epoch
+(`_cdc_stage_<epoch>`; schemas of older epochs are dropped during start-up). Staging appends are committed on
+their own and are not fenced: they are invisible to consumers, and a stale leader can only write into its own
+epoch's schema. The buffer in front of the append has a byte limit; when it is full the pipeline stops reading
+the engine's pipe, which stops the engine's queue and then the slot read (back-pressure, SPEC 5.4).
+
+Whether small groups skip the staging tables and apply straight from the local Arrow data is decided by the
+measurement on a Flight (`docs/spike/md_semantics.md`, apply-transaction part). The statements of 6.2–6.3 are the
+same in both cases; only the name of their input relation differs.
+
+### 6.2 Tables with a key
+
+For one table and one segment, with `net` = the last record per key by `_seq`:
+
+1. `DELETE FROM t USING net WHERE t.key = net.key` for keys whose net record is a delete or a complete image.
+2. `INSERT INTO t SELECT … FROM net` for complete images.
+3. Partial images (some column unchanged) are applied with `UPDATE … FROM net`, never by delete and insert, and
+   never write a column whose value is unchanged. A column that is unchanged in the last record takes the newest
+   changed value from earlier records of the same key in the group, if there is one.
+
+Chains and swaps of key values (SPEC 1.4) need nothing special: the delete and the create of each key change are
+ordinary records, and the last record per key decides. The destination has no keys or indexes, so no intermediate
+state can violate a constraint.
+
+The number of statement shapes per table depends on the table's columns, not on the data (SPEC 2.6).
+
+### 6.3 Tables without a key
+
+Every record carries the full old and new image. For one table and one segment, `delta` = per distinct row image
+the sum of +1 for every new image and −1 for every old image (`GROUP BY` all columns, which treats NULLs as equal).
+
+1. Images with a negative sum: delete exactly `-sum` rows among the identical rows, chosen by `rowid` through
+   `row_number() OVER (PARTITION BY <all columns>)`.
+2. Images with a positive sum: insert `sum` copies.
+
+A delete that finds fewer rows than it must remove is an invariant violation: the transaction is rolled back and
+the table goes to quarantine handling (SPEC 4.0); it is never ignored.
+
+Comparison uses a canonical form for types whose values do not compare equal to themselves in MotherDuck (UNION
+members, NaN): **[test]** decide the canonical form in P3 and use the same one in the oracle.
+
+The stream path and the backfill path must produce identical destination values for identical source values; the
+type fuzzer checks this for every type, because a keyless delete can only find a row that was written the same way.
+
+### 6.4 A transaction larger than a group
+
+Its records are appended to the staging tables in committed chunks while they arrive, so memory and local disk stay
+bounded. At its END record one destination transaction runs the statements of 6.2–6.3 over all of its staged rows,
+writes the position, fences and commits. The applied position does not move, and no later source transaction
+becomes visible, until that commit. Nothing is ever applied from an unfinished source transaction.
+
+### 6.5 Segments
+
+A TRUNCATE (all relations named in the message, so CASCADE needs nothing extra) or a schema change cuts the group
+into segments. Inside the one destination transaction: apply segment 1, execute the truncate or the DDL, apply
+segment 2, and so on, in commit order. DDL in MotherDuck is transactional, so a rolled-back group leaves no
+half-changed schema.
