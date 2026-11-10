@@ -285,7 +285,9 @@ class Load:
 
 class RunConfig:
     def __init__(self, fuzzer="workload", budget_s=60.0, episode_s=10.0, catch_up_s=90.0, pace_s=0.25,
-                 observer_interval_s=0.005, schedule=None, keep_workdir=False, start_timeout_s=120.0, abort=None):
+                 observer_interval_s=0.005, schedule=None, keep_workdir=False, start_timeout_s=120.0, abort=None,
+                 ignore_self_report=False):
+        self.ignore_self_report = ignore_self_report  # do not end a run on the system's own divergence report
         self.abort = abort                     # threading.Event: stop at the next episode, record nothing
         self.fuzzer, self.budget_s, self.episode_s = fuzzer, budget_s, episode_s
         self.catch_up_s, self.pace_s, self.observer_interval_s = catch_up_s, pace_s, observer_interval_s
@@ -335,7 +337,7 @@ class Run:
                 break
             except DeadlineExceeded as e:
                 self._watch(observers_)
-                said = self.system.divergence_reported(since)
+                said = "" if self.cfg.ignore_self_report else self.system.divergence_reported(since)
                 if said:
                     cp["catch_up_s"] = round(time.monotonic() - t, 3)
                     self.checkpoints.append(cp)

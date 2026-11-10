@@ -75,11 +75,14 @@ def test_suite_17_small_on_the_toy(tmp_path):
     lease = pool.acquire(wait_s=60)
     pts = make_system("toy", lease).crash_points()
     lease.release()
-    res = run_suite("toy", tmp_path / "out", REPO, seeds=(1,), soak_s=40, min_soak_faults=5, group_budget_s=16,
-                    workers=1, points=[pts[0], "toyrep.commit_sent", "toyrep.committed"], log=lambda *_: None)
+    res = run_suite("toy", tmp_path / "out", REPO, seeds=(1,), soak_s=40, group_budget_s=16, workers=1,
+                    points=[pts[0], "toyrep.commit_sent", "toyrep.committed"], log=lambda *_: None, smoke=True)
     assert res["parts"]["crash_points"]["all_passed"], res["parts"]["crash_points"]
     assert not res["parts"]["crash_points"]["missing_points"]
-    assert res["all_passed"], json.dumps(res["parts"], default=str)[:2000]
+    groups = {k: v for k, v in res["parts"].items() if k not in ("crash_points", "soak")}
+    assert all(v["passed"] for v in groups.values()), json.dumps(groups, default=str)[:2000]
+    assert res["parts"]["soak"]["outcome"] == "pass"
+    assert res["smoke"] and res["parts"]["soak"]["passed"] is False and res["all_passed"] is False   # never true
 
 
 def test_campaign_killed_cleaned_and_started_again(tmp_path):

@@ -103,16 +103,33 @@ def _scenario_system(system_name, leases, source_node):
     return sysm
 
 
+SPEC_SOAK_S = 3600.0          # SPEC 1.7: a randomized soak of at least 1 h ...
+SPEC_SOAK_FAULTS = 200        # ... with at least 200 faults (that had an effect); never lowered
+SELF_TEST_SOAK_S = 900.0      # the toy may run 15 minutes; its result is labelled a self-test
+SMOKE_SOAK_S = 120.0          # a routine smoke run: its soak never passes
+
+
 def run_suite(system_name: str, out_dir: Path, repo: Path, source_node: str = "replica", seeds=(1, 2, 3),
-              soak_s: float = 900.0, min_soak_faults: int = 200, group_budget_s: float = 30.0, workers: int = 2,
-              points=None, log=print) -> dict:
+              soak_s=None, min_soak_faults: int = SPEC_SOAK_FAULTS, group_budget_s: float = 30.0, workers: int = 2,
+              points=None, log=print, smoke: bool = False) -> dict:
     out_dir = Path(out_dir)
+    if min_soak_faults < SPEC_SOAK_FAULTS and not smoke:
+        raise ValueError("the soak's minimum of %d faults is not lowered" % SPEC_SOAK_FAULTS)
     work = pool.CACHE / "fuzz" / "suite" / time.strftime("%Y%m%dT%H%M%S", time.gmtime())
     work.mkdir(parents=True, exist_ok=True)
     register_root(work, "<run>")
     register_root(repo, "<repo>")
     leases = _Leases(max(1, workers))
-    summary = {"system": system_name, "source_node": source_node, "seeds": list(seeds), "parts": {}}
+    from .run import git_state
+    self_test = bool(make_system(system_name, None, source_node).is_self_test)
+    if soak_s is None:
+        soak_s = SMOKE_SOAK_S if smoke else SELF_TEST_SOAK_S if self_test else SPEC_SOAK_S
+    need_s = soak_s if (self_test or smoke) else SPEC_SOAK_S
+    summary = {"system": system_name, "source_node": source_node, "seeds": list(seeds), "parts": {},
+               **git_state(repo), "self_test": self_test, "smoke": smoke,
+               "label": ("SMOKE RUN: its soak never passes" if smoke else
+                         "SELF-TEST of the fuzzers on the toy (15-minute soak allowed; never counts for SPEC 1.7)"
+                         if self_test else "SPEC 1.7")}
     t0 = time.monotonic()
     try:
         def factory():
@@ -156,10 +173,14 @@ def run_suite(system_name: str, out_dir: Path, repo: Path, source_node: str = "r
         rec = run_once(sysm, 2000, work / "soak", RunConfig(fuzzer="fault", budget_s=soak_s, episode_s=10.0,
                                                             schedule=sch), repo)
         counted = sum(rec["faults"].values())
-        summary["parts"]["soak"] = {"outcome": rec["outcome"], "seconds": rec["duration_s"], "faults": counted,
+        summary["parts"]["soak"] = {"outcome": rec["outcome"], "seconds": rec["duration_s"],
+                                    "faults_with_effect": counted, "faults_without_effect": sum(
+                                        rec["no_effect"].values()),
                                     "per_kind": rec["faults"], "no_effect": rec["no_effect"],
-                                    "minimum_faults": min_soak_faults, "soak_s": soak_s,
-                                    "passed": rec["outcome"] == "pass" and counted >= min_soak_faults,
+                                    "minimum_faults": SPEC_SOAK_FAULTS, "soak_s": soak_s,
+                                    "minimum_seconds": need_s,
+                                    "passed": (not smoke and rec["outcome"] == "pass" and counted >= SPEC_SOAK_FAULTS
+                                               and rec["duration_s"] >= need_s),
                                     "reason": rec["reason"][:300], "not_attacked": sch.not_attacked}
         runs.append(rec)
         log("soak: %s" % json.dumps({k: v for k, v in summary["parts"]["soak"].items() if k != "per_kind"}))

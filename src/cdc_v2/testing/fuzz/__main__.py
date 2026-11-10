@@ -45,23 +45,28 @@ def main(argv=None) -> int:
     r.add_argument("--reduce", action="store_true", help="reduce each failure to a regression test")
     r.add_argument("--option", action="append", help="system option key=value (JSON), e.g. toy.conflict_rate=0")
     r.add_argument("--keep", action="store_true", help="keep the work directory of passing runs")
+    r.add_argument("--ignore-self-report", action="store_true",
+                   help="do not end a run on the system's own divergence report: the oracle decides")
     st = sub.add_parser("status", help="the ledger")
     st.add_argument("--write", action="store_true", help="write evidence/robustness/ledger.json")
     s = sub.add_parser("suite-1.7", help="the suite of SPEC 1.7")
     s.add_argument("--system", default="toy")
     s.add_argument("--source-node", default="replica", choices=("replica", "primary"))
     s.add_argument("--seeds", default="1,2,3")
-    s.add_argument("--soak-minutes", type=float, default=15.0)
-    s.add_argument("--min-soak-faults", type=int, default=200)
+    s.add_argument("--soak-minutes", type=float, default=None,
+                   help="default: 60 for a system that is not a self-test, 15 for the toy, 2 for --smoke")
+    s.add_argument("--smoke", action="store_true", help="a short routine run, labelled smoke; its soak never passes")
     s.add_argument("--workers", type=int, default=2)
     s.add_argument("--out", default=None)
     v = sub.add_parser("variants", help="the wrong variants of the toy and the fuzzer that must find each")
     v.add_argument("--only", help="comma separated variants")
     v.add_argument("--merge", action="store_true", help="replace only these rows of the existing table")
+    v.add_argument("--workers", type=int, default=2)
     v.add_argument("--source-node", default="replica", choices=("replica", "primary"))
     v.add_argument("--out", default=str(REPO / "evidence" / "p3" / "fuzzers" / "variants.json"))
     o = sub.add_parser("stream-offline", help="the stream fuzzer against the engine's reader, offline")
-    o.add_argument("--cases", type=int, default=100_000)
+    o.add_argument("--cases", type=int, default=20_000,
+                   help="20,000 for a routine self-test; 100,000 when the frame format or the decoder changes")
     o.add_argument("--seed", type=int, default=None, help="first case seed (default: after the ledger's)")
     o.add_argument("--negative-controls", action="store_true")
     o.add_argument("--out", default=None, help="also write the summary to this evidence file")
@@ -78,7 +83,7 @@ def main(argv=None) -> int:
         c = Campaign(a.fuzzer, a.system, a.source_node, seeds=parse_seeds(a.seeds) if a.seeds else None,
                      hours=a.hours, workers=a.workers, budget_s=a.budget, rounds=a.rounds, options=_opts(a.option),
                      reduce_failures=a.reduce, keep_workdir=a.keep, ledger_root=root,
-                     kinds=a.kinds.split(",") if a.kinds else None)
+                     kinds=a.kinds.split(",") if a.kinds else None, ignore_self_report=a.ignore_self_report)
         if a.seeds is None and a.hours is None:
             c.seeds = None
             c.hours = None
@@ -97,13 +102,17 @@ def main(argv=None) -> int:
         from .suite17 import run_suite
         out = Path(a.out) if a.out else REPO / "evidence" / "p3" / "fuzzers" / ("suite-1.7-" + a.system.replace(
             ":", "-") + "-" + a.source_node)
-        res = run_suite(a.system, out, REPO, a.source_node, parse_seeds(a.seeds), soak_s=a.soak_minutes * 60,
-                        min_soak_faults=a.min_soak_faults, workers=min(2, a.workers))
+        if a.smoke and not a.out:
+            out = out.parent / (out.name + "-smoke")
+        res = run_suite(a.system, out, REPO, a.source_node, parse_seeds(a.seeds),
+                        soak_s=a.soak_minutes * 60 if a.soak_minutes else None, workers=min(2, a.workers),
+                        smoke=a.smoke)
         print(json.dumps({"all_passed": res["all_passed"], "seconds": res["seconds"]}))
         return 0 if res["all_passed"] else 1
     if a.cmd == "variants":
         from .variants import run_variants
-        res = run_variants(a.only.split(",") if a.only else None, a.source_node, a.out, merge=a.merge)
+        res = run_variants(a.only.split(",") if a.only else None, a.source_node, a.out, merge=a.merge,
+                           workers=min(2, a.workers), ledger_root=root)
         print(json.dumps({"all_found": res["all_found"], "correct_toy_passed": res["correct_toy_passed"]}))
         return 0 if res["all_found"] and res["correct_toy_passed"] else 1
     if a.cmd == "stream-offline":
