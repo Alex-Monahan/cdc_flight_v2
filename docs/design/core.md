@@ -232,8 +232,12 @@ For one table and one segment, with `net` = the last record per key by `_seq`:
    never write a column whose value is unchanged. A column that is unchanged in the last record takes the newest
    changed value from earlier records of the same key in the group, if there is one.
 
-Chains and swaps of key values (SPEC 1.4) need nothing special: the delete and the create of each key change are
-ordinary records, and the last record per key decides. The destination has no keys or indexes, so no intermediate
+Chains and swaps of key values (SPEC 1.4): the delete and the create of each key change are ordinary records, and
+the last record per key decides. One case needs more. The create of a key change can be a partial image; its
+unchanged values belong to the row that had the old key. The engine therefore copies the old key onto the create
+record (Debezium links the two records with the headers `__debezium.oldkey` and `__debezium.newkey` **[test]**),
+and the applier resolves a chain of key changes inside a group back to the key the row had before the group, and
+takes the unchanged values from that row before it deletes it. The destination has no keys or indexes, so no intermediate
 state can violate a constraint.
 
 The number of statement shapes per table depends on the table's columns, not on the data (SPEC 2.6).
@@ -282,9 +286,19 @@ re-backfill and a resumed backfill (SPEC 3.3). The stream never stops for it.
    that commit on, the table's changes are not applied to the visible table; they are appended to the table's
    **pending log** in the same group transaction that moves the position. Consumers keep the old version.
 2. **Read.** The backfill lane reads chunks from the source into the **new table** (same schema as the target, a
-   reserved name, so that the swap can be a rename). Each chunk is one fenced transaction in lane `backfill` that
-   also records the chunk as done (crash point `backfill.chunk_committed`). Chunks are `ctid` ranges, read by
-   parallel readers; R3: Debezium takes no snapshot.
+   reserved name, so that the swap can be a rename). Chunks are `ctid` ranges, read with `COPY` by parallel
+   readers (2 on F16); R3: Debezium takes no snapshot. A load transaction covers one or more chunks; it is fenced
+   in lane `backfill` and records its chunks as done in the same transaction (crash point
+   `backfill.chunk_committed`). Rules for the source side, from `docs/spike/local_throughput.md` section 8:
+   - every chunk is read in its own short transaction, far shorter than `max_standby_streaming_delay`. A long
+     read transaction on a standby is cancelled by any `ACCESS EXCLUSIVE` lock taken on the primary (also by a
+     vacuum that truncates the table's tail) and stalls replay, and with it the stream, until then;
+   - a snapshot that several chunks share is held by an **exporter** connection that never touches the table (it
+     holds no relation lock); readers import it with `SET TRANSACTION SNAPSHOT`;
+   - a snapshot is kept for at most `backfill.snapshot_max_age` (60 s), because it holds back cleanup on the
+     primary through `hot_standby_feedback`. After that, or when it is lost, the table continues under a new
+     snapshot (7.3). A resume is the same step;
+   - a chunk that fails with a recovery conflict (SQLSTATE 40001) is read again.
 3. **Catch up.** The backfill lane applies pending changes to the new table in rounds (statements of section 6),
    recording `caught_up_lsn` each time, until the rest is small.
 4. **Swap.** A stream-lane group applies the rest of the pending log, drops the old table, renames the new one,
@@ -322,11 +336,27 @@ readers with their own snapshots: mixed states).
 ### 7.3 Tables with a key
 
 Chunks may be read under different snapshots, which is what makes a resumed backfill possible without reading
-completed chunks again (SPEC 3.7). The pending log is replayed from `replay_from` = `R0` of the table's first
-snapshot; `unknown` counts as `outside`. Replaying a change that a chunk already contains is harmless, because
-every replayed change rewrites or removes the whole row by key, in commit order. A row that moved between `ctid`
-ranges between two snapshots is either read twice or not at all; in both cases the change that moved it is in the
-replayed log and leaves exactly one correct row. Catch-up starts only after all chunks are loaded.
+completed chunks again (SPEC 3.7). The pending log is replayed from `replay_from` = the smallest `R0` of the
+table's snapshots; `unknown` counts as `outside`. Catch-up starts only after all chunks are loaded.
+
+A row can move between `ctid` ranges between two snapshots, but only through an `UPDATE`, and that change is in
+the replayed log. So after loading, for a key that does not occur in the log the new table holds exactly one
+correct row, and for a key that occurs in the log it may hold **no row, one row or several versions**. Catch-up
+therefore treats the keys of the log like this, before the statements of 6.2 run:
+
+1. Several versions of a key are reduced to one; which one does not matter, because every column that differs
+   between them was changed by a record in the log, and the log supplies that value.
+2. If the last record of a key is a partial image (unchanged TOAST values) and a column is still unresolved after
+   looking at the earlier records of the key in the log, the value is taken from the row in the new table. If the
+   new table has no row for the key, the key goes to a **repair read**: one statement per round reads the missing
+   rows by key from the source under a new snapshot (`WHERE key = ANY(…)`; no temporary table, the standby is
+   read-only), and they are loaded like a chunk. This is a backfill read, not a re-read of an unchanged value in
+   the stream (SPEC 2.6); it counts towards the row bound of SPEC 3.7.
+3. Then every key of the log ends as exactly one row, or none after a delete.
+
+The swap waits until the stream position has passed the upper bound of every snapshot the table used, repair
+reads included: the stream has applied a transaction whose commit ends after that snapshot's `R1` (7.2). Until
+then the new table may hold values that are newer than the stream position; consumers never see it in that state.
 
 Rows also move without any change record when the table is rewritten (`VACUUM FULL`, `CLUSTER`, a rewriting
 `ALTER TABLE`, `TRUNCATE`). Every chunk therefore reads `pg_relation_filenode` under its own snapshot; if it
@@ -418,3 +448,6 @@ src/cdc_v2/oracle/          source/destination comparison used by every test tie
 | 6 | Identity of a recreated slot; reading the timeline history (8) | P3, stage 2 for PlanetScale |
 | 7 | Publication join rule (7.5) | P4 discovery work |
 | 8 | Guard over the Postgres endpoint; hand-over that starts the new leader before the old one stops | after P6, if the numbers ask for it |
+| 9 | Key change with unchanged TOAST values: old key on the create record, chains resolved (6.2) | P3 (1.4) and P4 (2.6) tests |
+| 10 | Several versions and missing rows after loading under several snapshots; repair read (7.3) | P3 handoff tests, workload fuzzer with TOAST values |
+| 11 | A schema change of a table during its own backfill | P4 schema wave; first rule: the table's backfill starts again |
