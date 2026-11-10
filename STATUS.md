@@ -1,6 +1,6 @@
 # Build status
 
-Last updated: 2026-11-09, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` (read §9), this file and `git log`.
+Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` (read §9), this file and `git log`.
 
 ## Where the build stands
 
@@ -27,7 +27,7 @@ Last updated: 2026-11-09, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 | 4 Flight SQL functions, platform facts | done | `docs/spike/flight_platform.md` |
 | 3 MotherDuck semantics | laptop part done and merged; the network-bound measurements are being repeated inside an F16 Flight | `docs/spike/md_semantics.md` |
 | 1 JVM and stock Debezium on a Flight | running | `docs/spike/jvm_on_flight.md` |
-| 2 Run semantics | running | `docs/spike/run_semantics.md` |
+| 2 Run semantics | done | `docs/spike/run_semantics.md` |
 | 5 Local throughput (first indication) | part 1 (read rate from the replica) running; part 2 (stock Debezium streaming rate) waits for the JVM program of spike 1 | `docs/spike/local_throughput.md` |
 | `docs/spike_report.md` and the architecture decision record | after the spikes | — |
 
@@ -55,6 +55,14 @@ Last updated: 2026-11-09, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 - MotherDuck plan and region: measured in P2 — Business plan, us-east-1, maximum run time 8 h
   (`docs/spike/flight_platform.md`). No longer open.
 - Stage 2 values of PLAN §8 (PlanetScale service token, branch, hosts, admin role, TLS mode).
+- **Billing of short runs.** MotherDuck documents no billing granularity or minimum charge per run. The cost of
+  the every-minute schedule above assumes per-second billing; with a minimum of one minute per run it would be
+  $14.40 a day. The owner accepted the cost of the short runs in advance (R18); the number needs an invoice or a
+  word from MotherDuck to be confirmed.
+- **Replacement time of a dead leader (SPEC 4.2: "within 90 s plus start-up").** Measured worst case: 30 s until
+  the heartbeat is stale, up to 60 s to the next scheduled minute, then 4–8 s until the newcomer's guard has decided
+  — about 98 s. The criterion holds if "start-up" includes the newcomer's own guard decision; that reading is used
+  unless the owner says otherwise.
 - **Latency and very large transactions (research finding F-3).** Stock Debezium speaks only version 1 of the
   `pgoutput` protocol, which sends a transaction after its commit, in one piece. Everything committed after a
   10M-row transaction therefore waits until that transaction is applied (at the target rate: 100 s or more). SPEC 5.2
@@ -94,7 +102,6 @@ Each in its own worktree and branch (Opus, high effort); the orchestrator merges
 |---|---|---|---|
 | Spike worker: MotherDuck semantics, second part — the same measurements inside an F16 Flight (`cdc_v2_spike_md*`) | P2 (§2 A 3) | 2026-11-09 | `flights/spike_md/`, additions to `docs/spike/md_semantics.md`, `evidence/p2/md_semantics/flight_*` |
 | Spike worker: JVM and stock Debezium on a Flight | P2 (§2 A 1) | 2026-11-09 | `flights/spike_jvm/`, `docs/spike/jvm_on_flight.md`, `evidence/p2/jvm_on_flight/` |
-| Spike worker: run semantics | P2 (§2 A 2) | 2026-11-09 | `flights/spike_runs/`, `docs/spike/run_semantics.md`, `evidence/p2/run_semantics/` |
 | Spike worker: local read throughput (private cluster, home `pg-spike-tp`, ports 55500–55509; MotherDuck database `cdc_v2_spike_tp`) | P2 (§2 A 5, part 1) | 2026-11-09 | `spikes/local_throughput/`, `docs/spike/local_throughput.md`, `evidence/p2/local_throughput/` |
 
 Not started yet: part 2 of the local throughput spike (stock Debezium streaming rate for small transactions and for
@@ -102,6 +109,14 @@ one 10M-row transaction). It reuses the JVM program of the JVM spike and the pri
 
 Finished and merged:
 
+- 2026-11-10 — Run semantics (§2 A 2): `flights/spike_runs/`, `tools/spike/run_semantics_*.py`,
+  `docs/spike/run_semantics.md`, `evidence/p2/run_semantics/`. All 12 spike Flights and both spike databases deleted.
+  What it settles: every scheduled minute starts a run whatever is active (no skip, no queue); a run can cancel
+  another run from inside; nothing is retried; every platform stop kills without a signal; a cancelled run can still
+  commit for about 2.5 s (fencing is mandatory); an out-of-memory kill of any child ends the whole run; the bootstrap
+  hard-exit ends a frozen run 65 s after the freeze; a dead leader is replaced at most about 98 s after its death;
+  the every-minute schedule costs about $1.46 a day with a guard that installs `duckdb`, $0.73 with a guard that
+  reads the leader record through MotherDuck's Postgres endpoint (per-second billing assumed; not documented).
 - 2026-11-09 — MotherDuck semantics, laptop part (§2 A 3): `spikes/md_semantics/`, `docs/spike/md_semantics.md`,
   `evidence/p2/md_semantics/`. Design consequences (binding for P3 unless the Flight run changes them): heartbeat
   time comes from `uuid_extract_timestamp(uuidv7())` because `now()` is computed by the client; destination tables
