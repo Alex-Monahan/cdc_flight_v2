@@ -1,0 +1,21 @@
+$ tools/cutstress run --label v1_big_drop --seconds 120 --writers big,drop,plain,long --takers-own 2 --takers-exported 0 --out evidence/p3/cut/v1_big_drop.json
+load average before: 7.97 6.83 7.41
+   30s cuts=26447 transactions=41197 violations=0 waiting=356
+   60s cuts=51969 transactions=81049 violations=0 waiting=392
+   90s cuts=76748 transactions=118046 violations=0 waiting=416
+v1_big_drop: OK
+  Postgres 18.6 (Homebrew), 122 s, writers big,drop,plain,long, disturbances none, slot on replica
+  cuts checked 104047 (not checked 0), transactions delivered 157457
+  violations of the sound rules: none
+  stream out of E order: 0
+  wrong rules caught (cuts): stmt_as_r0=508, r1_inside=508, r1_outside=8210, naive_sharp=11, xmax_inside=46307, xmin_outside=92906
+  unknown set (transactions per cut)   empty     mean   max
+    base                                 0.00%    1.344   202
+    xid                                 72.57%    0.447   200
+    sharp                               75.31%    0.429   201
+    xid+sharp                           76.64%    0.404   200
+    really_visible                      76.03%    0.417   201
+  cuts_with_r0_below_received: 0
+  cuts_that_miss_a_received_transaction: 0
+  cuts_with_r0_eq_r1: 73005
+  cuts taken the own way: 104047, of them quiet (xmin = xmax): 10806 (10.4%), with a violation: 0
