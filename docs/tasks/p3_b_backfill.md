@@ -69,6 +69,33 @@ or contract C7 says elsewhere, these points and that document hold.
 - On a source of Postgres 17 or later the backfill reads `infinity` and `-infinity` in interval columns as they
   are. The stream cannot (plan C3, "Ambiguous zero interval"); nothing follows for you in P3.
 
+## From the cut as built (package X) — build on it
+
+Contract C9 is now the paragraph of `docs/design/cut.md` 13.4; core design 7.1–7.4 carry its rules. What it means
+for you:
+
+- Every cut is taken through `cdc_v2.pg.cut`, also the cuts of chunks and of repair reads. On each SQL connection
+  that takes cuts read `floor = settle_floor(conn)` once; it serves that connection only.
+- Every standby taker also needs `repl`, a second connection to the same standby opened with
+  `replication=database` (`connect(target, deadline, replication=True).raw`): you need a replication connection to
+  every node you read, and every standby you read must accept one from the runtime role. You read nothing about
+  the cut's node for `valid_on`; the taker read it right after the cut and keeps it on the cut.
+- Keyed tables: `take_standby_cut_after(conn, repl, p0, deadline, floor)`. Tables without a key (rule K):
+  `take_keyless_standby_cut(conn, repl, p0, deadline, floor)` — a quiet exported snapshot within a bounded,
+  declared wait (default 60 s), else one reader with its own snapshot; on a server with the fix a plain exported
+  snapshot. If `cut.way == "exported"` readers call `import_snapshot(c, cut.snapshot_id)`; if `"own"` the taking
+  connection is the one reader. No other program may import snapshots on the standby you read.
+- Primary: `take_primary_cut_after(conn, X, deadline)`, or `take_primary_cut` until `mark.admits(cut)` with the
+  `GapMark` package S hands you at every `P0` and `caught_up_lsn`, then `seal_primary_cut(conn, cut, deadline)`.
+  A cut from a one-attempt function that is not sealed is valid nowhere.
+- At the swap, for every cut the table used: `has_passed(applied)`, then `valid_on(stream)` with `stream` =
+  `slot.timeline_history` of the stream's node read at the swap; if false, the backfill starts again. (This
+  replaces any rule of this task that abandons open cuts on a promotion or a slot finding.) Do not use the start
+  of a commit record (`s=`): stock Debezium does not deliver it.
+- From the second review of apply: a catch-up call is never repeated after a later call (only the immediate repeat
+  is safe); after a crash resume from the stored round. A repair replaces the key's row (delete, then insert, in
+  the repair's transaction). The start-state checks of apply are sums; your final comparison stays the proof.
+
 ## What may be missing when you start
 
 Packages X, E, D, A, P, Y, S and O are merged. Package V (slot continuity) may or may not be: its finding reaches

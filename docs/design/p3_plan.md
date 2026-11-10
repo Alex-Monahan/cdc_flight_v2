@@ -531,7 +531,26 @@ Details in `docs/oracle.md`. What binds every package that writes a gate test:
 
 ### C9 Cut (package X)
 
-As delivered by package X; its report defines the interface, and this section is completed when it merges.
+`cdc_v2.pg.cut` is the only code that takes or judges a cut (`docs/design/cut.md`). Standby: on each
+connection that takes cuts, read `floor = settle_floor(conn)` once; it serves that connection only. Every taker
+also needs `repl`, a second connection to the same standby opened with `replication=database`
+(`connect(target, deadline, replication=True).raw`): B needs a replication connection to every node it reads,
+and every standby we read must accept one from the runtime role. Keyed tables:
+`take_standby_cut_after(conn, repl, p0, deadline, floor)` returns a settled and sealed `StandbyCut` with
+`R0 ≥ P0`, its read-only REPEATABLE READ transaction left open. Tables without a key (rule K):
+`take_keyless_standby_cut(conn, repl, p0, deadline, floor)`; if `cut.way == "exported"` readers call
+`import_snapshot(c, cut.snapshot_id)`, if `"own"` this connection is the one reader. For every `END`, in
+stream order: `cut.observe(E)`, then `cut.classify(E, xid32)`. Primary: `take_primary_cut_after(conn, X,
+deadline)`, or `take_primary_cut` until `mark.admits(cut)` and then `cut = seal_primary_cut(conn, cut,
+deadline)`; either way the cut is sealed (its server has flushed the WAL up to the cut's insert position) and
+its transaction is left open; `classify(xid32)`. The stream lane (package S) starts a
+`GapTracker(unknown_below=next_xid_marker(primary))` at each engine start, calls `delivered_xid32(txId)` for
+each applied `END` and `probe(probe_snapshot(conn))` once per group, and hands `mark()` to B at every `P0` and
+`caught_up_lsn`. At the swap, for every cut the table used: `has_passed(applied)`, then `valid_on(stream)`; if
+false, the backfill starts again. `stream` is `slot.timeline_history` of the stream's node, read at the swap.
+The caller reads nothing about the cut's own node: the taker read it right after the cut and keeps it on the
+cut (`cut.sealed`). A cut from a one-attempt function (`take_standby_cut_own`, `take_standby_cut_exported`,
+`take_primary_cut` without `seal_primary_cut`) is valid nowhere.
 
 ### C10 Stream and backfill (packages S, B, V, T)
 
