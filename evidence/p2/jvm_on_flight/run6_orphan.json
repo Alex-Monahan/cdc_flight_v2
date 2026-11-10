@@ -1,0 +1,109 @@
+{
+ "boot": {
+  "child_exit": "3.475",
+  "clone": "0.378",
+  "commit": "a262259ba8e87c0528d422de6182bbff2c11fc17",
+  "exit": "0",
+  "first_line": "1794280308.971"
+ },
+ "derived": {
+  "container_and_requirements_s": 2.319,
+  "cost_usd_at_0.60_per_h": 0.0018,
+  "run_wall_s": 10.905
+ },
+ "marks": [
+  "T 0.963 driver_start",
+  "T 0.963 phase_orphan"
+ ],
+ "raw_log": [
+  "Using CPython 3.12.15",
+  "Creating virtual environment at: .venv",
+  "Resolved 3 packages in 829ms",
+  "Downloading psycopg-binary (5.0MiB)",
+  " Downloaded psycopg-binary",
+  "Prepared 3 packages in 539ms",
+  "Installed 3 packages in 29ms",
+  " + psycopg==3.3.8",
+  " + psycopg-binary==3.3.8",
+  " + typing-extensions==4.16.0",
+  "BOOT first_line 1794280308.971",
+  "BOOT clone 0.378",
+  "BOOT commit a262259ba8e87c0528d422de6182bbff2c11fc17",
+  "T 0.963 driver_start",
+  "RESULT {\"cpu_max\": \"200000 100000\", \"jdk\": \"temurin-21\", \"mem_max\": \"17179869184\", \"modes\": [\"orphan\"], \"os_cpu_count\": 8, \"phase\": \"driver\", \"t_run\": 0.963}",
+  "T 0.963 phase_orphan",
+  "RESULT {\"child_pid\": 53, \"phase\": \"orphan_spawned\", \"pid1_comm\": \"tower-runtime-e\", \"t_run\": 0.964}",
+  "ORPHAN tick 0 0.0",
+  "ORPHAN tick 1 1.0",
+  "ORPHAN tick 2 2.0",
+  "ORPHAN parent_exit 1794280312.435",
+  "BOOT child_exit 3.475",
+  "BOOT exit 0",
+  "ORPHAN tick 3 3.0",
+  "ORPHAN tick 4 4.0",
+  "ORPHAN tick 5 5.0",
+  "ORPHAN tick 6 6.0",
+  "ORPHAN tick 7 7.0"
+ ],
+ "results": [
+  {
+   "cpu_max": "200000 100000",
+   "jdk": "temurin-21",
+   "mem_max": "17179869184",
+   "modes": [
+    "orphan"
+   ],
+   "os_cpu_count": 8,
+   "phase": "driver",
+   "t_run": 0.963
+  },
+  {
+   "child_pid": 53,
+   "phase": "orphan_spawned",
+   "pid1_comm": "tower-runtime-e",
+   "t_run": 0.964
+  }
+ ],
+ "run": {
+  "cancelled_at": null,
+  "config": {
+   "CDC_V2_BIG_ROWS": "10000000",
+   "CDC_V2_COMMIT": "a262259ba8e87c0528d422de6182bbff2c11fc17",
+   "CDC_V2_DEADLINE": "2300",
+   "CDC_V2_JDK": "temurin-21",
+   "CDC_V2_SMALL_TX": "100000",
+   "CDC_V2_SPIKE_MODE": "orphan",
+   "CDC_V2_TPUT_ONLY": "all",
+   "CDC_V2_TPUT_ROWS": "1000000"
+  },
+  "created_at": "2026-11-10T03:11:45.253+00:00",
+  "ended_at": "2026-11-10T03:11:57.557+00:00",
+  "exit_code": 0,
+  "flight_id": "ff81b6f6-8cea-4f5d-b6f6-7de4f01d4d61",
+  "flight_name": "cdc_v2_spike_jvm",
+  "flight_version": 1,
+  "is_scheduled": false,
+  "observed_states": [
+   {
+    "observed_at": "2026-11-10T03:11:45.930820+00:00",
+    "state": "PENDING"
+   },
+   {
+    "observed_at": "2026-11-10T03:11:48.244091+00:00",
+    "state": "RUNNING"
+   },
+   {
+    "observed_at": "2026-11-10T03:12:00.049837+00:00",
+    "state": "SUCCEEDED"
+   }
+  ],
+  "run_id": "01a1c370-b21b-7407-b0e8-744d11ae27dc",
+  "run_number": 6,
+  "scheduled_at": "2026-11-10T03:11:45.179+00:00",
+  "started_at": "2026-11-10T03:11:46.652+00:00",
+  "started_by_id": "<redacted>",
+  "started_by_name": "<redacted>",
+  "state": "SUCCEEDED",
+  "status": "SUCCEEDED"
+ }
+}

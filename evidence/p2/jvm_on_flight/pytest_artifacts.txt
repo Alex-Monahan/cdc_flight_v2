@@ -1,0 +1,11 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.1, pytest-9.2.0, pluggy-1.7.0
+rootdir: <worktree>
+configfile: pyproject.toml
+plugins: hypothesis-6.170.15, timeout-2.4.0
+collected 34 items
+
+tests/test_artifacts.py ................................                 [ 94%]
+tests/test_spike_consumer.py ..                                          [100%]
+
+============================== 34 passed in 8.30s ==============================
