@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+"""TCP fault proxy for tests (src/cdc_v2/testing/netproxy.py). Ports 55440-55459; control socket per proxy.
+
+    tools/netproxy serve --target-port 55432 [--target-host localhost] [--port 55440]   # runs until stopped
+    tools/netproxy set 55440 blackhole [--direction up|down|both] [--conn ID]
+    tools/netproxy set 55440 delay --seconds 0.2
+    tools/netproxy set 55440 throttle --rate 50000
+    tools/netproxy set 55440 reset | close | refuse | pass
+    tools/netproxy stats 55440 [--connections]
+    tools/netproxy list                      # ports whose lease is held
+    tools/netproxy stop 55440
+
+`serve` prints one JSON line {"port": N} when it listens. Output never contains the target host.
+Exit status: 0 ok, 1 error, 2 usage.
+"""
+import argparse
+import json
+import os
+import signal
+import sys
+import threading
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
+
+from cdc_v2.testing import netproxy as np  # noqa: E402
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(prog="netproxy", description=__doc__.split("\n\n")[0],
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("serve", help="run a proxy in the foreground")
+    p.add_argument("--target-host", default="localhost")
+    p.add_argument("--target-port", type=int, required=True)
+    p.add_argument("--port", type=int, help="a port in 55440-55459 (default: first free)")
+    p = sub.add_parser("set", help="set a fault")
+    p.add_argument("port", type=int)
+    p.add_argument("mode", choices=np.MODES)
+    p.add_argument("--direction", choices=np.DIRECTIONS, default="both")
+    p.add_argument("--seconds", type=float)
+    p.add_argument("--rate", type=int, help="bytes per second (throttle)")
+    p.add_argument("--conn", type=int, help="one connection id (default: all connections)")
+    p = sub.add_parser("stats", help="counters")
+    p.add_argument("port", type=int)
+    p.add_argument("--connections", action="store_true")
+    sub.add_parser("list", help="ports with a running proxy")
+    p = sub.add_parser("stop", help="stop a proxy")
+    p.add_argument("port", type=int)
+    a = ap.parse_args(argv)
+    try:
+        if a.cmd == "serve":
+            px = np.NetProxy(a.target_host, a.target_port, port=a.port).start()
+            done = threading.Event()
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                signal.signal(sig, lambda *_: done.set())
+            print(json.dumps({"port": px.port}), flush=True)
+            while not done.is_set() and px.thread.is_alive():
+                done.wait(0.5)
+            px.stop()
+            return 0
+        if a.cmd == "list":
+            print(json.dumps(np.running_ports()))
+            return 0
+        ctl = np.ProxyControl(port=a.port)
+        if a.cmd == "set":
+            out = ctl.set_fault(a.mode, a.direction, a.seconds, a.rate, a.conn)
+        elif a.cmd == "stats":
+            out = ctl.connections() if a.connections else ctl.stats()
+        else:
+            out = ctl.stop()
+        print(json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except (np.ProxyError, OSError) as exc:
+        print("netproxy: %s" % exc, file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
