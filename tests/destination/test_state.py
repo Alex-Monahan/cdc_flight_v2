@@ -282,16 +282,23 @@ def test_a_child_row_created_from_two_lanes_is_created_with_a_transition_of_its_
 
 
 # ------------------------------------------------------------------------------------------------- enumeration
-def test_every_pair_of_the_example_machines(ex):
+@pytest.mark.parametrize("which", ["door", pytest.param("job", marks=pytest.mark.d_full)])
+def test_every_pair_of_the_example_machines(ex, which):
+    """The default run enumerates the door (64 attempts); the job (216 attempts) runs with `-m d_full`."""
+    if which == "door":
+        with ex.stream.transaction() as tx:
+            state.create(tx, ex.door, "d1", "closed", "installed")
+        door = tm.check_machine(ex.stream, ex.door, "d1")
+        assert door == {"stored_states": 4, "attempts": 64, "legal": 4, "illegal": 60}
+        assert state.read(ex.look, ex.door, "d1") == "closed"
+        assert len(log_rows(ex.look, "example_door")) == 1 + 4
+        return
     with ex.stream.transaction() as tx:
-        state.create(tx, ex.door, "d1", "closed", "installed")
         state.create(tx, ex.job, (1, 1), "queued", "new")
-    door = tm.check_machine(ex.stream, ex.door, "d1")
-    assert door == {"stored_states": 4, "attempts": 64, "legal": 4, "illegal": 60}
     job = tm.check_machine(ex.stream, "example_job", (1, 1), unknown=("no_such_state", "DONE"))
     assert job == {"stored_states": 6, "attempts": 216, "legal": 5, "illegal": 211}
-    assert state.read(ex.look, ex.door, "d1") == "closed" and state.read(ex.look, ex.job, (1, 1)) == "queued"
-    assert len(log_rows(ex.look, "example_door")) == 1 + 4 and len(log_rows(ex.look, "example_job")) == 1 + 5
+    assert state.read(ex.look, ex.job, (1, 1)) == "queued"
+    assert len(log_rows(ex.look, "example_job")) == 1 + 5
 
 
 def test_every_pair_of_the_alert_machine(ex):

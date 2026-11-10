@@ -9,6 +9,15 @@ Marker `md`: real MotherDuck, databases named `cdc_v2_t_d_*` only, created and d
 
 `pyproject.toml` does not register the marker and does not deselect it (this package may not edit that file), so
 this conftest registers it and deselects `md` tests unless the command line asks for them.
+
+Marker `d_full`: the rest of the full matrices of this package (fix round, item 7). The default run keeps one case
+per fault site of the deadline matrix of `test_lane.py`, one example machine of the enumeration of
+`test_state.py` and one shape of the take-over at every point of `test_fix_round.py`; the other cases carry
+`d_full` and run only when asked for:
+
+    uv run -q pytest -q -m d_full tests/destination
+
+A MotherDuck run (`-m md`) keeps them too.
 """
 import datetime
 import json
@@ -33,6 +42,9 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "md: needs real MotherDuck through tools/with-env; creates and drops databases cdc_v2_t_d_* "
                    "(opt-in: -m md)")
+    config.addinivalue_line(
+        "markers", "d_full: the rest of the full test matrices of package D, left out of the default run "
+                   "(opt-in: -m d_full)")
 
 
 def _wants_md(config):
@@ -40,7 +52,17 @@ def _wants_md(config):
     return bool(re.search(r"(?<!not )\bmd\b", expr))
 
 
+def _wants_full(config):
+    expr = config.getoption("markexpr") or ""
+    return bool(re.search(r"(?<!not )\bd_full\b", expr))
+
+
 def pytest_collection_modifyitems(config, items):
+    if not (_wants_full(config) or _wants_md(config)):
+        full = [i for i in items if "d_full" in i.keywords]
+        if full:
+            config.hook.pytest_deselected(items=full)
+            items[:] = [i for i in items if "d_full" not in i.keywords]
     if _wants_md(config):
         if not os.environ.get("motherduck_token"):
             skip = pytest.mark.skip(reason="no MotherDuck token in the environment (run through tools/with-env)")
@@ -105,7 +127,24 @@ def md_dest(no_leftovers):
         yield d
 
 
-MD_COMMAND = "tools/with-env uv run -q pytest -q -m md tests/destination"
+def run_command():
+    """The command that runs now, as a grader repeats it: the arguments pytest was given (fix round, item 5)."""
+    import shlex
+    import sys
+    return "tools/with-env uv run -q pytest " + " ".join(shlex.quote(a) for a in sys.argv[1:])
+
+
+def run_commit():
+    """The commit of the tree that runs now, and whether the files the tests use differ from it."""
+    import subprocess
+    try:
+        head = subprocess.run(["git", "-C", ROOT, "rev-parse", "--short", "HEAD"], capture_output=True, text=True,
+                              timeout=10).stdout.strip()
+        dirty = subprocess.run(["git", "-C", ROOT, "status", "--porcelain", "--", "src", "tests", "tools",
+                                "pyproject.toml", "uv.lock"], capture_output=True, text=True, timeout=10).stdout.strip()
+    except Exception:                                        # noqa: BLE001 - recorded as unknown
+        return None
+    return head + ("+changes" if dirty else "")
 
 
 def add_evidence(name, key, value, what=None):
@@ -120,13 +159,15 @@ def add_evidence(name, key, value, what=None):
     doc.setdefault("results", {})
     if what:
         doc["what"] = what
-    doc["command"] = MD_COMMAND
+    doc["command"] = "see results.<key>.command (each result names the run that wrote it)"
     doc["versions"] = {"duckdb_client": duckdb.__version__, "python": platform.python_version(),
                        "platform": "%s %s" % (platform.system(), platform.machine())}
     doc["machine_note"] = ("10 cores, 16 GB, shared with up to three other workers of the same build (their "
                            "tests, Postgres clusters and JVMs may have been running); times are indications only")
     value = dict(value)
     value["date_utc"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M")
+    value["commit"] = run_commit()
+    value["command"] = run_command()
     doc["results"][key] = value
     write_evidence(path, doc)
 

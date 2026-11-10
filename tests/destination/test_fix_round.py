@@ -126,14 +126,21 @@ def test_a_rolled_back_transaction_leaves_no_transition_row(ex):
             state.transition(tx, ex.door, "d1", "closed", "open", "then a statement fails")
             tx.execute("INSERT INTO _cdc_example.job VALUES ('not a number', 1, 'queued')")
     twin = ex.lane("stream", ex.epoch)
+    with twin.transaction():
+        pass                    # registered (a registration writes the fence row too: before, not in between)
+    n = fence_n(ex.look, "stream")
+    first, second = ex.stream.transaction(), twin.transaction()
+    tx1 = first.__enter__()
+    state.transition(tx1, ex.door, "d1", "closed", "locked", "first, commits")
+    tx2 = second.__enter__()
+    state.create(tx2, ex.door, "d2", "closed", "second, refused at the fence row")
+    first.__exit__(None, None, None)
     with pytest.raises(md.Conflict):
-        with ex.stream.transaction() as tx1:
-            state.transition(tx1, ex.door, "d1", "closed", "locked", "first")
-            with twin.transaction() as tx2:
-                state.create(tx2, ex.door, "d2", "closed", "second, refused at the fence row")
-    assert ex.look.fetchone("SELECT count(*) FROM _cdc.transitions")[0] == before
-    assert fence_n(ex.look, "stream") == n
-    assert state.read(ex.look, ex.door, "d1") == "closed"
+        second.__exit__(None, None, None)
+    assert [r[0] for r in ex.look.fetchall("SELECT cause FROM _cdc.transitions ORDER BY seq")][before:] == [
+        "first, commits"]
+    assert fence_n(ex.look, "stream") == n + 1
+    assert state.read(ex.look, ex.door, "d1") == "locked" and state.read(ex.look, ex.door, "d2") is None
 
 
 def test_a_run_that_bypasses_the_fence_shows_a_duplicate_seq(ex, monkeypatch):
@@ -144,13 +151,18 @@ def test_a_run_that_bypasses_the_fence_shows_a_duplicate_seq(ex, monkeypatch):
         state.create(tx, ex.door, "a", "closed", "installed")
         state.create(tx, ex.door, "b", "closed", "installed")
     twin = ex.lane("stream", ex.epoch)
-    with pytest.raises(md.Conflict):                                    # with the fence
+    with twin.transaction():
+        pass                    # registered (a registration writes the fence row too: before, not in between)
+    created = fence_n(ex.look, "stream") - 1                            # the transaction of the two creates
+    with pytest.raises(md.Conflict):                                    # with the fence: the second one is refused
         with ex.stream.transaction() as tx1:
             state.transition(tx1, ex.door, "a", "closed", "open", "first")
             with twin.transaction() as tx2:
                 state.transition(tx2, ex.door, "b", "closed", "open", "second")
     dup = "SELECT lane, seq, count(*) FROM _cdc.transitions GROUP BY lane, seq HAVING count(*) > 1"
-    assert ex.look.fetchall(dup) == [("stream", fence_n(ex.look, "stream"), 2)]   # the two creates: one transaction
+    assert ex.look.fetchall(dup) == [("stream", created, 2)]           # the two creates: one transaction
+    assert ex.look.fetchall("SELECT cause FROM _cdc.transitions WHERE seq > ?", [created]) == [("second",)]
+    assert state.read(ex.look, ex.door, "a") == "closed" and state.read(ex.look, ex.door, "b") == "open"
 
     def no_fence(self):                                                # the fence statement left out on purpose
         out = self._sess.wait(self._sess.submit(self._sess.commit()), self._deadline)
@@ -160,7 +172,7 @@ def test_a_run_that_bypasses_the_fence_shows_a_duplicate_seq(ex, monkeypatch):
     with ex.stream.transaction() as tx1:
         state.transition(tx1, ex.door, "a", "closed", "open", "first, no fence")
         with twin.transaction() as tx2:
-            state.transition(tx2, ex.door, "b", "closed", "open", "second, no fence")
+            state.transition(tx2, ex.door, "b", "open", "closed", "second, no fence")
     monkeypatch.undo()
     rows = ex.look.fetchall("SELECT cause, lane, seq FROM _cdc.transitions WHERE cause LIKE '%no fence' ORDER BY 1")
     assert rows == [("first, no fence", "stream", n + 1), ("second, no fence", "stream", n + 1)]
@@ -391,11 +403,17 @@ def test_the_fence_statement_and_the_registration_wait_the_statement_deadline_no
 
 
 # ------------------------------------------------------------------------------ item 8 (F0): take-over at every point
-def test_a_take_over_at_every_point_of_a_lane_transaction_keeps_the_fence(dest):
+CAMPAIGN_CASES = [("nothing", p) for p in fence_campaign.POINTS] + [
+    pytest.param(s, "fenced", marks=pytest.mark.d_full) for s in fence_campaign.SHAPES[1:]]
+
+
+@pytest.mark.parametrize("shape, point", CAMPAIGN_CASES)
+def test_a_take_over_at_every_point_of_a_lane_transaction_keeps_the_fence(dest, shape, point):
     """Item 8 (F0), the permanent form at T0 (`test_md_fix_round.py` runs it on MotherDuck, and
     `fence_campaign.py` runs it many times). After every round: every fence row and the heartbeat hold the
     leader's epoch, the old block committed only when the take-over came after its COMMIT returned, it reported
-    success exactly when it committed, and the old lane's next transaction gets `FenceLost`."""
+    success exactly when it committed, and the old lane's next transaction gets `FenceLost`. The empty block at
+    every point runs by default; the other shapes with `-m d_full`."""
     fence_campaign.setup(dest)
     probe = dest.connect("probe")
     with fence_campaign.Hooks() as hooks, tm.example_machines() as (door, _job):
@@ -403,10 +421,8 @@ def test_a_take_over_at_every_point_of_a_lane_transaction_keeps_the_fence(dest):
             for sql in tm.EXAMPLE_TABLES:
                 tx.execute(sql)
             state.create(tx, door, fence_campaign.DOOR, "closed", "setup")
-        cases = [("nothing", p) for p in fence_campaign.POINTS] + [(s, "fenced") for s in fence_campaign.SHAPES[1:]]
-        for i, (shape, point) in enumerate(cases):
-            rec = fence_campaign.one_round(dest, probe, hooks, shape, point, i, door)
-            assert rec["verdict"] == "pass", rec
+        rec = fence_campaign.one_round(dest, probe, hooks, shape, point, 0, door)
+        assert rec["verdict"] == "pass", rec
 
 
 # ------------------------------------------------------------------------------ items 9 to 11: the error mapping

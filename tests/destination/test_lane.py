@@ -457,7 +457,7 @@ def test_the_interrupt_of_a_replaced_connection_runs_on_the_new_connection(led, 
 # --------------------------------------------------------------------------------------------- deadlines
 @pytest.mark.parametrize("site, skip, error, lands", [
     ("md.execute", 1, md.DeadlineExceeded, False),      # a statement in the block
-    ("md.execute", 0, md.DeadlineExceeded, False),      # BEGIN
+    pytest.param("md.execute", 0, md.DeadlineExceeded, False, marks=pytest.mark.d_full),   # BEGIN
     ("md.fence", 0, md.DeadlineExceeded, False),        # the fence statement: COMMIT was not sent
     ("md.commit", 0, md.CommitUnknown, False),          # COMMIT sent, no answer: unknown (here: it never arrived)
     ("md.commit_reply", 0, md.CommitUnknown, True),     # COMMIT executed, the answer never came: unknown (it landed)

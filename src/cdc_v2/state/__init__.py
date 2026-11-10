@@ -301,7 +301,9 @@ def _transaction(tx, what):
 
 
 def _detail(detail):
-    return json.dumps(check_fields(detail, what="detail field"), sort_keys=True) if detail else None
+    if not detail:
+        return None
+    return json.dumps(check_fields(detail, what="detail field"), sort_keys=True, separators=(",", ":"))
 
 
 def _record(tx, m, key, from_state, to_state, cause, detail=None):

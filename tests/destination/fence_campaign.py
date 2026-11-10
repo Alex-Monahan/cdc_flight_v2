@@ -382,7 +382,7 @@ def main(argv=None):
             setup(dest)
             probe = dest.connect("probe")
             with example_machines() as (door, _job):
-                with md.Lane(dest.connect("door"), "control", td.read_leader(dest.settings)["epoch"]) \
+                with md.Lane(dest.connect("door"), "stream", td.read_leader(dest.settings)["epoch"]) \
                         .transaction() as tx:
                     for sql in ("CREATE SCHEMA IF NOT EXISTS _cdc_example",
                                 "CREATE TABLE IF NOT EXISTS _cdc_example.door (door_id VARCHAR, state VARCHAR, "
