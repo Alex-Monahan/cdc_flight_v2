@@ -1,17 +1,20 @@
 """The source-side heartbeat (SPEC 4.4, 4.6, R8) and the standby lag read (H-044).
 
-Decision: the heartbeat is an UPDATE of one row of a small table that is **in our publication**
-(`cdc_v2.heartbeat`, one row per slot name). Why a table row and not a logical message:
+Decision: the heartbeat is an upsert (INSERT … ON CONFLICT DO UPDATE) of one row of a small table that is **in our
+publication** (`cdc_v2.heartbeat`, one row per slot name), committed as a transaction of its own. Why:
 
 - The row travels as an ordinary change of a published table, so the engine frames it like any other transaction:
-  BEGIN, ROWS, END with an `ack_position` that may be acknowledged. An idle slot advances, and a slot behind a busy
-  but unpublished workload advances too (package E measured that Debezium's own heartbeat records do not).
+  BEGIN, ROWS, END with an `ack_position` that may be acknowledged. Only an END moves the applied position (C2):
+  Debezium's own heartbeat records and non-transactional logical messages are never acknowledged. An idle slot
+  advances, and so does a slot behind a busy but unpublished workload.
 - The stream recognises its own write by the row's `marker` (a value unique to the write) and by the transaction
-  id, which `beat` returns together with a bracket around the commit position on the primary. A black-holed
+  id, which `beat` returns together with a bracket around the commit record on the primary. A black-holed
   replication connection is noticed because a marker that was written does not come back (SPEC 4.6).
-- A logical message would also be framed (`MESSAGE`), but it needs `pg_logical_emit_message` on the primary and
-  Debezium's message prefix configuration, and transactional messages have had restart defects in Debezium
-  (docs/research/debezium.md §2.6). The runtime role needs no table privilege beyond UPDATE on this one table.
+- A logical message is not an option: a non-transactional one is never acknowledged (C2); a transactional one needs
+  Debezium's message prefix configuration and has had restart defects (docs/research/debezium.md §2.6). The runtime
+  role needs only SELECT, INSERT and UPDATE on this one table.
+- Cost: the table stays at one row per slot name (the updates are HOT and pruned in place); WAL per write is measured
+  by `test_heartbeat_cost` (evidence `localpg_pg<major>.json`, section `heartbeat`).
 
 The write is idempotent and harmless when two runs do it: each sets the row of its slot to a new marker; the
 later write wins and each run recognises only its own marker. `lock_timeout` bounds a wait on the row.

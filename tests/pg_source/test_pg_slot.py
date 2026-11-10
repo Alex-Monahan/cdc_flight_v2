@@ -35,10 +35,20 @@ def published_table(scratch, name="t"):
     scratch.c.replay_to_primary()
 
 
-def idle_primary(cluster, seconds=16):
-    """Let the primary go idle: after this, its background writer logs no running-transactions record until new
-    WAL is written (it logs one at most every 15 s and only after other WAL)."""
-    time.sleep(seconds)
+def idle_primary(cluster, quiet_s=17, limit_s=180):
+    """Wait until the primary is idle: its insert position has not moved for `quiet_s` seconds. Its background
+    writer then logs no running-transactions record until new important WAL is written (it logs one at most every
+    15 s and only after other WAL; autovacuum after earlier tests is such WAL)."""
+    end = time.monotonic() + limit_s
+    last, since = None, time.monotonic()
+    while time.monotonic() < end:
+        pos = cluster.boot("primary", "select pg_current_wal_insert_lsn()")[0][0]
+        if pos != last:
+            last, since = pos, time.monotonic()
+        elif time.monotonic() - since >= quiet_s:
+            return
+        time.sleep(1)
+    pytest.fail("the primary did not become idle within %d s" % limit_s)
 
 
 # ----------------------------------------------------------------------------------------------- create

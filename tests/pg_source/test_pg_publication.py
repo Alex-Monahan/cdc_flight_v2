@@ -277,3 +277,33 @@ def test_heartbeat_advances_an_idle_slot_behind_unpublished_traffic(cluster, scr
     finally:
         cluster.cleanup_slots(scratch.slot)
         scratch.admin(f"drop schema if exists {q(hs)} cascade")
+
+
+def test_heartbeat_cost(cluster, scratch):
+    """WAL bytes per heartbeat write and the table size after many writes (one row per slot)."""
+    hs = "cdc_v2_hb_" + scratch.tag
+    try:
+        for stmt in heartbeat.setup_sql(scratch.runtime, schema=hs):
+            scratch.admin(stmt)
+        setup = scratch.connect("primary", role="admin")
+        publication.ensure(setup, [(hs, heartbeat.TABLE)], publication=scratch.pub, deadline=D())
+        prim = scratch.connect("primary")
+        heartbeat.beat(prim, scratch.slot, schema=hs, deadline=D())
+        n = 200
+        start = heartbeat.beat(prim, scratch.slot, schema=hs, deadline=D()).upper
+        for _ in range(n):
+            last = heartbeat.beat(prim, scratch.slot, schema=hs, deadline=D())
+        per_write = (last.upper - start) / n
+        heartbeat.beat(prim, scratch.slot + "_other", schema=hs, deadline=D())      # a second slot: a second row
+        rows = scratch.admin(f"select count(*), pg_relation_size('{q(hs)}.heartbeat') from {q(hs)}.heartbeat")[0]
+        time.sleep(0.7)                                                       # statistics are flushed lazily
+        hot = scratch.admin("select n_tup_upd, n_tup_hot_upd from pg_stat_user_tables "
+                            "where schemaname = %s and relname = 'heartbeat'", (hs,))
+        record("heartbeat", "cost", {"writes": n, "wal_bytes_per_write_upper_bound": round(per_write, 1),
+                                     "rows_after_writes_two_slots": rows[0], "table_bytes": rows[1],
+                                     "updates_and_hot_updates": list(hot[0]) if hot else None,
+                                     "note": "insert-position difference on an otherwise idle primary, divided "
+                                             "by the writes; includes each transaction's commit record"})
+        assert rows[0] == 2 and per_write < 1000
+    finally:
+        scratch.admin(f"drop schema if exists {q(hs)} cascade")
