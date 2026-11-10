@@ -1,0 +1,491 @@
+{
+  "facts": {
+    "binaries": {
+      "apt-get": "/usr/bin/apt-get",
+      "bash": "/usr/bin/bash",
+      "cc": "/usr/bin/cc",
+      "curl": "/usr/bin/curl",
+      "gcc": "/usr/bin/gcc",
+      "git": "/usr/bin/git",
+      "gzip": "/usr/bin/gzip",
+      "java": null,
+      "javac": null,
+      "kill": null,
+      "make": "/usr/bin/make",
+      "pg_dump": null,
+      "pip": null,
+      "ps": null,
+      "psql": null,
+      "ssh": null,
+      "sudo": null,
+      "tar": "/usr/bin/tar",
+      "timeout": "/usr/bin/timeout",
+      "unzip": null,
+      "uv": "/root/.local/bin/uv",
+      "wget": null,
+      "xz": "/usr/bin/xz",
+      "zstd": null
+    },
+    "cpu": {
+      "cgroup_cpu.max": "200000 100000",
+      "model": "AMD EPYC 7571",
+      "os.cpu_count": 8,
+      "sched_getaffinity": 8
+    },
+    "disk": {
+      "/": {
+        "free_gb": 524.0,
+        "total_gb": 536.8,
+        "writable": true
+      },
+      "/app": {
+        "free_gb": 524.0,
+        "total_gb": 536.8,
+        "writable": true
+      },
+      "/dev/shm": {
+        "free_gb": 0.1,
+        "total_gb": 0.1,
+        "writable": true
+      },
+      "/root": {
+        "free_gb": 524.0,
+        "total_gb": 536.8,
+        "writable": true
+      },
+      "/tmp": {
+        "free_gb": 524.0,
+        "total_gb": 536.8,
+        "writable": true
+      }
+    },
+    "duckdb_installed": "1.5.6",
+    "env_names": [
+      "CDC_V2_PROBE_FLIGHT_NAME",
+      "CDC_V2_PROBE_MODE",
+      "CDC_V2_PROBE_NONCE",
+      "CDC_V2_PROBE_SECRET",
+      "CDC_V2_PROBE_TICKS",
+      "HOME",
+      "HOSTNAME",
+      "LANG",
+      "LC_CTYPE",
+      "MOTHERDUCK_FLIGHTS_RUN",
+      "MOTHERDUCK_FLIGHT_ID",
+      "MOTHERDUCK_FLIGHT_RUN_ID",
+      "MOTHERDUCK_FLIGHT_RUN_NUMBER",
+      "MOTHERDUCK_HOST",
+      "MOTHERDUCK_TOKEN",
+      "PATH",
+      "PORT",
+      "PYTHONPATH",
+      "PYTHONUNBUFFERED",
+      "REQUESTS_CA_BUNDLE",
+      "SLING_BINARY",
+      "SSL_CERT_FILE",
+      "TEMP",
+      "TMP",
+      "TMPDIR",
+      "TZ",
+      "UV",
+      "UV_LINK_MODE",
+      "UV_RUN_RECURSION_DEPTH",
+      "VIRTUAL_ENV",
+      "cdc_v2_spike_secret_CDC_V2_PROBE_SECRET"
+    ],
+    "first_line_unix": 1794276647.421,
+    "flight_functions_inside": {
+      "md_list_flights_ok": true,
+      "own_flight_found": true
+    },
+    "git_version": {
+      "out": "git version 2.39.5",
+      "rc": 0
+    },
+    "import_done_s": 0.402,
+    "java_version": null,
+    "limits": {
+      "out": "time(seconds)        unlimited\nfile(blocks)         unlimited\ndata(kbytes)         unlimited\nstack(kbytes)        10240\ncoredump(blocks)     unlimited\nmemory(kbytes)       unlimited\nlocked memory(kbytes) unlimited\nprocess              unlimited\nnofiles              1048576\nvmemory(kbytes)      unlimited\nlocks                unlimited\nrtprio               0",
+      "rc": 0
+    },
+    "memory": {
+      "MemAvailable": "62484056 kB",
+      "MemTotal": "65293228 kB",
+      "SwapTotal": "0 kB",
+      "cgroup_memory.current": "149565440",
+      "cgroup_memory.max": "17179869184"
+    },
+    "mode": "facts",
+    "motherduck": {
+      "client": "1.5.6",
+      "connect_s": 1.65,
+      "databases_cdc_v2": 2,
+      "databases_other": 72,
+      "databases_total": 74,
+      "org_type": "business",
+      "region": "us-east-1",
+      "server": "v1.5.6",
+      "username_hmac": "<present>"
+    },
+    "mounts": [
+      [
+        "/",
+        "overlay",
+        "rw,seclabel,relatime,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/61/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/60/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/59/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/58/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/57/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/56/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/54/fs,upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/58283/fs,workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/58283/work,uuid=on"
+      ],
+      [
+        "/app",
+        "xfs",
+        "rw,seclabel,noatime,attr2,inode64,logbufs=8,logbsize=32k,sunit=1024,swidth=1024,noquota"
+      ],
+      [
+        "/dev/shm",
+        "tmpfs",
+        "rw,seclabel,relatime,size=65536k"
+      ]
+    ],
+    "os_release": {
+      "BUG_REPORT_URL": "\"https://bugs.debian.org/\"",
+      "HOME_URL": "\"https://www.debian.org/\"",
+      "ID": "debian",
+      "NAME": "\"Debian GNU/Linux\"",
+      "PRETTY_NAME": "\"Debian GNU/Linux 12 (bookworm)\"",
+      "SUPPORT_URL": "\"https://www.debian.org/support\"",
+      "VERSION": "\"12 (bookworm)\"",
+      "VERSION_CODENAME": "bookworm",
+      "VERSION_ID": "\"12\""
+    },
+    "own_runs_seen_inside": [
+      [
+        2,
+        "RUNNING"
+      ],
+      [
+        1,
+        "SUCCEEDED"
+      ]
+    ],
+    "packages": [
+      "duckdb==1.5.6"
+    ],
+    "packages_count": 1,
+    "path": "/app/.venv/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "platform": {
+      "libc": [
+        "glibc",
+        "2.36"
+      ],
+      "machine": "x86_64",
+      "release": "6.12.113-138.209.amzn2023.x86_64",
+      "system": "Linux"
+    },
+    "process_tree": {
+      "error": "FileNotFoundError: [Errno 2] No such file or directory: 'ps'"
+    },
+    "python": {
+      "executable": "/app/.venv/bin/python",
+      "prefix": "/app/.venv",
+      "version": "3.12.15"
+    },
+    "secret": {
+      "bare_hmac": "<present>",
+      "names_present": [
+        "CDC_V2_PROBE_SECRET",
+        "cdc_v2_spike_secret_CDC_V2_PROBE_SECRET"
+      ],
+      "namespaced_hmac": "<present>"
+    },
+    "time": {
+      "localtime": "UTC +0000",
+      "tz_env": ""
+    },
+    "tmp_write_256mb_s": 1.1,
+    "token_env": {
+      "MOTHERDUCK_TOKEN": true,
+      "motherduck_token": false
+    },
+    "total_s": 3.61,
+    "user": {
+      "argv": [
+        "/app/./main.py"
+      ],
+      "cwd": "/app",
+      "euid": 0,
+      "gid": 0,
+      "home": "/root",
+      "name": "root",
+      "pid": 36,
+      "ppid": 33,
+      "script": "/app/main.py",
+      "uid": 0
+    }
+  },
+  "final": {
+    "cancelled_at": null,
+    "config": {
+      "CDC_V2_PROBE_FLIGHT_NAME": "cdc_v2_spike_hello",
+      "CDC_V2_PROBE_MODE": "facts",
+      "CDC_V2_PROBE_NONCE": "<redacted>",
+      "CDC_V2_PROBE_TICKS": "20"
+    },
+    "created_at": "2026-11-10T02:10:44.133+00:00",
+    "ended_at": "2026-11-10T02:10:51.117+00:00",
+    "exit_code": 0,
+    "flight_id": "206bf7dc-3ac6-42b7-80c1-cf80008e9fc7",
+    "flight_name": "cdc_v2_spike_hello",
+    "flight_version": 2,
+    "is_scheduled": false,
+    "observed_states": [
+      {
+        "observed_at": "2026-11-10T02:10:44.524663+00:00",
+        "state": "PENDING"
+      },
+      {
+        "observed_at": "2026-11-10T02:10:45.309275+00:00",
+        "state": "RUNNING"
+      },
+      {
+        "observed_at": "2026-11-10T02:10:51.562648+00:00",
+        "state": "SUCCEEDED"
+      }
+    ],
+    "run_id": "01a1c338-d4e5-7c64-9a42-78416d9f9120",
+    "run_number": 2,
+    "scheduled_at": "2026-11-10T02:10:44.069+00:00",
+    "started_at": "2026-11-10T02:10:44.394+00:00",
+    "started_by_id": "<redacted>",
+    "started_by_name": "<redacted>",
+    "state": "SUCCEEDED",
+    "status": "SUCCEEDED"
+  },
+  "label": "facts",
+  "local_requested_at": "2026-11-10T02:10:43.366100+00:00",
+  "local_run_call_returned_at": "2026-11-10T02:10:44.189842+00:00",
+  "log_line_count": 37,
+  "logs": [
+    {
+      "line": "Using CPython 3.12.15",
+      "line_number": 0,
+      "reported_at": "2026-11-10T02:10:44.994+00:00"
+    },
+    {
+      "line": "Creating virtual environment at: .venv",
+      "line_number": 1,
+      "reported_at": "2026-11-10T02:10:44.994+00:00"
+    },
+    {
+      "line": "Resolved 1 package in 771ms",
+      "line_number": 2,
+      "reported_at": "2026-11-10T02:10:46.047+00:00"
+    },
+    {
+      "line": "Downloading duckdb (20.6MiB)",
+      "line_number": 3,
+      "reported_at": "2026-11-10T02:10:46.192+00:00"
+    },
+    {
+      "line": " Downloaded duckdb",
+      "line_number": 4,
+      "reported_at": "2026-11-10T02:10:47.341+00:00"
+    },
+    {
+      "line": "Prepared 1 package in 1.29s",
+      "line_number": 5,
+      "reported_at": "2026-11-10T02:10:47.455+00:00"
+    },
+    {
+      "line": "Installed 1 package in 35ms",
+      "line_number": 6,
+      "reported_at": "2026-11-10T02:10:47.455+00:00"
+    },
+    {
+      "line": " + duckdb==1.5.6",
+      "line_number": 7,
+      "reported_at": "2026-11-10T02:10:47.455+00:00"
+    },
+    {
+      "line": "FACT {\"first_line_unix\": 1794276647.421}",
+      "line_number": 8,
+      "reported_at": "2026-11-10T02:10:47.455+00:00"
+    },
+    {
+      "line": "FACT {\"mode\": \"facts\"}",
+      "line_number": 9,
+      "reported_at": "2026-11-10T02:10:47.823+00:00"
+    },
+    {
+      "line": "FACT {\"import_done_s\": 0.402}",
+      "line_number": 10,
+      "reported_at": "2026-11-10T02:10:47.823+00:00"
+    },
+    {
+      "line": "FACT {\"python\": {\"version\": \"3.12.15\", \"executable\": \"/app/.venv/bin/python\", \"prefix\": \"/app/.venv\"}}",
+      "line_number": 11,
+      "reported_at": "2026-11-10T02:10:47.823+00:00"
+    },
+    {
+      "line": "FACT {\"platform\": {\"system\": \"Linux\", \"release\": \"6.12.113-138.209.amzn2023.x86_64\", \"machine\": \"x86_64\", \"libc\": [\"glibc\", \"2.36\"]}}",
+      "line_number": 12,
+      "reported_at": "2026-11-10T02:10:47.936+00:00"
+    },
+    {
+      "line": "FACT {\"os_release\": {\"PRETTY_NAME\": \"\\\"Debian GNU/Linux 12 (bookworm)\\\"\", \"NAME\": \"\\\"Debian GNU/Linux\\\"\", \"VERSION_ID\": \"\\\"12\\\"\", \"VERSION\": \"\\\"12 (bookworm)\\\"\", \"VERSION_CODENAME\": \"bookworm\", \"ID\": \"debian\", \"HOME_URL\": \"\\\"https://www.debian.org/\\\"\", \"SUPPORT_URL\": \"\\\"https://www.debian.org/support\\\"\", \"BUG_REPORT_URL\": \"\\\"https://bugs.debian.org/\\\"\"}}",
+      "line_number": 13,
+      "reported_at": "2026-11-10T02:10:47.936+00:00"
+    },
+    {
+      "line": "FACT {\"cpu\": {\"os.cpu_count\": 8, \"sched_getaffinity\": 8, \"cgroup_cpu.max\": \"200000 100000\", \"model\": \"AMD EPYC 7571\"}}",
+      "line_number": 14,
+      "reported_at": "2026-11-10T02:10:47.936+00:00"
+    },
+    {
+      "line": "FACT {\"memory\": {\"MemTotal\": \"65293228 kB\", \"MemAvailable\": \"62484056 kB\", \"SwapTotal\": \"0 kB\", \"cgroup_memory.max\": \"17179869184\", \"cgroup_memory.current\": \"149565440\"}}",
+      "line_number": 15,
+      "reported_at": "2026-11-10T02:10:47.936+00:00"
+    },
+    {
+      "line": "FACT {\"disk\": {\"/\": {\"total_gb\": 536.8, \"free_gb\": 524.0, \"writable\": true}, \"/tmp\": {\"total_gb\": 536.8, \"free_gb\": 524.0, \"writable\": true}, \"/app\": {\"total_gb\": 536.8, \"free_gb\": 524.0, \"writable\": true}, \"/root\": {\"total_gb\": 536.8, \"free_gb\": 524.0, \"writable\": true}, \"/dev/shm\": {\"total_gb\": 0.1, \"free_gb\": 0.1, \"writable\": true}}}",
+      "line_number": 16,
+      "reported_at": "2026-11-10T02:10:47.936+00:00"
+    },
+    {
+      "line": "FACT {\"mounts\": [[\"/\", \"overlay\", \"rw,seclabel,relatime,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/61/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/60/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/59/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/58/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/57/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/56/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/54/fs,upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/58283/fs,workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/58283/work,uuid=on\"], [\"/app\", \"xfs\", \"rw,seclabel,noatime,attr2,inode64,logbufs=8,logbsize=32k,sunit=1024,swidth=1024,noquota\"], [\"/dev/shm\", \"tmpfs\", \"rw,seclabel,relatime,size=65536k\"]]}",
+      "line_number": 17,
+      "reported_at": "2026-11-10T02:10:47.936+00:00"
+    },
+    {
+      "line": "FACT {\"tmp_write_256mb_s\": 1.1}",
+      "line_number": 18,
+      "reported_at": "2026-11-10T02:10:48.922+00:00"
+    },
+    {
+      "line": "FACT {\"user\": {\"uid\": 0, \"gid\": 0, \"euid\": 0, \"name\": \"root\", \"home\": \"/root\", \"cwd\": \"/app\", \"script\": \"/app/main.py\", \"argv\": [\"/app/./main.py\"], \"pid\": 36, \"ppid\": 33}}",
+      "line_number": 19,
+      "reported_at": "2026-11-10T02:10:49.056+00:00"
+    },
+    {
+      "line": "FACT {\"process_tree\": {\"error\": \"FileNotFoundError: [Errno 2] No such file or directory: 'ps'\"}}",
+      "line_number": 20,
+      "reported_at": "2026-11-10T02:10:49.056+00:00"
+    },
+    {
+      "line": "FACT {\"binaries\": {\"git\": \"/usr/bin/git\", \"curl\": \"/usr/bin/curl\", \"wget\": null, \"java\": null, \"javac\": null, \"tar\": \"/usr/bin/tar\", \"gzip\": \"/usr/bin/gzip\", \"unzip\": null, \"xz\": \"/usr/bin/xz\", \"zstd\": null, \"gcc\": \"/usr/bin/gcc\", \"cc\": \"/usr/bin/cc\", \"make\": \"/usr/bin/make\", \"apt-get\": \"/usr/bin/apt-get\", \"sudo\": null, \"pip\": null, \"uv\": \"/root/.local/bin/uv\", \"psql\": null, \"pg_dump\": null, \"ps\": null, \"kill\": null, \"timeout\": \"/usr/bin/timeout\", \"bash\": \"/usr/bin/bash\", \"ssh\": null}}",
+      "line_number": 21,
+      "reported_at": "2026-11-10T02:10:49.056+00:00"
+    },
+    {
+      "line": "FACT {\"git_version\": {\"rc\": 0, \"out\": \"git version 2.39.5\"}}",
+      "line_number": 22,
+      "reported_at": "2026-11-10T02:10:49.056+00:00"
+    },
+    {
+      "line": "FACT {\"java_version\": null}",
+      "line_number": 23,
+      "reported_at": "2026-11-10T02:10:49.056+00:00"
+    },
+    {
+      "line": "FACT {\"env_names\": [\"CDC_V2_PROBE_FLIGHT_NAME\", \"CDC_V2_PROBE_MODE\", \"CDC_V2_PROBE_NONCE\", \"CDC_V2_PROBE_SECRET\", \"CDC_V2_PROBE_TICKS\", \"HOME\", \"HOSTNAME\", \"LANG\", \"LC_CTYPE\", \"MOTHERDUCK_FLIGHTS_RUN\", \"MOTHERDUCK_FLIGHT_ID\", \"MOTHERDUCK_FLIGHT_RUN_ID\", \"MOTHERDUCK_FLIGHT_RUN_NUMBER\", \"MOTHERDUCK_HOST\", \"MOTHERDUCK_TOKEN\", \"PATH\", \"PORT\", \"PYTHONPATH\", \"PYTHONUNBUFFERED\", \"REQUESTS_CA_BUNDLE\", \"SLING_BINARY\", \"SSL_CERT_FILE\", \"TEMP\", \"TMP\", \"TMPDIR\", \"TZ\", \"UV\", \"UV_LINK_MODE\", \"UV_RUN_RECURSION_DEPTH\", \"VIRTUAL_ENV\", \"cdc_v2_spike_secret_CDC_V2_PROBE_SECRET\"]}",
+      "line_number": 24,
+      "reported_at": "2026-11-10T02:10:49.056+00:00"
+    },
+    {
+      "line": "FACT {\"path\": \"/app/.venv/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"}",
+      "line_number": 25,
+      "reported_at": "2026-11-10T02:10:49.056+00:00"
+    },
+    {
+      "line": "FACT {\"limits\": {\"rc\": 0, \"out\": \"time(seconds)        unlimited\\nfile(blocks)         unlimited\\ndata(kbytes)         unlimited\\nstack(kbytes)        10240\\ncoredump(blocks)     unlimited\\nmemory(kbytes)       unlimited\\nlocked memory(kbytes) unlimited\\nprocess              unlimited\\nnofiles              1048576\\nvmemory(kbytes)      unlimited\\nlocks                unlimited\\nrtprio               0\"}}",
+      "line_number": 26,
+      "reported_at": "2026-11-10T02:10:49.056+00:00"
+    },
+    {
+      "line": "FACT {\"time\": {\"tz_env\": \"\", \"localtime\": \"UTC +0000\"}}",
+      "line_number": 27,
+      "reported_at": "2026-11-10T02:10:49.056+00:00"
+    },
+    {
+      "line": "FACT {\"packages_count\": 1}",
+      "line_number": 28,
+      "reported_at": "2026-11-10T02:10:49.151+00:00"
+    },
+    {
+      "line": "FACT {\"packages\": [\"duckdb==1.5.6\"]}",
+      "line_number": 29,
+      "reported_at": "2026-11-10T02:10:49.151+00:00"
+    },
+    {
+      "line": "FACT {\"duckdb_installed\": \"1.5.6\"}",
+      "line_number": 30,
+      "reported_at": "2026-11-10T02:10:49.151+00:00"
+    },
+    {
+      "line": "FACT {\"token_env\": {\"MOTHERDUCK_TOKEN\": true, \"motherduck_token\": false}}",
+      "line_number": 31,
+      "reported_at": "2026-11-10T02:10:49.151+00:00"
+    },
+    {
+      "line": "FACT {\"motherduck\": {\"connect_s\": 1.65, \"client\": \"1.5.6\", \"server\": \"v1.5.6\", \"username_hmac\": \"85fc6115ccd4b13a\", \"org_type\": \"business\", \"region\": \"us-east-1\", \"databases_total\": 74, \"databases_cdc_v2\": 2, \"databases_other\": 72}}",
+      "line_number": 32,
+      "reported_at": "2026-11-10T02:10:50.826+00:00"
+    },
+    {
+      "line": "FACT {\"flight_functions_inside\": {\"md_list_flights_ok\": true, \"own_flight_found\": true}}",
+      "line_number": 33,
+      "reported_at": "2026-11-10T02:10:50.92+00:00"
+    },
+    {
+      "line": "FACT {\"own_runs_seen_inside\": [[2, \"RUNNING\"], [1, \"SUCCEEDED\"]]}",
+      "line_number": 34,
+      "reported_at": "2026-11-10T02:10:51.056+00:00"
+    },
+    {
+      "line": "FACT {\"secret\": {\"names_present\": [\"CDC_V2_PROBE_SECRET\", \"cdc_v2_spike_secret_CDC_V2_PROBE_SECRET\"], \"namespaced_hmac\": \"bae0146e5b270e2e\", \"bare_hmac\": \"bae0146e5b270e2e\"}}",
+      "line_number": 35,
+      "reported_at": "2026-11-10T02:10:51.056+00:00"
+    },
+    {
+      "line": "FACT {\"total_s\": 3.61}",
+      "line_number": 36,
+      "reported_at": "2026-11-10T02:10:51.056+00:00"
+    }
+  ],
+  "md_run_flight_returned": {
+    "cancelled_at": null,
+    "config": {
+      "CDC_V2_PROBE_FLIGHT_NAME": "cdc_v2_spike_hello",
+      "CDC_V2_PROBE_MODE": "facts",
+      "CDC_V2_PROBE_NONCE": "<redacted>",
+      "CDC_V2_PROBE_TICKS": "20"
+    },
+    "created_at": "2026-11-10T02:10:44.133+00:00",
+    "ended_at": null,
+    "exit_code": null,
+    "flight_id": "206bf7dc-3ac6-42b7-80c1-cf80008e9fc7",
+    "flight_name": "cdc_v2_spike_hello",
+    "flight_version": 2,
+    "is_scheduled": false,
+    "run_id": "01a1c338-d4e5-7c64-9a42-78416d9f9120",
+    "run_number": 2,
+    "scheduled_at": "2026-11-10T02:10:44.069+00:00",
+    "started_at": null,
+    "started_by_id": "<redacted>",
+    "started_by_name": "<redacted>",
+    "state": "PENDING",
+    "status": "PENDING"
+  },
+  "per_run_config_override": null,
+  "timing": {
+    "cancelled_at": null,
+    "created_at": "2026-11-10T02:10:44.133+00:00",
+    "created_to_ended_s": 6.984,
+    "created_to_first_line_s": 3.288,
+    "created_to_started_s": 0.261,
+    "ended_at": "2026-11-10T02:10:51.117+00:00",
+    "f16_cost_usd_if_billed_started_to_ended": 0.00112,
+    "first_line_to_ended_s": 3.696,
+    "scheduled_at": "2026-11-10T02:10:44.069+00:00",
+    "started_at": "2026-11-10T02:10:44.394+00:00",
+    "started_to_ended_s": 6.723,
+    "started_to_first_line_s": 3.027
+  }
+}

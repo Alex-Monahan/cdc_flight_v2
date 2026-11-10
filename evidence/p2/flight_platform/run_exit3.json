@@ -1,0 +1,152 @@
+{
+  "facts": {
+    "first_line_unix": 1794276684.155,
+    "import_done_s": 0.409,
+    "mode": "exit3"
+  },
+  "final": {
+    "cancelled_at": null,
+    "config": {
+      "CDC_V2_PROBE_FLIGHT_NAME": "cdc_v2_spike_hello",
+      "CDC_V2_PROBE_MODE": "exit3",
+      "CDC_V2_PROBE_NONCE": "<redacted>",
+      "CDC_V2_PROBE_TICKS": "20"
+    },
+    "created_at": "2026-11-10T02:11:20.474+00:00",
+    "ended_at": "2026-11-10T02:11:24.597+00:00",
+    "exit_code": 3,
+    "flight_id": "206bf7dc-3ac6-42b7-80c1-cf80008e9fc7",
+    "flight_name": "cdc_v2_spike_hello",
+    "flight_version": 2,
+    "is_scheduled": false,
+    "observed_states": [
+      {
+        "observed_at": "2026-11-10T02:11:20.914706+00:00",
+        "state": "PENDING"
+      },
+      {
+        "observed_at": "2026-11-10T02:11:21.737168+00:00",
+        "state": "RUNNING"
+      },
+      {
+        "observed_at": "2026-11-10T02:11:25.658313+00:00",
+        "state": "FAILED"
+      }
+    ],
+    "run_id": "01a1c339-6310-7373-8012-c281a0077bcc",
+    "run_number": 6,
+    "scheduled_at": "2026-11-10T02:11:20.464+00:00",
+    "started_at": "2026-11-10T02:11:20.898+00:00",
+    "started_by_id": "<redacted>",
+    "started_by_name": "<redacted>",
+    "state": "FAILED",
+    "status": "FAILED"
+  },
+  "label": "exit3",
+  "local_requested_at": "2026-11-10T02:11:19.510343+00:00",
+  "local_run_call_returned_at": "2026-11-10T02:11:20.571594+00:00",
+  "log_line_count": 12,
+  "logs": [
+    {
+      "line": "Using CPython 3.12.15",
+      "line_number": 0,
+      "reported_at": "2026-11-10T02:11:21.53+00:00"
+    },
+    {
+      "line": "Creating virtual environment at: .venv",
+      "line_number": 1,
+      "reported_at": "2026-11-10T02:11:21.53+00:00"
+    },
+    {
+      "line": "Resolved 1 package in 753ms",
+      "line_number": 2,
+      "reported_at": "2026-11-10T02:11:22.549+00:00"
+    },
+    {
+      "line": "Downloading duckdb (20.6MiB)",
+      "line_number": 3,
+      "reported_at": "2026-11-10T02:11:22.655+00:00"
+    },
+    {
+      "line": " Downloaded duckdb",
+      "line_number": 4,
+      "reported_at": "2026-11-10T02:11:24.076+00:00"
+    },
+    {
+      "line": "Prepared 1 package in 1.52s",
+      "line_number": 5,
+      "reported_at": "2026-11-10T02:11:24.175+00:00"
+    },
+    {
+      "line": "Installed 1 package in 34ms",
+      "line_number": 6,
+      "reported_at": "2026-11-10T02:11:24.175+00:00"
+    },
+    {
+      "line": " + duckdb==1.5.6",
+      "line_number": 7,
+      "reported_at": "2026-11-10T02:11:24.175+00:00"
+    },
+    {
+      "line": "FACT {\"first_line_unix\": 1794276684.155}",
+      "line_number": 8,
+      "reported_at": "2026-11-10T02:11:24.175+00:00"
+    },
+    {
+      "line": "FACT {\"mode\": \"exit3\"}",
+      "line_number": 9,
+      "reported_at": "2026-11-10T02:11:24.564+00:00"
+    },
+    {
+      "line": "FACT {\"import_done_s\": 0.409}",
+      "line_number": 10,
+      "reported_at": "2026-11-10T02:11:24.564+00:00"
+    },
+    {
+      "line": "cdc_v2 probe: exiting with status 3",
+      "line_number": 11,
+      "reported_at": "2026-11-10T02:11:24.564+00:00"
+    }
+  ],
+  "md_run_flight_returned": {
+    "cancelled_at": null,
+    "config": {
+      "CDC_V2_PROBE_FLIGHT_NAME": "cdc_v2_spike_hello",
+      "CDC_V2_PROBE_MODE": "exit3",
+      "CDC_V2_PROBE_NONCE": "<redacted>",
+      "CDC_V2_PROBE_TICKS": "20"
+    },
+    "created_at": "2026-11-10T02:11:20.474+00:00",
+    "ended_at": null,
+    "exit_code": null,
+    "flight_id": "206bf7dc-3ac6-42b7-80c1-cf80008e9fc7",
+    "flight_name": "cdc_v2_spike_hello",
+    "flight_version": 2,
+    "is_scheduled": false,
+    "run_id": "01a1c339-6310-7373-8012-c281a0077bcc",
+    "run_number": 6,
+    "scheduled_at": "2026-11-10T02:11:20.464+00:00",
+    "started_at": null,
+    "started_by_id": "<redacted>",
+    "started_by_name": "<redacted>",
+    "state": "PENDING",
+    "status": "PENDING"
+  },
+  "per_run_config_override": [
+    "CDC_V2_PROBE_MODE"
+  ],
+  "timing": {
+    "cancelled_at": null,
+    "created_at": "2026-11-10T02:11:20.474+00:00",
+    "created_to_ended_s": 4.123,
+    "created_to_first_line_s": 3.681,
+    "created_to_started_s": 0.424,
+    "ended_at": "2026-11-10T02:11:24.597+00:00",
+    "f16_cost_usd_if_billed_started_to_ended": 0.000616,
+    "first_line_to_ended_s": 0.442,
+    "scheduled_at": "2026-11-10T02:11:20.464+00:00",
+    "started_at": "2026-11-10T02:11:20.898+00:00",
+    "started_to_ended_s": 3.699,
+    "started_to_first_line_s": 3.257
+  }
+}

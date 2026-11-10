@@ -1,0 +1,103 @@
+{
+  "* * * * *": {
+    "accepted": true,
+    "schedule_cron": "* * * * *",
+    "schedule_status": "ACTIVE",
+    "set_at": "2026-11-10T02:12:45.162044+00:00"
+  },
+  "*/30 * * * * *": {
+    "accepted": false,
+    "error": "schedule_cron must have 5 fields (UTC): '*/30 * * * * *'"
+  },
+  "0 0 1 1 *": {
+    "accepted": true,
+    "schedule_cron": "0 0 1 1 *",
+    "schedule_status": "ACTIVE"
+  },
+  "@hourly": {
+    "accepted": false,
+    "error": "schedule_cron must have 5 fields (UTC): '@hourly'"
+  },
+  "clear_absent_schedule": {
+    "error": null
+  },
+  "cleared": {
+    "schedule_cron": "* * * * *",
+    "schedule_status": "DISABLED"
+  },
+  "runs_after_clear_70s": [
+    {
+      "created_at": "2026-11-10T02:12:47.821+00:00",
+      "is_scheduled": true,
+      "run_number": 10
+    },
+    {
+      "created_at": "2026-11-10T02:12:10.216+00:00",
+      "is_scheduled": false,
+      "run_number": 9
+    },
+    {
+      "created_at": "2026-11-10T02:11:54.314+00:00",
+      "is_scheduled": false,
+      "run_number": 8
+    },
+    {
+      "created_at": "2026-11-10T02:11:26.724+00:00",
+      "is_scheduled": false,
+      "run_number": 7
+    },
+    {
+      "created_at": "2026-11-10T02:11:20.474+00:00",
+      "is_scheduled": false,
+      "run_number": 6
+    }
+  ],
+  "scheduled_run": {
+    "cancelled_at": null,
+    "config": {
+      "CDC_V2_PROBE_FLIGHT_NAME": "cdc_v2_spike_hello",
+      "CDC_V2_PROBE_MODE": "facts",
+      "CDC_V2_PROBE_NONCE": "<redacted>",
+      "CDC_V2_PROBE_TICKS": "20"
+    },
+    "created_at": "2026-11-10T02:12:47.821+00:00",
+    "ended_at": "2026-11-10T02:13:09.725+00:00",
+    "exit_code": 0,
+    "flight_id": "206bf7dc-3ac6-42b7-80c1-cf80008e9fc7",
+    "flight_name": "cdc_v2_spike_hello",
+    "flight_version": 4,
+    "is_scheduled": true,
+    "observed_states": [
+      {
+        "observed_at": "2026-11-10T02:13:03.969535+00:00",
+        "state": "RUNNING"
+      },
+      {
+        "observed_at": "2026-11-10T02:13:11.319217+00:00",
+        "state": "SUCCEEDED"
+      }
+    ],
+    "run_id": "01a1c33a-b847-7b66-bb82-81eaf9d94c8b",
+    "run_number": 10,
+    "scheduled_at": "2026-11-10T02:13:00+00:00",
+    "started_at": "2026-11-10T02:13:01.295+00:00",
+    "started_by_id": null,
+    "started_by_name": null,
+    "state": "SUCCEEDED",
+    "status": "SUCCEEDED"
+  },
+  "scheduled_run_timing": {
+    "cancelled_at": null,
+    "created_at": "2026-11-10T02:12:47.821+00:00",
+    "created_to_ended_s": 21.904,
+    "created_to_first_line_s": 18.297,
+    "created_to_started_s": 13.474,
+    "ended_at": "2026-11-10T02:13:09.725+00:00",
+    "f16_cost_usd_if_billed_started_to_ended": 0.001405,
+    "first_line_to_ended_s": 3.607,
+    "scheduled_at": "2026-11-10T02:13:00+00:00",
+    "started_at": "2026-11-10T02:13:01.295+00:00",
+    "started_to_ended_s": 8.43,
+    "started_to_first_line_s": 4.823
+  }
+}

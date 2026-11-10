@@ -314,6 +314,12 @@ def parse_time(value: Any) -> _dt.datetime | None:
     return _dt.datetime.fromisoformat(str(normalize_timestamp(value)))
 
 
+def schedule_active(flight: Mapping[str, Any]) -> bool:
+    """Measured: clearing a schedule (schedule_cron := '') keeps the cron text and sets schedule_status DISABLED;
+    only ACTIVE fires."""
+    return bool(flight.get("schedule_cron")) and normalize_status(flight.get("schedule_status")) == "ACTIVE"
+
+
 def run_is_active(run: Mapping[str, Any]) -> bool:
     return normalize_status(run.get("status")) in ACTIVE_STATES
 
@@ -418,8 +424,8 @@ class FlightCtl:
 
     def unschedule(self, ref: str) -> dict[str, Any]:
         flight = self.resolve(ref)
-        if not flight.get("schedule_cron"):
-            return flight  # clearing an absent schedule is an error on the server
+        if not schedule_active(flight):
+            return flight  # nothing fires; clearing a never-set schedule is an error on the server
         return self.query(build_update_sql(flight["flight_id"], schedule_cron=""))[0]
 
     def delete(self, ref: str) -> dict[str, Any]:

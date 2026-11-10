@@ -1,0 +1,278 @@
+{
+  "facts": {
+    "egress_ip": "32.195.40.107",
+    "first_line_unix": 1794276657.334,
+    "flight_functions_inside": {
+      "md_list_flights_ok": true,
+      "own_flight_found": true
+    },
+    "git_clone_public_repo": {
+      "error": null,
+      "head": "11983942f87febe77ef1741e69317757b5fb47c8",
+      "rc": 0,
+      "s": 0.27
+    },
+    "import_done_s": 0.405,
+    "jdk_download_adoptium_100mb": {
+      "MB_per_s": 266.3,
+      "bytes": 100000000,
+      "s": 0.38,
+      "status": 206
+    },
+    "jdk_download_corretto_100mb": {
+      "MB_per_s": 245.7,
+      "bytes": 100000000,
+      "s": 0.41,
+      "status": 206
+    },
+    "maven_central": {
+      "MB_per_s": 0.3,
+      "bytes": 10353,
+      "s": 0.04,
+      "status": 200
+    },
+    "maven_central_jar_download": {
+      "MB_per_s": 3.1,
+      "bytes": 401685,
+      "s": 0.13,
+      "status": 200
+    },
+    "mode": "net",
+    "motherduck": {
+      "client": "1.5.6",
+      "connect_s": 1.6,
+      "databases_cdc_v2": 2,
+      "databases_other": 72,
+      "databases_total": 74,
+      "org_type": "business",
+      "region": "us-east-1",
+      "server": "v1.5.6",
+      "username_hmac": "<present>"
+    },
+    "own_runs_seen_inside": [
+      [
+        3,
+        "RUNNING"
+      ],
+      [
+        2,
+        "SUCCEEDED"
+      ],
+      [
+        1,
+        "SUCCEEDED"
+      ]
+    ],
+    "pypi": {
+      "MB_per_s": 4.9,
+      "bytes": 3120409,
+      "s": 0.63,
+      "status": 200
+    },
+    "token_env": {
+      "MOTHERDUCK_TOKEN": true,
+      "motherduck_token": false
+    },
+    "total_s": 4.39
+  },
+  "final": {
+    "cancelled_at": null,
+    "config": {
+      "CDC_V2_PROBE_FLIGHT_NAME": "cdc_v2_spike_hello",
+      "CDC_V2_PROBE_MODE": "net",
+      "CDC_V2_PROBE_NONCE": "<redacted>",
+      "CDC_V2_PROBE_TICKS": "20"
+    },
+    "created_at": "2026-11-10T02:10:52.79+00:00",
+    "ended_at": "2026-11-10T02:11:01.776+00:00",
+    "exit_code": 0,
+    "flight_id": "206bf7dc-3ac6-42b7-80c1-cf80008e9fc7",
+    "flight_name": "cdc_v2_spike_hello",
+    "flight_version": 2,
+    "is_scheduled": false,
+    "observed_states": [
+      {
+        "observed_at": "2026-11-10T02:10:53.236606+00:00",
+        "state": "PENDING"
+      },
+      {
+        "observed_at": "2026-11-10T02:10:54.809913+00:00",
+        "state": "RUNNING"
+      },
+      {
+        "observed_at": "2026-11-10T02:11:02.747753+00:00",
+        "state": "SUCCEEDED"
+      }
+    ],
+    "run_id": "01a1c338-f6ed-7e65-bcb5-983d3f96c929",
+    "run_number": 3,
+    "scheduled_at": "2026-11-10T02:10:52.781+00:00",
+    "started_at": "2026-11-10T02:10:54.183+00:00",
+    "started_by_id": "<redacted>",
+    "started_by_name": "<redacted>",
+    "state": "SUCCEEDED",
+    "status": "SUCCEEDED"
+  },
+  "label": "net1",
+  "local_requested_at": "2026-11-10T02:10:52.085740+00:00",
+  "local_run_call_returned_at": "2026-11-10T02:10:52.914206+00:00",
+  "log_line_count": 23,
+  "logs": [
+    {
+      "line": "Using CPython 3.12.15",
+      "line_number": 0,
+      "reported_at": "2026-11-10T02:10:54.841+00:00"
+    },
+    {
+      "line": "Creating virtual environment at: .venv",
+      "line_number": 1,
+      "reported_at": "2026-11-10T02:10:54.841+00:00"
+    },
+    {
+      "line": "Resolved 1 package in 781ms",
+      "line_number": 2,
+      "reported_at": "2026-11-10T02:10:55.885+00:00"
+    },
+    {
+      "line": "Downloading duckdb (20.6MiB)",
+      "line_number": 3,
+      "reported_at": "2026-11-10T02:10:56.015+00:00"
+    },
+    {
+      "line": " Downloaded duckdb",
+      "line_number": 4,
+      "reported_at": "2026-11-10T02:10:57.257+00:00"
+    },
+    {
+      "line": "Prepared 1 package in 1.37s",
+      "line_number": 5,
+      "reported_at": "2026-11-10T02:10:57.375+00:00"
+    },
+    {
+      "line": "Installed 1 package in 31ms",
+      "line_number": 6,
+      "reported_at": "2026-11-10T02:10:57.375+00:00"
+    },
+    {
+      "line": " + duckdb==1.5.6",
+      "line_number": 7,
+      "reported_at": "2026-11-10T02:10:57.375+00:00"
+    },
+    {
+      "line": "FACT {\"first_line_unix\": 1794276657.334}",
+      "line_number": 8,
+      "reported_at": "2026-11-10T02:10:57.375+00:00"
+    },
+    {
+      "line": "FACT {\"mode\": \"net\"}",
+      "line_number": 9,
+      "reported_at": "2026-11-10T02:10:57.739+00:00"
+    },
+    {
+      "line": "FACT {\"import_done_s\": 0.405}",
+      "line_number": 10,
+      "reported_at": "2026-11-10T02:10:57.739+00:00"
+    },
+    {
+      "line": "FACT {\"egress_ip\": \"32.195.40.107\"}",
+      "line_number": 11,
+      "reported_at": "2026-11-10T02:10:57.855+00:00"
+    },
+    {
+      "line": "FACT {\"git_clone_public_repo\": {\"rc\": 0, \"s\": 0.27, \"head\": \"11983942f87febe77ef1741e69317757b5fb47c8\", \"error\": null}}",
+      "line_number": 12,
+      "reported_at": "2026-11-10T02:10:58.062+00:00"
+    },
+    {
+      "line": "FACT {\"maven_central\": {\"status\": 200, \"bytes\": 10353, \"s\": 0.04, \"MB_per_s\": 0.3}}",
+      "line_number": 13,
+      "reported_at": "2026-11-10T02:10:58.176+00:00"
+    },
+    {
+      "line": "FACT {\"maven_central_jar_download\": {\"status\": 200, \"bytes\": 401685, \"s\": 0.13, \"MB_per_s\": 3.1}}",
+      "line_number": 14,
+      "reported_at": "2026-11-10T02:10:58.27+00:00"
+    },
+    {
+      "line": "FACT {\"jdk_download_adoptium_100mb\": {\"status\": 206, \"bytes\": 100000000, \"s\": 0.38, \"MB_per_s\": 266.3}}",
+      "line_number": 15,
+      "reported_at": "2026-11-10T02:10:58.613+00:00"
+    },
+    {
+      "line": "FACT {\"jdk_download_corretto_100mb\": {\"status\": 206, \"bytes\": 100000000, \"s\": 0.41, \"MB_per_s\": 245.7}}",
+      "line_number": 16,
+      "reported_at": "2026-11-10T02:10:59.02+00:00"
+    },
+    {
+      "line": "FACT {\"pypi\": {\"status\": 200, \"bytes\": 3120409, \"s\": 0.63, \"MB_per_s\": 4.9}}",
+      "line_number": 17,
+      "reported_at": "2026-11-10T02:10:59.654+00:00"
+    },
+    {
+      "line": "FACT {\"token_env\": {\"MOTHERDUCK_TOKEN\": true, \"motherduck_token\": false}}",
+      "line_number": 18,
+      "reported_at": "2026-11-10T02:10:59.654+00:00"
+    },
+    {
+      "line": "FACT {\"motherduck\": {\"connect_s\": 1.6, \"client\": \"1.5.6\", \"server\": \"v1.5.6\", \"username_hmac\": \"85fc6115ccd4b13a\", \"org_type\": \"business\", \"region\": \"us-east-1\", \"databases_total\": 74, \"databases_cdc_v2\": 2, \"databases_other\": 72}}",
+      "line_number": 19,
+      "reported_at": "2026-11-10T02:11:01.499+00:00"
+    },
+    {
+      "line": "FACT {\"flight_functions_inside\": {\"md_list_flights_ok\": true, \"own_flight_found\": true}}",
+      "line_number": 20,
+      "reported_at": "2026-11-10T02:11:01.635+00:00"
+    },
+    {
+      "line": "FACT {\"own_runs_seen_inside\": [[3, \"RUNNING\"], [2, \"SUCCEEDED\"], [1, \"SUCCEEDED\"]]}",
+      "line_number": 21,
+      "reported_at": "2026-11-10T02:11:01.736+00:00"
+    },
+    {
+      "line": "FACT {\"total_s\": 4.39}",
+      "line_number": 22,
+      "reported_at": "2026-11-10T02:11:01.736+00:00"
+    }
+  ],
+  "md_run_flight_returned": {
+    "cancelled_at": null,
+    "config": {
+      "CDC_V2_PROBE_FLIGHT_NAME": "cdc_v2_spike_hello",
+      "CDC_V2_PROBE_MODE": "net",
+      "CDC_V2_PROBE_NONCE": "<redacted>",
+      "CDC_V2_PROBE_TICKS": "20"
+    },
+    "created_at": "2026-11-10T02:10:52.79+00:00",
+    "ended_at": null,
+    "exit_code": null,
+    "flight_id": "206bf7dc-3ac6-42b7-80c1-cf80008e9fc7",
+    "flight_name": "cdc_v2_spike_hello",
+    "flight_version": 2,
+    "is_scheduled": false,
+    "run_id": "01a1c338-f6ed-7e65-bcb5-983d3f96c929",
+    "run_number": 3,
+    "scheduled_at": "2026-11-10T02:10:52.781+00:00",
+    "started_at": null,
+    "started_by_id": "<redacted>",
+    "started_by_name": "<redacted>",
+    "state": "PENDING",
+    "status": "PENDING"
+  },
+  "per_run_config_override": [
+    "CDC_V2_PROBE_MODE"
+  ],
+  "timing": {
+    "cancelled_at": null,
+    "created_at": "2026-11-10T02:10:52.79+00:00",
+    "created_to_ended_s": 8.986,
+    "created_to_first_line_s": 4.544,
+    "created_to_started_s": 1.393,
+    "ended_at": "2026-11-10T02:11:01.776+00:00",
+    "f16_cost_usd_if_billed_started_to_ended": 0.001265,
+    "first_line_to_ended_s": 4.442,
+    "scheduled_at": "2026-11-10T02:10:52.781+00:00",
+    "started_at": "2026-11-10T02:10:54.183+00:00",
+    "started_to_ended_s": 7.593,
+    "started_to_first_line_s": 3.151
+  }
+}

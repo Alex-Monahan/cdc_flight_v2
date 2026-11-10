@@ -1,0 +1,182 @@
+{
+  "final": {
+    "cancelled_at": null,
+    "config": {
+      "CDC_V2_PROBE_FLIGHT_NAME": "cdc_v2_spike_hello",
+      "CDC_V2_PROBE_MODE": "ticks",
+      "CDC_V2_PROBE_NONCE": "<redacted>",
+      "CDC_V2_PROBE_TICKS": "20"
+    },
+    "created_at": "2026-11-10T02:11:26.724+00:00",
+    "ended_at": "2026-11-10T02:11:50.952+00:00",
+    "exit_code": 0,
+    "flight_id": "206bf7dc-3ac6-42b7-80c1-cf80008e9fc7",
+    "flight_name": "cdc_v2_spike_hello",
+    "flight_version": 2,
+    "is_scheduled": false,
+    "run_id": "01a1c339-7b75-72f9-ba45-47f00759fd8d",
+    "run_number": 7,
+    "scheduled_at": "2026-11-10T02:11:26.709+00:00",
+    "started_at": "2026-11-10T02:11:27.363+00:00",
+    "started_by_id": "<redacted>",
+    "started_by_name": "<redacted>",
+    "state": "SUCCEEDED",
+    "status": "SUCCEEDED"
+  },
+  "local_requested_at": "2026-11-10T02:11:26.006869+00:00",
+  "log_polls": 20,
+  "note": "visible_after_s compares the Flight's clock with this machine's clock (both NTP); polling 0.5 s",
+  "states_observed_polling_0_5s": [
+    {
+      "local_observed_at": "2026-11-10T02:11:27.233857+00:00",
+      "state": "PENDING"
+    },
+    {
+      "local_observed_at": "2026-11-10T02:11:28.110957+00:00",
+      "state": "RUNNING"
+    },
+    {
+      "local_observed_at": "2026-11-10T02:11:52.403777+00:00",
+      "state": "SUCCEEDED"
+    }
+  ],
+  "ticks": [
+    {
+      "printed_unix": 1794276690.879,
+      "reported_at_minus_printed_s": 0.001,
+      "tick": 0,
+      "visible_after_s": -0.19
+    },
+    {
+      "printed_unix": 1794276691.879,
+      "reported_at_minus_printed_s": 0.001,
+      "tick": 1,
+      "visible_after_s": 0.13
+    },
+    {
+      "printed_unix": 1794276692.879,
+      "reported_at_minus_printed_s": 0.002,
+      "tick": 2,
+      "visible_after_s": 0.4
+    },
+    {
+      "printed_unix": 1794276693.88,
+      "reported_at_minus_printed_s": 0.0,
+      "tick": 3,
+      "visible_after_s": 0.69
+    },
+    {
+      "printed_unix": 1794276694.88,
+      "reported_at_minus_printed_s": 0.0,
+      "tick": 4,
+      "visible_after_s": 0.89
+    },
+    {
+      "printed_unix": 1794276695.88,
+      "reported_at_minus_printed_s": 0.0,
+      "tick": 5,
+      "visible_after_s": -0.11
+    },
+    {
+      "printed_unix": 1794276696.88,
+      "reported_at_minus_printed_s": 0.0,
+      "tick": 6,
+      "visible_after_s": 0.23
+    },
+    {
+      "printed_unix": 1794276697.88,
+      "reported_at_minus_printed_s": 0.0,
+      "tick": 7,
+      "visible_after_s": 0.45
+    },
+    {
+      "printed_unix": 1794276698.88,
+      "reported_at_minus_printed_s": 0.001,
+      "tick": 8,
+      "visible_after_s": 0.82
+    },
+    {
+      "printed_unix": 1794276699.88,
+      "reported_at_minus_printed_s": 0.001,
+      "tick": 9,
+      "visible_after_s": -0.18
+    },
+    {
+      "printed_unix": 1794276700.88,
+      "reported_at_minus_printed_s": 0.001,
+      "tick": 10,
+      "visible_after_s": 0.11
+    },
+    {
+      "printed_unix": 1794276701.881,
+      "reported_at_minus_printed_s": 0.0,
+      "tick": 11,
+      "visible_after_s": 0.46
+    },
+    {
+      "printed_unix": 1794276702.881,
+      "reported_at_minus_printed_s": 0.0,
+      "tick": 12,
+      "visible_after_s": 0.74
+    },
+    {
+      "printed_unix": 1794276703.881,
+      "reported_at_minus_printed_s": 0.0,
+      "tick": 13,
+      "visible_after_s": -0.26
+    },
+    {
+      "printed_unix": 1794276704.881,
+      "reported_at_minus_printed_s": 0.0,
+      "tick": 14,
+      "visible_after_s": -0.04
+    },
+    {
+      "printed_unix": 1794276705.881,
+      "reported_at_minus_printed_s": 0.0,
+      "tick": 15,
+      "visible_after_s": 0.21
+    },
+    {
+      "printed_unix": 1794276706.881,
+      "reported_at_minus_printed_s": 0.001,
+      "tick": 16,
+      "visible_after_s": 0.36
+    },
+    {
+      "printed_unix": 1794276707.881,
+      "reported_at_minus_printed_s": 0.001,
+      "tick": 17,
+      "visible_after_s": 0.71
+    },
+    {
+      "printed_unix": 1794276708.882,
+      "reported_at_minus_printed_s": 0.0,
+      "tick": 18,
+      "visible_after_s": -0.29
+    },
+    {
+      "printed_unix": 1794276709.882,
+      "reported_at_minus_printed_s": 0.0,
+      "tick": 19,
+      "visible_after_s": 0.06
+    }
+  ],
+  "timing": {
+    "cancelled_at": null,
+    "created_at": "2026-11-10T02:11:26.724+00:00",
+    "created_to_ended_s": 24.228,
+    "created_to_first_line_s": 3.753,
+    "created_to_started_s": 0.639,
+    "ended_at": "2026-11-10T02:11:50.952+00:00",
+    "f16_cost_usd_if_billed_started_to_ended": 0.003931,
+    "first_line_to_ended_s": 20.475,
+    "scheduled_at": "2026-11-10T02:11:26.709+00:00",
+    "started_at": "2026-11-10T02:11:27.363+00:00",
+    "started_to_ended_s": 23.589,
+    "started_to_first_line_s": 3.114
+  },
+  "visible_after_s_max": 0.89,
+  "visible_after_s_median": 0.23,
+  "visible_after_s_min": -0.29
+}

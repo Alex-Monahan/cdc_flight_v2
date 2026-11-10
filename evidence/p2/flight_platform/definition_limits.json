@@ -1,0 +1,77 @@
+{
+  "leftover": [],
+  "results": [
+    {
+      "accepted": true,
+      "bytes": 199999,
+      "error": null,
+      "kind": "source"
+    },
+    {
+      "accepted": true,
+      "bytes": 200000,
+      "error": null,
+      "kind": "source"
+    },
+    {
+      "accepted": true,
+      "bytes": 200001,
+      "error": null,
+      "kind": "source"
+    },
+    {
+      "accepted": true,
+      "bytes": 204800,
+      "error": null,
+      "kind": "source"
+    },
+    {
+      "accepted": false,
+      "bytes": 204801,
+      "error": "Invalid Input Error: source_code exceeds the 204800-byte limit (got 204801 bytes)",
+      "kind": "source"
+    },
+    {
+      "accepted": false,
+      "bytes": 250000,
+      "error": "Invalid Input Error: source_code exceeds the 204800-byte limit (got 250000 bytes)",
+      "kind": "source"
+    },
+    {
+      "accepted": true,
+      "bytes": 19999,
+      "error": null,
+      "kind": "requirements"
+    },
+    {
+      "accepted": true,
+      "bytes": 20000,
+      "error": null,
+      "kind": "requirements"
+    },
+    {
+      "accepted": true,
+      "bytes": 20001,
+      "error": null,
+      "kind": "requirements"
+    },
+    {
+      "accepted": true,
+      "bytes": 20480,
+      "error": null,
+      "kind": "requirements"
+    },
+    {
+      "accepted": false,
+      "bytes": 20481,
+      "error": "Invalid Input Error: requirements_txt exceeds the 20480-byte limit (got 20481 bytes)",
+      "kind": "requirements"
+    },
+    {
+      "accepted": false,
+      "bytes": 25000,
+      "error": "Invalid Input Error: requirements_txt exceeds the 20480-byte limit (got 25000 bytes)",
+      "kind": "requirements"
+    }
+  ]
+}

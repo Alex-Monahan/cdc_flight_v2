@@ -181,6 +181,20 @@ def test_parse_json_rows_redacts_users_and_adds_state():
     assert "someone" not in json.dumps(row)
 
 
+def test_schedule_active():
+    assert fc.schedule_active({"schedule_cron": "* * * * *", "schedule_status": "ACTIVE"})
+    assert fc.schedule_active({"schedule_cron": "* * * * *", "schedule_status": "SCHEDULE_STATUS_ACTIVE"})
+    assert not fc.schedule_active({"schedule_cron": "* * * * *", "schedule_status": "DISABLED"})
+    assert not fc.schedule_active({"schedule_cron": None, "schedule_status": None})
+
+
+def test_unschedule_skips_disabled_schedule():
+    con = FakeCon([("MD_GET_FLIGHT(", [{"flight_id": FID, "flight_name": "cdc_v2_x", "schedule_cron": "* * * * *",
+                                        "schedule_status": "DISABLED"}])])
+    fc.FlightCtl(con).unschedule(FID)
+    assert not any("MD_UPDATE_FLIGHT" in s for s in con.sql)
+
+
 def test_run_state_predicates():
     assert fc.run_is_active({"status": "RUN_STATUS_PENDING"}) and fc.run_is_active({"status": "RUNNING"})
     assert fc.run_is_terminal({"status": "CANCELLED"}) and not fc.run_is_terminal({"status": "RUNNING"})
@@ -305,7 +319,11 @@ def test_integration_create_run_logs_delete():
         assert final2["state"] == "FAILED" and final2["exit_code"] == 4
         updated = ctl.update(name, schedule_cron="0 0 1 1 *")
         assert updated["schedule_cron"] == "0 0 1 1 *"
-        assert ctl.unschedule(name)["schedule_cron"] is None
+        assert fc.schedule_active(updated)
+        cleared = ctl.unschedule(name)
+        assert not fc.schedule_active(cleared) and cleared["state"] == "ACTIVE"
+        assert fc.normalize_status(cleared["schedule_status"]) == "DISABLED"
+        assert not fc.schedule_active(ctl.unschedule(name))  # idempotent
     finally:
         if ctl.find_flight(name):
             ctl.delete(name)
