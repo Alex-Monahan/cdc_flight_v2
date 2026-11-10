@@ -26,9 +26,9 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 |---|---|---|
 | 4 Flight SQL functions, platform facts | done | `docs/spike/flight_platform.md` |
 | 3 MotherDuck semantics | laptop part done and merged; the network-bound measurements are being repeated inside an F16 Flight | `docs/spike/md_semantics.md` |
-| 1 JVM and stock Debezium on a Flight | running | `docs/spike/jvm_on_flight.md` |
+| 1 JVM and stock Debezium on a Flight | done | `docs/spike/jvm_on_flight.md` |
 | 2 Run semantics | done | `docs/spike/run_semantics.md` |
-| 5 Local throughput (first indication) | part 1 (read rate from the replica) running; part 2 (stock Debezium streaming rate) waits for the JVM program of spike 1 | `docs/spike/local_throughput.md` |
+| 5 Local throughput (first indication) | part 1 (read rate from the replica) running; part 2 (stock Debezium streaming rate) starts when part 1 has finished, on the same private cluster | `docs/spike/local_throughput.md` |
 | `docs/spike_report.md` and the architecture decision record | after the spikes | — |
 
 ## Decisions
@@ -59,6 +59,13 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
   the every-minute schedule above assumes per-second billing; with a minimum of one minute per run it would be
   $14.40 a day. The owner accepted the cost of the short runs in advance (R18); the number needs an invoice or a
   word from MotherDuck to be confirmed.
+- **Streaming rate of stock Debezium against the 100K rows/s target (R5, SPEC 5.1, decision D3).** First
+  measurement on an F16 Flight: 24–26K rows/s for a 1M-row transaction and 30K rows/s for a 10M-row transaction;
+  10K one-row transactions per second when draining a backlog. The limit is Debezium's single streaming thread at
+  30–40 µs of CPU per row; batch sizes, queue sizes, heap and the acknowledgement round trip did not move it. On 2
+  vCPUs, 100K rows/s leaves 20 µs of CPU per row for everything. Not a contradiction of SPEC (D3 expects the case),
+  so the build continues; the tuning work and its log belong to P9. The owner should expect 5.1 to be reported as
+  measured, well below the target, unless tuning finds much more than the 10 % found so far.
 - **Replacement time of a dead leader (SPEC 4.2: "within 90 s plus start-up").** Measured worst case: 30 s until
   the heartbeat is stale, up to 60 s to the next scheduled minute, then 4–8 s until the newcomer's guard has decided
   — about 98 s. The criterion holds if "start-up" includes the newcomer's own guard decision; that reading is used
@@ -101,14 +108,28 @@ Each in its own worktree and branch (Opus, high effort); the orchestrator merges
 | Job | Phase | Started | Delivers |
 |---|---|---|---|
 | Spike worker: MotherDuck semantics, second part — the same measurements inside an F16 Flight (`cdc_v2_spike_md*`) | P2 (§2 A 3) | 2026-11-09 | `flights/spike_md/`, additions to `docs/spike/md_semantics.md`, `evidence/p2/md_semantics/flight_*` |
-| Spike worker: JVM and stock Debezium on a Flight | P2 (§2 A 1) | 2026-11-09 | `flights/spike_jvm/`, `docs/spike/jvm_on_flight.md`, `evidence/p2/jvm_on_flight/` |
 | Spike worker: local read throughput (private cluster, home `pg-spike-tp`, ports 55500–55509; MotherDuck database `cdc_v2_spike_tp`) | P2 (§2 A 5, part 1) | 2026-11-09 | `spikes/local_throughput/`, `docs/spike/local_throughput.md`, `evidence/p2/local_throughput/` |
+| P3 worker, started early in a free slot: oracle, tier-T1 harness (isolated source and destination per test, evidence writer with redaction), seeded workload generator. MotherDuck databases `cdc_v2_t_*`; private clusters from port 55520 | P3 | 2026-11-10 | `src/cdc_v2/oracle/`, `src/cdc_v2/testing/`, `tools/oracle`, `docs/oracle.md`, `evidence/p3/oracle/` |
 
 Not started yet: part 2 of the local throughput spike (stock Debezium streaming rate for small transactions and for
-one 10M-row transaction). It reuses the JVM program of the JVM spike and the private cluster of part 1.
+one 10M-row transaction). It reuses the JVM program of the JVM spike (merged) and the private cluster of part 1,
+so it starts when part 1 has finished.
+
+Written by the orchestrator while the spikes ran: `docs/design/core.md`, the draft contracts of the core
+(position, commit and acknowledge, leader/fence/heartbeat rows, bootstrap, apply, snapshot and stream, slot
+continuity, state machines, modules, open points). P3 workers build against it.
 
 Finished and merged:
 
+- 2026-11-10 — JVM and stock Debezium on a Flight (§2 A 1): `jvm/` (lock files, `EngineMain.java`),
+  `src/cdc_v2/artifacts.py`, `flights/spike_jvm/`, `spikes/jvm_on_flight/`, `docs/spike/jvm_on_flight.md`,
+  `evidence/p2/jvm_on_flight/` (8 Flight runs). The spike Flight is deleted. What it settles: candidate B works on
+  an F16 Flight (Debezium 3.7.1.Final embedded in our own small JVM program, Temurin 21 fetched and verified at
+  start, 73 jars / 40 MB verified by SHA-256); a hand-over needs 14.6 s from the platform's start to the first
+  change event; the JVM peaks at 0.3–0.8 GB; change frames travel on their own pipe; the JVM must watch its
+  parent, or it is orphaned and keeps the slot; a frozen JVM holds the slot for 60 s (`wal_sender_timeout`).
+  **Streaming rate: 24–30K rows/s at `lineitem` width, with the fixture Postgres on the same 2 vCPUs** (see the
+  questions for the owner).
 - 2026-11-10 — Run semantics (§2 A 2): `flights/spike_runs/`, `tools/spike/run_semantics_*.py`,
   `docs/spike/run_semantics.md`, `evidence/p2/run_semantics/`. All 12 spike Flights and both spike databases deleted.
   What it settles: every scheduled minute starts a run whatever is active (no skip, no queue); a run can cancel
@@ -137,6 +158,10 @@ Finished and merged:
 - 2026-11-09, `.secretscan-allow` created with one rule: `^cdc_v2_spike_secret(_CDC_V2_PROBE_SECRET)?$`. It is the
   *name* of the spike's Flight secret and of the environment variable it produces (no value); the randomness rule
   flagged the name. The scanner and its tests are unchanged.
+- 2026-11-10, one rule added by the JVM spike worker: `^(2B\d/)?OpenJDK\d\dU-jdk_x64_linux_hotspot_\d\d$`. It
+  matches the file names of the Eclipse Temurin JDK tarballs in `jvm/jdk.lock.json` (public vendor artifacts); the
+  randomness rule flagged them. Anchored at both ends; reviewed by the orchestrator at the merge. The scanner and
+  its tests are unchanged.
 
 Also for the owner: commit `aa6a435` contains a pytest evidence file whose header shows a local path including the
 operating-system user name of this machine. It is not a credential, hostname, database user name or connection
