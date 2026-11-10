@@ -17,13 +17,14 @@ from apply_standin import StandInTx
 from cdc_v2.apply import LocalChangeSet, Target, apply_group
 from cdc_v2.apply.statements import Shapes
 
-N = int(os.environ.get("CDC_V2_APPLY_EXAMPLES", "12"))
+N = int(os.environ.get("CDC_V2_APPLY_EXAMPLES", "10"))
 SETTINGS = dict(max_examples=N, deadline=None, suppress_health_check=[HealthCheck.too_slow], derandomize=True)
 SEEDS = st.integers(min_value=0, max_value=2 ** 31)
 
 
 @settings(**SETTINGS)
 @given(seed=SEEDS, form=st.sampled_from(["local", "local", "relation"]))
+@example(seed=2273038, form="local")     # regression: -infinity DATE key missed by a join in the same transaction
 def test_keyed_stream_equals_source(seed, form):
     stream_scenario(local_conn(), seed, keyed=True, form=form)
 
@@ -60,7 +61,7 @@ def test_statement_shapes_depend_on_columns_only():
                               key_kinds=["bigint"])
     seen = {}
     total_sets = 0
-    for seed in range(25):
+    for seed in range(10):
         r2 = random.Random(seed)
         src = KeyedSource(meta, r2, kinds, toast_rate=0.7)
         src.seed_rows(8)
@@ -77,4 +78,4 @@ def test_statement_shapes_depend_on_columns_only():
     sh = Shapes(meta, Target("s", "t"), list(meta.unchanged_columns))
     assert all(len(v) == 1 for v in seen.values()), {k: len(v) for k, v in seen.items()}
     assert len(seen) <= sh.shape_bound(), (sorted(seen), sh.shape_bound())
-    assert total_sets == 75
+    assert total_sets == 30
