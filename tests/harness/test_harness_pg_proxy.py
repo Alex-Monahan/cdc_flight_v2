@@ -1,16 +1,17 @@
-"""Tier T1: psycopg through the TCP fault proxy to the shared local primary (port 55432). SPEC 4.5, 4.6.
+"""Tier T1: psycopg through the TCP fault proxy to the primary of the T1 fixtures' cluster. SPEC 4.5, 4.6.
 
-    tools/with-env uv run pytest -m t1 tests/harness/test_harness_pg_proxy.py
+    CDC_V2_PG_HOME=... CDC_V2_PG_PORT_BASE=... uv run pytest -m t1 tests/harness/test_harness_pg_proxy.py
+
+The cluster is the one the shared fixtures name (`tests/conftest.py`: your own home and port base; the default home
+only with CDC_V2_T1_SHARED=1).
 
 Measures how fast a client notices a black hole (TCP keepalives plus a client-side statement deadline), a reset and
 a refused connection, and that a delayed statement still succeeds. Set CDC_V2_HARNESS_EVIDENCE=<dir> to keep the
-measured times. Only `tools/localpg up` is run (a no-op when the cluster runs); nothing is stopped or changed.
+measured times. The fixture may run `tools/localpg up` (a no-op when the cluster runs); nothing is stopped or changed.
 """
-import json
 import os
 import select
 import socket
-import subprocess
 import threading
 import time
 
@@ -22,10 +23,7 @@ from cdc_v2.testing.harness_evidence import write_evidence
 
 pytestmark = pytest.mark.t1
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-LOCALPG = os.path.join(REPO, "tools", "localpg")
 EVIDENCE = os.environ.get("CDC_V2_HARNESS_EVIDENCE")
-PRIMARY_PORT = 55432
 KEEPALIVE = dict(keepalives=1, keepalives_idle=1, keepalives_interval=1, keepalives_count=2)
 DEADLINE_S = 2.0
 STATEMENT_TIMEOUT_MS = 1000
@@ -33,16 +31,12 @@ RESULTS = {}
 
 
 @pytest.fixture(scope="module")
-def cluster():
-    if not os.environ.get("CDC_V2_PG_HOME"):
-        pytest.skip("run through tools/with-env")
-    subprocess.run([LOCALPG, "up"], capture_output=True, text=True, timeout=300, check=True)
-    info = json.loads(subprocess.run([LOCALPG, "conninfo", "--json"], capture_output=True, text=True, timeout=60,
-                                     check=True).stdout)
-    assert info["primary"]["port"] == PRIMARY_PORT
-    with open(info["passwords_json"], encoding="utf-8") as f:
-        creds = json.load(f)["admin"]
-    yield {"db": info["database"], "ca": info["ca_cert"], "user": creds["user"], "password": creds["password"]}
+def cluster(shared_pg):
+    info, creds = shared_pg.info, shared_pg.passwords["admin"]
+    port = shared_pg.primary_port
+    assert port != 5432
+    yield {"db": info["database"], "ca": info["ca_cert"], "user": creds["user"], "password": creds["password"],
+           "port": port}
     if EVIDENCE and RESULTS:
         write_evidence(os.path.join(EVIDENCE, "pg_proxy_detection.json"), {
             "what": "psycopg %s through tools/netproxy to the local primary; times in seconds" % psycopg.__version__,
@@ -52,8 +46,8 @@ def cluster():
 
 
 @pytest.fixture
-def px():
-    p = npx.NetProxy("localhost", PRIMARY_PORT).start()
+def px(cluster):
+    p = npx.NetProxy("localhost", cluster["port"]).start()
     yield p
     p.stop()
 
