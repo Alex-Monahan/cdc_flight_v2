@@ -143,8 +143,8 @@ def main(argv=None) -> int:
         fdir = root / fz / "failures" / fid
         meta = json.loads((fdir / "failure.json").read_text())
         rec = json.loads((fdir / "bundle" / "record.json").read_text())
-        src = Path(meta["local_bundle"].replace("<runs>", str(pool.CACHE / "fuzz" / "runs"))) \
-            if meta.get("local_bundle") else fdir / "bundle"
+        lb = meta.get("local_bundle") or {}
+        src = pool.CACHE / "fuzz" / "runs" / lb["campaign"] / lb["dir"] if lb else fdir / "bundle"
         if not (src / "replay.jsonl").exists():
             src = fdir / "bundle"
         case = red.case_from_bundle(src, dict(rec, system_spec=meta["system_spec"]))

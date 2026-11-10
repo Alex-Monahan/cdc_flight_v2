@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "ffdd6f4d03642758ebcff34819b9decba821113e",
+  "first_failure_s": 1.639,
+  "fixed_commit": null,
+  "fuzzer": "workload",
+  "id": "workload-toy-reorder-replica-s1-ffdd6f4",
+  "local_bundle": {
+    "campaign": "20261110T120809-5822",
+    "dir": "bundle-workload-toy-reorder-replica-s1-ffdd6f4"
+  },
+  "outcome": "violation",
+  "reason": "consumer loop: parent_child 6 of 46 ([{\"parents_with_wrong_count\": 1, \"orphan_parent_ids\": 0, \"sample_parent_id_count_children\": [[14, 1, 4]], \"sample_orphans\": [], \"parents\": 3, \"observation\": 41, \"t\": 0.741}])",
+  "regression_test": null,
+  "seed": 1,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-reorder",
+  "system_spec": "toy:reorder"
+}

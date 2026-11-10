@@ -1,0 +1,135 @@
+{
+ "campaign": "20261110T121239-6f64",
+ "checkpoints": [],
+ "clean": false,
+ "commit": "ffdd6f4d03642758ebcff34819b9decba821113e",
+ "config": {
+  "budget_s": 40.0,
+  "catch_up_s": 90.0,
+  "episode_s": 10.0,
+  "fuzzer": "workload",
+  "keep_workdir": false,
+  "observer_interval_s": 0.005,
+  "pace_s": 0.25,
+  "schedule": null,
+  "start_timeout_s": 120.0
+ },
+ "counts": {
+  "checkpoints": 0,
+  "final_rows": null,
+  "observations": 1424,
+  "rolled_back": 62,
+  "rounds": 30,
+  "transactions": 600
+ },
+ "duration_s": 10.182,
+ "failure_id": "workload-toy-swallow-replica-s1-ffdd6f4",
+ "faults": {},
+ "faults_without_effect": [],
+ "first_failure_s": 9.53,
+ "fuzzer": "workload",
+ "instances": {
+  "exits": {},
+  "started": 1
+ },
+ "no_effect": {},
+ "observers": [
+  {
+   "check": "transfers",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "expected": 24000,
+    "sum": 24000
+   },
+   "longest_gap_s": 0.525,
+   "observations": 356,
+   "seconds": 9.032,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "parent_child",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "orphan_parent_ids": 0,
+    "parents": 3,
+    "parents_with_wrong_count": 0,
+    "sample_orphans": [],
+    "sample_parent_id_count_children": []
+   },
+   "longest_gap_s": 0.525,
+   "observations": 356,
+   "seconds": 9.033,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "debit_credit",
+   "errors": [],
+   "first_violations": [
+    {
+     "credit_rows": 33,
+     "credits": 131376,
+     "debit_rows": 21,
+     "debits": 123937,
+     "observation": 344,
+     "t": 8.501
+    },
+    {
+     "credit_rows": 33,
+     "credits": 131376,
+     "debit_rows": 21,
+     "debits": 123937,
+     "observation": 345,
+     "t": 8.517
+    },
+    {
+     "credit_rows": 33,
+     "credits": 131376,
+     "debit_rows": 21,
+     "debits": 123937,
+     "observation": 346,
+     "t": 8.534
+    }
+   ],
+   "last": {
+    "credit_rows": 35,
+    "credits": 140046,
+    "debit_rows": 22,
+    "debits": 132607
+   },
+   "longest_gap_s": 0.525,
+   "observations": 356,
+   "seconds": 9.033,
+   "unavailable": 0,
+   "violations": 13
+  },
+  {
+   "check": "large_marked",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "batches": 1,
+    "batches_partial_or_unmarked": 0,
+    "sample_batch_rows_marked": []
+   },
+   "longest_gap_s": 0.525,
+   "observations": 356,
+   "seconds": 9.033,
+   "unavailable": 0,
+   "violations": 0
+  }
+ ],
+ "options": {},
+ "outcome": "violation",
+ "reason": "consumer loop: debit_credit 9 of 352 ([{\"debits\": 123937, \"credits\": 131376, \"debit_rows\": 21, \"credit_rows\": 33, \"observation\": 344, \"t\": 8.501}])",
+ "seed": 1,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T12:12:39Z",
+ "system": "toy-swallow",
+ "system_spec": "toy:swallow",
+ "tier": "local"
+}

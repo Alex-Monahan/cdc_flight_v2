@@ -158,7 +158,7 @@ class Campaign:
                 "reason": rec.get("reason"), "commit": rec.get("commit"), "self_test": rec.get("self_test"),
                 "first_failure_s": rec.get("first_failure_s"), "bundle": "bundle/", "regression_test": None,
                 "fixed_commit": None}
-        meta["local_bundle"] = str(local)
+        meta["local_bundle"] = {"campaign": self.id, "dir": local.name}     # under ~/.cache/cdc_flight_v2/fuzz/runs
         write_evidence(fdir / "failure.json", meta)
         for p in sorted(local.iterdir()):
             if not p.is_file():

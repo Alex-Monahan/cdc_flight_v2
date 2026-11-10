@@ -1,0 +1,962 @@
+{
+  "about": "Written by `tools/fuzz status --write` from runs.jsonl and git (docs/testing/fuzzers.md). Self-test runs (the toy) never count toward SPEC \u00a74.",
+  "exempt_commits": [],
+  "fuzzers": {
+    "fault": {
+      "affects": [
+        "src/cdc_v2/stream",
+        "src/cdc_v2/apply",
+        "src/cdc_v2/md",
+        "src/cdc_v2/pg",
+        "src/cdc_v2/transform",
+        "src/cdc_v2/backfill",
+        "src/cdc_v2/state",
+        "src/cdc_v2/leader",
+        "src/cdc_v2/supervisor.py",
+        "src/cdc_v2/pipeline.py",
+        "src/cdc_v2/config.py",
+        "src/cdc_v2/lsn.py",
+        "src/cdc_v2/deadline.py",
+        "src/cdc_v2/artifacts.py",
+        "jvm/src",
+        "flights/cdc_v2",
+        "src/cdc_v2/crashpoints.py",
+        "src/cdc_v2/faultsites.py"
+      ],
+      "against_minimum_total": {
+        "divergences": {
+          "maximum": 0,
+          "met": false,
+          "value": 0
+        },
+        "faults": {
+          "met": false,
+          "minimum": 10000,
+          "value": 0
+        },
+        "hours": {
+          "met": false,
+          "minimum": 100.0,
+          "value": 0.0
+        },
+        "per_kind": {
+          "below": {},
+          "kinds": 0,
+          "met": false,
+          "minimum": 100
+        },
+        "seeds": {
+          "met": false,
+          "minimum": 500,
+          "value": 0
+        }
+      },
+      "bar_met": false,
+      "combos": {
+        "missing": [
+          "local/replica",
+          "local/primary",
+          "planetscale/replica",
+          "planetscale/primary"
+        ],
+        "required": [
+          "local/replica",
+          "local/primary",
+          "planetscale/replica",
+          "planetscale/primary"
+        ]
+      },
+      "counted_total": {
+        "divergences": 0,
+        "faults": 0,
+        "faults_per_kind": {},
+        "hours": 0.0,
+        "no_effect_per_kind": {},
+        "outcomes": {},
+        "rounds": 0,
+        "runs": 0,
+        "seeds": 0
+      },
+      "failures": [
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-ack_early-replica-s1-ffdd6f4",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-ack_early"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-position_apart-replica-s1-ffdd6f4",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-position_apart"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-skip_on_reconnect-replica-s1-ffdd6f4",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-skip_on_reconnect"
+        }
+      ],
+      "failures_fixed": 0,
+      "failures_open": 0,
+      "groups": [
+        {
+          "all_runs": {
+            "divergences": 1,
+            "faults": 1,
+            "faults_per_kind": {
+              "kill_point": 1
+            },
+            "hours": 0.0054,
+            "no_effect_per_kind": {
+              "kill_point_later": 1
+            },
+            "outcomes": {
+              "diverged": 1
+            },
+            "rounds": 57,
+            "runs": 1,
+            "seeds": 1
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-ack_early",
+          "tier": "local",
+          "weights": {
+            "not_attacked": [
+              "dest_delay",
+              "dest_error",
+              "dest_hang",
+              "freeze",
+              "hang_point",
+              "net_blackhole",
+              "net_drop",
+              "net_latency",
+              "net_reset",
+              "replica_promote",
+              "replica_restart",
+              "slot_drop",
+              "slot_invalidate",
+              "spill_full",
+              "src_cancel",
+              "src_lock",
+              "src_long_txn",
+              "src_restart_primary",
+              "src_terminate",
+              "src_wal_switch"
+            ],
+            "weights": {
+              "kill_group": 6,
+              "kill_point": 10,
+              "kill_point_later": 4
+            }
+          }
+        },
+        {
+          "all_runs": {
+            "divergences": 0,
+            "faults": 7,
+            "faults_per_kind": {
+              "kill_group": 1,
+              "kill_point": 4,
+              "kill_point_later": 2
+            },
+            "hours": 0.0185,
+            "no_effect_per_kind": {
+              "kill_point": 2
+            },
+            "outcomes": {
+              "pass": 1
+            },
+            "rounds": 183,
+            "runs": 1,
+            "seeds": 1
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-correct",
+          "tier": "local",
+          "weights": {
+            "not_attacked": [
+              "dest_delay",
+              "dest_error",
+              "dest_hang",
+              "freeze",
+              "hang_point",
+              "net_blackhole",
+              "net_drop",
+              "net_latency",
+              "net_reset",
+              "replica_promote",
+              "replica_restart",
+              "slot_drop",
+              "slot_invalidate",
+              "spill_full",
+              "src_cancel",
+              "src_lock",
+              "src_long_txn",
+              "src_restart_primary",
+              "src_terminate",
+              "src_wal_switch"
+            ],
+            "weights": {
+              "kill_group": 6,
+              "kill_point": 10,
+              "kill_point_later": 4
+            }
+          }
+        },
+        {
+          "all_runs": {
+            "divergences": 1,
+            "faults": 4,
+            "faults_per_kind": {
+              "kill_point": 2,
+              "kill_point_later": 2
+            },
+            "hours": 0.0125,
+            "no_effect_per_kind": {
+              "kill_point": 1
+            },
+            "outcomes": {
+              "diverged": 1
+            },
+            "rounds": 130,
+            "runs": 1,
+            "seeds": 1
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-position_apart",
+          "tier": "local",
+          "weights": {
+            "not_attacked": [
+              "dest_delay",
+              "dest_error",
+              "dest_hang",
+              "freeze",
+              "hang_point",
+              "net_blackhole",
+              "net_drop",
+              "net_latency",
+              "net_reset",
+              "replica_promote",
+              "replica_restart",
+              "slot_drop",
+              "slot_invalidate",
+              "spill_full",
+              "src_cancel",
+              "src_lock",
+              "src_long_txn",
+              "src_restart_primary",
+              "src_terminate",
+              "src_wal_switch"
+            ],
+            "weights": {
+              "kill_group": 6,
+              "kill_point": 10,
+              "kill_point_later": 4
+            }
+          }
+        },
+        {
+          "all_runs": {
+            "divergences": 1,
+            "faults": 2,
+            "faults_per_kind": {
+              "net_reset": 1,
+              "src_terminate": 1
+            },
+            "hours": 0.0034,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "diverged": 1
+            },
+            "rounds": 36,
+            "runs": 1,
+            "seeds": 1
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-skip_on_reconnect",
+          "tier": "local",
+          "weights": {
+            "not_attacked": [
+              "dest_delay",
+              "dest_error",
+              "dest_hang",
+              "freeze",
+              "hang_point",
+              "kill_group",
+              "kill_point",
+              "kill_point_later",
+              "net_latency",
+              "replica_promote",
+              "replica_restart",
+              "slot_drop",
+              "slot_invalidate",
+              "spill_full",
+              "src_cancel",
+              "src_lock",
+              "src_long_txn",
+              "src_restart_primary",
+              "src_wal_switch"
+            ],
+            "weights": {
+              "net_blackhole": 5,
+              "net_drop": 4,
+              "net_reset": 5,
+              "src_terminate": 5
+            }
+          }
+        }
+      ],
+      "restart": {
+        "commit": "6e114bce2692ac0f54989a16b6e0a434299e8fbd",
+        "subject": "P3 engine: held list keeps the newest sample (bound for every limit, property test), value-changing options forbidden, F",
+        "why": "touches jvm/src/cdc_v2/engine/CdcEngine.java, jvm/src/cdc_v2/engine/FrameGen.java, jvm/src/cdc_v2/engine/HeldEnds.java, jvm/src/cdc_v2/engine/HeldSelftest.java, jvm/src/cdc_v2/engine/ProtectedConfig.java"
+      }
+    },
+    "leadership": {
+      "affects": [
+        "src/cdc_v2/leader",
+        "src/cdc_v2/md",
+        "src/cdc_v2/state",
+        "src/cdc_v2/supervisor.py",
+        "src/cdc_v2/pipeline.py",
+        "src/cdc_v2/stream",
+        "flights/cdc_v2",
+        "src/cdc_v2/crashpoints.py"
+      ],
+      "against_minimum_total": {
+        "rounds": {
+          "met": false,
+          "minimum": 1000,
+          "value": 0
+        }
+      },
+      "bar_met": false,
+      "counted_total": {
+        "divergences": 0,
+        "faults": 0,
+        "faults_per_kind": {},
+        "hours": 0.0,
+        "no_effect_per_kind": {},
+        "outcomes": {},
+        "rounds": 0,
+        "runs": 0,
+        "seeds": 0
+      },
+      "failures": [
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-correct-replica-s1-ffdd6f4",
+          "outcome": "error",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-correct"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s1-ffdd6f4",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s2-4dffb64",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 2,
+          "self_test": true,
+          "system": "toy-no_fence"
+        }
+      ],
+      "failures_fixed": 0,
+      "failures_open": 0,
+      "groups": [
+        {
+          "all_runs": {
+            "divergences": 0,
+            "faults": 3,
+            "faults_per_kind": {
+              "dest_delay": 1,
+              "net_reset": 1,
+              "spill_full": 1
+            },
+            "hours": 0.0195,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "error": 1,
+              "pass": 1
+            },
+            "rounds": 6,
+            "runs": 2,
+            "seeds": 2
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-correct",
+          "tier": "local",
+          "weights": null
+        },
+        {
+          "all_runs": {
+            "divergences": 2,
+            "faults": 2,
+            "faults_per_kind": {
+              "net_latency": 1,
+              "spill_full": 1
+            },
+            "hours": 0.0196,
+            "no_effect_per_kind": {
+              "dest_delay": 1
+            },
+            "outcomes": {
+              "violation": 2
+            },
+            "rounds": 4,
+            "runs": 2,
+            "seeds": 2
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-no_fence",
+          "tier": "local",
+          "weights": null
+        }
+      ],
+      "restart": {
+        "commit": "6e114bce2692ac0f54989a16b6e0a434299e8fbd",
+        "subject": "P3 engine: held list keeps the newest sample (bound for every limit, property test), value-changing options forbidden, F",
+        "why": "touches src/cdc_v2/stream/engine.py, src/cdc_v2/stream/frames.py"
+      }
+    },
+    "stream": {
+      "affects": [
+        "src/cdc_v2/stream",
+        "src/cdc_v2/transform",
+        "jvm/src"
+      ],
+      "against_minimum_total": {},
+      "bar_met": null,
+      "counted_total": {
+        "divergences": 0,
+        "faults": 0,
+        "faults_per_kind": {},
+        "hours": 0.0,
+        "no_effect_per_kind": {},
+        "outcomes": {},
+        "rounds": 0,
+        "runs": 0,
+        "seeds": 0
+      },
+      "failures": [
+        {
+          "fixed_commit": null,
+          "id": "stream-toy-trust_frames-replica-s1-ffdd6f4",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-trust_frames"
+        }
+      ],
+      "failures_fixed": 0,
+      "failures_open": 0,
+      "groups": [
+        {
+          "against_minimum": {},
+          "all_runs": {
+            "divergences": 0,
+            "faults": 100000,
+            "faults_per_kind": {
+              "ack_regress": 5327,
+              "content_replaced_same_shape": 5414,
+              "cut_at_boundary": 5192,
+              "drop_begin": 5286,
+              "drop_end": 5290,
+              "dup_txn_same_life": 5329,
+              "end_count": 5242,
+              "flip_header_length": 5110,
+              "flip_header_seq": 5152,
+              "flip_header_type": 5211,
+              "flip_payload": 5252,
+              "foreign_rows": 5251,
+              "heartbeat_ahead": 5308,
+              "new_life_replay": 5367,
+              "pipefault": 5214,
+              "raw_drop_frame": 5346,
+              "raw_dup_run": 5237,
+              "raw_swap": 5183,
+              "swap_records": 5289
+            },
+            "hours": 0.0848,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "pass": 1
+            },
+            "rounds": 0,
+            "runs": 1,
+            "seeds": 1
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "self_test": false,
+          "source_mode": "offline",
+          "system": "engine-reader",
+          "tier": "offline",
+          "weights": null
+        },
+        {
+          "all_runs": {
+            "divergences": 0,
+            "faults": 42,
+            "faults_per_kind": {
+              "stream_bytes": 42
+            },
+            "hours": 0.0118,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "pass": 1
+            },
+            "rounds": 130,
+            "runs": 1,
+            "seeds": 1
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-correct",
+          "tier": "local",
+          "weights": null
+        },
+        {
+          "all_runs": {
+            "divergences": 1,
+            "faults": 11,
+            "faults_per_kind": {
+              "stream_bytes": 11
+            },
+            "hours": 0.0041,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "diverged": 1
+            },
+            "rounds": 36,
+            "runs": 1,
+            "seeds": 1
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-trust_frames",
+          "tier": "local",
+          "weights": null
+        }
+      ],
+      "restart": {
+        "commit": "6e114bce2692ac0f54989a16b6e0a434299e8fbd",
+        "subject": "P3 engine: held list keeps the newest sample (bound for every limit, property test), value-changing options forbidden, F",
+        "why": "touches jvm/src/cdc_v2/engine/CdcEngine.java, jvm/src/cdc_v2/engine/FrameGen.java, jvm/src/cdc_v2/engine/HeldEnds.java, jvm/src/cdc_v2/engine/HeldSelftest.java, jvm/src/cdc_v2/engine/ProtectedConfig.java"
+      }
+    },
+    "value": {
+      "affects": [
+        "src/cdc_v2/transform",
+        "src/cdc_v2/apply",
+        "src/cdc_v2/stream",
+        "jvm/src"
+      ],
+      "against_minimum_total": {
+        "values_per_family": {
+          "met": false,
+          "minimum": 1000000,
+          "note": "the value fuzzer is built in the P4 type wave"
+        }
+      },
+      "bar_met": false,
+      "counted_total": {
+        "divergences": 0,
+        "faults": 0,
+        "faults_per_kind": {},
+        "hours": 0.0,
+        "no_effect_per_kind": {},
+        "outcomes": {},
+        "rounds": 0,
+        "runs": 0,
+        "seeds": 0
+      },
+      "failures": [],
+      "failures_fixed": 0,
+      "failures_open": 0,
+      "groups": [],
+      "note": "not built yet: the value fuzzer belongs to the P4 type wave (task of package F)",
+      "restart": {
+        "commit": "6e114bce2692ac0f54989a16b6e0a434299e8fbd",
+        "subject": "P3 engine: held list keeps the newest sample (bound for every limit, property test), value-changing options forbidden, F",
+        "why": "touches jvm/src/cdc_v2/engine/CdcEngine.java, jvm/src/cdc_v2/engine/FrameGen.java, jvm/src/cdc_v2/engine/HeldEnds.java, jvm/src/cdc_v2/engine/HeldSelftest.java, jvm/src/cdc_v2/engine/ProtectedConfig.java"
+      }
+    },
+    "workload": {
+      "affects": [
+        "src/cdc_v2/stream",
+        "src/cdc_v2/apply",
+        "src/cdc_v2/md",
+        "src/cdc_v2/pg",
+        "src/cdc_v2/transform",
+        "src/cdc_v2/backfill",
+        "src/cdc_v2/state",
+        "src/cdc_v2/leader",
+        "src/cdc_v2/supervisor.py",
+        "src/cdc_v2/pipeline.py",
+        "src/cdc_v2/config.py",
+        "src/cdc_v2/lsn.py",
+        "src/cdc_v2/deadline.py",
+        "src/cdc_v2/artifacts.py",
+        "jvm/src",
+        "flights/cdc_v2"
+      ],
+      "against_minimum_total": {
+        "hours": {
+          "met": false,
+          "minimum": 100.0,
+          "value": 0.0
+        },
+        "seeds": {
+          "met": false,
+          "minimum": 1000,
+          "value": 0
+        }
+      },
+      "bar_met": false,
+      "combos": {
+        "missing": [
+          "local/replica",
+          "local/primary",
+          "planetscale/replica",
+          "planetscale/primary"
+        ],
+        "required": [
+          "local/replica",
+          "local/primary",
+          "planetscale/replica",
+          "planetscale/primary"
+        ]
+      },
+      "counted_total": {
+        "divergences": 0,
+        "faults": 0,
+        "faults_per_kind": {},
+        "hours": 0.0,
+        "no_effect_per_kind": {},
+        "outcomes": {},
+        "rounds": 0,
+        "runs": 0,
+        "seeds": 0
+      },
+      "failures": [
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-reorder-replica-s1-ffdd6f4",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-reorder"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-split-replica-s1-ffdd6f4",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-split"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-swallow-replica-s1-ffdd6f4",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-swallow"
+        }
+      ],
+      "failures_fixed": 0,
+      "failures_open": 0,
+      "groups": [
+        {
+          "all_runs": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0114,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "pass": 1
+            },
+            "rounds": 136,
+            "runs": 1,
+            "seeds": 1
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-correct",
+          "tier": "local",
+          "weights": null
+        },
+        {
+          "all_runs": {
+            "divergences": 1,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0005,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "violation": 1
+            },
+            "rounds": 3,
+            "runs": 1,
+            "seeds": 1
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-reorder",
+          "tier": "local",
+          "weights": null
+        },
+        {
+          "all_runs": {
+            "divergences": 1,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0004,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "violation": 1
+            },
+            "rounds": 1,
+            "runs": 1,
+            "seeds": 1
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-split",
+          "tier": "local",
+          "weights": null
+        },
+        {
+          "all_runs": {
+            "divergences": 1,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0028,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "violation": 1
+            },
+            "rounds": 30,
+            "runs": 1,
+            "seeds": 1
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-swallow",
+          "tier": "local",
+          "weights": null
+        }
+      ],
+      "restart": {
+        "commit": "6e114bce2692ac0f54989a16b6e0a434299e8fbd",
+        "subject": "P3 engine: held list keeps the newest sample (bound for every limit, property test), value-changing options forbidden, F",
+        "why": "touches jvm/src/cdc_v2/engine/CdcEngine.java, jvm/src/cdc_v2/engine/FrameGen.java, jvm/src/cdc_v2/engine/HeldEnds.java, jvm/src/cdc_v2/engine/HeldSelftest.java, jvm/src/cdc_v2/engine/ProtectedConfig.java"
+      }
+    }
+  },
+  "minimums": {
+    "fault": {
+      "divergences": 0,
+      "faults": 10000,
+      "hours": 100.0,
+      "per_kind": 100,
+      "seeds": 500
+    },
+    "leadership": {
+      "rounds": 1000
+    },
+    "stream": {},
+    "value": {
+      "values_per_family": 1000000
+    },
+    "workload": {
+      "hours": 100.0,
+      "seeds": 1000
+    }
+  }
+}

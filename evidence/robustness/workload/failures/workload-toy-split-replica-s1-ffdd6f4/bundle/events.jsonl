@@ -1,0 +1,4 @@
+{"epoch": 1, "kind": "took_over", "pid": 17012, "previous_age_ms": 847627647823, "previous_state": "released", "run": "i1-17012", "t": 1794312447.825897, "tag": "i1"}
+{"epoch": 1, "kind": "started", "pid": 17012, "run": "i1-17012", "t": 1794312447.828251, "tag": "i1", "variant": "split"}
+{"kind": "resync_start", "pid": 17012, "run": "i1-17012", "t": 1794312447.851386, "tag": "i1", "why": "pending"}
+{"kind": "resync_done", "pid": 17012, "position": "0/5CFF438", "rows": 24, "run": "i1-17012", "t": 1794312447.965884, "tag": "i1"}

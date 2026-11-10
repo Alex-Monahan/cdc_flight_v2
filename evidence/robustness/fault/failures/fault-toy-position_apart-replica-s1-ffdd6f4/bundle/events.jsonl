@@ -1,0 +1,44 @@
+{"epoch": 1, "kind": "took_over", "pid": 16557, "previous_age_ms": 847627602641, "previous_state": "released", "run": "i1-16557", "t": 1794312402.644243, "tag": "i1"}
+{"epoch": 1, "kind": "started", "pid": 16557, "run": "i1-16557", "t": 1794312402.646383, "tag": "i1", "variant": "position_apart"}
+{"kind": "resync_start", "pid": 16557, "run": "i1-16557", "t": 1794312402.670188, "tag": "i1", "why": "pending"}
+{"kind": "resync_done", "pid": 16557, "position": "0/4EBE978", "rows": 24, "run": "i1-16557", "t": 1794312402.816985, "tag": "i1"}
+{"epoch": 2, "kind": "took_over", "pid": 16571, "previous_age_ms": 2022, "previous_state": "leading", "run": "i2-16571", "t": 1794312405.200001, "tag": "i2"}
+{"epoch": 2, "kind": "started", "pid": 16571, "run": "i2-16571", "t": 1794312405.203453, "tag": "i2", "variant": "position_apart"}
+{"epoch": 3, "kind": "took_over", "pid": 16607, "previous_age_ms": 2014, "previous_state": "leading", "run": "i4-16607", "t": 1794312407.214659, "tag": "i4"}
+{"epoch": 3, "kind": "started", "pid": 16607, "run": "i4-16607", "t": 1794312407.21791, "tag": "i4", "variant": "position_apart"}
+{"detail": "write-write conflict on public.w_xfer_2", "error": "ToyConflict", "kind": "retry", "pid": 16607, "run": "i4-16607", "t": 1794312407.406954, "tag": "i4"}
+{"detail": "write-write conflict on public.w_k0", "error": "ToyConflict", "kind": "retry", "pid": 16607, "run": "i4-16607", "t": 1794312407.612519, "tag": "i4"}
+{"epoch": 4, "kind": "took_over", "pid": 16638, "previous_age_ms": 2042, "previous_state": "leading", "run": "i5-16638", "t": 1794312409.769468, "tag": "i5"}
+{"epoch": 4, "kind": "started", "pid": 16638, "run": "i5-16638", "t": 1794312409.772813, "tag": "i5", "variant": "position_apart"}
+{"detail": "write-write conflict on public.w_k1", "error": "ToyConflict", "kind": "retry", "pid": 16638, "run": "i5-16638", "t": 1794312411.588022, "tag": "i5"}
+{"detail": "write-write conflict on public.w_child", "error": "ToyConflict", "kind": "retry", "pid": 16638, "run": "i5-16638", "t": 1794312414.582811, "tag": "i5"}
+{"detail": "write-write conflict on public.w_k0", "error": "ToyConflict", "kind": "retry", "pid": 16638, "run": "i5-16638", "t": 1794312416.455248, "tag": "i5"}
+{"detail": "write-write conflict on public.w_credit", "error": "ToyConflict", "kind": "retry", "pid": 16638, "run": "i5-16638", "t": 1794312417.626451, "tag": "i5"}
+{"detail": "write-write conflict on public.w_k0", "error": "ToyConflict", "kind": "retry", "pid": 16638, "run": "i5-16638", "t": 1794312419.069251, "tag": "i5"}
+{"epoch": 5, "kind": "took_over", "pid": 16726, "previous_age_ms": 2097, "previous_state": "leading", "run": "i6-16726", "t": 1794312422.772962, "tag": "i6"}
+{"epoch": 5, "kind": "started", "pid": 16726, "run": "i6-16726", "t": 1794312422.776858, "tag": "i6", "variant": "position_apart"}
+{"epoch": 6, "kind": "took_over", "pid": 16754, "previous_age_ms": 2120, "previous_state": "leading", "run": "i7-16754", "t": 1794312424.89312, "tag": "i7"}
+{"epoch": 6, "kind": "started", "pid": 16754, "run": "i7-16754", "t": 1794312424.896558, "tag": "i7", "variant": "position_apart"}
+{"detail": "write-write conflict on public.w_credit", "error": "ToyConflict", "kind": "retry", "pid": 16754, "run": "i7-16754", "t": 1794312429.987955, "tag": "i7"}
+{"epoch": 7, "kind": "took_over", "pid": 16834, "previous_age_ms": 2052, "previous_state": "leading", "run": "i8-16834", "t": 1794312433.113098, "tag": "i8"}
+{"epoch": 7, "kind": "started", "pid": 16834, "run": "i8-16834", "t": 1794312433.117208, "tag": "i8", "variant": "position_apart"}
+{"epoch": 8, "kind": "took_over", "pid": 16852, "previous_age_ms": 2006, "previous_state": "leading", "run": "i9-16852", "t": 1794312435.11928, "tag": "i9"}
+{"epoch": 8, "kind": "started", "pid": 16852, "run": "i9-16852", "t": 1794312435.123381, "tag": "i9", "variant": "position_apart"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 16852, "run": "i9-16852", "t": 1794312435.282219, "tag": "i9"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 16852, "run": "i9-16852", "t": 1794312435.449733, "tag": "i9"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 16852, "run": "i9-16852", "t": 1794312435.670212, "tag": "i9"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 16852, "run": "i9-16852", "t": 1794312436.008446, "tag": "i9"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 16852, "run": "i9-16852", "t": 1794312436.553943, "tag": "i9"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 16852, "run": "i9-16852", "t": 1794312437.518135, "tag": "i9"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 16852, "run": "i9-16852", "t": 1794312438.664765, "tag": "i9"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 16852, "run": "i9-16852", "t": 1794312439.804179, "tag": "i9"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 16852, "run": "i9-16852", "t": 1794312440.946174, "tag": "i9"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 16852, "run": "i9-16852", "t": 1794312442.110539, "tag": "i9"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 16852, "run": "i9-16852", "t": 1794312443.254341, "tag": "i9"}
+{"epoch": 9, "kind": "took_over", "pid": 16955, "previous_age_ms": 2020, "previous_state": "leading", "run": "i10-16955", "t": 1794312445.154768, "tag": "i10"}
+{"epoch": 9, "kind": "started", "pid": 16955, "run": "i10-16955", "t": 1794312445.158775, "tag": "i10", "variant": "position_apart"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 16955, "run": "i10-16955", "t": 1794312445.319793, "tag": "i10"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 16955, "run": "i10-16955", "t": 1794312445.498168, "tag": "i10"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 16955, "run": "i10-16955", "t": 1794312445.726939, "tag": "i10"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 16955, "run": "i10-16955", "t": 1794312446.092936, "tag": "i10"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 16955, "run": "i10-16955", "t": 1794312446.656478, "tag": "i10"}

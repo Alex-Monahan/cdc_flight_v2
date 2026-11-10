@@ -1,0 +1,19 @@
+{"epoch": 1, "kind": "took_over", "pid": 19558, "previous_age_ms": 847627970142, "previous_state": "released", "run": "i1-19558", "t": 1794312770.144852, "tag": "i1"}
+{"epoch": 1, "kind": "started", "pid": 19558, "run": "i1-19558", "t": 1794312770.147031, "tag": "i1", "variant": "trust_frames"}
+{"kind": "resync_start", "pid": 19558, "run": "i1-19558", "t": 1794312770.169249, "tag": "i1", "why": "pending"}
+{"kind": "resync_done", "pid": 19558, "position": "0/98BD9D8", "rows": 24, "run": "i1-19558", "t": 1794312770.291182, "tag": "i1"}
+{"detail": "write-write conflict on public.w_nk", "error": "ToyConflict", "kind": "retry", "pid": 19558, "run": "i1-19558", "t": 1794312770.745247, "tag": "i1"}
+{"kind": "stream_fault", "kinds": ["dup", "cut"], "pid": 19558, "run": "i1-19558", "t": 1794312771.273231, "tag": "i1"}
+{"kind": "stream_fault", "kinds": ["dup", "flip"], "pid": 19558, "run": "i1-19558", "t": 1794312771.675116, "tag": "i1"}
+{"kind": "stream_fault", "kinds": ["flip"], "pid": 19558, "run": "i1-19558", "t": 1794312771.816902, "tag": "i1"}
+{"kind": "stream_fault", "kinds": ["truncate"], "pid": 19558, "run": "i1-19558", "t": 1794312772.302195, "tag": "i1"}
+{"kind": "stream_fault", "kinds": ["cut"], "pid": 19558, "run": "i1-19558", "t": 1794312772.587474, "tag": "i1"}
+{"detail": "write-write conflict on public.w_k0", "error": "ToyConflict", "kind": "retry", "pid": 19558, "run": "i1-19558", "t": 1794312772.686669, "tag": "i1"}
+{"kind": "stream_fault", "kinds": ["cut"], "pid": 19558, "run": "i1-19558", "t": 1794312773.122395, "tag": "i1"}
+{"kind": "stream_fault", "kinds": ["flip", "truncate"], "pid": 19558, "run": "i1-19558", "t": 1794312773.972561, "tag": "i1"}
+{"kind": "stream_fault", "kinds": ["flip", "truncate"], "pid": 19558, "run": "i1-19558", "t": 1794312775.987405, "tag": "i1"}
+{"kind": "stream_fault", "kinds": ["flip", "flip", "truncate"], "pid": 19558, "run": "i1-19558", "t": 1794312776.601672, "tag": "i1"}
+{"kind": "stream_fault", "kinds": ["dup", "flip"], "pid": 19558, "run": "i1-19558", "t": 1794312778.643381, "tag": "i1"}
+{"epoch": 2, "kind": "took_over", "pid": 19881, "previous_age_ms": 2114, "previous_state": "leading", "run": "i2-19881", "t": 1794312780.677742, "tag": "i2"}
+{"epoch": 2, "kind": "started", "pid": 19881, "run": "i2-19881", "t": 1794312780.681593, "tag": "i2", "variant": "trust_frames"}
+{"kind": "stream_fault", "kinds": ["dup", "dup", "truncate"], "pid": 19881, "run": "i2-19881", "t": 1794312782.658205, "tag": "i2"}

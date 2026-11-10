@@ -60,7 +60,7 @@ class Git:
         return subprocess.run(["git", *args], cwd=self.repo, capture_output=True, text=True, timeout=60)
 
     def commits_touching(self, paths: list) -> list:
-        out = self.run("log", "--format=%H", "--", *paths)
+        out = self.run("log", "--no-merges", "--format=%H", "--", *paths)
         return [c for c in out.stdout.split() if c]
 
     def missing_fixes(self, run_commit: str, paths: list, exempt: set) -> list:
@@ -68,7 +68,7 @@ class Git:
         fixes the run did not have (merge order does not matter)."""
         key = ("missing", run_commit)
         if key not in self._anc:
-            out = self.run("rev-list", "%s..HEAD" % run_commit, "--", *paths)
+            out = self.run("rev-list", "--no-merges", "%s..HEAD" % run_commit, "--", *paths)
             if out.returncode != 0:
                 self._anc[key] = ["<unknown commit>"]
             else:

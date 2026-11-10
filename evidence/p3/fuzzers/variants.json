@@ -1,0 +1,176 @@
+{
+  "about": "Wrong variants of the toy replicator (tests/fuzz/toy/toy.py), the fuzzer that must find each, and the correct toy on the same seeds (docs/testing/fuzzers.md section 2).",
+  "all_found": true,
+  "correct_toy_passed": true,
+  "source_node": "replica",
+  "variants": [
+    {
+      "bound_seeds": 6,
+      "correct_toy_passed": true,
+      "correct_toy_same_seeds": {
+        "1": "pass"
+      },
+      "expected_finder": "fault fuzzer (process kills): a lost change",
+      "failure_id": "fault-toy-ack_early-replica-s1-ffdd6f4",
+      "first_failure_s_in_run": 18.922,
+      "found": true,
+      "fuzzer": "fault",
+      "outcome": "diverged",
+      "reason": "the system reports that the destination diverged from the source (3 times ApplyInvariantError, last: unchanged value of public.w_toast has no earlier row), stopped short of 0/3868D90",
+      "seconds_until_found": 19.4,
+      "seeds_run": [
+        1
+      ],
+      "seeds_until_found": 1,
+      "variant": "ack_early",
+      "wall_s": 24.6
+    },
+    {
+      "bound_seeds": 6,
+      "correct_toy_passed": true,
+      "correct_toy_same_seeds": {
+        "1": "pass"
+      },
+      "expected_finder": "fault fuzzer (process kills): a change applied twice",
+      "failure_id": "fault-toy-position_apart-replica-s1-ffdd6f4",
+      "first_failure_s_in_run": 44.455,
+      "found": true,
+      "fuzzer": "fault",
+      "outcome": "diverged",
+      "reason": "the system reports that the destination diverged from the source (4 times ApplyInvariantError, last: unchanged value of public.w_toast has no earlier row), stopped short of 0/58557C0",
+      "seconds_until_found": 45.1,
+      "seeds_run": [
+        1
+      ],
+      "seeds_until_found": 1,
+      "variant": "position_apart",
+      "wall_s": 45.2
+    },
+    {
+      "bound_seeds": 4,
+      "correct_toy_passed": true,
+      "correct_toy_same_seeds": {
+        "1": "pass"
+      },
+      "expected_finder": "the consumer loops (the end-state oracle cannot see it)",
+      "failure_id": "workload-toy-split-replica-s1-ffdd6f4",
+      "first_failure_s_in_run": 0.964,
+      "found": true,
+      "fuzzer": "workload",
+      "outcome": "violation",
+      "reason": "consumer loop: debit_credit 3 of 12 ([{\"debits\": 8256, \"credits\": 0, \"debit_rows\": 1, \"credit_rows\": 0, \"observation\": 4, \"t\": 0.061}])",
+      "seconds_until_found": 1.3,
+      "seeds_run": [
+        1
+      ],
+      "seeds_until_found": 1,
+      "variant": "split",
+      "wall_s": 1.4
+    },
+    {
+      "bound_seeds": 4,
+      "correct_toy_passed": true,
+      "correct_toy_same_seeds": {
+        "1": "pass"
+      },
+      "expected_finder": "workload fuzzer",
+      "failure_id": "workload-toy-reorder-replica-s1-ffdd6f4",
+      "first_failure_s_in_run": 1.639,
+      "found": true,
+      "fuzzer": "workload",
+      "outcome": "violation",
+      "reason": "consumer loop: parent_child 6 of 46 ([{\"parents_with_wrong_count\": 1, \"orphan_parent_ids\": 0, \"sample_parent_id_count_children\": [[14, 1, 4]], \"sample_orphans\": [], \"parents\": 3, \"observation\": 41, \"t\": 0.741}])",
+      "seconds_until_found": 1.9,
+      "seeds_run": [
+        1
+      ],
+      "seeds_until_found": 1,
+      "variant": "reorder",
+      "wall_s": 2.0
+    },
+    {
+      "bound_seeds": 3,
+      "correct_toy_passed": true,
+      "correct_toy_same_seeds": {
+        "2": "pass"
+      },
+      "expected_finder": "leadership fuzzer: two writers",
+      "failure_id": "leadership-toy-no_fence-replica-s2-4dffb64",
+      "first_failure_s_in_run": 22.552,
+      "found": true,
+      "fuzzer": "leadership",
+      "outcome": "violation",
+      "reason": "round 1: writer log: [{'two_writers': True, 'order': 817, 'epoch': 3, 'after_epoch': 4, 'run': 'run17-839cfe'}, {'two_writers': True, 'order': 818, 'epoch': 3, 'after_epoch': 4, 'run': 'run17-839cfe'}, {'two_writers': True, 'order': 819, 'epoch': 3, 'after_epoch': 4, 'run': 'run17-839cfe'}]",
+      "seconds_until_found": 24.1,
+      "seeds_run": [
+        2
+      ],
+      "seeds_until_found": 1,
+      "variant": "no_fence",
+      "wall_s": 24.2
+    },
+    {
+      "bound_seeds": 6,
+      "correct_toy_passed": true,
+      "correct_toy_same_seeds": {
+        "1": "pass"
+      },
+      "expected_finder": "fault fuzzer (network and source backends)",
+      "failure_id": "fault-toy-skip_on_reconnect-replica-s1-ffdd6f4",
+      "first_failure_s_in_run": 12.143,
+      "found": true,
+      "fuzzer": "fault",
+      "outcome": "diverged",
+      "reason": "oracle: public.w_bulk missing 600 extra 300 different 0; public.w_bulk_mark missing 2 extra 1 different 0; public.w_child missing 11 extra 10 different 0; public.w_credit missing 37 extra 7 different 4; public.w_debit missing 24 extra 5 different 4; public.w_k0 missing 633 extra 27 different 18",
+      "seconds_until_found": 12.4,
+      "seeds_run": [
+        1
+      ],
+      "seeds_until_found": 1,
+      "variant": "skip_on_reconnect",
+      "wall_s": 198.1
+    },
+    {
+      "bound_seeds": 4,
+      "correct_toy_passed": true,
+      "correct_toy_same_seeds": {
+        "1": "pass"
+      },
+      "expected_finder": "workload fuzzer",
+      "failure_id": "workload-toy-swallow-replica-s1-ffdd6f4",
+      "first_failure_s_in_run": 9.53,
+      "found": true,
+      "fuzzer": "workload",
+      "outcome": "violation",
+      "reason": "consumer loop: debit_credit 9 of 352 ([{\"debits\": 123937, \"credits\": 131376, \"debit_rows\": 21, \"credit_rows\": 33, \"observation\": 344, \"t\": 8.501}])",
+      "seconds_until_found": 10.2,
+      "seeds_run": [
+        1
+      ],
+      "seeds_until_found": 1,
+      "variant": "swallow",
+      "wall_s": 10.2
+    },
+    {
+      "bound_seeds": 4,
+      "correct_toy_passed": true,
+      "correct_toy_same_seeds": {
+        "1": "pass"
+      },
+      "expected_finder": "stream fuzzer",
+      "failure_id": "stream-toy-trust_frames-replica-s1-ffdd6f4",
+      "first_failure_s_in_run": 14.394,
+      "found": true,
+      "fuzzer": "stream",
+      "outcome": "diverged",
+      "reason": "oracle: public.w_bulk missing 1 extra 0 different 0; public.w_k0 missing 0 extra 0 different 77",
+      "seconds_until_found": 14.8,
+      "seeds_run": [
+        1
+      ],
+      "seeds_until_found": 1,
+      "variant": "trust_frames",
+      "wall_s": 14.8
+    }
+  ]
+}

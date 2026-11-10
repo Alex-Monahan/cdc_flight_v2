@@ -1,0 +1,8 @@
+{"epoch": 1, "kind": "took_over", "pid": 19341, "previous_age_ms": 847627959996, "previous_state": "released", "run": "i1-19341", "t": 1794312759.999729, "tag": "i1"}
+{"epoch": 1, "kind": "started", "pid": 19341, "run": "i1-19341", "t": 1794312760.003508, "tag": "i1", "variant": "swallow"}
+{"kind": "resync_start", "pid": 19341, "run": "i1-19341", "t": 1794312760.030008, "tag": "i1", "why": "pending"}
+{"kind": "resync_done", "pid": 19341, "position": "0/91E40C0", "rows": 24, "run": "i1-19341", "t": 1794312760.181595, "tag": "i1"}
+{"kind": "apply_error_ignored", "pid": 19341, "run": "i1-19341", "t": 1794312762.635623, "table": "public.w_parent", "tag": "i1"}
+{"kind": "apply_error_ignored", "pid": 19341, "run": "i1-19341", "t": 1794312764.709773, "table": "public.w_parent", "tag": "i1"}
+{"kind": "apply_error_ignored", "pid": 19341, "run": "i1-19341", "t": 1794312765.014973, "table": "public.w_k1", "tag": "i1"}
+{"kind": "apply_error_ignored", "pid": 19341, "run": "i1-19341", "t": 1794312768.362445, "table": "public.w_credit", "tag": "i1"}

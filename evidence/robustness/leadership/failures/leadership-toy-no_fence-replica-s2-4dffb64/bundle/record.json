@@ -1,0 +1,167 @@
+{
+ "actions": [
+  {
+   "action": "cancel",
+   "round": 0,
+   "run": "r1",
+   "t": 1.424
+  },
+  {
+   "action": "pause",
+   "round": 0,
+   "run": "r3",
+   "seconds": 4.33,
+   "t": 2.574
+  },
+  {
+   "action": "start",
+   "round": 0,
+   "runs": [
+    "r4",
+    "r5",
+    "r6"
+   ],
+   "t": 2.913
+  },
+  {
+   "action": "pause",
+   "round": 1,
+   "run": "r8",
+   "seconds": 1.18,
+   "t": 11.205
+  },
+  {
+   "action": "kill",
+   "round": 1,
+   "run": "r8",
+   "t": 11.322
+  },
+  {
+   "action": "start",
+   "round": 1,
+   "runs": [
+    "r15"
+   ],
+   "t": 11.368
+  },
+  {
+   "action": "pause",
+   "round": 1,
+   "run": "r17",
+   "seconds": 4.69,
+   "t": 13.022
+  },
+  {
+   "action": "start",
+   "round": 1,
+   "runs": [
+    "r18"
+   ],
+   "t": 13.307
+  },
+  {
+   "action": "pause",
+   "round": 1,
+   "run": "r17",
+   "seconds": 2.56,
+   "t": 13.943
+  }
+ ],
+ "campaign": "20261110T121455-9a87",
+ "clean": false,
+ "commit": "4dffb645f2e54c02dc367d577318787fb58cc8ea",
+ "config": {
+  "catch_up_s": 60.0,
+  "newcomer_exit_s": 10.0,
+  "round_s": 6.0,
+  "rounds": 4,
+  "tick_s": 1.0
+ },
+ "counts": {
+  "actions": 9,
+  "rounds": 1,
+  "runs_started": 27,
+  "transactions": 1240,
+  "workload_rounds": 62
+ },
+ "duration_s": 24.064,
+ "failure_id": "leadership-toy-no_fence-replica-s2-4dffb64",
+ "faults": {},
+ "first_failure_s": 22.552,
+ "fuzzer": "leadership",
+ "no_effect": {},
+ "observers": [
+  {
+   "check": "transfers",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "expected": 24000,
+    "sum": 24000
+   },
+   "longest_gap_s": 0.648,
+   "observations": 830,
+   "seconds": 21.74,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "parent_child",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "orphan_parent_ids": 0,
+    "parents": 16,
+    "parents_with_wrong_count": 0,
+    "sample_orphans": [],
+    "sample_parent_id_count_children": []
+   },
+   "longest_gap_s": 0.647,
+   "observations": 825,
+   "seconds": 21.742,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "debit_credit",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "credit_rows": 80,
+    "credits": 247120,
+    "debit_rows": 51,
+    "debits": 247120
+   },
+   "longest_gap_s": 0.648,
+   "observations": 829,
+   "seconds": 21.742,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "large_marked",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "batches": 9,
+    "batches_partial_or_unmarked": 0,
+    "sample_batch_rows_marked": []
+   },
+   "longest_gap_s": 0.647,
+   "observations": 828,
+   "seconds": 21.742,
+   "unavailable": 0,
+   "violations": 0
+  }
+ ],
+ "options": {},
+ "outcome": "violation",
+ "reason": "round 1: writer log: [{'two_writers': True, 'order': 817, 'epoch': 3, 'after_epoch': 4, 'run': 'run17-839cfe'}, {'two_writers': True, 'order': 818, 'epoch': 3, 'after_epoch': 4, 'run': 'run17-839cfe'}, {'two_writers': True, 'order': 819, 'epoch': 3, 'after_epoch': 4, 'run': 'run17-839cfe'}]",
+ "seed": 2,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T12:14:55Z",
+ "system": "toy-no_fence",
+ "system_spec": "toy:no_fence",
+ "tier": "local"
+}

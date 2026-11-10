@@ -1,0 +1,108 @@
+{
+  "adapter": "toy-correct",
+  "all_passed": true,
+  "by_point": {
+    "toyrep.applied": {
+      "pass": 3
+    },
+    "toyrep.begun": {
+      "pass": 3
+    },
+    "toyrep.commit_sent": {
+      "pass": 6
+    },
+    "toyrep.committed": {
+      "pass": 3
+    },
+    "toyrep.fenced": {
+      "pass": 3
+    },
+    "toyrep.heartbeat_written": {
+      "pass": 3
+    },
+    "toyrep.position_written": {
+      "pass": 3
+    },
+    "toyrep.resync_committed": {
+      "pass": 3
+    },
+    "toyrep.resync_marked": {
+      "pass": 3
+    },
+    "toyrep.schema_ready": {
+      "pass": 3
+    },
+    "toyrep.slot_advanced": {
+      "pass": 3
+    },
+    "toyrep.slot_created": {
+      "pass": 3
+    },
+    "toyrep.taken_over": {
+      "pass": 3
+    }
+  },
+  "config": {
+    "catch_up_timeout": 90.0,
+    "crash_timeout": 30.0,
+    "freeze_after": [
+      0.1,
+      0.6
+    ],
+    "freeze_for": [
+      0.3,
+      1.2
+    ],
+    "kill_after": [
+      0.05,
+      0.8
+    ],
+    "kills": 4,
+    "max_hit": 3,
+    "max_workload_steps": 200,
+    "settle_after_cont": 0.3,
+    "stop_timeout": 15.0,
+    "workers": 1,
+    "workload_interval": 0.25
+  },
+  "coverage": "13/13",
+  "declared_points": [
+    "toyrep.schema_ready",
+    "toyrep.taken_over",
+    "toyrep.resync_marked",
+    "toyrep.slot_created",
+    "toyrep.resync_committed",
+    "toyrep.heartbeat_written",
+    "toyrep.begun",
+    "toyrep.applied",
+    "toyrep.position_written",
+    "toyrep.fenced",
+    "toyrep.commit_sent",
+    "toyrep.committed",
+    "toyrep.slot_advanced"
+  ],
+  "failures": [],
+  "missing_points": [],
+  "outcomes": {
+    "pass": 42
+  },
+  "reached_points": [
+    "toyrep.applied",
+    "toyrep.begun",
+    "toyrep.commit_sent",
+    "toyrep.committed",
+    "toyrep.fenced",
+    "toyrep.heartbeat_written",
+    "toyrep.position_written",
+    "toyrep.resync_committed",
+    "toyrep.resync_marked",
+    "toyrep.schema_ready",
+    "toyrep.slot_advanced",
+    "toyrep.slot_created",
+    "toyrep.taken_over"
+  ],
+  "runs": 42,
+  "runs_by_mode": {
+    "crash_point": 42
+  }
+}

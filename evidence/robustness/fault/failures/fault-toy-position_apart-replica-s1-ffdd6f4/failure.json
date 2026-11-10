@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "ffdd6f4d03642758ebcff34819b9decba821113e",
+  "first_failure_s": 44.455,
+  "fixed_commit": null,
+  "fuzzer": "fault",
+  "id": "fault-toy-position_apart-replica-s1-ffdd6f4",
+  "local_bundle": {
+    "campaign": "20261110T120642-1aca",
+    "dir": "bundle-fault-toy-position_apart-replica-s1-ffdd6f4"
+  },
+  "outcome": "diverged",
+  "reason": "the system reports that the destination diverged from the source (4 times ApplyInvariantError, last: unchanged value of public.w_toast has no earlier row), stopped short of 0/58557C0",
+  "regression_test": null,
+  "seed": 1,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-position_apart",
+  "system_spec": "toy:position_apart"
+}

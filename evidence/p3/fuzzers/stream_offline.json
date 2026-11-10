@@ -1,0 +1,75 @@
+{
+  "about": "The stream fuzzer against package E's frame decoder and the reference assembler, offline (docs/testing/fuzzers.md \u00a75).",
+  "clean": false,
+  "command": "tools/fuzz stream-offline --cases 100000 --seed 1 --negative-controls",
+  "commit": "ffdd6f4d03642758ebcff34819b9decba821113e",
+  "corpus": [
+    "engine_all_types",
+    "engine_prefix"
+  ],
+  "counts": {
+    "cases": 100000
+  },
+  "detected": {
+    "ack_regress": 5327,
+    "drop_begin": 5286,
+    "drop_end": 4540,
+    "dup_txn_same_life": 5329,
+    "end_count": 5242,
+    "flip_header_length": 5110,
+    "flip_header_seq": 5152,
+    "flip_header_type": 5211,
+    "flip_payload": 5252,
+    "foreign_rows": 5251,
+    "pipefault": 5210,
+    "raw_drop_frame": 5161,
+    "raw_dup_run": 5237,
+    "raw_swap": 5183,
+    "swap_records": 5289
+  },
+  "duration_s": 305.306,
+  "failing_cases": [],
+  "faults": {
+    "ack_regress": 5327,
+    "content_replaced_same_shape": 5414,
+    "cut_at_boundary": 5192,
+    "drop_begin": 5286,
+    "drop_end": 5290,
+    "dup_txn_same_life": 5329,
+    "end_count": 5242,
+    "flip_header_length": 5110,
+    "flip_header_seq": 5152,
+    "flip_header_type": 5211,
+    "flip_payload": 5252,
+    "foreign_rows": 5251,
+    "heartbeat_ahead": 5308,
+    "new_life_replay": 5367,
+    "pipefault": 5214,
+    "raw_drop_frame": 5346,
+    "raw_dup_run": 5237,
+    "raw_swap": 5183,
+    "swap_records": 5289
+  },
+  "fuzzer": "stream",
+  "negative_control": {
+    "cases": 2000,
+    "failures_found": 112
+  },
+  "no_effect": {},
+  "outcome": "pass",
+  "reason": "",
+  "seed": 1,
+  "seeds": [
+    1,
+    100000
+  ],
+  "self_test": false,
+  "source_mode": "offline",
+  "start": "2026-11-10T12:10:18Z",
+  "system": "engine-reader",
+  "tier": "offline",
+  "undetected_by_class": {
+    "clean_end_at_boundary": 5957,
+    "content_replaced_same_shape": 3788
+  }
+}

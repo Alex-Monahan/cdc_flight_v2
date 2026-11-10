@@ -1,0 +1,23 @@
+{"epoch": 1, "kind": "took_over", "pid": 18366, "previous_age_ms": 847627761800, "previous_state": "released", "run": "i1-18366", "t": 1794312561.80234, "tag": "i1"}
+{"epoch": 1, "kind": "started", "pid": 18366, "run": "i1-18366", "t": 1794312561.804463, "tag": "i1", "variant": "skip_on_reconnect"}
+{"kind": "resync_start", "pid": 18366, "run": "i1-18366", "t": 1794312561.835911, "tag": "i1", "why": "pending"}
+{"kind": "resync_done", "pid": 18366, "position": "0/8A503D8", "rows": 24, "run": "i1-18366", "t": 1794312561.983439, "tag": "i1"}
+{"detail": "write-write conflict on public.w_k0", "error": "ToyConflict", "kind": "retry", "pid": 18366, "run": "i1-18366", "t": 1794312562.389658, "tag": "i1"}
+{"detail": "write-write conflict on public.w_xfer_1", "error": "ToyConflict", "kind": "retry", "pid": 18366, "run": "i1-18366", "t": 1794312562.666067, "tag": "i1"}
+{"detail": "write-write conflict on public.w_k0", "error": "ToyConflict", "kind": "retry", "pid": 18366, "run": "i1-18366", "t": 1794312564.937721, "tag": "i1"}
+{"detail": "write-write conflict on public.w_k0", "error": "ToyConflict", "kind": "retry", "pid": 18366, "run": "i1-18366", "t": 1794312565.439085, "tag": "i1"}
+{"kind": "source_lost", "pid": 18366, "run": "i1-18366", "t": 1794312567.177578, "tag": "i1", "why": "connection"}
+{"error": "AdminShutdown", "kind": "source_error", "pid": 18366, "run": "i1-18366", "t": 1794312567.177746, "tag": "i1"}
+{"kind": "source_reconnected", "pid": 18366, "run": "i1-18366", "t": 1794312567.257158, "tag": "i1"}
+{"kind": "skipped_to_newest", "pid": 18366, "position": "0/8B62EB0", "run": "i1-18366", "t": 1794312567.259275, "tag": "i1"}
+{"kind": "source_lost", "pid": 18366, "run": "i1-18366", "t": 1794312567.994004, "tag": "i1", "why": "connection"}
+{"error": "OperationalError", "kind": "source_error", "pid": 18366, "run": "i1-18366", "t": 1794312567.994159, "tag": "i1"}
+{"error": "OperationalError", "kind": "source_error", "pid": 18366, "run": "i1-18366", "t": 1794312568.07509, "tag": "i1"}
+{"error": "OperationalError", "kind": "source_error", "pid": 18366, "run": "i1-18366", "t": 1794312568.193332, "tag": "i1"}
+{"error": "OperationalError", "kind": "source_error", "pid": 18366, "run": "i1-18366", "t": 1794312568.417131, "tag": "i1"}
+{"error": "OperationalError", "kind": "source_error", "pid": 18366, "run": "i1-18366", "t": 1794312568.869871, "tag": "i1"}
+{"error": "OperationalError", "kind": "source_error", "pid": 18366, "run": "i1-18366", "t": 1794312569.692368, "tag": "i1"}
+{"error": "OperationalError", "kind": "source_error", "pid": 18366, "run": "i1-18366", "t": 1794312570.743968, "tag": "i1"}
+{"error": "OperationalError", "kind": "source_error", "pid": 18366, "run": "i1-18366", "t": 1794312571.786144, "tag": "i1"}
+{"kind": "source_reconnected", "pid": 18366, "run": "i1-18366", "t": 1794312572.824969, "tag": "i1"}
+{"kind": "skipped_to_newest", "pid": 18366, "position": "0/8D4B1A0", "run": "i1-18366", "t": 1794312572.82846, "tag": "i1"}
