@@ -1,0 +1,96 @@
+{
+  "spike": "clock",
+  "duckdb_client": "1.5.6",
+  "started_utc": "2026-11-10T03:31:43Z",
+  "note": "measured from a laptop over the public internet; performance numbers are indications only",
+  "plans": {
+    "now()": {
+      "remote_projection": "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 '2026-11-10 03:31:45.80468 +00'::TIMESTAMP WITH TIME ZONE  ~1 row",
+      "folded_to_literal_by_client": true
+    },
+    "current_timestamp": {
+      "remote_projection": "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 '2026-11-10 03:31:45 .815159+00'::TIMESTAMP WITH TIME ZONE  ~1 row",
+      "folded_to_literal_by_client": true
+    },
+    "get_current_timestamp()": {
+      "remote_projection": "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 '2026-11-10 03:31:45 .826114+00'::TIMESTAMP WITH TIME ZONE  ~1 row",
+      "folded_to_literal_by_client": true
+    },
+    "transaction_timestamp()": {
+      "remote_projection": "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 '2026-11-10 03:31:45 .837431+00'::TIMESTAMP WITH TIME ZONE  ~1 row",
+      "folded_to_literal_by_client": true
+    },
+    "current_localtimestamp()": {
+      "remote_projection": "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 '2026-11-10 03:31:45 .848987'::TIMESTAMP  ~1 row",
+      "folded_to_literal_by_client": true
+    },
+    "epoch_ms(now())": {
+      "remote_projection": "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 1794281505862  ~1 row",
+      "folded_to_literal_by_client": true
+    },
+    "uuid_extract_timestamp(uuidv7())": {
+      "remote_projection": "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 uuid_extract_timestamp (uuidv7())  ~1 row",
+      "folded_to_literal_by_client": false
+    },
+    "gen_random_uuid()": {
+      "remote_projection": "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 gen_random_uuid()  ~1 row",
+      "folded_to_literal_by_client": false
+    },
+    "UPDATE ... SET hb = now()": "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 CAST(1794281505893 AS INTEGER) rowid  ~1 row",
+    "UPDATE ... SET hb = uuid_extract_timestamp(uuidv7())": "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 CAST(epoch_ms (uuid_extract_timestamp (uuidv7())) AS INTEGER) rowid  ~1 row",
+    "INSERT ... SELECT now()": "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 CAST(1794281505915 AS INTEGER)  ~1 row"
+  },
+  "stale_transaction": {
+    "client_begin_ms": 1794281505926,
+    "client_query_sent_ms": 1794281510933,
+    "now_minus_begin_ms": 0,
+    "current_timestamp_minus_begin_ms": 0,
+    "get_current_timestamp_minus_query_ms": -5007,
+    "server_uuidv7_minus_query_ms": 9,
+    "round_trip_ms": 11
+  },
+  "defaults": {
+    "default_now_minus_begin_ms": 0,
+    "default_get_current_timestamp_minus_insert_ms": -5008,
+    "default_uuidv7_minus_insert_ms": 7
+  },
+  "timezone": {
+    "now_varchar_offset": "+05:45",
+    "uuid_ts_varchar_offset": "+05:45"
+  },
+  "server_ts_outside_client_window": [
+    0,
+    300
+  ],
+  "skew": {
+    "rtt_all_ms": {
+      "n": 300,
+      "min": 7.26628303527832,
+      "p50": 8.006572723388672,
+      "p90": 9.438037872314453,
+      "p99": 14.019966125488281,
+      "max": 15.98978042602539,
+      "mean": 8.346429665883383
+    },
+    "rtt_best_ms": {
+      "n": 30,
+      "min": 7.26628303527832,
+      "p50": 7.58814811706543,
+      "p90": 7.633686065673828,
+      "p99": 7.661342620849609,
+      "max": 7.661342620849609,
+      "mean": 7.572269439697266
+    },
+    "skew_best_ms": {
+      "n": 30,
+      "min": -0.43896484375,
+      "p50": 0.10302734375,
+      "p90": 0.407958984375,
+      "p99": 0.610595703125,
+      "max": 0.610595703125,
+      "mean": 0.07281901041666666
+    }
+  },
+  "server_side_age_after_2s_ms": 2015,
+  "finished_utc": "2026-11-10T03:32:01Z"
+}

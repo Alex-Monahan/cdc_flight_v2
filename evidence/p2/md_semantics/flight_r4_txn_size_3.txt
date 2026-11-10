@@ -1,0 +1,6 @@
+== Part 3: small transactions sent from the client (INSERT VALUES + state UPDATE + COMMIT), 20 s each
+   batch   1 rows, 1 connection(s):   29.6 commits/s,       30 rows/s, txn latency p50 0.034 s p99 0.044 s
+   batch   1 rows, 4 connection(s):   97.0 commits/s,       97 rows/s, txn latency p50 0.040 s p99 0.058 s
+   batch 100 rows, 1 connection(s):   11.2 commits/s,     1125 rows/s, txn latency p50 0.089 s p99 0.099 s
+   batch 100 rows, 4 connection(s):   36.5 commits/s,     3645 rows/s, txn latency p50 0.107 s p99 0.158 s
+database dropped

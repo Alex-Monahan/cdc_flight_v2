@@ -19,6 +19,38 @@ conflict; concurrent updates or deletes of the same row conflict; the losing tra
 them describes transactional DDL, where clock functions are evaluated, or what happens to a client's open
 transaction when the client dies, so all of that was measured.
 
+## On an F16 Flight (follow-up, 2026-11-10)
+
+The network-bound measurements were repeated inside a real **F16** Flight (`cdc_v2_spike_md`, source
+`flights/spike_md/main.py`: it fetches this public repository anonymously at a pinned commit, runs the same scripts
+with the Flight's Python, prints their evidence files between markers; `spikes/md_semantics/flight_extract.py` pulls
+them out of the run log). Client DuckDB threads are capped at the cgroup's 2 CPUs. Four runs, 20.7 Flight minutes in
+total; the Flight was never scheduled and is deleted.
+
+**Authoritative Flight evidence: run 4, `flight_r4_*`.** Runs 2 and 3 (`flight_r2_*`, `flight_r3_*`) ran while a heavy
+server-side test of mine (the 20 s+ long-scan check below) was running from the laptop under the same MotherDuck user,
+and their server-side work was 4-5 times slower (creating the 10M-row target: 85-102 s in runs 2-3, 20.8 s in run 4,
+21 s from the laptop). **All sessions of one MotherDuck user share one server instance**: a heavy query from any other
+session of the account slows the pipeline's applier directly. The pipeline should run under an account (the service
+account) that nothing else uses, and performance runs must make sure the account is otherwise idle. (Other build
+workers may also use this account; run 4 is consistent with an idle server.)
+
+| measurement | laptop | F16 Flight (run 4) |
+|---|---|---|
+| round trip, trivial remote query, p50 | 80 ms | **8.0 ms** (fastest 7.3 ms) |
+| `now()` folded by the client | yes | yes (identical plans) |
+| client-to-server clock skew | +88 ± 37 ms | **+0.1 ± 3.8 ms** |
+| tiny transactions, 1-row batch, 1 / 4 connections | 3.8 / 15.1 commits/s | **29.6 / 97.0 commits/s** (p50 34 ms) |
+| tiny transactions, 100-row VALUES batch, 1 / 4 connections | 3.1 / 11.9 commits/s | 11.2 / 36.5 commits/s |
+| apply transaction, 1-row batch (best staging) | 0.82 s | **0.066 s** |
+| apply transaction, 10K rows | 0.88 s (11K rows/s) | 0.13 s (**77K rows/s**) |
+| apply transaction, 100K rows | — | 0.47 s (**212K rows/s**) |
+| apply transaction, 1M rows | — | 2.8-2.9 s (**342-355K rows/s**) |
+| apply client CPU per million rows (≥ 100K-row batches) | — | 0.8-2.6 s |
+| bulk load, real TPC-H lineitem, COPY from Parquet (12M rows) | 0.50M rows/s (6M) | **1.58M rows/s**, 40 MB/s |
+| bulk load, Arrow stream, 1 process (12M rows) | 0.55M rows/s (6M) | 1.11M rows/s |
+| server-side INSERT … SELECT table to table (12M) | 7.2M rows/s (10M) | 8.4M rows/s |
+
 ## Findings that contradict SPEC or force a design choice
 
 1. **`now()`, `current_timestamp`, `get_current_timestamp()`, `transaction_timestamp()` are evaluated by the client,
@@ -43,7 +75,7 @@ transaction when the client dies, so all of that was measured.
 5. **One shared state row updated by parallel apply transactions makes them conflict** (SPEC 1.3, 5.3, 3.3). Parallel
    appliers need separate state rows (one per stream or per table group), or must be serialised.
 6. **The fixed cost of a destination transaction is a few round trips** (3.8 commits/s per connection from this
-   laptop; 4 connections gave 15/s). SPEC 5.3 (2,000 source TPS) is only reachable by **grouping many source
+   laptop; on an F16 Flight 29.6 commits/s on one connection and 97/s on four, ~65 ms for a full apply transaction). SPEC 5.3 (2,000 source TPS) is only reachable by **grouping many source
    transactions into one destination transaction** (allowed by 1.3: a source transaction is never split, but several
    may share one commit). Statements in one transaction are sent one round trip each; a multi-statement string does
    not save round trips.
@@ -51,6 +83,13 @@ transaction when the client dies, so all of that was measured.
    use DELETE as part of the fencing protocol; the leader row is only ever UPDATEd.
 8. `ALTER COLUMN … TYPE TIMESTAMPTZ` from `TIMESTAMP` interprets the old values in the session `TimeZone`, which the
    client sends to the server: the applier must run with `SET TimeZone = 'UTC'`.
+9. **(Flight) All sessions of one MotherDuck user share one server instance.** A heavy query from another session of
+   the same account made the Flight's server-side work 4-5× slower. The pipeline needs an account nothing else uses
+   (the service account), and performance runs need an idle account (SPEC 5.1-5.3, 3.1).
+10. **(Flight) The applier is bound by round trips for small batches and by client upload and CPU for large ones**,
+   not by MotherDuck: ~65 ms per apply transaction, 342-355K rows/s at 1M-row batches, 1.3-1.9 client CPU-seconds
+   per million rows. A pyarrow `RecordBatchReader` handed to DuckDB can grow to 2 GB resident for 12M rows: Arrow
+   hand-offs need bounded batches (SPEC 5.4).
 
 ## Q1 Atomic swap (SPEC 3.2, R7) — `swap.py`, evidence `swap.txt`, `swap_long_scan.txt`
 
@@ -70,6 +109,10 @@ connection saw nothing of the open transaction. Swap transaction duration p50 0.
 trips). **Design:** R7 holds as written; use drop+rename (simplest). Note from Q4: a writer that inserts into `t`
 while a swap of `t` commits fails ("has been dropped by a different transaction"), so CDC apply to a table must not
 run concurrently with that table's swap — the 3.3 handoff state machine serialises them.
+
+**Longer scans** (`swap_long_scan_x200.txt`, run from the laptop since it is server-side work): 11 scans of
+**64-119 s** each (each processes 1,000M rows) across 60 drop+rename swaps of a 5M-row table: 11 of 11 consistent
+(one complete version each, no error).
 
 ## Q2 Position and data in one transaction (SPEC 1.1, 1.3) — `atomic_multi.py`, evidence `atomic_multi.txt`, `atomic_multi_c.txt`
 
@@ -122,6 +165,42 @@ set-based statements from a staged table (`DELETE … USING` + `INSERT`, or `MER
 (finding 2); group many source transactions per destination commit (finding 6); 5.2 latency on a Flight is a few
 round trips plus upload time, far below 30 s; a single 10M-row source transaction fits in one destination
 transaction with bounded client memory (5.1, 5.4).
+
+**On an F16 Flight** (run 4, `flight_r4_txn_size_3.txt`, `flight_r4_apply_txn.txt`). Tiny transactions (one INSERT …
+VALUES, a state UPDATE, COMMIT): 29.6 commits/s with 1-row batches on one connection (p50 34 ms, about 4 round trips)
+and 97/s on four; 100-row batches 11.2/s and 36.5/s (the 100-row VALUES statement itself costs about 50 ms of client
+parsing and planning). **Realistic apply transaction** (`apply_txn.py`): BEGIN; stage a client-side Arrow batch of
+lineitem-width rows (1/3 inserts, 1/3 updates, 1/3 deletes); `DELETE … USING` + `INSERT` into a 10M-row target;
+state UPDATE; fence UPDATE last; COMMIT. Median seconds per transaction, Flight run 4:
+
+| batch | direct Arrow scan | TEMP table | MD table in txn | MD table before txn |
+|---|---|---|---|---|
+| 1 | 0.067 | 0.066 | 0.082 | 0.098 |
+| 100 | 0.072 | 0.069 | 0.086 | 0.105 |
+| 10K | 0.149 (67K/s) | 0.129 (77K/s) | 0.143 (70K/s) | 0.210 (48K/s) |
+| 100K | 0.472 (212K/s) | 0.512 (195K/s) | 0.511 (196K/s) | 0.748 (134K/s) |
+| 1M | 2.92 (342K/s) | 2.82 (355K/s) | 3.98 (251K/s) | 5.16 (194K/s) |
+| client CPU s per M rows (1M batch) | 1.85 | 1.33 | 0.79 | 0.78 |
+
+Split for a 1M-row batch, direct scan: DELETE 0.79 s, INSERT 1.60 s, state+fence 0.016 s, COMMIT 0.53 s; TEMP
+table: local copy 0.68 s, DELETE 0.19 s, INSERT 1.49 s, COMMIT 0.47 s; MD table in the transaction: CTAS upload
+2.29 s, DELETE 0.075 s, INSERT 1.04 s, COMMIT 0.56 s. For batches of 1-100 rows a transaction costs 66-100 ms,
+almost all of it round trips (6-7 statements at 8 ms plus a ~17 ms commit). **Staging:** a TEMP table lives in the
+client (MotherDuck temporary tables are local), so like the direct Arrow scan its rows are uploaded by each statement
+that reads them; this is the fastest wall-clock option. A staging table in the MotherDuck database uploads the batch
+once and halves the client CPU per row, but its CTAS costs more wall time than the two uploads it saves; committing it
+before the apply transaction is slower still (an extra commit of the staged rows). Every target row count was
+verified after every transaction. In the contended runs (`flight_r2_apply_txn.txt`, `flight_r3_apply_txn_staging.txt`)
+the CTAS into a MotherDuck table inside the transaction took 19.5 s for 1M rows: that path is the most sensitive to
+server load. **What limits the applier on a Flight:** small batches are bound by round trips (~65 ms per
+transaction, i.e. about 15 transactions per second per connection), large batches by uploading row data from the
+client (INSERT of 667K full rows ≈ 1.5 s) and by client CPU (1.3-1.9 CPU-seconds per million rows with client-side
+staging: at 100K rows/s that is 0.13-0.19 of the Flight's 2 CPUs, before the JVM and decoding). The server-side work
+(DELETE 0.075 s, COMMIT ~0.5 s per 1M rows) is not the limit. **Design:** batches of ≥ 100K rows reach 2-3.5× the
+100K rows/s target on a single connection in one transaction per batch; SPEC 5.3 needs ≥ ~70 source transactions per
+destination commit at 2,000 TPS if one connection applies (29.6 commits/s), which also keeps p99 latency far below
+30 s. Use the direct Arrow scan (or a TEMP table) for apply; a MotherDuck staging table only if client CPU becomes
+the bottleneck.
 
 ## Q4 Concurrent writers (SPEC 4.2, 3.3) — `concurrent_writers.py`, evidence `concurrent_writers.txt`
 
@@ -184,6 +263,15 @@ clock showed an age of 2.19 s after a 2 s sleep. The session `TimeZone` is appli
 setting showed in server-rendered text). **Design:** write the heartbeat as `uuid_extract_timestamp(uuidv7())` and
 compute its age in the same SQL expression on the server; never use `now()` for anything compared across runs.
 
+**On an F16 Flight** (run 4, `flight_r4_clock.txt`; run 2 agrees): identical behaviour. `now()`, `current_timestamp`,
+`get_current_timestamp()`, `transaction_timestamp()`, `current_localtimestamp()` are folded into literals by the client
+planner; inside a transaction opened 5 s earlier they return the client's BEGIN time; `DEFAULT now()` stores it too;
+`uuid_extract_timestamp(uuidv7())` is evaluated by the server. Round trip p50 8.0 ms (fastest 7.3 ms). The Flight's
+clock and the server's agree: skew **+0.1 ms ± 3.8 ms**, and 0 of 300 server timestamps fell outside the client's
+[send, receive] window. A heartbeat written and read with the server clock showed 2.02 s after a 2 s sleep.
+**Design unchanged:** the Flight's clock happens to be good, but `now()` still comes from whichever client wrote the
+row, so the heartbeat stays on `uuid_extract_timestamp(uuidv7())`.
+
 ## Q7 Type machinery (SPEC 2.4, 2.5, R9) — `type_machinery.py`, evidence `types.txt`
 
 Works on MotherDuck, inside one transaction together with INSERT and UPDATE, and rolls back cleanly: INTEGER → BIGINT,
@@ -227,15 +315,39 @@ stream 548K rows/s, pandas `append` 255K rows/s, 4 processes 710K rows/s (17.7 M
 (Arrow stream or Parquet into a staging table, then server-side INSERT … SELECT / swap) has headroom above 100K rows/s;
 the server-side copy rate (7M rows/s) is not the bottleneck.
 
+**On an F16 Flight** (run 4, `flight_r4_bulk_load_tpch.txt`): real TPC-H lineitem generated inside the Flight with
+`dbgen` (sf 1/6 → 1.0M rows; sf 2 → 12.0M rows, 26 B/row as zstd Parquet in 250K-row files; `dbgen` rounds a
+fractional scale factor above 1 down, so "10M" became sf 2 = 12M). Rates include the commit; CPU is user + system of
+all client processes; memory is the peak resident set of the largest loader process.
+
+| method | 1.0M rows | 12.0M rows | client CPU s / M rows (12M) | peak RSS (12M) |
+|---|---|---|---|---|
+| COPY t FROM Parquet, 1 connection | 603K/s | **1.58M/s** (40 MB/s) | 0.82 | 273 MB |
+| INSERT … read_parquet, 1 process | 583K/s | 1.11M/s | 0.94 | 206 MB |
+| same, 2 processes | 551K/s | 1.43M/s | 0.96 | 233 MB |
+| same, 4 processes | 544K/s | 1.09M/s | 1.17 | 195 MB |
+| Arrow stream, 1 process | 455K/s | 1.11M/s | 1.45 | **2,046 MB** |
+| Arrow stream, 2 processes | 451K/s | 0.93M/s | 1.62 | 1,096 MB |
+| Arrow stream, 4 processes | 396K/s | 0.80M/s | 1.80 | 727 MB |
+| server: INSERT … SELECT generator | 448K/s | 479K/s (generator-bound) | — | — |
+| server: INSERT … SELECT from a table | 2.1M/s | 8.4M/s | — | — |
+
+The Flight loads about 3× faster than the laptop. More than two loader processes never helps (the container has 2
+CPUs; at 1.58M rows/s COPY already uses about 1.3 CPUs), and Parquet through DuckDB's own reader costs about half the
+client CPU of a pyarrow Arrow stream. A single pyarrow `RecordBatchReader` registered with DuckDB reached a 2 GB
+resident set for 12M rows: the reader is consumed faster than it is uploaded, so an Arrow hand-off needs bounded
+batches (SPEC 5.4). **Design:** the backfill's destination side is far above 100K rows/s even single-threaded; stage
+chunks as Parquet files and `COPY` them (lowest CPU and memory), at most 2 loaders per Flight; the source read is the
+part to measure next (stage 2).
+
 ## Unfinished or limited
 
-- Long scans across swaps lasted about 1.1 s each (40M rows processed per scan), not tens of seconds; longer scans were
-  not tried.
 - The SIGKILL "during COMMIT" trials could not separate "COMMIT not yet received by the server" from "received":
   outcomes are reported per trial; none was partial.
-- Server-side fixed cost of a commit could not be separated from the laptop's round trips; Part 3 of Q3 must be
-  repeated on a Flight (same script) to bound SPEC 5.2/5.3 properly.
-- Bulk-load numbers are laptop-uplink numbers; `bulk_load.py` is ready to run unchanged in a Flight
-  (`CDC_V2_SPIKE_TMP`, `CDC_V2_SPIKE_EVIDENCE`, `CDC_V2_BULK_*` from the environment).
+- Flight numbers come from one clean run (run 4); repeat counts per point are small (2-5 transactions per apply
+  point, one load per bulk point). The Flight's own processes were alone, but other users of the same MotherDuck
+  account could not be excluded.
+- The 100-row VALUES batch in the tiny-transaction test measures client SQL parsing as much as MotherDuck; the apply
+  test's 100-row Arrow batch (0.07 s per transaction) is the representative number.
 - The idle-transaction lease (~30 s) was measured, not documented by MotherDuck; whether it is configurable was not
   found in the public documentation.
