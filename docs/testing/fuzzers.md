@@ -318,6 +318,19 @@ written by the data transactions themselves and the toy writes its take-over int
 so the check does not rest on the fence it tests, and an old leader that writes after a take-over is caught even
 before the new leader's first write.
 
+**The fence drill** (fix round 2), in every seed of the leadership fuzzer, before its rounds: for each of
+`System.fence_points()` a fresh leader is started with its crash point armed with the action `stop`, held there,
+a newcomer is let in, the connections of earlier epochs are interrupted (`System.interrupt_earlier_epochs()`), and
+the old run is resumed; then the writer log is checked and every commit that a client was told succeeded
+(`System.committed_positions()`; the toy reports each group end) must be in it. For the pipeline the points are
+`<lane>.fenced` and `<lane>.commit_sent` (C4) and the facts come from S's batch rows (plan 6.2). For the toy the
+points are `toyrep.fenced` and `toyrep.commit_sent` — inside the destination transaction, where the file lock makes
+the newcomer wait, so the old commit lands before the take-over — and `toyrep.slot_advanced`, outside it, where the
+newcomer takes over while the old run is held; a file destination has no server connection to interrupt. Result
+(`evidence/p3/fuzzers/no_fence_repetitions.json`): `no_fence` was found in its first seed in 24 of 25 runs (10 at
+`toyrep.fenced`, 2 at `toyrep.commit_sent`, 12 at `toyrep.slot_advanced`); the 25th ended in a harness error (EPERM
+from `killpg`), fixed in `procs.kill_tree`; no run missed it.
+
 **Consumer loops** (`observers.py`). One statement per observation (one snapshot), as fast as `min_interval`
 allows (5 ms in the runs); each loop reports observations, the longest gap between two successful ones, unavailable
 reads and the first violations as counts and keys. `versions(table, allowed)` is the observer of SPEC 3.2 (package B
@@ -353,7 +366,10 @@ source backend termination, slot loss and the full spill area (every kind of the
 a randomized soak with every supported kind. For a system that is not a self-test the soak lasts at least
 3,600 s by default, and `all_passed` needs at least 3,600 s and at least 200 faults that had an effect (SPEC 1.7);
 injections without effect are counted apart and never toward the 200. The toy may run a 15-minute soak, and its
-summary is labelled a self-test; the minimum of 200 is not lowered for anything. `--smoke` runs a short routine
+summary is labelled a self-test; the minimum of 200 is not lowered for anything. `suite17.judge` decides
+`all_passed`: every expected part (crash points, the five groups, the soak) must be present and must say `passed:
+true`; a missing part never passes, and a group the system does not support passes only when the system declares it
+not applicable with a reason (`System.not_applicable()`), which the summary prints. `--smoke` runs a short routine
 suite whose summary is labelled a smoke run and whose soak never passes (`all_passed` is never true). The summary
 names the commit and whether the tree was clean. Pass = oracle equality after every run. `summary.json`, `crash_summary.json`, `crash_ledger.jsonl` and
 `runs.jsonl` are the format of the evidence of SPEC 1.7.
@@ -417,7 +433,10 @@ started again, nothing left behind.
    or healed less than 3 s ago (`run.FaultWindow`); the load of a primary kill is paused and runs no writer. Every
    other source error fails the run (`error`), because the pipeline itself can break the application's writes
    (H-014: SQLSTATE 55000, no replica identity). `test_a_system_that_breaks_the_source_writes_fails_the_run` shows
-   it with a toy that takes the replica identity away from a published table.
+   it with a toy that takes the replica identity away from a published table. A failure of `system.setup()` is
+   `error` too (a refusal at start, for example the source package's publication check, is the system's);
+   `infrastructure` only for the named environment causes of `run.SETUP_ENVIRONMENT_CAUSES`: the kernel's
+   shared-memory table is full, no free fuzz home, no free private port block.
 8. The toy reads `test_decoding` through the SQL functions (no Debezium, no publication); it is a model of the
    protocol, not of the engine. Its frames use the C2 layout with every value as text.
 9. "A newcomer exits within 10 s" is measured for the toy as process exit time; round 2 measures the real bootstrap
@@ -527,6 +546,13 @@ Still open:
 - `register_root` grows by two roots per run, which slows only very long campaigns.
 
 The variant table, the offline stream result and the suite were produced again in the fix round (sections 2 and 6).
+
+Fix round 2 (the coordinator's re-check): a setup failure is no longer `infrastructure` (contract note 7); suite 1.7
+never passes with a part missing (section 6); `testing/pg.py` deletes a leased home only after `localpg down`
+succeeded, and otherwise keeps it and says why; the fence drill above. `tests/fuzz/test_fuzz_fix2.py` holds the tests;
+three of them fail on the code of 19b4a52 (the fourth, the environment causes, passes on both, as it should). Two
+races met on the way are fixed: the system registry loaded a module twice from two workers, and `kill_tree` gave up
+on EPERM.
 
 ## 12. How long a round takes on this machine
 
