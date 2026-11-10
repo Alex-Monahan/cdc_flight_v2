@@ -28,6 +28,8 @@ def loaded(make_source_db, make_dest_db, evidence):
     dst = make_dest_db()
     counts = loader.load_database(src.params(), dst.conn)
     yield src, dst, counts
+    if len(RESULTS) < 50:                  # a partial run (-k) must not replace the evidence of a full run
+        return
     evidence("p3/oracle").write_json("mutations", {
         "what": "each mutation of the destination, applied inside a transaction and compared by the oracle",
         "dataset": counts, "config": CFG, "mutations": RESULTS,
@@ -373,3 +375,37 @@ def test_duckdb_update_of_an_equal_comparing_value(dest_db, evidence):
                         "delete_insert_changed_representation": after_replace != before})
     evidence("p3/oracle").write_json("duckdb_equal_update", {"duckdb": duckdb.__version__, "cases": out})
     assert all(o["delete_insert_changed_representation"] for o in out), out
+
+
+# ------------------------------------------------------------------------------------------------ command line
+
+def test_command_line(loaded, shared_pg, evidence):
+    import json
+    import subprocess
+    import sys
+    from pathlib import Path
+    src, dst, _ = loaded
+    tool = Path(__file__).resolve().parents[2] / "tools" / "oracle"
+    argv = [sys.executable, str(tool), "--source-port", str(shared_pg.primary_port), "--source-db", src.name,
+            "--dest-db", dst.name, "--chunk-rows", "500", "--json", "-"]
+    ok = subprocess.run(argv, capture_output=True, text=True, timeout=300)
+    assert ok.returncode == 0, ok.stderr
+    assert json.loads(ok.stdout)["equal"] is True
+    c = dst.conn
+    c.execute("CREATE TEMP TABLE saved AS SELECT * FROM public.types_k WHERE id = 7")
+    c.execute("DELETE FROM public.types_k WHERE id = 7")
+    try:
+        bad = subprocess.run(argv, capture_output=True, text=True, timeout=300)
+    finally:
+        c.execute("INSERT INTO public.types_k SELECT * FROM saved")
+        c.execute("DROP TABLE saved")
+    assert bad.returncode == 1, bad.stderr
+    res = json.loads(bad.stdout)
+    t = next(x for x in res["tables"] if x["source"] == "public.types_k")
+    assert t["missing_rows"] == 1 and t["sample"]["missing"][0]["id"] == "7"
+    assert "DIFFERENT" in bad.stderr and "public.types_k" in bad.stderr
+    evidence("p3/oracle").write_text("cli.txt", "$ tools/oracle --source-port %d --source-db <db> --dest-db <db> "
+                                     "--chunk-rows 500 --json -\nexit %d\n%s\n\nafter deleting row id=7 on the "
+                                     "destination:\nexit %d\n%s\n" % (shared_pg.primary_port, ok.returncode,
+                                                                       ok.stderr.strip(), bad.returncode,
+                                                                       bad.stderr.strip()))

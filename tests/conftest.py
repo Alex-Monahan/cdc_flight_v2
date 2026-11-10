@@ -22,6 +22,16 @@ from cdc_v2.evidence import EvidenceWriter, default_redactor
 PG_BIN = os.environ.get("CDC_V2_PG_BIN", "/opt/homebrew/opt/postgresql@18/bin")
 
 
+def pytest_configure(config):
+    """Temporary files (tmp_path, DuckDB spill files) live under ~/.cache/cdc_flight_v2/tmp, not the system temp."""
+    import tempfile
+    from pathlib import Path
+    tmp = Path(os.environ.get("CDC_V2_CACHE", Path.home() / ".cache" / "cdc_flight_v2")) / "tmp"
+    tmp.mkdir(parents=True, exist_ok=True)
+    os.environ["TMPDIR"] = str(tmp)
+    tempfile.tempdir = None
+
+
 def pytest_collection_modifyitems(config, items):
     missing = []
     if not os.access(os.path.join(PG_BIN, "postgres"), os.X_OK):
