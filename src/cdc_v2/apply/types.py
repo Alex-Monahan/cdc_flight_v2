@@ -241,6 +241,10 @@ def join_wrap(expr: str, t: DType) -> str:
         return "(%s + 0)" % expr
     if t.base in ("TIMESTAMP", "TIMESTAMP WITH TIME ZONE"):
         return "(%s + INTERVAL '0 microseconds')" % expr
+    if t.base in ("UUID", "JSON"):
+        # the same pushdown into an Arrow scan fails for these Arrow extension types ("Unimplemented type UUID for
+        # Arrow Filter Pushdown"; JSON: no `is_in` kernel); their text is exact (UUID: lower-case canonical form)
+        return "CAST(%s AS VARCHAR)" % expr
     return expr
 
 

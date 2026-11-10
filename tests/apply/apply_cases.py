@@ -270,6 +270,21 @@ def type_key_cases() -> List[Case]:
         r2 = R().d(2, {0: lo}).u(2, {0: hi, 1: None}, unchanged=[1]).move(2, {0: hi}, {0: lo, 1: None}, unchanged=[1])
         cs.append(Case("infinite_%s_keys_in_one_transaction" % typ.lower(), inf, [], [r1.out, r2.out],
                        [{0: lo, 1: "'b'"}], one_tx=True, forms=("local", "relation")))
+    # UUID and JSON keys written and then deleted in one transaction: DuckDB pushes the join filter into the Arrow
+    # scan, which cannot filter these extension types (found by the campaign, seeds 10002906, 10005444, 10005702)
+    for typ, lo, hi in [("UUID", "'00000000-0000-0000-0000-000000000001'::UUID", "'ffffffff-0000-0000-0000-000000000002'::UUID"),
+                        ("JSON", "'{\"a\":1}'::JSON", "'[]'::JSON")]:
+        ux = TableMeta((Column(0, "k", typ, key=True), Column(1, "x", "TIMETZ", key=True),
+                        Column(2, "big", "VARCHAR", unchanged_possible=True)))
+        r1 = R().c(1, {0: lo, 1: "'12:00:00+01'::TIMETZ", 2: "'a'"}).c(1, {0: hi, 1: "'12:00:00+01'::TIMETZ", 2: "'b'"})
+        r2 = R().d(2, {0: lo, 1: "'12:00:00+01'::TIMETZ"}).u(2, {0: hi, 1: "'12:00:00+01'::TIMETZ", 2: None}, unchanged=[2])
+        cs.append(Case("%s_keys_in_one_transaction" % typ.lower(), ux, [], [r1.out, r2.out],
+                       [{0: hi, 1: "'12:00:00+01'::TIMETZ", 2: "'b'"}], one_tx=True, forms=("local", "relation")))
+    KJ = TableMeta((Column(0, "j", "JSON"), Column(1, "u", "UUID")))
+    r1 = R().kl(1, "c", a={0: "'{\"a\":1}'::JSON", 1: "'00000000-0000-0000-0000-000000000001'::UUID"})
+    r2 = R().kl(2, "d", b={0: "'{\"a\":1}'::JSON", 1: "'00000000-0000-0000-0000-000000000001'::UUID"})
+    cs.append(Case("keyless_json_uuid_in_one_transaction", KJ, [], [r1.out, r2.out], [], one_tx=True,
+                   forms=("local", "relation")))
     # TIME WITH TIME ZONE keys: equal instants with other offsets are other keys, and a key travels back intact
     TZ = TableMeta((Column(0, "k", "TIMETZ", key=True), Column(1, "big", "VARCHAR", unchanged_possible=True)))
     tz_start = [{0: "'11:00:00+00'::TIMETZ", 1: "'a'"}]

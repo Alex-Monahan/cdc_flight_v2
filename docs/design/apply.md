@@ -103,8 +103,11 @@ of the row with that key, older or newer than the change set's start. Rules, in 
 1. the root X (arrival 0 of the key the row had before the change set) is used if the destination holds exactly
    one row for X and **no `c` of the change set lands on X** (otherwise the destination row at X can be a later
    row that reused the key; see 2.6);
-2. else, if the final row's own `c` is the first record of its key in the change set, the destination row with
-   the final key, if exactly one (C3a rule 3: the snapshot already saw the row under its new name);
+2. else, if the final row's own `c` is the first record of its key in the change set **and the source did not
+   hold that key when the change set starts** (`p = 0`), the destination row with the final key, if exactly one
+   (C3a rule 3: the snapshot already saw the row under its new name). The second condition was found by the
+   campaign (seeds 10000325, 10004510, 10008026): in a deferred permutation the final row's `c` can arrive while
+   the key's old row is still there, and the destination row under that key is then the old row;
 3. else the key is **unresolved**: nothing is inserted or moved for it, its destination row is deleted (2.6), and
    its key columns are returned in `ApplyCounts.unresolved` for the repair read.
 
@@ -314,7 +317,10 @@ unless another file is named).
    other side is Arrow data (both; DuckDB's join filter pushdown, gone with
    `SET disabled_optimizers = 'join_filter_pushdown'`). Every key join compares both sides through
    `types.join_wrap` (`date + 0`, `timestamp + INTERVAL '0 microseconds'`); both sides must be expressions. Found
-   by the property test (seed 2273038); named cases `infinite_*_keys_in_one_transaction`. (A first fix cast DATE to
+   by the property test (seed 2273038); named cases `infinite_*_keys_in_one_transaction`. The same pushdown, into
+   the Arrow scan, fails outright for UUID ("Unimplemented type UUID for Arrow Filter Pushdown") and JSON (no
+   `is_in` kernel) keys once the transaction has written rows; `join_wrap` compares their text (found by the
+   campaign, seeds 10002906, 10005444, 10005702; named cases `uuid_keys_in_one_transaction` and others). (A first fix cast DATE to
    TIMESTAMP; the review found that this overflows for dates past 294247 AD, which Postgres and DuckDB allow, and
    puts the value into the error text: named cases `*date*beyond_the_timestamp_range`.) The cost: DuckDB cannot
    prune the destination scan by the join's key range for DATE, TIMESTAMP, FLOAT, DOUBLE and INTERVAL keys; every

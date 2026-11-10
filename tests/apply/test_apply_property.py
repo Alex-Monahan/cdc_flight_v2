@@ -25,6 +25,7 @@ SEEDS = st.integers(min_value=0, max_value=2 ** 31)
 @settings(**SETTINGS)
 @given(seed=SEEDS, form=st.sampled_from(["local", "local", "relation"]))
 @example(seed=2273038, form="local")     # regression: -infinity DATE key missed by a join in the same transaction
+@example(seed=10002906, form="local")    # regression (campaign): UUID key, Arrow filter pushdown not implemented
 def test_keyed_stream_equals_source(seed, form):
     stream_scenario(local_conn(), seed, keyed=True, form=form)
 
@@ -40,6 +41,9 @@ def test_keyless_stream_equals_source(seed, form):
 @example(seed=0, form="relation")        # regression: unresolved TIMETZ keys came back as TIME (offset lost)
 @example(seed=260, form="relation")      # regression: same, through the lane connection's Arrow export
 @example(seed=135239, form="local")      # regression: a later call took a value from an unresolved key's stale row
+@example(seed=10004510, form="local")    # regression (campaign): rule 3 used a key the source held at the start
+@example(seed=10000325, form="local")    # same
+@example(seed=10008026, form="local")    # same
 def test_catch_up_converges_and_is_idempotent(seed, form):
     catch_up_scenario(local_conn(), seed, form=form)
 

@@ -232,20 +232,23 @@ FROM {fin} AS f {res_join}
         steps.append(Step("cand_r", "sql", """
 SELECT DISTINCT {fx} FROM (
   SELECT rkx AS kx FROM {dec} WHERE how = 'ref'
-  UNION ALL SELECT kx FROM {dec} WHERE how IN ('ref', 'unres') AND crn IS NOT NULL AND crn = first_rn
+  UNION ALL SELECT d.kx FROM {dec} AS d JOIN {kp} AS kf ON kf.kx = d.kx
+            WHERE d.how IN ('ref', 'unres') AND d.crn IS NOT NULL AND d.crn = d.first_rn AND kf.p = 0
 ) AS c
-""".format(fx=flat_x(meta, "kx"), dec=R("dec"))))
+""".format(fx=flat_x(meta, "kx"), dec=R("dec"), kp=R("kp"))))
         steps.append(Step("rootcnt", "lookup", source="cand_r"))
         rc = lambda alias, sx: x_join(meta, alias, sx)
         steps.append(Step("act0", "sql", """
 SELECT d.*,
   CASE WHEN d.how = 'complete' THEN 'ins'
        WHEN d.how = 'ref' AND r2.n = 1 AND kr.n_c = 0 THEN 'upd'
-       WHEN d.how IN ('ref', 'unres') AND d.crn IS NOT NULL AND d.crn = d.first_rn AND r3.n = 1 THEN 'upd3'
+       WHEN d.how IN ('ref', 'unres') AND d.crn IS NOT NULL AND d.crn = d.first_rn AND kf.p = 0 AND r3.n = 1
+            THEN 'upd3'
        ELSE 'unres' END AS action0
 FROM {dec} AS d
 LEFT JOIN {rc} AS r2 ON {j2}
 LEFT JOIN {kp} AS kr ON kr.kx = d.rkx
+LEFT JOIN {kp} AS kf ON kf.kx = d.kx
 LEFT JOIN {rc} AS r3 ON {j3}
 """.format(dec=R("dec"), rc=R("rootcnt"), kp=R("kp"), j2=rc("r2", "d.rkx"), j3=rc("r3", "d.kx"))))
         root = "CASE WHEN action0 = 'upd3' THEN kx ELSE rkx END"
