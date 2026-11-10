@@ -296,7 +296,7 @@ database the oracle finds equal to the original (loaded to MotherDuck).
 
 **Claim: the observer catches a split source transaction.** `observer.json`: transfers applied to MotherDuck as
 whole transactions gave 38 observations, all with the expected sum, and the oracle found the destination equal;
-the same kind of transfers applied as two commits each gave 143 violations in 161 observations, while the final
+the same kind of transfers applied as two commits each gave 132 violations in 150 observations (numbers of the final run; they vary with timing), while the final
 state was again equal: only the observer sees the split.
 
 ## 5. Not done, limits
