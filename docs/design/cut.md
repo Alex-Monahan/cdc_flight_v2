@@ -141,11 +141,18 @@ the other list (`subxip`), so the printed in-progress list is always empty (`xid
 `pg_current_snapshot`, line 409 / 370 / 370).
 
 **`R0 ≥ P0`.** `P0` is the `E` of a transaction the stream delivered. Every transaction the stream applied
-before the switch has `E ≤ P0 ≤ R0` and is `inside`. With the slot on the same standby the condition holds for
-every later snapshot, because the slot decodes only WAL the standby has replayed (`walsender.c`
-`XLogSendLogical`, `logicalfuncs.c` `pg_logical_slot_get_changes_guts`: the end of WAL in recovery is the
-replay position). With the slot on the primary and the snapshots on a standby it can fail, and the backfill
-waits.
+before the switch has `E ≤ P0 ≤ R0` and is `inside`. The condition is checked for every snapshot. It is not
+implied by anything else:
+
+- With the slot on the same standby it holds while the standby keeps running, because the slot decodes only WAL
+  the standby has replayed (`walsender.c` `XLogSendLogical`, `logicalfuncs.c`
+  `pg_logical_slot_get_changes_guts`: the end of WAL in recovery is the replay position). It can fail after the
+  standby restarts. A standby replays again from its restart point and accepts queries as soon as it reaches
+  its consistency point (`xlogrecovery.c` `CheckRecoveryConsistency`, 2142 / 2192 / 2212), which can lie
+  before what the slot delivered earlier. Section 5.6, variant 5, has such cuts.
+- With the slot on the primary and the snapshots on a standby it fails whenever the standby lags (variant 6).
+
+In both cases the backfill waits.
 
 **Has passed.** The stream delivers transactions in the order of `E` (section 6). When the applied position is
 greater than `R1`, the stream has applied a transaction with `E > R1`, hence the one at `E1` and every
