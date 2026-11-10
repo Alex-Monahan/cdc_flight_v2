@@ -111,10 +111,13 @@ of the row with that key, older or newer than the change set's start. Rules, in 
 Catch-up asks the destination once per change set for the candidate rows of rules 1 and 2 (a lookup by exact key,
 returning counts).
 
-Idempotence (C3a): applying the same change set twice gives the same table except for unresolved keys. Why: the
-complete final rows are rewritten identically; a moved row whose root is gone the second time is found again
-under its final key by rule 2 (its `c` is still the first record of that key). Tested in the named cases
-(`catch_up_*`, `twice=True`) and in every catch-up property example.
+Idempotence (C3a): applying the same change set twice gives the same table except for keys returned as
+unresolved. Complete final rows are rewritten identically; a moved row whose root is gone the second time is found
+again under its final key by rule 2 when its `c` is the first record of that key. When it is not (the log deleted
+the final key before moving a row onto it: `d(2) d(1) c(2, k=1)` with an unchanged column), the second call
+reports key 2 unresolved and deletes its (correct) row: allowed by C3a, but a run-again then costs a repair read
+(found by the review). Tested in the named cases (`catch_up_*`, `twice=True`) and in every catch-up property
+example.
 
 ### 2.4 Several destination rows with one key
 
@@ -154,16 +157,20 @@ Both were found by the property tests; each has a regression test.
 * A change set is `LocalChangeSet(rows, transactions, meta)` or `RelationChangeSet(sql, params, meta,
   scratch_prefix="_cdc_apply", u_present=None)`. `transactions` is not needed for the current-state table and may
   be `None`; the local order column is `txn`, the relation order column `commit_lsn`.
-* A NULL `u<i>` means "not unchanged". `u<i>` on a key column is ignored: a key value is always present; a record
+* A NULL `u<i>` means "not unchanged". A `u<i>` column is honoured whenever it is present, also if `meta` does not
+  flag the column (otherwise its NULL `a<i>` would be written as a value). `u<i>` on a key column is ignored: a key value is always present; a record
   without its key value raises `ApplyInvariantError` (an unchanged TOASTed key column, which pgoutput can send, is
   a hazard for the catalogue).
 * A key change is recognised only when the `c` with `k<i>` directly follows the `d` of that old key in the same
   transaction (the engine's order). Otherwise the link is broken: values that need it are unresolved.
 * `op = 't'` (or anything but `c`, `u`, `d`) raises `ChangeSetError`, as do two records with one
-  (transaction, `seq`).
+  (transaction, `seq`) and a record without a transaction order or `seq`.
+* Mode `catch_up` on a table without a key is accepted and behaves as `stream` (design 7.4 replays such a table
+  from one exact cut, so it needs nothing else).
 * `ApplyCounts`: `records`, `by_op`, `deleted`, `inserted`, `updated` (rows moved or updated by K3), `statements`
   (statements sent through `tx`, one round trip each), `shapes` (the shape of each, section 3.2), `unresolved`
-  (catch-up: an Arrow table with the key columns `a<i>` in destination types; `None` in stream mode).
+  (catch-up: an Arrow table with the key columns `a<i>` in destination types, also when empty; `None` in stream
+  mode).
 * The relation form creates its working tables in a schema `<scratch_prefix>_<random>` inside the caller's
   transaction and drops every table and the schema before returning (one `DROP TABLE` per table, section 5).
 * `TableMeta` refuses two names that differ only by case. Any other string is a destination name, including
@@ -181,7 +188,15 @@ catch-up, `unres`. Local form: in a private in-memory DuckDB (one per thread, a 
 its own; no row comes to the client.
 
 One rule for every step: **a value of a row never passes through an aggregate, a window or QUALIFY** (section
-5.3). Those see only record numbers and exact keys; the values are read at the end by joins on the record number.
+5.3). Values live only in `r0` (the change set as given: locally a view over the Arrow data, remotely one copy);
+every other relation holds record numbers, positions and exact keys. The outputs are then built from positions:
+in the local form by Arrow `take` from the change set's own columns (no SQL touches a value on the way, so no
+normalisation can happen), in the relation form by joins on the row id of `r0`. Locally, intermediate tables are
+dropped after their last use, and the planning database has a memory limit (`ApplySettings.local_memory_limit`,
+default 1 GB) beyond which DuckDB spills. Measured for one million lineitem-width records (180 MB of Arrow): the
+plan holds 90-460 MB of tables depending on the limit, and the process's peak resident set grows by about
+1.1-1.3 GB during planning (freed memory is not returned to the system, so the peak is a high-water mark);
+assembling the outputs adds about 60 MB per 333K rows. Client memory is proportional to the change set.
 
 ### 3.2 The shapes
 
@@ -244,7 +259,8 @@ change: Java compares the doubles by bits). Exact keys keep the two apart, so th
 `UPDATE SET key = 0` over `-0` stores nothing (3.3), and a sentinel cannot be used on the key (the next statement
 finds rows by key). Such a row with values from its root is copied instead (K7: the root's unchanged values are
 copied on the server; K8 deletes the root). This is the only place where an unchanged value is rewritten, and only
-for this case.
+for this case. It also applies to a composite key when one DOUBLE or INTERVAL part changes only in form while
+another part changes (found by the review: K3 would set the other part and leave the stored `-0`).
 
 ## 4. Statements for a table without a key
 
@@ -297,8 +313,12 @@ unless another file is named).
 5. **A hash join on plain DATE or TIMESTAMP values misses ±infinity** in rows the same transaction wrote, when the
    other side is Arrow data (both; DuckDB's join filter pushdown, gone with
    `SET disabled_optimizers = 'join_filter_pushdown'`). Every key join compares both sides through
-   `types.join_wrap` (`CAST(date AS TIMESTAMP)`, `timestamp + INTERVAL '0 microseconds'`); both sides must be
-   expressions. Found by the property test (seed 2273038); named cases `infinite_*_keys_in_one_transaction`.
+   `types.join_wrap` (`date + 0`, `timestamp + INTERVAL '0 microseconds'`); both sides must be expressions. Found
+   by the property test (seed 2273038); named cases `infinite_*_keys_in_one_transaction`. (A first fix cast DATE to
+   TIMESTAMP; the review found that this overflows for dates past 294247 AD, which Postgres and DuckDB allow, and
+   puts the value into the error text: named cases `*date*beyond_the_timestamp_range`.) The cost: DuckDB cannot
+   prune the destination scan by the join's key range for DATE, TIMESTAMP, FLOAT, DOUBLE and INTERVAL keys; every
+   statement scans the destination's key column.
 6. **`DROP SCHEMA ... CASCADE` of tables created in the same transaction fails at COMMIT** ("another transaction
    has dropped this table"; local DuckDB, see `duckdb_semantics.json` for MotherDuck). The relation form drops
    its tables one by one.
@@ -363,3 +383,9 @@ uv run python tests/apply/apply_campaign.py --seconds 600                       
 * The deferred-constraint ambiguity of 2.1 is a property of the stream.
 * A key column sent as "unchanged" (a TOASTed key) cannot be applied: `ApplyInvariantError`.
 * Speed is measured from this laptop only; Flight numbers are P9.
+* The relation form sends about 40 statements per change set (one CREATE TABLE and one DROP TABLE per plan step;
+  `md_cases.json`: median 41 against 2 for the local form). It serves oversized transactions and pending logs,
+  where the rows dominate; merging steps would lower it.
+* `join_wrap` covers DATE, TIMESTAMP and TIMESTAMP WITH TIME ZONE; the other timestamp precisions are not produced
+  by C3 today.
+* DuckDB errors (a value that does not fit a column, a constraint) pass through unchanged and can name a value.

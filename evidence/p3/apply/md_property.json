@@ -1,0 +1,420 @@
+{
+  "command": "CDC_V2_MD_PREFIX=cdc_v2_t_a_ CDC_V2_APPLY_MD_EXAMPLES=25 tools/with-env uv run pytest -m md tests/apply/test_apply_md.py -k property",
+  "entries": [
+    {
+      "form": "local",
+      "keyed": true,
+      "mode": "stream",
+      "ok": true,
+      "one_tx": true,
+      "records": 52,
+      "seed": 1000003,
+      "sets": 4,
+      "statements": 12,
+      "types": [
+        "BIGINT",
+        "DECIMAL(18,3)",
+        "INTERVAL",
+        "STRUCT(i INTERVAL)",
+        "TIMETZ"
+      ]
+    },
+    {
+      "form": "local",
+      "keyed": false,
+      "mode": "stream",
+      "ok": true,
+      "one_tx": true,
+      "records": 11,
+      "seed": 2000006,
+      "sets": 2,
+      "statements": 4,
+      "types": [
+        "MAP(VARCHAR, DOUBLE)",
+        "TIMESTAMP",
+        "UUID"
+      ]
+    },
+    {
+      "duplicates_removed": 0,
+      "form": "local",
+      "loaded_rows": 6,
+      "mode": "catch_up",
+      "ok": true,
+      "records": 15,
+      "seed": 3000009,
+      "snapshots": 1,
+      "split": false,
+      "types": [
+        "DOUBLE",
+        "VARCHAR"
+      ],
+      "unresolved": 0,
+      "unresolved_second": 0
+    },
+    {
+      "form": "relation",
+      "keyed": true,
+      "mode": "stream",
+      "ok": true,
+      "one_tx": false,
+      "records": 54,
+      "seed": 4000012,
+      "sets": 1,
+      "statements": 39,
+      "types": [
+        "BLOB",
+        "DATE"
+      ]
+    },
+    {
+      "form": "local",
+      "keyed": false,
+      "mode": "stream",
+      "ok": true,
+      "one_tx": true,
+      "records": 17,
+      "seed": 5000015,
+      "sets": 2,
+      "statements": 3,
+      "types": [
+        "DECIMAL(18,3)",
+        "TIMESTAMP",
+        "UNION(n DECIMAL(38,10), s VARCHAR)"
+      ]
+    },
+    {
+      "duplicates_removed": 0,
+      "form": "local",
+      "loaded_rows": 3,
+      "mode": "catch_up",
+      "ok": true,
+      "records": 25,
+      "seed": 6000018,
+      "snapshots": 2,
+      "split": false,
+      "types": [
+        "TIME",
+        "UUID"
+      ],
+      "unresolved": 3,
+      "unresolved_second": 3
+    },
+    {
+      "form": "local",
+      "keyed": true,
+      "mode": "stream",
+      "ok": true,
+      "one_tx": true,
+      "records": 30,
+      "seed": 7000021,
+      "sets": 2,
+      "statements": 6,
+      "types": [
+        "BIGINT",
+        "FLOAT",
+        "STRUCT(i INTERVAL)"
+      ]
+    },
+    {
+      "form": "relation",
+      "keyed": false,
+      "mode": "stream",
+      "ok": true,
+      "one_tx": true,
+      "records": 9,
+      "seed": 8000024,
+      "sets": 3,
+      "statements": 44,
+      "types": [
+        "INTEGER",
+        "UNION(d DOUBLE, i BIGINT)",
+        "UNION(n DECIMAL(38,10), s VARCHAR)"
+      ]
+    },
+    {
+      "duplicates_removed": 0,
+      "form": "local",
+      "loaded_rows": 9,
+      "mode": "catch_up",
+      "ok": true,
+      "records": 5,
+      "seed": 9000027,
+      "snapshots": 1,
+      "split": false,
+      "types": [
+        "BLOB",
+        "BOOLEAN",
+        "DATE"
+      ],
+      "unresolved": 1,
+      "unresolved_second": 1
+    },
+    {
+      "form": "local",
+      "keyed": true,
+      "mode": "stream",
+      "ok": true,
+      "one_tx": false,
+      "records": 31,
+      "seed": 10000030,
+      "sets": 2,
+      "statements": 5,
+      "types": [
+        "INTEGER",
+        "INTEGER[]",
+        "TIMESTAMP",
+        "UNION(n DECIMAL(38,10), s VARCHAR)",
+        "UUID"
+      ]
+    },
+    {
+      "form": "local",
+      "keyed": false,
+      "mode": "stream",
+      "ok": true,
+      "one_tx": false,
+      "records": 8,
+      "seed": 11000033,
+      "sets": 3,
+      "statements": 5,
+      "types": [
+        "DOUBLE[]",
+        "INTEGER",
+        "UNION(n DECIMAL(38,10), s VARCHAR)"
+      ]
+    },
+    {
+      "duplicates_removed": 0,
+      "form": "relation",
+      "loaded_rows": 1,
+      "mode": "catch_up",
+      "ok": true,
+      "records": 2,
+      "seed": 12000036,
+      "snapshots": 2,
+      "split": false,
+      "types": [
+        "INTEGER",
+        "STRUCT(i INTERVAL)",
+        "TIMESTAMPTZ"
+      ],
+      "unresolved": 1,
+      "unresolved_second": 1
+    },
+    {
+      "form": "local",
+      "keyed": true,
+      "mode": "stream",
+      "ok": true,
+      "one_tx": true,
+      "records": 13,
+      "seed": 13000039,
+      "sets": 1,
+      "statements": 2,
+      "types": [
+        "BLOB",
+        "DECIMAL(18,3)",
+        "DOUBLE"
+      ]
+    },
+    {
+      "form": "local",
+      "keyed": false,
+      "mode": "stream",
+      "ok": true,
+      "one_tx": true,
+      "records": 4,
+      "seed": 14000042,
+      "sets": 1,
+      "statements": 4,
+      "types": [
+        "DOUBLE",
+        "STRUCT(i INTERVAL)"
+      ]
+    },
+    {
+      "duplicates_removed": 1,
+      "form": "local",
+      "loaded_rows": 3,
+      "mode": "catch_up",
+      "ok": true,
+      "records": 6,
+      "seed": 15000045,
+      "snapshots": 2,
+      "split": false,
+      "types": [
+        "BOOLEAN",
+        "INTERVAL",
+        "MAP(VARCHAR, DOUBLE)",
+        "TIME"
+      ],
+      "unresolved": 1,
+      "unresolved_second": 1
+    },
+    {
+      "form": "relation",
+      "keyed": true,
+      "mode": "stream",
+      "ok": true,
+      "one_tx": true,
+      "records": 33,
+      "seed": 16000048,
+      "sets": 2,
+      "statements": 87,
+      "types": [
+        "DATE",
+        "DOUBLE[]",
+        "INTEGER[]",
+        "TIMETZ"
+      ]
+    },
+    {
+      "form": "local",
+      "keyed": false,
+      "mode": "stream",
+      "ok": true,
+      "one_tx": false,
+      "records": 2,
+      "seed": 17000051,
+      "sets": 1,
+      "statements": 0,
+      "types": [
+        "BIGINT",
+        "TIMETZ",
+        "VARCHAR"
+      ]
+    },
+    {
+      "duplicates_removed": 0,
+      "form": "local",
+      "loaded_rows": 3,
+      "mode": "catch_up",
+      "ok": true,
+      "records": 19,
+      "seed": 18000054,
+      "snapshots": 2,
+      "split": false,
+      "types": [
+        "FLOAT",
+        "TIMESTAMP"
+      ],
+      "unresolved": 1,
+      "unresolved_second": 1
+    },
+    {
+      "form": "local",
+      "keyed": true,
+      "mode": "stream",
+      "ok": true,
+      "one_tx": true,
+      "records": 1,
+      "seed": 19000057,
+      "sets": 1,
+      "statements": 1,
+      "types": [
+        "BLOB",
+        "FLOAT",
+        "INTERVAL"
+      ]
+    },
+    {
+      "form": "relation",
+      "keyed": false,
+      "mode": "stream",
+      "ok": true,
+      "one_tx": true,
+      "records": 7,
+      "seed": 20000060,
+      "sets": 1,
+      "statements": 15,
+      "types": [
+        "DOUBLE[]"
+      ]
+    },
+    {
+      "duplicates_removed": 0,
+      "form": "local",
+      "loaded_rows": 0,
+      "mode": "catch_up",
+      "ok": true,
+      "records": 13,
+      "seed": 21000063,
+      "snapshots": 1,
+      "split": false,
+      "types": [
+        "DECIMAL(18,3)",
+        "FLOAT",
+        "TIME"
+      ],
+      "unresolved": 3,
+      "unresolved_second": 3
+    },
+    {
+      "form": "local",
+      "keyed": true,
+      "mode": "stream",
+      "ok": true,
+      "one_tx": true,
+      "records": 27,
+      "seed": 22000066,
+      "sets": 2,
+      "statements": 5,
+      "types": [
+        "STRUCT(a DOUBLE, \"b c\" VARCHAR)",
+        "VARCHAR"
+      ]
+    },
+    {
+      "form": "local",
+      "keyed": false,
+      "mode": "stream",
+      "ok": true,
+      "one_tx": false,
+      "records": 14,
+      "seed": 23000069,
+      "sets": 1,
+      "statements": 4,
+      "types": [
+        "TIMESTAMPTZ"
+      ]
+    },
+    {
+      "duplicates_removed": 0,
+      "form": "relation",
+      "loaded_rows": 1,
+      "mode": "catch_up",
+      "ok": true,
+      "records": 4,
+      "seed": 24000072,
+      "snapshots": 3,
+      "split": true,
+      "types": [
+        "STRUCT(i INTERVAL)",
+        "TIMESTAMP",
+        "TIMETZ"
+      ],
+      "unresolved": 0,
+      "unresolved_second": 0
+    },
+    {
+      "form": "local",
+      "keyed": true,
+      "mode": "stream",
+      "ok": true,
+      "one_tx": false,
+      "records": 42,
+      "seed": 25000075,
+      "sets": 3,
+      "statements": 12,
+      "types": [
+        "INTEGER",
+        "INTEGER[]",
+        "TIMESTAMP",
+        "UNION(n DECIMAL(38,10), s VARCHAR)"
+      ]
+    }
+  ],
+  "examples": 25,
+  "failures": 0
+}
