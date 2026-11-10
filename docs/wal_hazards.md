@@ -442,10 +442,16 @@ stays in place behind every entry.
   UPDATE cdc_v2_t SET id = 1 WHERE id = -2; COMMIT;`; keyless: `CREATE TABLE cdc_v2_dup (a int) ; ALTER TABLE cdc_v2_dup
   REPLICA IDENTITY FULL; INSERT INTO cdc_v2_dup VALUES (1),(1),(1); DELETE FROM cdc_v2_dup WHERE ctid = (SELECT ctid FROM
   cdc_v2_dup LIMIT 1);`.
-- **Prevention.** Design rules for the applier: per transaction, collapse changes per key in order (net effect) before
-  applying set-based statements, so intermediate uniqueness states never reach the destination; keyless tables carry a
-  per-row multiplicity (or a synthetic row id) and a delete removes exactly one occurrence (SPEC 1.2).
-- **Why prevention.** The destination never executes the intermediate states.
+- **Prevention.** Design rules (core design section 6). Rule K: a table has a key only if its primary key is
+  immediate; a table with a deferrable primary key is a table without a key and needs `REPLICA IDENTITY FULL`, so
+  each of its records carries the whole old row. For a table with a key the applier follows each key record by
+  record: the first record of a key in a change set says whether the row existed, every later record must leave at
+  most one row, and a record that does not is an invariant violation, never applied silently; a key change moves the
+  row, so values that were not sent follow it. The statements are set-based and run once per change set, so the
+  destination never executes an intermediate state. Tables without a key carry a multiplicity per row image, and a
+  delete removes exactly one occurrence (SPEC 1.2).
+- **Why prevention.** The destination never executes the intermediate states, and the one table shape whose records
+  can be ambiguous by key is never applied by key.
 - **Test.** `test_h015_key_chains_swaps` (DEFAULT and FULL identity, history mode on), `test_h015_duplicate_rows`.
 - **Residual.** None known.
 

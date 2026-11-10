@@ -37,14 +37,16 @@ table → chunk readers (B) → transform (Y) → load, pending log, swap (B, A)
 | P | Source: connections with deadlines, catalog and catalog observation (H-008), publication, slot on a standby and on a primary, slot facts, timeline history, primary heartbeat | 8 (facts only), SPEC 4.4 | — | Opus |
 | L | Leadership: guard, take-over, heartbeat, planned hand-over, release; bootstrap; platform interface and local simulator; the leader machine | 4, 5 | D, H | Fable |
 | Y | Transform: destination type per source type; conversion of the engine's transport form and of the backfill's text form into destination-typed Arrow, inside the process; baseline type families | 6.1, SPEC 2.4 (baseline), 8.3 (place only) | E, P | Opus |
-| S | Stream: transaction assembly, groups, the commit and acknowledge protocol with its crash points, unknown commit outcome, the oversized transaction, supervisor, pipeline process, configuration file | 2, 3, 6.4 | E, D, A; then Y, P, L | Fable |
+| S | Stream: transaction assembly, groups, the commit and acknowledge protocol with its crash points, unknown commit outcome, the oversized transaction, supervisor, pipeline process, configuration file | 2, 3, 6.4 | E, D, A, K; then Y, P, L | Fable |
 | V | Slot continuity: the attach step and its decision, the periodic check, the finding enacted (alert, position, backfill requests) | 8, SPEC 1.8, 4.1 | P, D, E; completes after B | Fable |
 | F | Fuzzers and the campaign ledger: workload, fault, stream, leadership (value fuzzer in the P4 type wave); the consumer loop of SPEC 1.3 and 3.2; hand-overs under load and the hung component of SPEC 4.2 | SPEC §4, PLAN §6 | O, H; attacks S and L as they appear | Opus |
 | B | Backfill and hand-off: chunk planning and readers, pending log, catch-up with repair reads, swap; table and backfill machines | 7, 9 | X, S, A, P, Y | Fable |
 | T | Truncate, drop, drop-and-recreate end to end; remaining machines and the enumeration tests of 1.9 | 6.5, 9, SPEC 1.5 | S, B | Opus |
+| K | Key rule: the catalog reads deferrability, the engine is told which tables are without a key, what Debezium calls a key is measured (added 2026-11-10 after the second review of A) | 6 (rule K), H-015 | E, P | Opus |
 
 Order: E, D, A and P start as writer slots become free (at most four writers at once). Then L (after D), Y (after
-E and P), S (after E, D and A), V (after P and D), F (after O and H), B (after X and S), T last. The gate tests of
+E and P), S (after E, D, A and K), V (after P and D), F (after O and H), B (after X and S), T last. K (after E and P)
+is small and runs when a writer slot is free. The gate tests of
 1.1–1.9 and 4.2 are written by the package that owns the behaviour and run by the T1 harness of package O.
 
 Not in P3, but the contracts leave room for it: history tables and soft deletes (SPEC 8.1, 8.2: P4 builds them
@@ -599,6 +601,7 @@ never touched; every command names its port.
 | F | `pg-f<n>`, from 55700 in steps of 8, up to 55795 | `cdc_v2_t_f_*` |
 | B | `pg-b`, 55800 (`pg-b2`, 55808) | `cdc_v2_t_b_*` |
 | T | `pg-t`, 55816 | `cdc_v2_t_t_*` |
+| K | the homes of E (`pg-e`, 55620) and P (`pg-p`, 55640; `pg-p2`, 55648), whose workers have finished | none |
 
 TCP fault proxies listen on 55440–55459 (package H); a worker that needs proxies of its own takes ports from the
 upper half of its own range.
@@ -689,6 +692,16 @@ every transaction id in the in-progress list; if one is already `committed`, tak
 is inside iff the snapshot sees it by its 64-bit id. "The stream has passed" = applied position >
 `pg_current_wal_insert_lsn()` read after the snapshot. To be proven with a stopped synchronous standby and a
 negative control.
+
+**Rule K (core design section 6), for S, Y, B, T and the P4 waves.** S: at every `SCHEMA` frame the key flag and
+the key positions must equal the catalog's (Y's `plan` makes the comparison); a difference is a typed error, the
+stream reads the catalog again and restarts the engine with a fresh list of tables without a key; it never applies
+by a key the catalog does not confirm. S and B: a T1 case for a key that changes only its form (`float8` `-0` to
+`0`: the engine sends a key change). T and the schema wave of P4: a change of the key facts of a table (key
+columns, deferrability, replica identity) is a schema change; they are part of the table's shape. Type wave and
+PII rules of P4: the mapping of a key column is injective up to the source's equality; a rule that masks or
+truncates a key column is refused. History of P4: a table with a deferrable primary key gets the plain changelog
+of a table without a key.
 
 ### 6.3 Simplifications taken
 

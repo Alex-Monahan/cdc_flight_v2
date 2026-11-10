@@ -8,9 +8,10 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
   the table). **P2 Platform spike: gate passed on 2026-11-10** — every spike is done and merged, the report
   (`docs/spike_report.md`) is complete and was sent to the owner; nothing found contradicts SPEC, so the build
   continues without waiting. **P3 Core: in progress** (table below): the fault harness, the oracle, the source
-  package and the engine are merged; the apply package is delivered and reviewed (a short fix round is owed); the
-  cut is in its round of fixes; the destination basics, the transform and the fuzzers are being built; the task
-  file of every package is written.
+  package and the engine are merged; the apply package is delivered and reviewed twice (one fix round is owed,
+  its list is final); the question the second review raised — which tables have a key — is measured and decided
+  (rule K, below) and has a small package of its own; the cut is in its round of fixes; the destination basics,
+  the transform and the fuzzers are being built; the task file of every package is written.
 - Stage 2 (PlanetScale) cannot start: of its names only `PLANETSCALE_ORG` and `PLANETSCALE_DATABASE` are in the env
   file (checked again at the P1 gate). The service token and the connection values are owed by the owner.
 
@@ -53,15 +54,16 @@ green on T1 (local primary and standby, real MotherDuck, local JVM).
 | X | The cut: where a snapshot lies in the stream | Fable | review: merge after fixes (below); **fix round running** |
 | E | Engine: the JVM program around stock Debezium, frames, the Python side | Opus | **merged** (two reviews, two fix rounds) |
 | D | Destination basics: lanes, fence, deadlines, errors, `_cdc` schema, transition function, alert records | Fable | running |
-| A | Apply: the statements over a change set, keyed and keyless | Opus | **delivered**; coordinator: merge after a short fix round (below); a second review (Fable) of its row-version model is running; the fix round starts at the next free writer slot |
+| A | Apply: the statements over a change set, keyed and keyless | Opus | **delivered**; two reviews done (coordinator; a second reviewer, Fable, on the row-version model); one fix round owed, list final (below); it starts at the next free writer slot |
 | P | Source: connections, catalog and its observation, publication, slot, slot facts, timeline, heartbeat | Opus | **merged** (with the repair of `tools/localpg` for Postgres 16; one fix after the review) |
 | L | Leadership: guard, take-over, heartbeat, hand-over, bootstrap, platform interface | Fable | task written; after D |
 | Y | Transform: source types to destination types | Opus | **running** |
-| S | Stream: transactions, groups, commit and acknowledge, supervisor, pipeline process | Fable | task written; after E, D, A, P |
+| S | Stream: transactions, groups, commit and acknowledge, supervisor, pipeline process | Fable | task written; after E, D, A, P, K |
 | V | Slot continuity | Fable | task written; after S |
 | F | Fuzzers (stream, workload, fault, leadership), the consumer loop of 1.3 and 3.2 | Opus | **running** |
 | B | Backfill and hand-off | Fable | task written; after X, S, A, P, Y |
 | T | The catalog gate, truncate, drop and recreate, the document and the test over all state machines | Opus | task written; after S, B |
+| K | The key rule: the catalog reads whether a primary key is deferrable, the engine is told which tables are without a key, what Debezium calls a key is measured (added 2026-11-10) | Opus | task written (`docs/tasks/p3_k_key_rule.md`); starts at a free writer slot after A's fix round; S waits for it |
 
 At most four workers write at once (PLAN §3). The coordinator (Opus, xhigh) writes no code: it reviewed the plan
 and reviews every package branch before its merge; D, L, S, V, B and the acknowledgement path of E get a second
@@ -240,6 +242,13 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
   (reproduced three times; argued from the source; not reported upstream). The pipeline guards against both
   (Decisions, and the settle rule of the cut). **For the owner:** should the second be reported to the Postgres
   project, and by whom? Nothing is sent anywhere without the owner's word.
+- **Tables with a deferrable primary key (rule K).** Such a table is replicated as a table without a key: it
+  needs `REPLICA IDENTITY FULL` (more WAL for that table), its history is the plain changelog of SPEC 8.2 instead
+  of SCD2, and its backfill reads the whole table under one snapshot, so it cannot resume in the middle (SPEC
+  3.7 names resume for keyed tables). Its current-state copy is exact. The reason is measured (H-015): inside a
+  transaction two rows of such a table can hold one key, so a record that names only a key is ambiguous. If SCD2
+  history or a resumable backfill is wanted for such tables, say so: it is possible in P4 at the price of a
+  second apply path. A table whose primary key is immediate is not affected, also under `REPLICA IDENTITY FULL`.
 - **Infinite intervals (source on Postgres 17 or later).** Stock Debezium cannot deliver `interval 'infinity'`
   through the stream: the value arrives as a zero interval (Decisions). The rule decided makes the value exact
   by a read at a known place in the stream, built in P4; a table without a key that has an `interval` column on
@@ -287,33 +296,51 @@ Each in its own worktree and branch; the orchestrator merges. The P3 packages ar
 |---|---|---|---|
 | Package D, destination basics (Fable, xhigh). MotherDuck databases `cdc_v2_t_d_*`. No Postgres | P3 | 2026-11-10 | `src/cdc_v2/md/`, `src/cdc_v2/state/`, `src/cdc_v2/alerts.py`, `docs/design/destination.md`, `docs/state_machines.md`, `evidence/p3/destination/` |
 | Package A, apply (Opus, high): **delivered**, branch `worktree-agent-adbee9c1aec8e2051`, not merged. MotherDuck databases `cdc_v2_t_a_*` | P3 | 2026-11-10 | `apply_group`, `truncate`, `reduce_duplicates`, the statement shapes for tables with and without a key, `docs/design/apply.md`, tests against the oracle's canonical form, cost numbers on MotherDuck. Owed: the fix round below |
-| Second review of package A (Fable, reads only): looks for a counterexample to the row-version model and the catch-up rules | P3 | 2026-11-10 | findings for A's fix round |
+| Second review of package A (Fable, reads only): **done**. It found counterexamples to the row-version model and the catch-up rules (below); it runs its campaigns again on the fixed branch | P3 | 2026-11-10 | findings in A's fix round |
 | Package F, fuzzers (Opus, high). Homes `pg-f<n>`, ports 55700 + 8·n; MotherDuck databases `cdc_v2_t_f_*` | P3 | 2026-11-10 | the four fuzzers with seeds and replay, the consumer loop of SPEC 1.3 and 3.2, their self-tests with planted defects |
 | Package X, fix round (Fable; the worker that built the cut). Home `pg-cut`, ports 55600–55607. No MotherDuck | P3 | 2026-11-10 | the items listed below; then the coordinator checks it again and it is merged |
 | Package Y, transform (Opus, high). Home `pg-y`, ports 55656–55663. No MotherDuck | P3 | 2026-11-10 | `src/cdc_v2/transform/`, `docs/design/transform.md`, the cross-path test (stream form against backfill form through a local Postgres), the list of ambiguous interval columns and their mask |
 
-**Package A, apply — delivered 2026-11-10, coordinator's verdict: merge after a short fix round.** What the
-worker owes before the merge:
+**Package A, apply — delivered 2026-11-10; two reviews; one fix round owed.** The coordinator's verdict was
+"merge after a short fix round". The second reviewer (Fable) then tested the model the package is built on —
+"a key is a queue of row versions, because a deferred unique constraint lets a transaction hold two rows of one
+key" — and found sequences for which it gives a wrong table, silently, in both modes. That question was settled
+by measurement before anything was fixed:
 
-- The default test run of `tests/apply` is too slow (14 s): a small set of named cases and few property examples
-  by default, the rest behind a switch.
-- `evidence/p3/apply/campaign_local.json` is 3 MB: keep the summary, the failing and regression seeds and the
-  command; drop the per-seed ledger.
-- The private planning database spills to DuckDB's default directory without a limit when no directory is given:
-  the settings take the pipeline's spill area and a size limit, and refuse to run without them outside tests
-  (SPEC 5.4).
-- A negative control for the property tests and the campaign: the same properties against a deliberately wrong
-  planner ("the last record per key decides"; plain `GROUP BY` for keyless tables) must fail.
-- The test simulator must not parse types with the package's own parser.
-- After D merges: the MotherDuck tests once through D's real lane transaction.
+- **Measured** (`tests/pg_source/test_pg_keys.py`, Postgres 16.6 and 18.6, evidence
+  `evidence/p3/source/replica_identity_keys_pg*.json`, hazard H-015): a deferrable unique index cannot be a
+  replica identity; a table with a deferrable primary key and `DEFAULT` identity refuses its own `UPDATE` and
+  `DELETE` once published; an immediate key is checked row by row, also under `REPLICA IDENTITY FULL`. So the
+  only table that can hold two rows with one key inside a transaction is one with a deferrable primary key and
+  `REPLICA IDENTITY FULL`, and its decoded stream shows that state.
+- **Decided: rule K** (design 6, first paragraph; coordinator agreed, and preferred it to refusing such tables,
+  which would break R20 and the spirit of R16). A table has a key only if its primary key is immediate. A table
+  with a deferrable primary key is a table without a key: it needs `REPLICA IDENTITY FULL` and is applied by whole
+  row images, like a table with no primary key. With that, for every table with a key no two rows hold one key
+  after any record of the stream, the queue model is not needed, and every sequence the reviewer found is either
+  impossible at the source or detectable. Package K builds the rule (catalog, engine, measurements of what
+  Debezium calls a key).
+- **A's fix round** (one list from both reviews, `~/.cache/cdc_flight_v2/msgs/a_fix_round.md`, 13 items): the
+  model for tables with a key becomes "the first record of a key in a change set fixes whether the row existed;
+  every later record must leave at most one row; anything else is `ApplyInvariantError`", in both modes; stream
+  mode checks the start state where it costs nothing and with one count statement otherwise (cost measured on a
+  10 M-row table); a change set may end inside a source transaction but never between the two records of a key
+  change; the catch-up rules are derived again and their unresolved rate reported before and after; the test
+  simulator's source behaves like Postgres (keys unique after every record under the source's equality), and
+  the sequences only a deferrable key allows move to the tests of tables without a key; plus the coordinator's
+  five points: default run time of `tests/apply` (14 s), evidence size (3 MB), a bounded spill area for the
+  planning database (SPEC 5.4), negative controls against deliberately wrong planners, and no use of the
+  package's own type parser in the simulator.
+- After the fix round: the coordinator checks again, the second reviewer runs its campaigns again, then the
+  merge. After D merges: the MotherDuck tests once through D's real lane transaction.
 
-What the review changes in the design and the contracts (folded in at the merge): a key is a queue of row
-versions, because a deferred unique constraint lets one transaction hold two rows of one key for a while ("the
-last record per key decides" is wrong there); the rules for unchanged values and for unresolved keys in mode
-`catch_up`; exact grouping for keyless tables; the planning schema that lives inside one lane transaction; the
-calls apply needs from D's transaction. Limits accepted for P3 and carried: an unchanged TOASTed key column and
-the remaining ambiguity under a deferrable key both need `REPLICA IDENTITY FULL` on such tables (owner's question
-with F-7, P4); no pruning by key for some key types (measured in P9).
+What changes in the design and the contracts at A's merge: design 6.2 (the queue paragraph is replaced by the
+rule above), plan C3a (a change set is a contiguous run of records in stream order and may end inside a source
+transaction; the precondition and the idempotence of mode `catch_up` in the reviewer's exact words); exact
+grouping for tables without a key; the planning schema that lives inside one lane transaction; the calls apply
+needs from D's transaction. Limits accepted for P3 and carried: an unchanged TOASTed key column needs `REPLICA
+IDENTITY FULL` on such a table (owner's question with F-7, P4); no pruning by key for some key types (measured in
+P9).
 
 **Package E, the engine — merged 2026-11-10** (`11599e6`; JVM program `jvm/src/cdc_v2/engine/`, the Python side
 `src/cdc_v2/stream/{frames,engine,jvm}.py`, `tests/engine/`, `docs/design/engine.md`, `evidence/p3/engine/`).
@@ -570,17 +597,17 @@ the exact-value layer.
 ## Next steps
 
 1. P3, as writer slots become free (at most four; now D, the fix round of X, Y and F): A's fix round at the next
-   free slot, with the findings of both reviews in one list; then the coordinator checks it again, A is merged
-   and the review's sentences go into design 6.1–6.3, plan C0, C3a, C4 and C10, the tasks of D, Y, S and B, the
-   hazard notes (H-015 and a new entry for a TOASTed key column sent as unchanged) and
-   `docs/spike/md_semantics.md`. Review and merge D, X, Y and F as they report: the coordinator reviews each, D
-   also gets a second reviewer. Then L after D; S after D and A; then V, B, T in the order of the table above.
-   When X merges: design 7.1–7.4 and open points 1 and 12 take its text, plan C9 is completed, and the tasks of
-   B, S, V and T take the rules of the cut (settle floor, `R0 ≥ P0` for every snapshot, the tracker on a primary,
-   timeline).
+   free slot, with the findings of both reviews in one list; then package K; then the coordinator checks A
+   again, the second reviewer repeats its campaigns, A is merged and the review's sentences go into design
+   6.1–6.3, plan C0, C3a, C4 and C10, the tasks of D, Y, S and B, the hazard notes (a new entry for a TOASTed key
+   column sent as unchanged) and `docs/spike/md_semantics.md`. Review and merge D, X, Y and F as they report: the
+   coordinator reviews each, D also gets a second reviewer. Then L after D; S after D and A; then V, B, T in the
+   order of the table above. When X merges: design 7.1–7.4 and open points 1 and 12 take its text, plan C9 is
+   completed, and the tasks of B, S, V and T take the rules of the cut (settle floor, `R0 ≥ P0` for every snapshot,
+   the tracker on a primary, timeline).
 2. Add to the owner's questions when A merges: `REPLICA IDENTITY FULL` for a table whose key column can be
-   TOASTed or whose key is deferrable (more WAL; with F-7); whether the DuckDB join-filter defect that apply
-   works around should be reported upstream.
+   TOASTed (more WAL; with F-7); whether the DuckDB join-filter defect that apply works around should be
+   reported upstream.
 3. Carry into P4: the preflight warning for a server without the confirmed-flush guard. Carry into P5 (from the
    `tools/localpg` work): slot creation on a standby waits for a running-transactions record
    and `pg_log_standby_snapshot()` needs a privileged role; a failover slot is synchronised to a standby only after it

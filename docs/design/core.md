@@ -255,6 +255,22 @@ take-over and cancel).
 
 ## 6. Apply
 
+**Which tables have a key (rule K).** A table *has a key* when it has a primary key that is not deferrable
+(`pg_index.indimmediate`) and its replica identity is `DEFAULT`, `FULL`, or `USING INDEX` on the primary key's own
+index. Its key is the primary key. Every other table that can be published is a *table without a key* and needs
+`REPLICA IDENTITY FULL`: a table with no primary key (also when it has unique indexes), and a table whose primary
+key is deferrable. Why: an immediate key is checked row by row, so in the decoded stream no two rows hold one key
+after any record; a deferrable key allows two rows with one key inside a transaction, and a record that names only
+a key then does not say which row it means (H-015, measured on Postgres 16.6 and 18.6). The catalog
+(`cdc_v2.pg.catalog`) is the one authority. The engine is told which tables are without a key and sends the old
+image for them; the consumer checks at every table frame that the engine's key flag equals the catalog's, and a
+difference is an error, never ignored. What a table without a key costs: its history is a plain changelog (SPEC
+8.2), and its backfill reads the whole table under one snapshot (7.4).
+
+The destination's equality on the mapped key must not be coarser than the source's: two keys that the source
+calls different must be different in the destination. The type mapping of a key column and any transform on it
+must keep that (a salted hash keeps it; masking or truncating a key column does not, and is refused).
+
 ### 6.1 Staging
 
 The engine sends change records as Arrow record batches, one stream per table. The names and exact column sets
