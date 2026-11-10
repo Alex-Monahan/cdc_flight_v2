@@ -98,7 +98,10 @@ def replay_case(case: dict, workdir: Path, variant: Optional[str] = None, catch_
             time.sleep(0.05)
         wl = system.wl
         checks = obs.checks_for(wl.cfg.features, wl.cfg.schema, wl.transfer_table_names, wl.transfer_sum)
-        observers_ = obs.Observers(checks, system.observer_connect, 0.005).start() if checks else None
+        # consumer loops only for a case that a consumer loop found: removing entries can break the workload's
+        # invariants at the source, so a case found by the oracle is decided by the oracle alone
+        observers_ = obs.Observers(checks, system.observer_connect, 0.005).start() \
+            if checks and case.get("outcome") == "violation" else None
         sup.pause()
         p = sup.current
         if p is not None and p.alive():
