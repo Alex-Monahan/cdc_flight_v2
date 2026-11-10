@@ -204,12 +204,12 @@ every package (C0) and nothing else reads the file.
   The `END` count is compared with the records received, in total and per table as far as package E's frames
   allow; a mismatch is a protocol error (section 7). Records of one transaction stay in (`txn`, `seq`) order and
   are never reduced by you (C3a).
-- **Transform on arrival.** Every `ROWS` batch goes through `transform.stream(plan, rows)` when it arrives,
-  before it is buffered, staged or counted against a byte limit (C3; SPEC 8.3 depends on this place). A
-  `SCHEMA` frame gives a plan through `transform.plan(source_table, schema_frame)`; the source table comes from
-  package P's catalog. A plan whose hash differs from the one stored for the table is the schema change of C10:
-  the table leaves the visible path in that group, with a backfill request. `WideningNeeded` is treated the same
-  way in P3. `ConversionError` and `PlanMismatch` are failures of one table (section 7), never of the stream.
+- **Transform on arrival.** Every `ROWS` batch goes through `transform.stream(plan, rows)` when it arrives, before
+  it is buffered, staged or counted against a byte limit (C3; SPEC 8.3 depends on this place). A `SCHEMA` frame
+  gives a plan through `transform.plan(source_table, schema_frame, server_version_num=…)`; the source table comes
+  from package P's catalog. A plan whose hash differs from the one stored for the table is the schema change of C10:
+  the table leaves the visible path in that group, with a backfill request. `WideningNeeded` is treated the same way
+  in P3. `ConversionError` and `PlanMismatch` are failures of one table (section 7), never of the stream.
 - **Groups.** A group is one or more whole transactions. It closes on the first of `apply.max_group_delay`
   since its first record, `apply.max_group_bytes`, a transaction that is larger than a group on its own, a
   planned hand-over, or an idle position step (below). `TRUNCATE` cuts a table's rows into segments inside the

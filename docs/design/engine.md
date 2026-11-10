@@ -144,9 +144,9 @@ Why µs since 2000 and not since 1970: every finite Postgres timestamp fits in i
 Postgres stores it), but not relative to 1970 (the top ~10,000 years overflow); the same for dates in int32.
 
 Limits found in the Debezium path (in the raw value, before our converter, so not curable by configuration):
-an interval whose hour part exceeds 2^31 (`'2562047788 hours'`) and the infinite intervals of Postgres 17+ fail in
-pgjdbc's `PGInterval` parser and stop the engine with FATAL (not tested here; P4 type wave); geometric values pass
-through pgjdbc objects and lose Postgres' float formatting.
+an interval whose hour part exceeds 2^31 (`'2562047788 hours'`) fails in pgjdbc's `PGInterval` parser and stops the
+engine with FATAL; the infinite intervals of Postgres 17+ are parsed into a zero interval without an error (both
+measured, section 10); geometric values pass through pgjdbc objects and lose Postgres' float formatting.
 
 **Unchanged (H-003).** Debezium hands a TOAST column that pgoutput sent as `u` to the converter as one of the marker
 objects of `UnchangedToastedReplicationMessageColumn` (compared by reference). The converter maps it to our own
@@ -436,10 +436,9 @@ parse never reaches our code. Measured on the Postgres 18.6 pair (`test_engine_v
   keeps `infinity`. Details: `interval 'infinity'` and `interval '-infinity'` (Postgres 17+): pgjdbc's `PGInterval`
   parses them **into the zero interval, silently**; the engine delivers `0 months 0 days 0 microseconds`, the same as a real zero
   (`infinite_interval.json`, `test_infinite_interval_is_delivered_as_zero`). Our converter receives only the parsed
-  object; the text is gone, so the engine cannot tell. **This is silent data loss with stock Debezium and must be
-  decided outside the engine** (a finding for the orchestrator): for example a guard in the transform that treats a
-  zero interval from the stream as "re-read this row from the source", or a refusal to stream interval columns of a
-  source ≥ 17 that may hold infinite values. Not a crash, so no restart loop.
+  object; the text is gone, so the engine cannot tell. **This is silent data loss with stock Debezium and is decided
+  outside the engine**: the rule is "Ambiguous zero interval" in contract C3 of `docs/design/p3_plan.md`. Not a
+  crash, so no restart loop.
 
 ## 11. Measurements
 

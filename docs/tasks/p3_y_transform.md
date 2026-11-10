@@ -54,9 +54,23 @@ says elsewhere, these points and that document hold.
 - Geometric types arrive in Java's float formatting; they are not lossless yet (P4). Say so in the type table.
 - `u<i>` exists for a superset of the columns that can be sent as unchanged; a column that never is has an all-false
   `u<i>`.
-- Infinite intervals and intervals above 2^31 hours do not reach you through the stream today: the driver fails on
-  them and the stream quarantines the table (package S). The backfill path does read them; your cross-path test
-  lists them as stream-side gaps instead of skipping them silently.
+- An interval above 2^31 hours does not reach you through the stream: the driver fails on it and the stream
+  quarantines the table (package S). The backfill path does read it; your cross-path test lists it as a
+  stream-side gap instead of skipping it silently.
+- **Ambiguous zero interval** (plan C3, read it). On a source of Postgres 17 or later an infinite interval in a
+  scalar `interval` column arrives through the stream as a zero interval, the same as a real zero; an interval
+  array keeps it; the backfill reads `infinity` and `-infinity` as text. Yours in P3: `TablePlan.ambiguous` (the
+  positions of scalar interval columns when the source is 17 or later, else empty — the source's version is part
+  of the plan's input and of its hash), `transform.ambiguous(plan, rows) -> mask` (vectorised: the rows of a
+  stream batch whose new image holds a zero in such a column and whose `u<i>` is not set), and the wide form of
+  `interval`, `UNION(INTERVAL, VARCHAR)`, which the backfill path needs for the infinite values. You do not read
+  the source and you change no value: the repair is the stream's, in P4. The cross-path test shows the gap on
+  Postgres 18 (a row with `infinity`: zero through the stream, marked; the true value through the backfill) and
+  the absence of the mask on 16.
+- **Two transport forms, on purpose.** The engine's walsender session has `IntervalStyle=postgres` and
+  `DateStyle=ISO`; the read connections of package P have `IntervalStyle=iso_8601`, `DateStyle=ISO, YMD`,
+  `extra_float_digits=3`, `bytea_output=hex`, time zone UTC and `lc_monetary=C`. Take the stream form from the
+  table in section 3 of the engine's document and the backfill form from section 1 of the source's.
 
 ## Resources
 
@@ -69,15 +83,18 @@ says elsewhere, these points and that document hold.
 ## Interfaces
 
 ```python
-plan = transform.plan(source_table, schema_frame=None) -> TablePlan
+plan = transform.plan(source_table, schema_frame=None, *, server_version_num) -> TablePlan
 transform.stream(plan, rows: pyarrow.RecordBatch) -> pyarrow.RecordBatch     # engine transport form → destination types
 transform.backfill(plan, rows: pyarrow.RecordBatch) -> pyarrow.RecordBatch   # Postgres text → destination types
+transform.ambiguous(plan, rows: pyarrow.RecordBatch) -> pyarrow.BooleanArray | None   # plan C3; None: no such column
 ```
 
 - `TablePlan` is frozen and has a stable hash. Per column position: source name, source type (as the catalog
   names it, with modifiers), destination name, destination type, key flag, "unchanged possible", the family, and
-  the **form** the column is currently stored in (below). It also gives `TableMeta` for package A (C3a) and the
-  column list for `CREATE TABLE` (types only; who creates the table is not yours).
+  the **form** the column is currently stored in (below). It also gives `TableMeta` for package A (C3a), the
+  column list for `CREATE TABLE` (types only; who creates the table is not yours), and `ambiguous`: the column
+  positions whose zero in the stream cannot be told from an infinite value (plan C3; empty on a source below
+  Postgres 17). `plan` therefore takes the source's server version with the table's catalog facts.
 - `rows` for `stream` is a `ROWS` batch as C2 defines it (`seq`, `op`, `a<i>`, `b<i>`, `u<i>`, `k<i>`); `seq`,
   `op` and `u<i>` pass through untouched, and a value under a set `u<i>` is never looked at. `rows` for
   `backfill` has `a<i>` as text columns with real NULLs (how the reader gets them out of `COPY` is package B's).
