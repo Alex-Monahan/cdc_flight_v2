@@ -323,6 +323,8 @@ def plan(rounds, main_share=0.5):
 
 
 def commit_of_tree():
+    if os.environ.get("CDC_V2_CAMPAIGN_COMMIT"):             # a run from a copy of the tree at a commit
+        return os.environ["CDC_V2_CAMPAIGN_COMMIT"]
     try:
         return subprocess.run(["git", "-C", HERE, "rev-parse", "--short", "HEAD"], capture_output=True, text=True,
                               timeout=10).stdout.strip() or None
