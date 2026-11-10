@@ -35,6 +35,18 @@ or of SPEC 3.4.
   a hazard is a check of the catalog and P3 has no other owner for it, the check belongs in the observation you
   build. Say in your report which you took and which stay for P4 or P5.
 
+## From the engine as built — build on it
+
+Package E is built and reviewed. `docs/design/engine.md` is the full account; where it differs from what this task
+says elsewhere, these points and that document hold.
+
+- A TRUNCATE arrives as one `TRUNCATE` frame per table, in message order; children that a `CASCADE` reached arrive
+  too when they are published. The `CASCADE` and `RESTART IDENTITY` flags are not carried.
+- `skipped.operations=none` is enforced by the engine: it refuses to start with another value, so a truncate is
+  never dropped silently. Each `TRUNCATE` frame counts one in `END.event_count`.
+- A TRUNCATE of a table outside the include list inside a transaction that also touches included tables: the
+  engine's document says what arrives; build on what it shows.
+
 ## What may be missing when you start
 
 Packages S and B are merged, and with them X, E, D, A, P, Y, O and H. Packages V, L and F may or may not be.

@@ -28,6 +28,18 @@ component). The value fuzzer belongs to the P4 type wave; the ledger has its pla
   (SPEC §4, last line): your generators must be able to produce shapes nobody listed.
 - `docs/localpg.md`: what a local cluster can be told to do (kill, restart, promote, add a standby, settings).
 
+## From the engine as built — build on it
+
+Package E is built and reviewed. `docs/design/engine.md` is the full account; where it differs from what this task
+says elsewhere, these points and that document hold.
+
+- The stream fuzzer builds frames with `cdc_v2.testing.frames` (byte-identical to the Java encoder, with a shared
+  generator) and injects byte faults with `pipefaults`; it needs no JVM. The decoder stays broken after its first
+  error, by design: a test that expects recovery restarts the reader.
+- `END.event_count` = rows + `TRUNCATE` frames + transactional `MESSAGE` frames; a key change counts two; an `END`
+  with count 0 is legal. `HEARTBEAT` frames may arrive inside a transaction. `seq` starts at 0 for every engine
+  life. A generator that breaks one of these on purpose is a negative control.
+
 ## Resources
 
 - Postgres: homes `~/.cache/cdc_flight_v2/pg-f<n>` with port base `55700 + 8·n`, n = 0 … 11. For the shared T1
@@ -123,8 +135,9 @@ its parameters, `inject()` and `heal()`, logged with times. Kinds, as SPEC lists
   `kill_later` on the points before a commit), SIGKILL of the process group at a random time, freeze and
   continue (SIGSTOP, SIGCONT), hang at a point.
 - **Network** on a proxied link: drop, black hole, reset, latency, for a random time.
-- **Source errors**: termination or cancellation of the pipeline's own backends (found through the slot's
-  `active_pid` and the pipeline's `application_name` only — never a wider filter), a conflicting
+- **Source errors**: termination or cancellation of the pipeline's own backends (the walsender through the
+  slot's `active_pid`, the SQL sessions through the pipeline's `application_name` — never a wider filter; the
+  replication connection itself carries Debezium's fixed name), a conflicting
   `ACCESS EXCLUSIVE` lock on a published table for a bounded time, a long transaction on the primary, a WAL
   switch and a checkpoint, a restart of the primary.
 - **Destination errors**: the fault sites of C4 (`md.connect`, `md.execute`, `md.fence`, `md.commit`) and the

@@ -148,14 +148,20 @@ Column sets of a `ROWS` frame, each column named by its position `i` in the sche
 `bytea` and arrays a mark that does not travel inside the value). The engine turns it into `u<i>`; after the
 engine, no code compares a value with a placeholder. The H-003 tests are part of package E.
 
-**Attach rule.** The pipeline decides slot continuity only while its own engine holds the slot (design section
-8), so it must know when that is the case and which backend it is. The engine therefore sends `HELLO` only after
-`START_REPLICATION` has succeeded, and its replication connection carries an application name that is unique to
-this engine instance and is repeated in `HELLO`. If Debezium offers no documented point at which "replication
-has started" can be observed, package E says so, `HELLO` is sent when the engine starts, and the pipeline relies
-on the application name and the slot's `active_pid` alone. The engine never attaches a second time by itself:
-Debezium's retries are off (including its own retry when the slot is still active), and any loss of the
-replication connection ends in `FATAL`.
+**Attach rule.** The pipeline decides slot continuity only while its own engine holds the slot (design section 8),
+so it must know when that is the case and which backend it is. Stock Debezium names every replication connection
+`Debezium Streaming`, so the engine cannot carry a unique application name (found by package E). The engine sends
+`HELLO` at its first `handleBatch` call — records exist only after `START_REPLICATION` has succeeded, and on an idle
+source Debezium's heartbeat record makes that call within `heartbeat.interval.ms` — and `HELLO` names the slot's
+holder as one SQL query reads it at that moment: `active_pid` and that backend's `backend_start` (µs, UTC). A holder
+is identified by this pair, never by the process id alone. If the probe fails or the slot has no holder, the engine
+sends `FATAL`. The engine never attaches a second time by itself: `errors.max.retries=0`, `slot.max.retries=0`, and
+any loss of the replication connection ends in `FATAL`.
+
+The engine checks its effective configuration at start and refuses (`FATAL`) a value that would weaken a guarantee:
+among others `skipped.operations`, the offset storage and flush interval, `lsn.flush.mode`, the retry settings, the
+transaction metadata, the snapshot mode, the publication mode, the converter, tombstones and a heartbeat interval
+outside 0 < interval ≤ 10 s. Nothing that reaches the engine as "extra" properties can override them.
 
 `END` and `HEARTBEAT` carry the exact position the engine flushes when that record is marked processed. The
 package document states which records Debezium's event counts include, proven by test for a key change, a

@@ -32,6 +32,53 @@ check each rule of design section 3 against one place in the code.
 - `docs/research/debezium.md`: restart and re-send of whole transactions, the offset rules, the heartbeat.
 - `docs/wal_hazards.md`: every hazard whose owner is the stream (search for "stream" and "ack").
 
+## From the engine as built — build on it
+
+Package E is built and reviewed. `docs/design/engine.md` is the full account; where it differs from what this task
+says elsewhere, these points and that document hold.
+
+- A transaction is the frames from `BEGIN` to the next `END`, in stream order. Never use Debezium's transaction id:
+  it differs on `BEGIN`, on every row and on `END`. `positions.txId` is the 32-bit xid and is used only by the cut
+  on a primary.
+- `seq` numbers every record, `BEGIN`, `END` and `HEARTBEAT` included, from 0 for every engine life.
+- `HEARTBEAT` frames may arrive inside a transaction; they are not boundaries. A `HEARTBEAT` without `ack_position`
+  acknowledges nothing.
+- `END.event_count` = rows in `ROWS` frames + `TRUNCATE` frames + transactional `MESSAGE` frames between `BEGIN` and
+  `END`. A key change counts two (a delete and a create). The per-collection counts name a message collection by a
+  text with an unstable ending; match those by prefix. An `END` with count 0 is a legal empty transaction (for
+  example one that touched only tables outside the include list), and its `ack_position` may move the applied
+  position.
+- Send no `DURABLE` before the attach decision; after it, send `DURABLE(applied position)` at once. The engine keeps
+  the position and applies it to records that the server delivers again.
+- `HELLO` comes with the engine's first batch. On an idle source that batch is Debezium's own heartbeat record,
+  within `heartbeat.interval.ms` of the start of streaming, also while the server decodes a large unconfirmed
+  transaction again. The wait for `HELLO` is part of the attach step's declared wait.
+- After a restart the server may decode an unconfirmed large transaction again for minutes before the first row
+  arrives (36 s for 10M rows locally, `docs/spike/local_streaming.md` section 5). That is a declared wait, not a
+  fault, and no silence rule may end the engine for it.
+- Frames prove that the engine is alive, not that its connection is: Debezium's timer keeps producing `HEARTBEAT`
+  frames on a dead connection, and neither Debezium nor the driver noticed a black-holed replication connection
+  within 150 s. Source liveness therefore comes from two rules. Package V's periodic check finds a holder that is
+  gone (the server ends a silent walsender after `wal_sender_timeout`). Yours is the marker rule of SPEC 4.6, and it
+  counts **only while no transaction is open and after the first `BEGIN` or the first marker of an engine life**: a
+  marker committed behind a 10M-row transaction cannot arrive within 60 s, and tearing the connection down there
+  would force the same decode again, for ever. State the detection bound for each case (idle; inside a transaction)
+  and test both with package H's proxy.
+- `frames(deadline)` ends at the deadline without an exception; `next_frame` raises `DeadlineExceeded`;
+  `EngineExited` is an `EngineBroken`; `start_position` is only echoed in `HELLO` (Debezium always starts from the
+  slot's confirmed position).
+- A 10M-row transaction arrives as about 1,200 `ROWS` frames of at most one Debezium batch each.
+- `FATAL` carries the position of the last record the engine handed over and, when it is known, the schema and
+  table, and never a source value. This is what "fails again and again at one position" (section 7) compares.
+- A value the engine cannot read (found so far: an infinite interval and an interval above 2^31 hours fail inside
+  the Postgres driver, before our converter) ends the engine with `FATAL` at the same place on every start. The way
+  out is yours, under C10 and SPEC 4.0 and 4.3. After `stream.max_attempts_at_position` failures at one position:
+  when `FATAL` names the table and `docs/design/engine.md` shows that the engine passes the transaction once that
+  table is left out of its include list, quarantine that table only (routing `skip`, engine restarted without it, a
+  backfill request after a gap, retries on the slow schedule of SPEC 4.0) and keep every other table streaming.
+  Otherwise the last line of defence of section 7 applies (move past the place, backfill every table, alert). Test
+  both with a real value on Postgres 18.
+
 ## What may be missing when you start
 
 Packages E, D, A and P are merged. Three others may not be yet. Build to their contracts and join when they

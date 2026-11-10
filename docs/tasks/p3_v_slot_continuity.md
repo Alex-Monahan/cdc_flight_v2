@@ -20,11 +20,29 @@ stand in its way.
 - `docs/design/source.md` (package P): `slot.facts` and which facts exist on which Postgres version, the answer
   on slot identity (open point 6), `slot.create` on a standby and its waits, `slot.drop`,
   `slot.terminate_holder`, `slot.timeline_history`, `timeline.contains`, the role split.
-- `docs/design/engine.md` (package E): when `HELLO` is sent, the unique application name of an engine instance,
-  what the engine does when it loses the slot, and whatever it found on open point 14.
+- `docs/design/engine.md` (package E): when `HELLO` is sent, how an engine instance is recognised (the walsender's
+  process id together with its backend start time; Debezium fixes the application name), what the engine does when
+  it loses the slot, and what it found on open point 14.
 - `docs/research/replica_decoding.md`, and in `docs/wal_hazards.md` every hazard about slots, invalidation,
   timelines and failover (H-029, H-034 to H-048). Where a hazard says **[test]** and the fact decides your
   finding, the test is yours unless package P's document already answers it; then cite it.
+
+## From the engine as built — build on it
+
+Package E is built and reviewed. `docs/design/engine.md` is the full account; where it differs from what this task
+says elsewhere, these points and that document hold.
+
+- Stock Debezium names every replication connection `Debezium Streaming`, so no engine instance has a name of its
+  own. The engine sends `HELLO` with its first batch and names in it the holder of the slot as one SQL query read it
+  at that moment: `active_pid` and that backend's `backend_start` (µs). If the slot has no holder then, or the read
+  fails, the engine sends `FATAL` instead (C2).
+- The periodic check (section 5) compares the holder with that pair. It is also what finds a black-holed replication
+  connection inside a long transaction: the server ends a silent walsender after `wal_sender_timeout`, so the bound
+  is `wal_sender_timeout` + `slot.verify_interval`. Refuse to stream from a server whose `wal_sender_timeout` is 0
+  (an alert that names the setting; SPEC 4.7 retry), and test the bound with package H's proxy.
+- Open point 14 was tested by package E on Postgres 18.6: a status update with a lower flush position does not move
+  `confirmed_flush_lsn` back. Repeat it on Postgres 16 (`tools/localpg` runs the 16 binaries since package P's
+  repair) and keep the negative control this task asks for.
 
 ## Resources
 
@@ -75,9 +93,13 @@ body and keep the callers. Design section 8, steps 1 to 4, exactly:
 2. Decide on those facts. For a finding that needs a new slot or a new position, enact it first (section 4) and
    start again at 1: after the enactment the same check finds `continuous`.
 3. Start the engine at the applied position and wait for `HELLO`.
-4. Read the facts again. The holder must be our engine (its backend, by the unique application name), and every
-   fact the decision used must be unchanged: same incarnation, same `confirmed_flush_lsn`, same server. If not,
-   kill the engine and start again at 1. No frame is handed to the stream before this.
+4. After `HELLO`, read the facts again. The holder must be the pair (`active_pid`, `backend_start`) that `HELLO`
+   names; the engine must not have sent `FATAL` or exited; and every fact the decision used must be unchanged: same
+   incarnation, same `confirmed_flush_lsn`, same server. If not, kill the engine and start again at 1. No frame is
+   handed to the stream and no `DURABLE` is sent before this. Why this is enough: our engine acknowledges nothing
+   before the decision, and `confirmed_flush_lsn` never moves backwards (open point 14), so equal facts in steps 1
+   and 4 mean that our engine started at the position of step 1. The pair adds that nobody else can move the slot
+   from now on. A holder is never recognised by the process id alone.
 
 - The loop has a deadline of at least 75 s after a take-over (`slot.attach_timeout`) and is a declared wait
   (C11) with a reason. When the deadline passes the stream component reports the failure to the supervisor; the
@@ -111,7 +133,8 @@ machine. Around it:
 
 Every `slot.verify_interval` (default 30 s) while streaming, as a component under the supervisor: read
 `slot.facts` and compare. While our engine holds the slot nobody else can advance or drop it, so the check looks
-for what can still happen: the holder is no longer our engine, the slot is invalidated or close to it
+for what can still happen: the holder is no longer the pair that `HELLO` named (or there is none), the slot
+is invalidated or close to it
 (`wal_status`, `safe_wal_size`: an alert **before** the loss, with the bytes left), the server changed
 (system identifier, timeline, recovery state). A finding here restarts the stream component, and the attach step
 decides. A read that fails is not a finding.

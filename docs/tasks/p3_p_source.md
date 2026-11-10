@@ -60,6 +60,14 @@ heartbeat. Contract: `docs/design/p3_plan.md` C0, C1, C7. Packages Y (transform)
 - Package E's document (`docs/design/engine.md`) reaches `main` during your work. Merge `origin/main` when your
   report is near, read its sections on HELLO, HEARTBEAT and MESSAGE frames, and name any disagreement.
 
+- **From the review of package E.** A table without a primary key must have `REPLICA IDENTITY FULL` before it is
+  published, also when it has `REPLICA IDENTITY USING INDEX`: Debezium gives such a table no key, and the engine
+  would carry an incomplete old image. `publication.ensure` and the catalog observation report it.
+- The heartbeat table is in the publication (it is what makes an idle slot advance and what the stream's marker rule
+  of SPEC 4.6 watches).
+- `slot.facts` returns the server's `wal_sender_timeout`. It bounds how long a black-holed replication connection
+  keeps the slot; 0 is refused by the pipeline (package V), so report it as a fact, with its unit.
+
 ## What to build (`src/cdc_v2/pg/`)
 
 ### 1. Connections
