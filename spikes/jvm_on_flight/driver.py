@@ -670,6 +670,11 @@ TPUT = [
 ]
 
 
+# best non-JSON setting of run 3 (evidence/p2/jvm_on_flight/run3_e2e_tput_memory.json), used when tput did not run
+MEASURED_BEST = (0, "parallelgc_batch8k", {"max.batch.size": "8192", "max.queue.size": "32768"},
+                 ("-XX:+UseParallelGC",))
+
+
 def phase_tput():
     T("phase_tput")
     pg_up()
@@ -724,7 +729,7 @@ def phase_big():
     T("phase_big")
     pg_up()
     prepare()
-    best = STATE.get("best") or (0, "batch8k_q32k", {"max.batch.size": "8192", "max.queue.size": "32768"}, ())
+    best = STATE.get("best") or MEASURED_BEST
     tx_test("big_10m_" + best[1], int(os.environ.get("CDC_V2_BIG_ROWS", "10000000")), best[2], "1g", best[3],
             timeout=1200)
 
@@ -748,7 +753,7 @@ def phase_small():
     import pgfixture as pgf
     pg_up()
     prepare()
-    best = STATE.get("best") or (0, "batch8k_q32k", {"max.batch.size": "8192", "max.queue.size": "32768"}, ())
+    best = STATE.get("best") or MEASURED_BEST
     n = int(os.environ.get("CDC_V2_SMALL_TX", "100000"))
     # (a1) backlog: n one-row transactions written while no engine runs, then caught up
     truncate()
