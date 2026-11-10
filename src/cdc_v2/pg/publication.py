@@ -62,7 +62,7 @@ class PublicationState:
         """Ways in which the publication differs from what we create (empty when it is as ours)."""
         if not self.exists:
             return ["missing"]
-        out = []
+        out = ["FOR ALL TABLES"] if self.all_tables else []
         if set(self.publish) != set(PUBLISH):
             out.append("publishes %s" % ",".join(self.publish))
         if self.via_root:
@@ -170,6 +170,12 @@ def ensure(primary: PgConnection, tables: Iterable, *, publication: str = DEFAUL
                                                          deadline=deadline)}
         problems = {p: "no such table" for p in missing if p not in found}
         problems.update(check(found.values()))
+        # with publish_via_partition_root = false the leaves of a partitioned table are what is published
+        for parent in [t for t in found.values() if t.relkind == "partitioned"]:
+            leaf_names = leaves(primary, parent.schema, parent.name, deadline=deadline)
+            leaf_tables = catalog.tables(primary, leaf_names, publication=publication, deadline=deadline)
+            for k, v in check(leaf_tables).items():
+                problems[k] = "partition of %s.%s: %s" % (parent.schema, parent.name, v)
         if problems:
             raise NotPublishable("tables cannot be published as they are: %s"
                                  % "; ".join("%s.%s: %s" % (k[0], k[1], v) for k, v in sorted(problems.items())),
@@ -186,6 +192,33 @@ def ensure(primary: PgConnection, tables: Iterable, *, publication: str = DEFAUL
         st = state(primary, publication=publication, deadline=deadline)
         return EnsureResult(created, tuple(missing), tuple(present), _next_xid(primary, deadline), st)
     raise errors.SourceError("publication.ensure: the publication kept changing under us")
+
+
+def leaves(conn: PgConnection, schema: str, name: str, *, deadline: Deadline) -> list[tuple[str, str]]:
+    """The leaf partitions of a partitioned table, at every level (empty for an ordinary table)."""
+    rows = conn.execute(
+        "SELECT n.nspname, c.relname FROM pg_partition_tree((SELECT c0.oid FROM pg_class c0 JOIN pg_namespace n0 "
+        "ON n0.oid = c0.relnamespace WHERE n0.nspname = %s AND c0.relname = %s)) t "
+        "JOIN pg_class c ON c.oid = t.relid JOIN pg_namespace n ON n.oid = c.relnamespace "
+        "WHERE t.isleaf AND t.relid <> (SELECT c0.oid FROM pg_class c0 JOIN pg_namespace n0 "
+        "ON n0.oid = c0.relnamespace WHERE n0.nspname = %s AND c0.relname = %s) ORDER BY 1, 2",
+        (schema, name, schema, name), deadline=deadline, what="publication.leaves")
+    return [tuple(r) for r in rows]
+
+
+def has_table(conn: PgConnection, schema: str, name: str, *, publication: str = DEFAULT,
+              deadline: Deadline) -> bool:
+    """Whether the table is in our publication (directly or through a partition ancestor, or FOR ALL TABLES).
+    A plain catalog read: the runtime role may call it (the attach step checks the heartbeat table with it)."""
+    return bool(conn.scalar(
+        "SELECT EXISTS (SELECT 1 FROM pg_publication p WHERE p.pubname = %(pub)s AND (p.puballtables OR EXISTS ("
+        "  SELECT 1 FROM pg_publication_rel pr JOIN pg_class c ON c.oid = pr.prrelid"
+        "  WHERE pr.prpubid = p.oid AND c.oid IN ("
+        "    SELECT t.oid FROM pg_class t JOIN pg_namespace n ON n.oid = t.relnamespace"
+        "    WHERE n.nspname = %(s)s AND t.relname = %(n)s"
+        "    UNION SELECT a.relid FROM pg_partition_ancestors((SELECT t.oid FROM pg_class t JOIN pg_namespace n"
+        "      ON n.oid = t.relnamespace WHERE n.nspname = %(s)s AND t.relname = %(n)s)) a))))",
+        {"pub": publication, "s": schema, "n": name}, deadline=deadline, what="publication.has_table"))
 
 
 def _next_xid(primary: PgConnection, deadline: Deadline) -> int:

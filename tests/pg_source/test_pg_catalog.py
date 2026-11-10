@@ -77,6 +77,7 @@ def test_columns_types_keys_and_flags(cluster, scratch):
         alter table {s}.rls enable row level security;
         create table {s}.parted (k int, v int) partition by range (k);
         create table {s}.parted_1 partition of {s}.parted for values from (0) to (10);
+        create table {s}.inc (id int, x int, primary key (id) include (x));
     """)
     scratch.admin(f"create publication {q(scratch.pub)} for table {s}.t (b, a, c), {s}.full where (x > 0), "
                   f"{s}.parted")
@@ -114,6 +115,12 @@ def test_columns_types_keys_and_flags(cluster, scratch):
     assert "FULL" in idx.replica_identity_problem                 # no primary key: FULL even with USING INDEX
     assert "NOTHING" in got["nothing"].replica_identity_problem
     assert got["pk_ri"].replica_identity_problem and not got["pk_ri"].replica_identity_index_is_key
+    assert got["inc"].key == ("id",) and got["inc"].key_attnums == (1,)       # INCLUDE columns are not key
+    obs = catalog.observe(conn, [(scratch.schema, "inc"), (scratch.schema, "parted_1")], publication=scratch.pub,
+                          deadline=Deadline.after(10))
+    assert obs.by_name[(scratch.schema, "inc")].pk_attnums == (1,)
+    assert obs.by_name[(scratch.schema, "parted_1")].published                 # through its partition root
+    assert obs.visible(obs.xmin - 1) and not obs.visible(obs.xmax)
     assert got["unl"].persistence == "unlogged"
     assert got["rls"].rls_enabled and got["rls"].rls_applies_to_reader and not got["t"].rls_applies_to_reader
     assert got["parted"].relkind == "partitioned" and got["parted"].published

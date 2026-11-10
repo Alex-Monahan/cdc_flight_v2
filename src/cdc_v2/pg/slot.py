@@ -61,7 +61,7 @@ class SlotCreateTimeout(DeadlineExceeded):
 
 @dataclass(frozen=True)
 class ServerFacts:
-    system_identifier: str | None       # pg_control_system(); None if the role may not read it
+    system_identifier: str              # pg_control_system() (executable by every role on 16 and 18)
     timeline: int | None
     timeline_source: str                # 'wal' (primary: current WAL file), 'receiver', 'checkpoint', 'unknown'
     in_recovery: bool
@@ -263,11 +263,16 @@ def create(node: PgConnection, name: str, deadline: Deadline, *, primary: PgConn
     """Create the logical slot `name` (pgoutput, not temporary, two-phase off) and return its consistent point.
 
     On a standby the creation waits for a running-transactions record from the primary. With `primary` given, a
-    helper thread asks for one while the creation waits, every `nudge_interval_s`: `pg_log_standby_snapshot()` if
-    the role may call it, else a write of its own (`nudge_method`). `nudge` may also be a callable(deadline) (for
-    example the heartbeat write) or None. At the deadline the creation is cancelled; if the cancel is not answered,
-    the creating backend is terminated by its process id from a second connection; then the call checks that no
-    slot was left behind and raises `SlotCreateTimeout` with a report.
+    helper thread asks for one while the creation waits, every `nudge_interval_s`, on a connection of its own opened
+    from `primary`'s settings (the caller's connection is used only to choose the method and for the report):
+    `pg_log_standby_snapshot()` if the role may call it, else a write of its own (`nudge_method`). `nudge` may also
+    be a callable(deadline) (for example the heartbeat write) or None.
+
+    The creating statement runs with `statement_timeout = 0` (the caller's deadline bounds it) and
+    `client_connection_check_interval = 1000` (a backend whose client died abandons the creation). When the creation
+    fails for any reason — the deadline (`SlotCreateTimeout`), a lost connection, any error — the creating backend,
+    identified by process id and start time, is terminated from a second connection if it is still there, and the
+    call checks whether a slot was left behind; the report is the exception's `report` attribute.
 
     On a primary: `failover = true` where the server supports it (17+), and the facts say so.
     """
@@ -276,65 +281,84 @@ def create(node: PgConnection, name: str, deadline: Deadline, *, primary: PgConn
     standby = node.in_recovery(deadline)
     if facts(node, name, deadline=deadline) is not None:
         raise SlotExists("slot %s already exists" % name)
-    if not standby:
-        use_failover = failover and node.major >= 17
-        sql = ("SELECT lsn::text FROM pg_create_logical_replication_slot(%s, %s, false, false, true)"
-               if use_failover else "SELECT lsn::text FROM pg_create_logical_replication_slot(%s, %s, false, false)")
-        lsn_text = _create_stmt(node, sql, name, deadline)
-        crash_point("pg.slot_created")
-        return CreatedSlot(name, lsnmod.parse(lsn_text), False, use_failover if node.major >= 17 else None,
-                           time.monotonic() - t0, 0, None)
+    creator = tuple(node.execute("SELECT pid, (extract(epoch FROM backend_start) * 1000000)::bigint "
+                                 "FROM pg_stat_activity WHERE pid = pg_backend_pid()", deadline=deadline,
+                                 what="slot.create")[0])
+    use_failover = (not standby) and failover and node.major >= 17
+    if standby or not use_failover:
+        sql = "SELECT lsn::text FROM pg_create_logical_replication_slot(%s, %s, false, false)"
+    else:
+        sql = "SELECT lsn::text FROM pg_create_logical_replication_slot(%s, %s, false, false, true)"
     method: str | None = None
     fn: Callable[[Deadline], None] | None = None
-    if callable(nudge):
+    if standby and callable(nudge):
         method, fn = "callable", nudge
-    elif nudge is not None and primary is not None:
+    elif standby and nudge is not None and primary is not None:
         method = nudge_method(primary, deadline) if nudge == "auto" else nudge
         if method not in ("standby_snapshot", "write", "none"):
             raise ValueError("bad nudge method %r" % nudge)
-        if method != "none":
-            fn = lambda d: _nudge_once(primary, method, d)        # noqa: E731
     stop = threading.Event()
     count = [0]
     nudge_errors: list[str] = []
 
     def nudger():
-        while not stop.is_set() and not deadline.expired:
-            try:
-                fn(deadline.within(max(0.5, nudge_interval_s * 4)))
-                count[0] += 1
-            except Exception as e:      # noqa: BLE001 - reported; the creation goes on waiting
-                if len(nudge_errors) < 5:
-                    nudge_errors.append(type(e).__name__)
-            stop.wait(nudge_interval_s)
+        own = None
+        try:
+            while not stop.is_set() and deadline.remaining() > 1.0:
+                step = Deadline(min(deadline.at - 0.5, Deadline.after(max(1.0, nudge_interval_s * 4)).at))
+                try:
+                    if fn is not None:
+                        fn(step)
+                    else:
+                        if own is None or own.closed:
+                            own = connect(primary.node, step, application_name="cdc_v2_slot_nudge")
+                        _nudge_once(own, method, step)
+                    count[0] += 1
+                except Exception as e:      # noqa: BLE001 - reported; the creation goes on waiting
+                    if len(nudge_errors) < 5:
+                        nudge_errors.append(type(e).__name__)
+                stop.wait(nudge_interval_s)
+        finally:
+            if own is not None:
+                own.close()
 
-    creator = node.execute("SELECT pid, (extract(epoch FROM backend_start) * 1000000)::bigint FROM pg_stat_activity "
-                           "WHERE pid = pg_backend_pid()", deadline=deadline, what="slot.create")[0]
     th = None
-    if fn is not None:
+    if fn is not None or method in ("standby_snapshot", "write"):
         th = threading.Thread(target=nudger, daemon=True, name="cdc_v2-slot-nudge")
         th.start()
-    timed_out = False
+    failure: BaseException | None = None
+    lsn_text = None
     try:
-        lsn_text = _create_stmt(node, "SELECT lsn::text FROM pg_create_logical_replication_slot(%s, %s, false, false)",
-                                name, deadline)
-    except DeadlineExceeded:
-        timed_out = True
+        lsn_text = _create_stmt(node, sql, name, deadline)
+    except SlotExists:
+        raise
+    except BaseException as e:          # noqa: BLE001 - handled below, then raised again
+        failure = e
     finally:
         stop.set()
         if th is not None:
-            th.join(max(1.0, nudge_interval_s * 4 + 1))
-    if timed_out:
-        report = _abandon(node, name, tuple(creator), primary, method, count[0], time.monotonic() - t0, nudge_errors)
-        raise SlotCreateTimeout("slot.create %s: deadline passed after %.1f s" % (name, time.monotonic() - t0),
-                                report)
+            th.join(max(1.0, nudge_interval_s * 4) + 3 * (primary.node.cancel_grace_s if primary else 2.0) + 1)
+    if failure is not None:
+        report = _abandon(node, name, creator, primary if standby else None, method, count[0],
+                          time.monotonic() - t0, nudge_errors, standby)
+        if isinstance(failure, DeadlineExceeded):
+            raise SlotCreateTimeout("slot.create %s: deadline passed after %.1f s" % (name, time.monotonic() - t0),
+                                    report)
+        try:
+            failure.report = report
+        except AttributeError:
+            pass
+        raise failure
     crash_point("pg.slot_created")
-    return CreatedSlot(name, lsnmod.parse(lsn_text), True, None, time.monotonic() - t0, count[0], method)
+    return CreatedSlot(name, lsnmod.parse(lsn_text), standby, (use_failover if node.major >= 17 else None)
+                       if not standby else None, time.monotonic() - t0, count[0], method)
 
 
 def _create_stmt(node: PgConnection, sql: str, name: str, deadline: Deadline) -> str:
-    # A creation whose client is gone (process killed) must not finish the slot later: with this setting the
-    # backend checks the socket every second while it waits and aborts the creation when the client has closed.
+    # The caller's deadline bounds the creation, not the session's statement_timeout. A creation whose client is gone
+    # (process killed) must not finish the slot later: with client_connection_check_interval the backend checks the
+    # socket every second while it waits and aborts the creation when the client has closed.
+    node.execute("SET statement_timeout = 0", deadline=deadline, what="slot.create")
     node.execute("SET client_connection_check_interval = 1000", deadline=deadline, what="slot.create")
     try:
         return node.scalar(sql, (name, PLUGIN), deadline=deadline, what="slot.create")
@@ -345,45 +369,52 @@ def _create_stmt(node: PgConnection, sql: str, name: str, deadline: Deadline) ->
     finally:
         if not node.closed:
             try:
+                node.execute("RESET statement_timeout", deadline=Deadline.after(2), what="slot.create")
                 node.execute("RESET client_connection_check_interval", deadline=Deadline.after(2), what="slot.create")
             except (errors.SourceError, DeadlineExceeded):
                 pass
 
 
 def _abandon(node: PgConnection, name: str, creator: tuple[int, int], primary, method, nudges, waited,
-             nudge_errors) -> dict:
-    """After a creation passed its deadline: make sure the creating backend (pid and start time) is gone, so that it
-    cannot finish the slot later, and check that nothing is left."""
+             nudge_errors, standby: bool) -> dict:
+    """After a creation failed: make sure the creating backend (pid and start time) is gone, so that it cannot finish
+    the slot later, and check whether a slot was left behind (`leftover`: True, False, or None when the check itself
+    failed, with `cleanup_error`)."""
     report: dict = {"waited_s": round(waited, 2), "nudge_method": method, "nudges": nudges,
                     "nudge_errors": nudge_errors, "creator_terminated": False, "leftover": None}
     pid, start_us = creator
-    alive_sql = ("SELECT count(*) FROM pg_stat_activity WHERE pid = %s "
-                 "AND (extract(epoch FROM backend_start) * 1000000)::bigint = %s")
-    grace = Deadline.after(max(5.0, 3 * node.node.cancel_grace_s))
+    match = "pid = %s AND (extract(epoch FROM backend_start) * 1000000)::bigint = %s"
+    grace = Deadline.after(max(10.0, 4 * node.node.cancel_grace_s))
     try:
         with connect(node.node, grace, application_name="cdc_v2_slot_cleanup") as c:
-            while c.scalar(alive_sql, (pid, start_us), deadline=grace, what="slot.cleanup"):
-                c.execute("SELECT pg_terminate_backend(a.pid, 2000) FROM pg_stat_activity a WHERE a.pid = %s "
-                          "AND (extract(epoch FROM a.backend_start) * 1000000)::bigint = %s", (pid, start_us),
-                          deadline=grace, what="slot.cleanup")
-                report["creator_terminated"] = True
+            while c.scalar("SELECT count(*) FROM pg_stat_activity WHERE " + match, (pid, start_us), deadline=grace,
+                           what="slot.cleanup"):
+                if c.scalar("SELECT bool_or(pg_terminate_backend(pid)) FROM pg_stat_activity WHERE " + match,
+                            (pid, start_us), deadline=grace, what="slot.cleanup"):
+                    report["creator_terminated"] = True
                 grace.sleep(0.05, "slot.create cleanup")
             report["leftover"] = facts(c, name, deadline=grace) is not None
+            if primary is None and not standby:
+                _primary_report(c, report)
     except (errors.SourceError, DeadlineExceeded) as e:
-        report["cleanup_error"] = type(e).__name__
+        report["cleanup_error"] = "%s: %s" % (type(e).__name__, e)
     if primary is not None and not primary.closed:
-        try:
-            d = Deadline.after(3)
-            row = primary.execute(
-                "SELECT pg_snapshot_xmin(pg_current_snapshot())::text, pg_snapshot_xmax(pg_current_snapshot())::text,"
-                " (SELECT count(*) FROM pg_prepared_xacts), (SELECT min(prepared) FROM pg_prepared_xacts)",
-                deadline=d, what="slot.report")[0]
-            report.update(oldest_running_xid=int(row[0]), next_xid=int(row[1]), prepared_transactions=row[2],
-                          oldest_prepared_at=row[3].isoformat() if row[3] else None)
-        except (errors.SourceError, DeadlineExceeded) as e:
-            report["primary_report_error"] = type(e).__name__
+        _primary_report(primary, report)
     log.warning("slot creation abandoned", extra={"cdc_v2": report})
     return report
+
+
+def _primary_report(primary: PgConnection, report: dict) -> None:
+    """What the role may see of why a creation waits: the oldest running transaction id, prepared transactions."""
+    try:
+        row = primary.execute(
+            "SELECT pg_snapshot_xmin(pg_current_snapshot())::text, pg_snapshot_xmax(pg_current_snapshot())::text,"
+            " (SELECT count(*) FROM pg_prepared_xacts), (SELECT min(prepared) FROM pg_prepared_xacts)",
+            deadline=Deadline.after(3), what="slot.report")[0]
+        report.update(oldest_running_xid=int(row[0]), next_xid=int(row[1]), prepared_transactions=row[2],
+                      oldest_prepared_at=row[3].isoformat() if row[3] else None)
+    except (errors.SourceError, DeadlineExceeded) as e:
+        report["primary_report_error"] = type(e).__name__
 
 
 # --------------------------------------------------------------------------------------------------- drop, terminate
@@ -400,7 +431,9 @@ def drop(node: PgConnection, name: str, deadline: Deadline, *, terminate: bool =
         if f.active:
             if not terminate:
                 raise SlotActive("slot %s is held by pid %s" % (name, f.active_pid))
-            terminate_holder(node, name, deadline)
+            r = terminate_holder(node, name, deadline)
+            if r.outcome == "holder unknown":
+                raise SlotActive("slot %s is held by a backend this role cannot see" % name)
         try:
             node.execute("SELECT pg_drop_replication_slot(%s)", (name,), deadline=deadline, what="slot.drop")
         except errors.SourceError as e:
@@ -418,13 +451,13 @@ def drop(node: PgConnection, name: str, deadline: Deadline, *, terminate: bool =
 
 @dataclass(frozen=True)
 class TerminateResult:
-    outcome: str                                  # 'inactive' | 'missing' | 'other holder'
+    outcome: str                                  # 'inactive' | 'missing' | 'other holder' | 'holder unknown'
     terminated: tuple[tuple[int, int], ...]       # (pid, backend start µs) of every backend terminated
     facts: SlotFacts | None                       # the last facts read
 
 
 _TERMINATE_SQL = """
-SELECT pg_terminate_backend(s.active_pid, %(wait_ms)s)
+SELECT pg_terminate_backend(s.active_pid)
 FROM pg_replication_slots s JOIN pg_stat_activity a ON a.pid = s.active_pid
 WHERE s.slot_name = %(name)s AND s.active_pid = %(pid)s
   AND (extract(epoch FROM a.backend_start) * 1000000)::bigint = %(start)s
@@ -436,27 +469,30 @@ def terminate_holder(node: PgConnection, name: str, deadline: Deadline, *, expec
     """Terminate the backend that holds our slot `name`, and only that: the terminating statement checks the slot's
     `active_pid` and that backend's start time again. Repeats until the slot is inactive, missing, or (with
     `expect` = (pid, backend start µs)) held by another backend than the expected one; raises DeadlineExceeded when
-    the deadline passes first. Never terminates a pid taken from anywhere else."""
+    the deadline passes first. Never terminates a pid taken from anywhere else.
+
+    'holder unknown': the slot is active but this role cannot see its holder's start time (a backend of another
+    role, without pg_read_all_stats); nothing is terminated."""
     check_slot_name(name)
     done: list[tuple[int, int]] = []
     while True:
         f = facts(node, name, deadline=deadline)
         if f is None:
             return TerminateResult("missing", tuple(done), None)
-        if not f.active or f.holder is None:
+        if not f.active:
             return TerminateResult("inactive", tuple(done), f)
+        if f.holder is None:
+            return TerminateResult("holder unknown", tuple(done), f)
         if expect is not None and f.holder != tuple(expect):
             return TerminateResult("other holder", tuple(done), f)
         if _after_read is not None:
             _after_read(f)
-        wait_ms = int(max(100, min(5000, deadline.remaining() * 1000 - 200)))
-        rows = node.execute(_TERMINATE_SQL, {"name": name, "pid": f.active_pid, "start": f.holder_backend_start_us,
-                                             "wait_ms": wait_ms}, deadline=deadline, what="slot.terminate_holder")
-        if rows and rows[0][0]:
+        rows = node.execute(_TERMINATE_SQL, {"name": name, "pid": f.active_pid, "start": f.holder_backend_start_us},
+                            deadline=deadline, what="slot.terminate_holder")
+        if rows and rows[0][0] and f.holder not in done:
             done.append(f.holder)
             crash_point("pg.holder_terminated")
-        else:
-            deadline.sleep(0.05, "slot.terminate_holder %s" % name)
+        deadline.sleep(0.05, "slot.terminate_holder %s" % name)
 
 
 # --------------------------------------------------------------------------------------------------- timeline

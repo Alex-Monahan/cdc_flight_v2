@@ -34,6 +34,37 @@ SCHEMA = "cdc_v2"
 TABLE = "heartbeat"
 
 
+def ensure(setup: PgConnection, runtime_role: str, *, publication: str = "cdc_v2_pub", schema: str = SCHEMA,
+           table: str = TABLE, deadline: Deadline):
+    """Create the heartbeat table (if missing), grant the runtime role what `beat` needs, and add the table to the
+    publication. Idempotent; run by the setup (bootstrap) role, which can create schemas and owns the table.
+    Returns the `publication.EnsureResult`."""
+    from cdc_v2.pg import publication as pubmod
+    for stmt in setup_sql(runtime_role, schema=schema, table=table):
+        setup.execute(stmt, deadline=deadline, what="heartbeat.ensure")
+    return pubmod.ensure(setup, [(schema, table)], publication=publication, deadline=deadline)
+
+
+def check(conn: PgConnection, *, publication: str = "cdc_v2_pub", schema: str = SCHEMA, table: str = TABLE,
+          deadline: Deadline) -> list[str]:
+    """What prevents the heartbeat from working, as seen by this connection's role (the runtime role, in the attach
+    step): the table is missing, is not in the publication, or the role may not write it. Empty when ready."""
+    from cdc_v2.pg import publication as pubmod
+    t = qualified(schema, table)
+    row = conn.execute("SELECT to_regclass(%s) IS NOT NULL", (t,), deadline=deadline, what="heartbeat.check")[0]
+    if not row[0]:
+        return ["heartbeat table %s.%s is missing" % (schema, table)]
+    problems = []
+    if not pubmod.has_table(conn, schema, table, publication=publication, deadline=deadline):
+        problems.append("heartbeat table %s.%s is not in publication %s" % (schema, table, publication))
+    ok = conn.execute("SELECT has_table_privilege(%s, 'INSERT') AND has_table_privilege(%s, 'UPDATE') "
+                      "AND has_table_privilege(%s, 'SELECT')", (t, t, t), deadline=deadline,
+                      what="heartbeat.check")[0][0]
+    if not ok:
+        problems.append("this role may not write the heartbeat table")
+    return problems
+
+
 def setup_sql(runtime_role: str, *, schema: str = SCHEMA, table: str = TABLE) -> list[str]:
     """Statements for the setup role: the heartbeat table and the runtime role's privileges on it. The table has a
     primary key, so it needs no REPLICA IDENTITY change. It is added to the publication by `publication.ensure`."""
@@ -52,9 +83,19 @@ class HeartbeatWrite:
     slot: str
     marker: str           # uuid text, unique to this write; the stream finds it in the heartbeat row
     n: int                # the row's counter after this write
-    xid: int              # the writing transaction's id (64-bit, pg_current_xact_id)
+    xid: int              # the writing transaction's id (64-bit, pg_current_xact_id; pgoutput and Debezium carry the
+                          # low 32 bits: compare xid & 0xFFFFFFFF)
     lower: int            # pg_current_wal_insert_lsn() inside the transaction: lower ≤ start of the commit record
     upper: int            # pg_current_wal_insert_lsn() after COMMIT returned: end of the commit record ≤ upper
+
+    @property
+    def position(self) -> int:
+        """The position the stream recognises the beat by: `upper`, read on the same connection after COMMIT
+        returned, so the beat's commit end is ≤ it. An END whose ack_position (a commit end) is ≥ `position`
+        belongs to a transaction that committed at or after the beat; the slot decodes in commit order, so the
+        beat has been decoded when such an END arrives. With no other WAL between, the beat's own END has
+        ack_position == position (measured: `test_heartbeat_write_is_published_and_recognisable`)."""
+        return self.upper
 
 
 _BEAT_SQL = """

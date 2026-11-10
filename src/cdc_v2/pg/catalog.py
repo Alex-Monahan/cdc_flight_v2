@@ -170,7 +170,8 @@ ORDER BY a.attrelid, a.attnum
 """
 
 _KEYS_SQL = """
-SELECT i.indrelid, i.indexrelid, i.indisprimary, i.indisreplident, ic.relname, i.indkey::int2[]
+SELECT i.indrelid, i.indexrelid, i.indisprimary, i.indisreplident, ic.relname,
+       ARRAY(SELECT i.indkey[k] FROM generate_series(0, i.indnkeyatts - 1) k)        -- key columns, not INCLUDE
 FROM pg_index i JOIN pg_class ic ON ic.oid = i.indexrelid
 WHERE i.indrelid = ANY(%s) AND (i.indisprimary OR i.indisreplident)
 """
@@ -358,7 +359,7 @@ class TableFacts:
     pk_attnums: tuple[int, ...]
     replica_identity_index_attnums: tuple[int, ...] | None
     replica_identity_index_is_key: bool
-    published: bool                                # directly in our publication
+    published: bool                                # in our publication, directly or through a partition ancestor
     publication_has_column_list: bool
     publication_has_row_filter: bool
 
@@ -395,9 +396,9 @@ class PublicationFacts:
 
 @dataclass(frozen=True)
 class CatalogObservation:
-    """The catalog state at one replay position in [lower, upper] (standby), or on a primary: no commit inserted
-    after `upper` is visible; commits inserted at or before `lower` are visible unless their transaction was still
-    in `in_progress` (the snapshot's in-progress list) — see docs/design/source.md."""
+    """The catalog state at one replay position in [lower, upper] (standby). On a primary only the upper bound holds
+    (no commit inserted after `upper` is visible); whether a transaction is in the observation is `visible(xid)` —
+    see docs/design/source.md."""
     lower: int                                          # b
     upper: int                                          # a
     in_recovery: bool
@@ -413,6 +414,21 @@ class CatalogObservation:
         parts = self.snapshot.split(":")
         return tuple(int(x) for x in parts[2].split(",") if x) if len(parts) == 3 else ()
 
+    @property
+    def xmin(self) -> int:
+        return int(self.snapshot.split(":")[0])
+
+    @property
+    def xmax(self) -> int:
+        return int(self.snapshot.split(":")[1])
+
+    def visible(self, xid: int) -> bool:
+        """Whether the observing snapshot sees the (64-bit) transaction `xid` as finished: below xmax and not in the
+        in-progress list. On a primary this, not the bracket, says whether a DDL whose commit record lies before
+        `lower` is in the observation (it may not be: a commit record is written before the transaction becomes
+        visible). Whether it committed or aborted is not part of the answer."""
+        return xid < self.xmax and xid not in self.in_progress
+
 
 _OBSERVE_SQL = """
 WITH pub AS (SELECT oid FROM pg_publication WHERE pubname = %(pub)s),
@@ -425,10 +441,16 @@ rels AS (
 f AS (
 SELECT c.oid, n.nspname, c.relname, c.relfilenode, c.relreplident, c.relkind, c.relpersistence, c.relispartition,
        a.attnums, a.attnames, a.atttypids, a.atttypmods, a.attdropped, a.attgenerated, a.atthasdef,
-       (SELECT i.indkey::int2[] FROM pg_index i WHERE i.indrelid = c.oid AND i.indisprimary) AS pk,
-       (SELECT i.indkey::int2[] FROM pg_index i WHERE i.indrelid = c.oid AND i.indisreplident) AS ri,
+       (SELECT ARRAY(SELECT i.indkey[k] FROM generate_series(0, i.indnkeyatts - 1) k)
+          FROM pg_index i WHERE i.indrelid = c.oid AND i.indisprimary) AS pk,
+       (SELECT ARRAY(SELECT i.indkey[k] FROM generate_series(0, i.indnkeyatts - 1) k)
+          FROM pg_index i WHERE i.indrelid = c.oid AND i.indisreplident) AS ri,
        (SELECT i.indisprimary FROM pg_index i WHERE i.indrelid = c.oid AND i.indisreplident) AS ri_is_pk,
-       pr.prrelid IS NOT NULL AS published, pr.prattrs IS NOT NULL AS has_cols, pr.prqual IS NOT NULL AS has_filter
+       (pr.prrelid IS NOT NULL OR EXISTS (
+          SELECT 1 FROM pg_publication_rel pa
+          WHERE pa.prpubid IN (SELECT oid FROM pub)
+            AND pa.prrelid IN (SELECT relid FROM pg_partition_ancestors(c.oid)))) AS published,
+       pr.prattrs IS NOT NULL AS has_cols, pr.prqual IS NOT NULL AS has_filter
 FROM rels JOIN pg_class c ON c.oid = rels.oid JOIN pg_namespace n ON n.oid = c.relnamespace
 LEFT JOIN pg_publication_rel pr ON pr.prrelid = c.oid AND pr.prpubid IN (SELECT oid FROM pub)
 LEFT JOIN LATERAL (

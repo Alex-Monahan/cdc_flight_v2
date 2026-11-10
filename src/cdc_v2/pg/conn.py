@@ -43,6 +43,18 @@ class SessionSettingsMismatch(errors.SourceError):
     """A fixed session setting did not take effect (something on the server overrides it)."""
 
 
+class _SimpleQueryError(psycopg.DatabaseError):
+    """An error result of a simple-protocol command, with its SQLSTATE (mapped by errors.classify)."""
+
+    def __init__(self, message: str, sqlstate: str | None):
+        super().__init__(message)
+        self._state = sqlstate
+
+    @property
+    def sqlstate(self):         # noqa: D401 - mirrors psycopg.Error.sqlstate
+        return self._state
+
+
 def _check_deadline(deadline: Deadline) -> Deadline:
     if not isinstance(deadline, Deadline):
         raise TypeError("a Deadline is required (cdc_v2.deadline.Deadline), got %r" % (type(deadline).__name__,))
@@ -66,6 +78,12 @@ class PgConnection:
         self._in_recovery: bool | None = None
         self._broken = False
         self._secrets = (node.host, node.user)
+        # Our own duplicate of the connection's socket, kept for the connection's lifetime: a shutdown from the
+        # watchdog always reaches this connection's socket, never a reused descriptor number of another one.
+        try:
+            self._sock: socket.socket | None = socket.socket(fileno=os.dup(raw.pgconn.socket))
+        except OSError:
+            self._sock = None
 
     # ----------------------------------------------------------------------------------------------- facts
     @property
@@ -120,6 +138,7 @@ class PgConnection:
         t1.daemon = True
         timers.append(t1)
         t1.start()
+        mapped: BaseException | None = None
         try:
             try:
                 yield
@@ -130,18 +149,22 @@ class PgConnection:
                     t.cancel()
         except BaseException as exc:
             if state["fired"]:
-                self._mark_broken()
-                raise DeadlineExceeded("%s: deadline passed (cancelled%s)"
-                                       % (what, ", socket shut down" if state["shut"] else "")) from None
-            if isinstance(exc, (psycopg.Error, OSError, EOFError)):
+                mapped = DeadlineExceeded("%s: deadline passed (cancelled%s)"
+                                          % (what, ", socket shut down" if state["shut"] else ""))
+            elif isinstance(exc, (psycopg.Error, OSError, EOFError)):
                 mapped = errors.classify(exc, in_recovery=self._in_recovery, what=what, secrets=self._secrets)
                 if isinstance(mapped, errors.ConnectionLost) or self.raw.closed or self.raw.broken:
-                    self._mark_broken()
+                    self._broken = True
                 elif isinstance(mapped, errors.RecoveryConflict) and self.raw.info.transaction_status == \
                         psycopg.pq.TransactionStatus.UNKNOWN:
-                    self._mark_broken()
-                raise mapped from None
-            raise
+                    self._broken = True
+            else:
+                raise
+        if mapped is not None:
+            # raised outside the except block, so the driver's exception is not kept as __context__ either
+            if state["fired"] or self._broken:
+                self._mark_broken()
+            raise mapped
         if state["fired"]:              # the statement returned, but a cancel may still be on its way
             self._mark_broken()
             raise DeadlineExceeded("%s: deadline passed" % what)
@@ -173,9 +196,10 @@ class PgConnection:
             fault_site("pg.execute")
             res = self.raw.pgconn.exec_(sql.encode())
             if res.status not in (psycopg.pq.ExecStatus.TUPLES_OK, psycopg.pq.ExecStatus.COMMAND_OK):
-                err = psycopg.errors.lookup(res.error_field(psycopg.pq.DiagnosticField.SQLSTATE).decode()) \
-                    if res.error_field(psycopg.pq.DiagnosticField.SQLSTATE) else psycopg.OperationalError
-                raise err((res.error_message or b"").decode(errors="replace"))
+                state = res.error_field(psycopg.pq.DiagnosticField.SQLSTATE)
+                primary = res.error_field(psycopg.pq.DiagnosticField.MESSAGE_PRIMARY)
+                raise _SimpleQueryError((primary or res.error_message or b"").decode(errors="replace").strip(),
+                                        state.decode() if state else None)
             return [tuple(res.get_value(r, c) for c in range(res.nfields)) for r in range(res.ntuples)]
 
     @contextmanager
@@ -201,42 +225,48 @@ class PgConnection:
 
     # ----------------------------------------------------------------------------------------------- closing
     def _shutdown_socket(self) -> None:
-        try:
-            fd = self.raw.pgconn.socket
-        except Exception:           # noqa: BLE001 - already closed
-            return
-        try:
-            s = socket.socket(fileno=os.dup(fd))
-        except OSError:
+        s = self._sock
+        if s is None:
             return
         try:
             s.shutdown(socket.SHUT_RDWR)
         except OSError:
             pass
-        finally:
-            s.close()
 
     def _mark_broken(self) -> None:
+        """The connection cannot be used again: shut its socket down (never blocks) and close it in the background,
+        so the caller is not held by a close that has to write to a dead network path."""
         self._broken = True
-        self.close(Deadline.after(self.node.cancel_grace_s))
+        self._shutdown_socket()
+        threading.Thread(target=self._close_quietly, daemon=True, name="cdc_v2-pg-close").start()
 
     def close(self, deadline: Deadline | None = None) -> None:
-        """Close; never blocks beyond the deadline (default: `cancel_grace_s`)."""
+        """Close; never blocks beyond the deadline (default: `cancel_grace_s`): past it, the socket is shut down
+        and the close finishes in the background."""
         deadline = deadline or Deadline.after(self.node.cancel_grace_s)
         if self.raw.closed:
+            self._close_sock()
             return
         t = threading.Thread(target=self._close_quietly, daemon=True, name="cdc_v2-pg-close")
         t.start()
         t.join(deadline.remaining())
         if t.is_alive():
             self._shutdown_socket()
-            t.join(self.node.cancel_grace_s)
 
     def _close_quietly(self) -> None:
         try:
             self.raw.close()
         except Exception:           # noqa: BLE001
             pass
+        self._close_sock()
+
+    def _close_sock(self) -> None:
+        s, self._sock = self._sock, None
+        if s is not None:
+            try:
+                s.close()
+            except OSError:
+                pass
 
     def __enter__(self):
         return self

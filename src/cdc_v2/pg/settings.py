@@ -101,10 +101,10 @@ class NodeSettings:
     the probes (docs/testing/harness.md §7): the statement deadlines do.
     """
 
-    host: str
+    host: str = field(repr=False)
     port: int
     dbname: str
-    user: str
+    user: str = field(repr=False)
     password: Password | None = field(default=None, compare=False)
     tls: str = "verify-full"
     sslrootcert: str | None = None

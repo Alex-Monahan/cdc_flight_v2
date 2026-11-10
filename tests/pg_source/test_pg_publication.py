@@ -112,6 +112,18 @@ def test_replica_identity_guard_and_the_wrong_order(cluster, scratch):
     scratch.admin(f"update {s}.nokey set x = 3; delete from {s}.idx")      # the source's writes work
     obs = catalog.observe(setup, publication=scratch.pub, deadline=D())
     assert all(t.replica_identity_problem is None for t in obs.tables.values())
+    # a partitioned table: its leaves are what is published, and each needs FULL when it has no key
+    scratch.admin(f"create table {s}.p (k int, v int) partition by range (k); "
+                  f"create table {s}.p1 partition of {s}.p for values from (0) to (10); "
+                  f"create table {s}.p2 partition of {s}.p for values from (10) to (20)")
+    with pytest.raises(publication.NotPublishable) as ei:
+        publication.ensure(setup, [(scratch.schema, "p")], publication=scratch.pub, deadline=D())
+    assert {(scratch.schema, "p1"), (scratch.schema, "p2")} <= set(ei.value.problems)
+    assert replica_identity.set_full(setup, (scratch.schema, "p"), D())
+    publication.ensure(setup, [(scratch.schema, "p")], publication=scratch.pub, deadline=D())
+    scratch.admin(f"insert into {s}.p values (1, 1), (15, 2); update {s}.p set v = 3; delete from {s}.p")
+    assert publication.has_table(setup, scratch.schema, "p1", publication=scratch.pub, deadline=D())
+    assert not publication.has_table(setup, scratch.schema, "busy_none", publication=scratch.pub, deadline=D())
 
 
 def test_set_full_lock_timeout(cluster, scratch):
@@ -210,13 +222,19 @@ def test_publication_add_under_concurrent_writers_and_next_xid(cluster, scratch)
 def test_heartbeat_write_is_published_and_recognisable(cluster, scratch):
     hs = "cdc_v2_hb_" + scratch.tag
     try:
+        rt_primary = scratch.connect("primary")
+        assert "missing" in heartbeat.check(rt_primary, publication=scratch.pub, schema=hs, deadline=D())[0]
         for stmt in heartbeat.setup_sql(scratch.runtime, schema=hs):
             scratch.admin(stmt)
+        assert heartbeat.check(rt_primary, publication=scratch.pub, schema=hs, deadline=D()) == [
+            "heartbeat table %s.heartbeat is not in publication %s" % (hs, scratch.pub)]
         setup = scratch.connect("primary", role="admin")
-        publication.ensure(setup, [(hs, heartbeat.TABLE)], publication=scratch.pub, deadline=D())
+        heartbeat.ensure(setup, scratch.runtime, publication=scratch.pub, schema=hs, deadline=D())
+        heartbeat.ensure(setup, scratch.runtime, publication=scratch.pub, schema=hs, deadline=D())   # idempotent
+        assert heartbeat.check(rt_primary, publication=scratch.pub, schema=hs, deadline=D()) == []
         cluster.replay_to_primary()
-        rt_primary = scratch.connect("primary")
         rt_standby = scratch.connect("replica")
+        assert heartbeat.check(rt_standby, publication=scratch.pub, schema=hs, deadline=D()) == []
         slot.create(rt_standby, scratch.slot, D(60), primary=rt_primary)
         beats = [heartbeat.beat(rt_primary, scratch.slot, schema=hs, deadline=D()) for _ in range(3)]
         other = heartbeat.beat(cluster.connect("primary"), scratch.slot, schema=hs, deadline=D())  # a second run
@@ -236,10 +254,13 @@ def test_heartbeat_write_is_published_and_recognisable(cluster, scratch):
                 for mk in markers:
                     seen[mk] = (cur["xid"], m["commit_lsn"], m["end_lsn"])
         commits = {v[2] for v in seen.values()}
+        exact = 0
         for b in beats + [other]:
             xid, start, end = seen[b.marker]
             assert xid == (b.xid & 0xFFFFFFFF)
             assert b.lower <= start < end <= b.upper     # the commit record lies in the returned bracket
+            exact += end == b.position
+        record("heartbeat", "own_end_equals_position", {"beats": 4, "equal": exact})
         lag = heartbeat.standby_lag(rt_primary, rt_standby, deadline=D())
         assert lag.bytes_behind is not None and lag.bytes_behind >= 0 and lag.replay_paused == "not paused"
         assert lag.recovery_min_apply_delay_ms == 0
