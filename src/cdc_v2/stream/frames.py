@@ -262,6 +262,8 @@ def _rows(payload, validate):
     c = _Cursor(memoryview(payload))
     schema, table = c.str(), c.str()
     version, nrows, ncols = c.u32(), c.u32(), c.u16()
+    if ncols == 0:
+        raise EngineBroken("ROWS frame without columns")
     buf = pa.py_buffer(payload)
     bitmap = (nrows + 7) >> 3
     names, arrays = [], []
@@ -392,7 +394,10 @@ class FrameParser:
                 if length > self.max_frame_bytes:
                     self._fail("frame length %d above the limit %d" % (length, self.max_frame_bytes))
                 self._ftype, self._len = ftype, length
-                self._payload = bytearray(length)
+                try:
+                    self._payload = bytearray(length)
+                except MemoryError:
+                    self._fail("cannot allocate a frame of %d bytes" % length)
                 self._filled = 0
                 self._crc_buf = bytearray()
                 continue
@@ -456,6 +461,7 @@ class FrameReader:
         self.read_size = read_size
         self.pending = []
         self.ended = False
+        self.closed = False
         os.set_blocking(fd, False)
         self._poll = select.poll() if hasattr(select, "poll") else None
         if self._poll is not None:
@@ -467,20 +473,35 @@ class FrameReader:
         r, _, _ = select.select([self.fd], [], [], seconds)
         return bool(r)
 
+    def close(self):
+        """Close the file descriptor; every later read raises EngineBroken (never reads a reused descriptor)."""
+        if not self.closed:
+            self.closed = True
+            try:
+                os.close(self.fd)
+            except OSError:
+                pass
+
     def read(self, deadline: Deadline):
         while not self.pending:
             if self.ended:
                 return None
+            if self.closed:
+                raise EngineBroken("the frame stream is closed")
             if self.parser.broken is not None:
                 raise EngineBroken("stream already broken: %s" % self.parser.broken)
             try:
                 chunk = os.read(self.fd, self.read_size)
             except BlockingIOError:
+                if self.closed:
+                    raise EngineBroken("the frame stream is closed") from None
                 left = deadline.remaining()
                 if left <= 0:
                     raise DeadlineExceeded("waiting for the next engine frame")
                 self._wait(min(left, 1.0))
                 continue
+            except OSError as e:
+                raise EngineBroken("reading the frame stream failed: %s" % e) from None
             if not chunk:
                 self.ended = True
                 self.parser.eof()

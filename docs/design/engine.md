@@ -202,8 +202,11 @@ The consumer keeps references only to END and HEARTBEAT records not yet acknowle
 `PostgresStreamingChangeEventSource.commitOffset` sends). `ack_position` of END and HEARTBEAT records must not
 decrease over the engine's life; if it would, the engine stops with FATAL. On `DURABLE p` the consumer takes the
 newest held record with `ack_position ≤ p`, calls `markProcessed(record)` and `markBatchFinished()`, and drops it
-and every older entry. A `DURABLE` below every held record does nothing (it is remembered only as "the newest p
-seen"; the next DURABLE replaces it); a `DURABLE` above all of them acknowledges the newest held record. The list
+and every older entry. A `DURABLE` below every held record acknowledges nothing; the engine keeps the newest p it
+received, so records with `ack_position ≤ p` that arrive later (after a restart the pipeline may send p before
+the redelivered transactions arrive) are acknowledged when they come
+(`test_durable_sent_before_the_redelivery_still_acknowledges`). A `DURABLE` above all held records acknowledges
+the newest one. A malformed DURABLE line is logged (`BAD_COMMAND`) and ignored. The list
 is thinned when it exceeds `cdc_v2.ack.max.pending` (every second entry is dropped, the newest always kept);
 dropping is safe, a later DURABLE then acknowledges an older record.
 
@@ -280,12 +283,15 @@ the PlanetScale version.
 - `STOP`: no more frames are written; `engine.close()` in a separate thread with `cdc_v2.stop.timeout.ms`; then halt
   with 0 (or 3 if Debezium did not close). Measured 4–66 ms. `Engine.stop()` discards frames while it waits and
   SIGKILLs the JVM at its deadline.
-- Any engine failure: FATAL with class, message and cause chain, scrubbed (configured host, user, database name and
-  password replaced, `password=…` and JDBC URLs removed, 2,000 characters at most); exit 1. Our own messages never
+- Any engine failure: FATAL with class, message and cause chain, scrubbed (configured password, host, user and
+  database name replaced, longest first; `password=…` and JDBC URLs removed; 2,000 characters at most); exit 1.
+  Python scrubs the password from FATAL messages again before it raises `EngineFatal`. Our own messages never
   contain values (table, column position and `seq` only).
 - Parent killed with SIGKILL: the JVM was gone after 0.06 s and the slot inactive after 0.07 s
   (`parent_death.json`).
-- Frame pipe closed: halt with 5. `engine.kill()` from Python: SIGKILL, reap, close every pipe.
+- Frame pipe closed: halt with 5. `engine.kill()` from Python: SIGKILL, reap, close every pipe; after that every
+  read raises `EngineBroken` (the closed descriptor is never read again). A HELLO protocol error (no HELLO first, a
+  second HELLO) marks the stream broken and kills the JVM.
 
 ## 8. Back-pressure, memory, limits
 
@@ -383,7 +389,16 @@ here (P9).
 10. The marker `jvm` is registered by `tests/engine/conftest.py`, which also skips `jvm` tests unless `-m` selects
     them. `pyproject.toml` should list `jvm` in `markers` and in the default `addopts` exclusion (not edited here).
 
-## 12. Tests and how to run them
+## 12. Review
+
+A read-only reviewer with fresh context (Opus) found no problem in the acknowledgement path or the Java encoding and
+eight smaller ones, all fixed with tests where testable: a closed frame descriptor could be read after `kill()` or
+FATAL; HELLO protocol errors did not break the stream; a DURABLE that matched no held record was dropped (now kept,
+section 5); secret scrubbing depended on map order; a corrupted length could raise `MemoryError`; a ROWS frame
+without columns was accepted; `frame_target_bytes` was not checked against `frame_max_bytes`; a malformed DURABLE
+line halted the JVM as "parent gone".
+
+## 13. Tests and how to run them
 
 ```sh
 uv run -q pytest -q tests/engine                                         # hermetic (default run): codec, detection, Engine with a fake JVM

@@ -152,3 +152,19 @@ def test_java_crash_points_declared_and_called():
     descs = re.findall(r'Crash\.declare\("([^"]+)",\s*"([^"]+)"\)', text.replace('"\n            + "', ""))
     for name, desc in descs:
         assert JAVA_CRASH_POINTS[name].replace(" ", "") == desc.replace(" ", "")
+
+
+def test_stop_and_next_frame_after_fatal_raise_cleanly(fake):
+    start, _ = fake
+    e = start("fatal")
+    with pytest.raises(EngineFatal):
+        list(e.frames(Deadline.after(5)))
+    assert e.stop(Deadline.after(5)) == 1                # no OSError on the closed frame descriptor
+    with pytest.raises(F.EngineBroken):
+        e.next_frame(Deadline.after(1))
+
+
+def test_settings_refuse_a_frame_target_above_the_maximum():
+    with pytest.raises(ValueError):
+        EngineSettings(host="h", port=55621, dbname="d", user="u", password="p", frame_target_bytes=1 << 31,
+                       frame_max_bytes=1 << 30, max_value_bytes=1 << 20)

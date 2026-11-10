@@ -1,9 +1,9 @@
 {
-  "after_advance": "0/DEA5ED0",
-  "after_status_updates_with_flush_at_the_old_position": "0/DEA5ED0",
-  "confirmed_flush_before_advance": "0/DEA5C60",
-  "probe": "PROBE_DONE start=0/DEA5C60 flush=0/DEA5C60 last_receive=0/DEA5ED0",
+  "after_advance": "0/4D79F5F0",
+  "after_status_updates_with_flush_at_the_old_position": "0/4D79F5F0",
+  "confirmed_flush_before_advance": "0/4D79F380",
+  "probe": "PROBE_DONE start=0/4D79F380 flush=0/4D79F380 last_receive=0/4D79F5F0",
   "server_version": "18.6 (Homebrew)",
   "test": "tests/engine/test_engine_attach.py::test_lower_flush_position_does_not_move_the_slot_back",
-  "while_engine_streams": "0/DEA5ED0"
+  "while_engine_streams": "0/4D79F5F0"
 }

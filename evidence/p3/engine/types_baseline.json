@@ -2,156 +2,187 @@
   "families": {
     "ai": {
       "form": "array_text",
+      "non_null": 4,
       "type": "integer[]",
       "values": 10
     },
     "at": {
       "form": "array_text",
+      "non_null": 1,
       "type": "text[]",
       "values": 10
     },
     "bool": {
       "form": "bool",
+      "non_null": 2,
       "type": "boolean",
       "values": 10
     },
     "bt": {
       "form": "text",
+      "non_null": 1,
       "type": "bit(4)",
       "values": 10
     },
     "by": {
       "form": "bytes",
+      "non_null": 4,
       "type": "bytea",
       "values": 10
     },
     "ch": {
       "form": "text",
+      "non_null": 2,
       "type": "char(5)",
       "values": 10
     },
     "dt": {
       "form": "date_pg_days",
+      "non_null": 9,
       "type": "date",
       "values": 10
     },
     "f4": {
       "form": "float32",
+      "non_null": 8,
       "type": "real",
       "values": 10
     },
     "f8": {
       "form": "float64",
+      "non_null": 8,
       "type": "double precision",
       "values": 10
     },
     "i2": {
       "form": "int16",
+      "non_null": 3,
       "type": "smallint",
       "values": 10
     },
     "i4": {
       "form": "int32",
+      "non_null": 3,
       "type": "integer",
       "values": 10
     },
     "i8": {
       "form": "int64",
+      "non_null": 3,
       "type": "bigint",
       "values": 10
     },
     "inet_": {
       "form": "text",
+      "non_null": 2,
       "type": "inet",
       "values": 10
     },
     "iv": {
       "form": "interval_text",
+      "non_null": 5,
       "type": "interval",
       "values": 10
     },
     "jb": {
       "form": "text",
+      "non_null": 2,
       "type": "jsonb",
       "values": 10
     },
     "js": {
       "form": "text",
+      "non_null": 3,
       "type": "json",
       "values": 10
     },
     "mn": {
       "form": "money_text",
+      "non_null": 3,
       "type": "money",
       "values": 10
     },
     "name_": {
       "form": "text",
+      "non_null": 1,
       "type": "name",
       "values": 10
     },
     "num": {
       "form": "numeric_text",
+      "non_null": 8,
       "type": "numeric",
       "values": 10
     },
     "num_c": {
       "form": "numeric_text",
+      "non_null": 3,
       "type": "numeric(15,2)",
       "values": 10
     },
     "oid_": {
       "form": "int64",
+      "non_null": 2,
       "type": "oid",
       "values": 10
     },
     "qchar": {
       "form": "text",
+      "non_null": 2,
       "type": "\"char\"",
       "values": 10
     },
     "rng": {
       "form": "text",
+      "non_null": 2,
       "type": "int4range",
       "values": 10
     },
     "tm": {
       "form": "time_us",
+      "non_null": 4,
       "type": "time",
       "values": 10
     },
     "tmz": {
       "form": "text",
+      "non_null": 3,
       "type": "timetz",
       "values": 10
     },
     "ts": {
       "form": "timestamp_pg_us",
+      "non_null": 8,
       "type": "timestamp",
       "values": 10
     },
     "txt": {
       "form": "text",
+      "non_null": 5,
       "type": "text",
       "values": 10
     },
     "tz": {
       "form": "timestamptz_pg_us",
+      "non_null": 7,
       "type": "timestamptz",
       "values": 10
     },
     "uu": {
       "form": "text",
+      "non_null": 1,
       "type": "uuid",
       "values": 10
     },
     "vb": {
       "form": "text",
+      "non_null": 3,
       "type": "varbit",
       "values": 10
     },
     "vc": {
       "form": "text",
+      "non_null": 2,
       "type": "varchar(10)",
       "values": 10
     }

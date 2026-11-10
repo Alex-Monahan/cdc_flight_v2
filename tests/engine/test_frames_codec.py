@@ -190,3 +190,14 @@ def test_invalid_utf8_in_a_text_column_is_refused():
     data[-4:] = struct.pack("<I", zlib.crc32(body) & 0xFFFFFFFF)
     with pytest.raises(F.EngineBroken, match="invalid column buffers"):
         F.decode_all(bytes(data))
+
+
+def test_rows_frame_without_columns_is_refused():
+    from cdc_v2.testing.frames import envelope
+    import pyarrow as pa
+    payload = bytearray()
+    for s in ("s", "t"):
+        payload += struct.pack("<I", 1) + s.encode()
+    payload += struct.pack("<IIH", 1, 5, 0)          # 5 rows, 0 columns
+    with pytest.raises(F.EngineBroken, match="without columns"):
+        F.decode_all(envelope(F.ROWS, 0, bytes(payload)))

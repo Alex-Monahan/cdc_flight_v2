@@ -1,6 +1,6 @@
 {
   "error": "EngineFatal",
-  "message": "org.apache.kafka.connect.errors.ConnectException: An exception occurred in the change event producer. This connector will be stopped. (caused by io.debezium.DebeziumException: Failed to start replication stream at LSN{0/DE3B7C8}; when setting up multiple connectors for the same database host, please make sure to use a distinct replication slot name for each.; org.postgresql.util.PSQLException: ERR",
-  "seconds_to_fail": 1.51,
+  "message": "org.apache.kafka.connect.errors.ConnectException: An exception occurred in the change event producer. This connector will be stopped. (caused by io.debezium.DebeziumException: Failed to start replication stream at LSN{0/4D764328}; when setting up multiple connectors for the same database host, please make sure to use a distinct replication slot name for each.; org.postgresql.util.PSQLException: ER",
+  "seconds_to_fail": 1.46,
   "test": "tests/engine/test_engine_attach.py::test_slot_held_by_another_engine"
 }

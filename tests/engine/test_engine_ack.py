@@ -258,7 +258,30 @@ def test_frozen_reader(pair, scenario, artifacts):
         col.run(lambda c: sum(len(t.rows) for t in c.txns) >= n, timeout=300)
         eng.stop(Deadline.after(20))
     rss = [s["rss_mb"] for s in samples[2:]]
-    assert max(rss) - min(rss) < 64, samples           # flat while frozen
+    assert max(rss) - rss[0] < 64, samples             # no growth while frozen (the GC may give memory back)
     evidence("frozen_reader.json", {"test": "tests/engine/test_engine_ack.py::test_frozen_reader",
                                     "freeze_s": freeze_s, "rows": n, "wal_sender_timeout": "60s (default)",
                                     "samples": samples, "all_rows_arrived": True})
+
+
+def test_durable_sent_before_the_redelivery_still_acknowledges(pair, scenario, artifacts):
+    """After a restart the pipeline may send DURABLE p before the redelivered transactions with ack <= p arrive;
+    the engine keeps p and acknowledges them when they come (review finding, CdcEngine.Consumer.lastDurable)."""
+    sc = scenario("create table {s}.a (id int primary key, v text)")
+    pair.p("insert into %s.a values (1, 'x')" % sc.schema)
+    with Engine(sc.settings(), None, artifacts) as eng:
+        col = Collector(eng).run(lambda c: len(c.txns) >= 1, timeout=60)
+        p = col.txns[0].end.ack_position
+        eng.stop(Deadline.after(20))
+    before = L.parse(pair.slot(sc.slot)[0])
+    assert before < p                                   # nothing acknowledged yet
+    with Engine(sc.settings(heartbeat_interval_ms=500), None, artifacts) as eng:
+        eng.durable(p)                                  # before anything arrives
+        col = Collector(eng)
+        t0 = time.monotonic()
+        while L.parse(pair.slot(sc.slot)[0]) < p:
+            for f in eng.frames(Deadline.after(0.5)):
+                col.feed(f)
+            assert time.monotonic() - t0 < 30, "the early DURABLE was lost"
+        assert col.txns and col.txns[0].end.ack_position == p
+        eng.stop(Deadline.after(20))

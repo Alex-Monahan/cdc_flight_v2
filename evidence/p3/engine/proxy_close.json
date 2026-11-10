@@ -9,7 +9,7 @@
     "closed_by_fault": 2,
     "reset_by_fault": 0
   },
-  "seconds": 5.53,
+  "seconds": 5.47,
   "slot_active_after_kill": false,
   "test": "tests/engine/test_engine_attach.py::test_broken_source_connection_through_the_proxy[close]"
 }

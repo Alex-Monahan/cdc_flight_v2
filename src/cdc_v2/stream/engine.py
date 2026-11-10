@@ -99,8 +99,10 @@ class EngineSettings:
     def __post_init__(self):
         if not (0 < self.port < 65536) or self.port == 5432 and self.host in ("localhost", "127.0.0.1", "::1"):
             raise ValueError("refusing port %r" % (self.port,))
-        if self.max_value_bytes > self.frame_max_bytes - (1 << 20) or self.frame_max_bytes > 0xFFFFFFFF:
-            raise ValueError("max_value_bytes must leave 1 MiB below frame_max_bytes (at most 4 GiB)")
+        if (self.max_value_bytes > self.frame_max_bytes - (1 << 20) or self.frame_max_bytes > 0xFFFFFFFF
+                or self.frame_target_bytes > self.frame_max_bytes - (1 << 20)):
+            raise ValueError("max_value_bytes and frame_target_bytes must leave 1 MiB below frame_max_bytes "
+                             "(at most 4 GiB)")
         if self.gc not in ("parallel", "g1"):
             raise ValueError("gc must be parallel or g1")
 
@@ -257,7 +259,7 @@ class Engine:
     # ------------------------------------------------------------------------------------------------ plumbing
 
     def _scrub(self, text):
-        if self._secret and len(self._secret) >= 3:
+        if self._secret:
             text = text.replace(self._secret, "<password>")
         return text
 
@@ -316,13 +318,19 @@ class Engine:
             raise EngineExited(status, self._last_log())
         if isinstance(f, F.Fatal):
             self._reap(deadline.within(5))
-            raise EngineFatal(f)
+            raise EngineFatal(F.Fatal(self._scrub(f.error_class), self._scrub(f.message),
+                                      tuple((self._scrub(c), self._scrub(m)) for c, m in f.causes)))
+        problem = None
         if isinstance(f, F.Hello):
             if self.hello is not None:
-                raise EngineBroken("second HELLO")
-            self.hello = f
+                problem = "second HELLO"
+            self.hello = self.hello or f
         elif self.hello is None:
-            raise EngineBroken("first frame is %s, not HELLO" % type(f).__name__)
+            problem = "first frame is %s, not HELLO" % type(f).__name__
+        if problem:
+            self.reader.parser.broken = EngineBroken(problem)
+            self.kill()
+            raise EngineBroken(problem)
         return f
 
     def frames(self, deadline: Deadline):
@@ -404,10 +412,7 @@ class Engine:
                 f.close()
             except OSError:
                 pass
-        try:
-            os.close(self._frames_fd)
-        except OSError:
-            pass
+        self.reader.close()
         for t in self._drains:
             t.join(5)
         for f in (self.proc.stdout, self.proc.stderr):

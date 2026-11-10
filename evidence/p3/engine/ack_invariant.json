@@ -1,18 +1,18 @@
 {
   "busy_delay_s": {
-    "max": 0.142,
-    "p50": 0.061
+    "max": 0.151,
+    "p50": 0.062
   },
   "durables_sent": 76,
-  "heartbeat_ack_after_unpublished_writes": "0/DF12170",
-  "heartbeat_ack_before_unpublished_writes": "0/DF12170",
+  "heartbeat_ack_after_unpublished_writes": "0/4D666628",
+  "heartbeat_ack_before_unpublished_writes": "0/4D666628",
   "heartbeat_interval_ms": 5000,
   "heartbeat_moved_with_unpublished_wal": false,
-  "idle_delay_s": 2.007,
+  "idle_delay_s": 2.207,
   "phase1_slot_moved": false,
   "poll_interval_ms": 50,
-  "samples": 692,
+  "samples": 704,
   "test": "tests/engine/test_engine_ack.py::test_slot_never_ahead_of_durable_and_follows_it",
-  "transactions": 817,
+  "transactions": 842,
   "violations": 0
 }

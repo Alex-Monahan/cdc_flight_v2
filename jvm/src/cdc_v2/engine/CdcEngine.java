@@ -91,7 +91,8 @@ public final class CdcEngine {
             s.parentPollMs = Long.parseLong(c.getOrDefault("cdc_v2.parent.poll.ms", "500"));
             s.statIntervalMs = Long.parseLong(c.getOrDefault("cdc_v2.stat.interval.ms", "10000"));
             if (s.frameMaxRows < 1 || s.frameTargetBytes < 1 || s.ackMaxPending < 2
-                    || s.frameMaxBytes > 0xFFFFFFFFL || s.maxValueBytes > s.frameMaxBytes - (1 << 20)) {
+                    || s.frameMaxBytes > 0xFFFFFFFFL || s.maxValueBytes > s.frameMaxBytes - (1 << 20)
+                    || s.frameTargetBytes > s.frameMaxBytes - (1 << 20)) {
                 throw new IllegalArgumentException("cdc_v2 settings out of range");
             }
             return s;
@@ -278,7 +279,7 @@ public final class CdcEngine {
     }
 
     static void rememberSecret(String value, String placeholder) {
-        if (value != null && value.length() >= 3) {
+        if (value != null && !value.isEmpty() && (value.length() >= 3 || placeholder.equals("<password>"))) {
             secrets.put(value, placeholder);
         }
     }
@@ -287,7 +288,10 @@ public final class CdcEngine {
         if (s == null) {
             return "";
         }
-        for (Map.Entry<String, String> e : secrets.entrySet()) {
+        // longest first, so a user or host name inside the password cannot break the password's replacement
+        List<Map.Entry<String, String>> order = new ArrayList<>(secrets.entrySet());
+        order.sort((a, b) -> Integer.compare(b.getKey().length(), a.getKey().length()));
+        for (Map.Entry<String, String> e : order) {
             s = s.replace(e.getKey(), e.getValue());
         }
         s = s.replaceAll("(?i)password=[^\\s&;,]*", "password=<password>");
@@ -315,7 +319,12 @@ public final class CdcEngine {
             String line;
             while ((line = readLine(in)) != null) {
                 if (line.startsWith("DURABLE ")) {
-                    durables.add(Long.parseUnsignedLong(line.substring(8).trim()));
+                    try {
+                        durables.add(Long.parseUnsignedLong(line.substring(8).trim()));
+                    }
+                    catch (NumberFormatException e) {
+                        log("BAD_COMMAND", "durable_not_a_number length=" + line.length());
+                    }
                 }
                 else if (line.equals("STOP")) {
                     requestStop();
@@ -642,9 +651,13 @@ public final class CdcEngine {
             log("HELLO", "active_pid=" + h.activePid + " application_name=" + Json.quote(h.applicationName));
         }
 
+        /** The newest DURABLE position received; kept, so a DURABLE that matches no held record yet still counts
+         *  when such a record arrives later (after a restart the pipeline may send it before the redelivery). */
+        Long lastDurable;
+
         void applyDurable(DebeziumEngine.RecordCommitter<RecordChangeEvent<SourceRecord>> committer)
                 throws InterruptedException {
-            Long p = null;
+            Long p = lastDurable;
             Long d;
             while ((d = durables.poll()) != null) {
                 if (p == null || Long.compareUnsigned(d, p) > 0) {
@@ -654,6 +667,7 @@ public final class CdcEngine {
             if (p == null) {
                 return;
             }
+            lastDurable = p;
             Pending best = null;
             while (!pending.isEmpty() && Long.compareUnsigned(pending.peekFirst().ack, p) <= 0) {
                 best = pending.pollFirst();
