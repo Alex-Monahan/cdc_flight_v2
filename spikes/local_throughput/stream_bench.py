@@ -187,8 +187,9 @@ def t_backlog(cfg, node, n, rep) -> dict:
         smp = S.Sampler(eng, node)
         th0 = eng.thread_cpu()
         ok = eng.wait_events(n, 1800)
-        s = eng.stats()
         th1 = eng.thread_cpu()
+        time.sleep(3)  # anything beyond n would show up here
+        s = eng.stats()
         res = smp.finish()
     finally:
         stop_engine(eng, node)
@@ -352,6 +353,39 @@ def t_restart(cfg, node, sig, rep) -> dict:
             if s2.get("first_event_at") else None, "extra_events_beyond_tx": total2b - n, "_": extra}
 
 
+def t_confirm(cfg, node, extra, label) -> dict:
+    """Does the slot's confirmed_flush_lsn cover the last transaction before an idle period, and after a clean stop?"""
+    S.fresh_slot(node)
+    eng = S.Engine(node, cfg, extra=extra, label="confirm")
+    eng.wait_polling(120)
+    with C.pg_connect("primary", "admin") as p:
+        p.execute("INSERT INTO public.stream_li SELECT * FROM public.lineitem LIMIT 1000")
+        after = p.execute("select pg_current_wal_lsn()").fetchone()[0]
+    eng.wait_events(1000, 60)
+
+    def confirmed():
+        with C.pg_connect(node, "admin") as c:
+            return c.execute("select confirmed_flush_lsn >= %s::pg_lsn, confirmed_flush_lsn::text from "
+                             "pg_replication_slots where slot_name = %s", (after, S.SLOT)).fetchone()
+
+    out = {"test": "confirm", "variant": label, "extra": extra, "lsn_after_commit": str(after)}
+    for wait in (2, 10):
+        time.sleep(wait if wait == 2 else 8)
+        c = confirmed()
+        out[f"covered_after_{wait}s_idle"] = c[0]
+    eng.stop()
+    S.wait_slot_idle(node)
+    out["covered_after_clean_stop"] = confirmed()[0]
+    eng2 = S.Engine(node, cfg, extra=extra, label="confirm2")
+    eng2.wait_polling(120)
+    time.sleep(5)
+    out["redelivered_events_on_restart"] = eng2.events()
+    eng2.stop()
+    S.wait_slot_idle(node)
+    S.truncate("stream_li")
+    return out
+
+
 def run(plan, reps, tests, configs, default_reps, node):
     for rep in range(1, reps + 1):
         for cfg in configs:
@@ -359,8 +393,16 @@ def run(plan, reps, tests, configs, default_reps, node):
                 continue
             for t in tests:
                 print(f"rep {rep} cfg {cfg} node {node} test {t} load {C.load_avg()}", flush=True)
+                # every test starts from its own new slot: Debezium confirms the last transaction before an idle
+                # period or a stop only on a later batch (measured: test "confirm"), so a reused slot re-sends it
+                S.wait_slot_idle(node)
+                S.fresh_slot(node)
                 try:
-                    if t == "big1m":
+                    if t == "confirm":
+                        rs = [t_confirm(cfg, node, {}, "flush_1s_no_heartbeat"),
+                              t_confirm(cfg, node, {"heartbeat.interval.ms": "1000", "offset.flush.interval.ms": "0"},
+                                        "flush_0_heartbeat_1s")]
+                    elif t == "big1m":
                         rs = [t_big(cfg, node, 1_000_000, rep)]
                     elif t == "big10m":
                         rs = [t_big(cfg, node, 10_000_000, rep)]
@@ -390,7 +432,7 @@ def run(plan, reps, tests, configs, default_reps, node):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--plan", default="main", choices=["main", "primary", "restart", "custom"])
+    ap.add_argument("--plan", default="main", choices=["main", "primary", "restart", "custom", "confirm"])
     ap.add_argument("--reps", type=int, default=3)
     ap.add_argument("--tests", default=None)
     ap.add_argument("--configs", default="best,default")
@@ -400,12 +442,11 @@ def main():
     defaults = {"main": ("big1m,big10m,backlog,live,mixed", "replica"),
                 "primary": ("big1m,backlog", "primary"),
                 "restart": ("restart_term,restart_kill", "replica"),
-                "custom": ("big1m", "replica")}
+                "custom": ("big1m", "replica"), "confirm": ("confirm", "replica")}
     tests, node = defaults[a.plan]
     tests = (a.tests or tests).split(",")
     node = a.node or node
     S.truncate(*S.TABLES)
-    print(S.fresh_slot(node), flush=True)
     run(a.plan, a.reps, tests, a.configs.split(","), a.default_reps, node)
 
 
