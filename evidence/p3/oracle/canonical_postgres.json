@@ -1,0 +1,320 @@
+{
+  "all_match": true,
+  "values": [
+    {
+      "canonical": "-2147483648",
+      "literal": "'-2147483648'",
+      "match": true,
+      "reference": "-2147483648",
+      "type": "integer"
+    },
+    {
+      "canonical": "9223372036854775807",
+      "literal": "9223372036854775807",
+      "match": true,
+      "reference": "9223372036854775807",
+      "type": "bigint"
+    },
+    {
+      "canonical": "t",
+      "literal": "true",
+      "match": true,
+      "reference": "t",
+      "type": "boolean"
+    },
+    {
+      "canonical": "1.5",
+      "literal": "1.50",
+      "match": true,
+      "reference": "1.5",
+      "type": "numeric"
+    },
+    {
+      "canonical": "NaN",
+      "literal": "'NaN'",
+      "match": true,
+      "reference": "NaN",
+      "type": "numeric"
+    },
+    {
+      "canonical": "-Infinity",
+      "literal": "'-Infinity'",
+      "match": true,
+      "reference": "-Infinity",
+      "type": "numeric"
+    },
+    {
+      "canonical": "0",
+      "literal": "'-0.000'",
+      "match": true,
+      "reference": "0",
+      "type": "numeric"
+    },
+    {
+      "canonical": "100",
+      "literal": "100.000",
+      "match": true,
+      "reference": "100",
+      "type": "numeric(10,3)"
+    },
+    {
+      "canonical": "430c6bf526340000",
+      "literal": "1e15",
+      "match": true,
+      "reference": "430c6bf526340000",
+      "type": "double precision"
+    },
+    {
+      "canonical": "8000000000000000",
+      "literal": "'-0'",
+      "match": true,
+      "reference": "8000000000000000",
+      "type": "double precision"
+    },
+    {
+      "canonical": "NaN",
+      "literal": "'NaN'",
+      "match": true,
+      "reference": "NaN",
+      "type": "double precision"
+    },
+    {
+      "canonical": "0000000000000001",
+      "literal": "5e-324",
+      "match": true,
+      "reference": "0000000000000001",
+      "type": "double precision"
+    },
+    {
+      "canonical": "7fefffffffffffff",
+      "literal": "1.7976931348623157e308",
+      "match": true,
+      "reference": "7fefffffffffffff",
+      "type": "double precision"
+    },
+    {
+      "canonical": "3fb999999999999a",
+      "literal": "0.1",
+      "match": true,
+      "reference": "3fb999999999999a",
+      "type": "double precision"
+    },
+    {
+      "canonical": "3fb99999a0000000",
+      "literal": "0.1",
+      "match": true,
+      "reference": "3fb99999a0000000",
+      "type": "real"
+    },
+    {
+      "canonical": "4170000000000000",
+      "literal": "16777216",
+      "match": true,
+      "reference": "4170000000000000",
+      "type": "real"
+    },
+    {
+      "canonical": "8000000000000000",
+      "literal": "'-0'",
+      "match": true,
+      "reference": "8000000000000000",
+      "type": "real"
+    },
+    {
+      "canonical": "47efffffe0000000",
+      "literal": "3.4028235e38",
+      "match": true,
+      "reference": "47efffffe0000000",
+      "type": "real"
+    },
+    {
+      "canonical": "36a0000000000000",
+      "literal": "1e-45",
+      "match": true,
+      "reference": "36a0000000000000",
+      "type": "real"
+    },
+    {
+      "canonical": "Infinity",
+      "literal": "'Infinity'",
+      "match": true,
+      "reference": "Infinity",
+      "type": "real"
+    },
+    {
+      "canonical": "4130000040000000",
+      "literal": "1048576.25",
+      "match": true,
+      "reference": "4130000040000000",
+      "type": "real"
+    },
+    {
+      "canonical": "c19bf31800000000",
+      "literal": "-117229056",
+      "match": true,
+      "reference": "c19bf31800000000",
+      "type": "real"
+    },
+    {
+      "canonical": "",
+      "literal": "''",
+      "match": true,
+      "reference": "",
+      "type": "text"
+    },
+    {
+      "canonical": "h\u00e9llo",
+      "literal": "'h\u00e9llo'",
+      "match": true,
+      "reference": "h\u00e9llo",
+      "type": "varchar(5)"
+    },
+    {
+      "canonical": "ab",
+      "literal": "'ab'",
+      "match": true,
+      "reference": "ab",
+      "type": "char(5)"
+    },
+    {
+      "canonical": "00ff",
+      "literal": "'\\x00ff'",
+      "match": true,
+      "reference": "00ff",
+      "type": "bytea"
+    },
+    {
+      "canonical": "19724",
+      "literal": "'2024-01-02'",
+      "match": true,
+      "reference": "19724",
+      "type": "date"
+    },
+    {
+      "canonical": "infinity",
+      "literal": "'infinity'",
+      "match": true,
+      "reference": "infinity",
+      "type": "date"
+    },
+    {
+      "canonical": "-719162",
+      "literal": "'0001-01-01'",
+      "match": true,
+      "reference": "-719162",
+      "type": "date"
+    },
+    {
+      "canonical": "86400000000",
+      "literal": "'24:00:00'",
+      "match": true,
+      "reference": "86400000000",
+      "type": "time"
+    },
+    {
+      "canonical": "3723000004",
+      "literal": "'01:02:03.000004'",
+      "match": true,
+      "reference": "3723000004",
+      "type": "time"
+    },
+    {
+      "canonical": "1704067200000001",
+      "literal": "'2024-01-01 00:00:00.000001'",
+      "match": true,
+      "reference": "1704067200000001",
+      "type": "timestamp"
+    },
+    {
+      "canonical": "-infinity",
+      "literal": "'-infinity'",
+      "match": true,
+      "reference": "-infinity",
+      "type": "timestamp"
+    },
+    {
+      "canonical": "951848999999999",
+      "literal": "'2000-02-29 23:59:59.999999+05:30'",
+      "match": true,
+      "reference": "951848999999999",
+      "type": "timestamptz"
+    },
+    {
+      "canonical": "14:3:14706000007",
+      "literal": "'1 year 2 mons 3 days 04:05:06.000007'",
+      "match": true,
+      "reference": "14:3:14706000007",
+      "type": "interval"
+    },
+    {
+      "canonical": "-27:4:-18367000000",
+      "literal": "'-2 years -3 mons +4 days -05:06:07'",
+      "match": true,
+      "reference": "-27:4:-18367000000",
+      "type": "interval"
+    },
+    {
+      "canonical": "infinity",
+      "literal": "'infinity'",
+      "match": true,
+      "reference": "infinity",
+      "type": "interval"
+    },
+    {
+      "canonical": "6f9619ff-8b86-d011-b42d-00c04fc964ff",
+      "literal": "'6F9619FF-8B86-D011-B42D-00C04FC964FF'",
+      "match": true,
+      "reference": "6f9619ff-8b86-d011-b42d-00c04fc964ff",
+      "type": "uuid"
+    },
+    {
+      "canonical": "{\"b\": 1,  \"a\":2}",
+      "literal": "'{\"b\": 1,  \"a\":2}'",
+      "match": true,
+      "reference": "{\"b\": 1,  \"a\":2}",
+      "type": "json"
+    },
+    {
+      "canonical": "{\"a\": 2, \"b\": 1}",
+      "literal": "'{\"b\": 1,  \"a\":2}'",
+      "match": true,
+      "reference": "{\"a\": 2, \"b\": 1}",
+      "type": "jsonb"
+    },
+    {
+      "canonical": "[1:3]{V1:1,N,V1:3}",
+      "literal": "'{1,NULL,3}'",
+      "match": true,
+      "reference": "[1:3]{V1:1,N,V1:3}",
+      "type": "integer[]"
+    },
+    {
+      "canonical": "{}",
+      "literal": "'{}'",
+      "match": true,
+      "reference": "{}",
+      "type": "integer[]"
+    },
+    {
+      "canonical": "[1:2][1:2]{V1:1,V1:2,V1:3,V1:4}",
+      "literal": "'{{1,2},{3,4}}'",
+      "match": true,
+      "reference": "[1:2][1:2]{V1:1,V1:2,V1:3,V1:4}",
+      "type": "integer[]"
+    },
+    {
+      "canonical": "[1:2]{V0:,N}",
+      "literal": "'{\"\",NULL}'",
+      "match": true,
+      "reference": "[1:2]{V0:,N}",
+      "type": "text[]"
+    },
+    {
+      "canonical": "[1:2]{V16:8000000000000000,V3:NaN}",
+      "literal": "'{-0,NaN}'",
+      "match": true,
+      "reference": "[1:2]{V16:8000000000000000,V3:NaN}",
+      "type": "double precision[]"
+    }
+  ]
+}
