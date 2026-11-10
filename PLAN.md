@@ -156,8 +156,14 @@ launcher that puts only the project's credentials in the environment; Flights ar
 authenticated as that account, so they run with its permissions. MotherDuck databases created by this project are
 named `cdc_v2_*`; tests create and drop only such databases.
 
-**GitHub.** Build sessions hold a GitHub credential that is valid for this repository only; `git` and `gh` work for
-`Alex-Monahan/cdc_flight_v2` and for nothing else. Do not look for, or switch to, any other GitHub credential.
+**GitHub.** Build sessions hold a GitHub credential that is valid for this repository only: `git` fetch and push
+work for `Alex-Monahan/cdc_flight_v2` and for nothing else, and public repositories can be cloned anonymously. The
+`gh` command has no credential in build sessions — everything the build needs goes through `git`. Do not look for,
+or switch to, any other GitHub credential.
+
+**Names.** Everything this build creates carries a name that starts with `cdc_v2`: the Python package (`cdc_v2`),
+MotherDuck databases, Postgres roles, publications and slots, Flights, local folders. The repository name
+`cdc_flight_v2` is always written in full. Other spellings of the project name are refused by the boundary guard.
 
 **Public repository (SPEC R23).** Everything committed is published. Therefore:
 
@@ -182,8 +188,9 @@ installed. It scans the logs of every Claude session and subagent of this build,
 use of an out-of-bounds location. If it finds something, the owner is alerted (Slack and a local notification) with
 what was touched, by which session or agent, and when. The scan is deterministic; hits are judged and summarised by
 Haiku, and an hour without hits makes no model call. Its rule list is kept outside the repository. After each run it
-writes a receipt to `~/.config/cdc_flight_v2/audit_status.json` (times and counts only), which build sessions read
-in the session start checks and at each gate.
+writes a receipt to `~/.config/cdc_flight_v2/audit_status.json` (times and counts only: `last_run`, `status`,
+`findings_total`, `denials_seen_total`, `alerts_total`, …), which build sessions read in the session start checks and
+at each gate. A `status` other than `ok`, or a `findings_total` above zero, is a boundary failure: tell the owner.
 
 ## 5. Test environments
 
@@ -205,7 +212,12 @@ a change is green locally.
 - **Installed with Homebrew and run as native processes. Never Docker, never any other container or virtual
   machine** — this machine does not have the memory for it.
 - Run the formula's own binaries (`initdb`, `pg_ctl`, `pg_basebackup`) directly, not as a Homebrew service: nothing
-  starts at login, nothing listens on port 5432, and other Postgres installations on this machine are left alone.
+  starts at login and nothing of this build listens on port 5432.
+- **A Postgres that belongs to other work of the owner runs as a Homebrew service on port 5432. It is not part of
+  this build: never connect to it, stop it, restart it or touch its data directory.** Upgrade the formula with
+  `HOMEBREW_NO_INSTALL_CLEANUP=1 brew upgrade postgresql@18`, so that the binaries it is running stay on disk; it
+  picks up the new version whenever the owner next restarts it. Build sessions have `PGPORT=55432` in their
+  environment, so a connection that names no port reaches this build's primary and not that service.
 - Data directories live outside the repository, under `~/.cache/cdc_flight_v2/pg/`. Ports: primary 55432, replica
   55433, further standbys from 55434, TCP proxies from 55440. Listen on `localhost` only.
 - Topology: a primary with `wal_level = logical`, and a streaming replica created with `pg_basebackup` that uses a
