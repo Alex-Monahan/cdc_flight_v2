@@ -452,7 +452,10 @@ stays in place behind every entry.
   delete removes exactly one occurrence (SPEC 1.2).
 - **Why prevention.** The destination never executes the intermediate states, and the one table shape whose records
   can be ambiguous by key is never applied by key.
-- **Test.** `test_h015_key_chains_swaps` (DEFAULT and FULL identity, history mode on), `test_h015_duplicate_rows`.
+- **Test.** `test_h015_key_chains_swaps` (DEFAULT and FULL identity, history mode on), `test_h015_duplicate_rows`,
+  `tests/pg_source/test_pg_keys.py::test_catalog_follows_rule_k`, `::test_deferrable_key_set_full_then_publish`,
+  `::test_how_a_primary_key_becomes_deferrable`, `tests/engine/test_engine_keys.py::test_what_debezium_calls_a_key_and_the_list`,
+  `::test_a_listed_table_without_an_old_image`, `tests/pg_source/test_pg_hermetic.py::test_rule_k_and_identity_problem_over_every_combination`.
 - **Residual.** None known.
 
 ### H-016 TRUNCATE variants (and Debezium's default that drops them)
@@ -1075,6 +1078,35 @@ Background for every entry: `docs/research/replica_decoding.md`.
 - **Test.** `test_h050_startup_budget` (large catalog; assert start-up ≤ the share of the 120 s budget assigned to it).
 - **Residual.** Large catalogs on the source make hand-over slower.
 
+### H-051 Names stock Debezium cannot stream
+
+- **What.** A schema or table name that contains `"`. Measured with Debezium 3.7.1 on Postgres 18.6
+  (`docs/design/engine.md` 4a): `"b`, `x "q"` and `Odd.Name, "q"` stop the engine with FATAL
+  (`IllegalArgumentException` in Debezium's change event producer) at every start; a name wholly in quotes
+  (`"q"`) loses its records silently, its transactions arrive with `END` event count 0. The same four shapes as
+  schema names behave the same way (`a"b` streams, `"b` and `x "q"` FATAL, `"q"` dropped). **A table `"q"` next to
+  a table `q` in one schema: the rows of `"q"` arrive as rows of `q`, counted, with no error.**
+- **Mechanism.** Debezium parses a table identifier from text and treats a part that starts with a double quote
+  as a quoted identifier **[test]**; the engine has no hook between that parser and the record.
+- **Reproduction.** `CREATE TABLE s."""q""" (id int primary key); CREATE TABLE s.q (id int primary key);` both
+  published; insert into each; the stream shows only `q`.
+- **Prevention.** The catalog's name rule: any `"` in a schema or table name means the table is not streamed
+  (`SourceTable.name_problem`; `publication.ensure` refuses it with `NotPublishable`, `publication.check` reports
+  it when it was published by other means). Such a table gets routing `skip` with one alert in P3 (the full
+  refresh of SPEC 3.5 in P4) and is never in the publication; package T removes a table renamed into such a name
+  from the publication. The rule also refuses names with `"` that Debezium does stream (`a"b`); that costs little.
+- **Why prevention.** Two of the outcomes are silent (event count 0, rows credited to another table); no check
+  downstream of Debezium can see them.
+- **Test.** `tests/engine/test_engine_keys.py::test_names_stock_debezium_cannot_stream`,
+  `tests/engine/test_engine_names.py` (schema names, `"q"` next to `q`, schema `a.b` table `c` next to schema `a`
+  table `b.c` — kept apart, the frames carry schema and table separately; a table left out of
+  `table.include.list` — no FATAL, its transactions arrive with event count 0),
+  `tests/pg_source/test_pg_hermetic.py::test_name_problem`,
+  `tests/pg_source/test_pg_keys.py::test_name_rule_refuses_and_reports`.
+- **Residual.** The four residuals of the fix round were measured (above). Open for P5: other quoting characters
+  Debezium's parser might treat specially (none found besides `"` among dot, comma, space, upper case); names
+  of 63 bytes with `"`.
+
 ---
 
 ## Summary table
@@ -1131,6 +1163,7 @@ Background for every entry: `docs/research/replica_decoding.md`.
 | H-048 Recovery conflicts with our replica sessions | bounded chunks; timeouts; retries | `test_h048_*` | proposed |
 | H-049 Decoder spill on the replica | sizing check; spill metrics and alert | `test_h049_*` | proposed |
 | H-050 Slow Debezium start-up | measured budget; limited include list; warm standby **[test]** | `test_h050_*` | proposed |
+| H-051 Names stock Debezium cannot stream | name rule in the catalog; never published; routing `skip` + alert | `test_names_stock_debezium_cannot_stream`, `test_engine_names.py`, `test_name_problem` | proposed |
 
 ## Findings that affect SPEC or PLAN (for the orchestrator)
 

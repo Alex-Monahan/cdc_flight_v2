@@ -9,11 +9,13 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
   (`docs/spike_report.md`) is complete and was sent to the owner; nothing found contradicts SPEC, so the build
   continues without waiting. **P3 Core: in progress** (table below): the fault harness, the oracle, the source
   package, the engine and the transform are merged; the apply package is reviewed twice and its fix round is checked
-  (verdict: merge; the second reviewer's repeat campaigns found one correct history that is refused, so it is in a second, short fix round); the question the second
-  review raised — which tables have a key — is measured and decided (rule K, below) and has a small package of its
-  own, which is delivered and waits for its review; the cut's fix round is checked (verdict: merge after one text fix) and it is in a second,
-  short round; the destination basics are delivered, reviewed once (merge after named fixes) and under the second reviewer's attack; round 1 of the fuzzers (against a toy replicator) is reviewed
-  and in its fix round; the task file of every package is written.
+  (verdict: merge; the second reviewer's repeat campaigns found one correct history that is refused, so it is in a
+  second, short fix round); the question the second review raised — which tables have a key — is measured and decided
+  (rule K, below) and has a small package of its own, which is merged; the cut is merged; the destination basics are
+  reviewed twice and in a fix round of sixteen items (the first is one unexplained result at the fence: once in 30
+  runs on MotherDuck an old run's empty transaction was answered "committed" after a take-over; it did not recur in
+  237 further cases and is now being reproduced with full diagnostics); round 1 of the fuzzers (against a toy
+  replicator) is reviewed and in its fix round; the task file of every package is written.
 - Stage 2 (PlanetScale) cannot start: of its names only `PLANETSCALE_ORG` and `PLANETSCALE_DATABASE` are in the env
   file (checked again at the P1 gate). The service token and the connection values are owed by the owner.
 
@@ -53,19 +55,19 @@ green on T1 (local primary and standby, real MotherDuck, local JVM).
 |---|---|---|---|
 | H | Crash points, fault sites, process control, crash runner, TCP fault proxy, byte-stream relay | Opus | **merged** |
 | O | Oracle, T1 harness, evidence writer, workload generator and observer | Opus | **merged** (fix round included) |
-| X | The cut: where a snapshot lies in the stream | Fable | review: merge after fixes (below); fix round delivered (`23519bd`) and checked: merge after one text fix; **second, short round running** (below) |
+| X | The cut: where a snapshot lies in the stream | Opus (was Fable) | **merged** (`1cd62c9`; three reviews, three fix rounds; with it the oracle's reader on a standby was repaired) |
 | E | Engine: the JVM program around stock Debezium, frames, the Python side | Opus | **merged** (two reviews, two fix rounds) |
-| D | Destination basics: lanes, fence, deadlines, errors, `_cdc` schema, transition function, alert records | Fable | **delivered** (`9e389cc`); the coordinator's review: **merge after named fixes**; the second reviewer's attack is running; one fix round follows it |
-| A | Apply: the statements over a change set, keyed and keyless | Opus | **delivered**; two reviews; **fix round delivered** (13 items, `68df804`); the coordinator's re-check: **merge**, with two small fixes; the second reviewer's repeat campaigns (about 17,000 seeds) found no silent error inside the preconditions and one correct history that is refused; **second, short fix round running** |
+| D | Destination basics: lanes, fence, deadlines, errors, `_cdc` schema, transition function, alert records | Opus (was Fable) | **delivered** (`9e389cc`); two reviews: the coordinator **merge after named fixes**, the second reviewer **not yet** (one unexplained result at the fence on MotherDuck, defects in the error mapping, the state module and the migrations); **fix round running** (Opus, xhigh; 16 items) |
+| A | Apply: the statements over a change set, keyed and keyless | Opus | **delivered**; two reviews; two fix rounds (`68df804`, `6d5e87b`: the refused history repaired, per-key checks, the new-key check inside the statements — one round trip for an insert-only change set, 359 ms instead of 567 ms at 10,000 records on MotherDuck); the coordinator's re-check: **merge after two small items** (one more case; `apply.repair_keys` for the backfill), **running** |
 | P | Source: connections, catalog and its observation, publication, slot, slot facts, timeline, heartbeat | Opus | **merged** (with the repair of `tools/localpg` for Postgres 16; one fix after the review) |
-| L | Leadership: guard, take-over, heartbeat, hand-over, bootstrap, platform interface | Fable | task written; after D |
+| L | Leadership: guard, take-over, heartbeat, hand-over, bootstrap, platform interface | Opus (was Fable) | task written; after D |
 | Y | Transform: source types to destination types | Opus | **merged** (`362d00b`; one review, one fix round, one last check) |
-| S | Stream: transactions, groups, commit and acknowledge, supervisor, pipeline process | Fable | task written; after E, D, A, P, K |
-| V | Slot continuity | Fable | task written; after S |
+| S | Stream: transactions, groups, commit and acknowledge, supervisor, pipeline process | Opus (was Fable) | task written; after E, D, A, P, K |
+| V | Slot continuity | Opus (was Fable) | task written; after S |
 | F | Fuzzers (stream, workload, fault, leadership), the consumer loop of 1.3 and 3.2 | Opus | **round 1 delivered** (branch `p3-f-fuzzers`, against a toy replicator); coordinator: merge after a fix round (below), **running**; round 2, against the real system, after S, L, B, V |
-| B | Backfill and hand-off | Fable | task written; after X, S, A, P, Y |
+| B | Backfill and hand-off | Opus (was Fable) | task written; after X, S, A, P, Y |
 | T | The catalog gate, truncate, drop and recreate, the document and the test over all state machines | Opus | task written; after S, B |
-| K | The key rule: the catalog reads whether a primary key is deferrable, the engine is told which tables are without a key, what Debezium calls a key is measured (added 2026-11-10) | Opus | **delivered** (`f182e1e`; task `docs/tasks/p3_k_key_rule.md`); waits for the coordinator's review; S waits for it |
+| K | The key rule: the catalog reads whether a primary key is deferrable, the engine is told which tables are without a key, what Debezium calls a key is measured (added 2026-11-10) | Opus | **merged** (`947aabd`; one review, one fix round) |
 
 At most four workers write at once (PLAN §3). The coordinator (Opus, xhigh) writes no code: it reviewed the plan
 and reviews every package branch before its merge; D, L, S, V, B and the acknowledgement path of E get a second
@@ -79,6 +81,9 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
 | 1.7 crash points at every step of a schema change | P4, schema and types |
 | 1.9 schema change applied in place (P3 has the life of a catalog finding, which ends in a drop or a backfill); the full quarantine machine (P3 has the exit to `quarantined` and the operator's re-backfill) | P4 |
 | 1.7 soak of at least 1 h with at least 200 faults | a short soak at the P3 gate; the full one in the P6 campaign |
+| Pre-flight checks found by the cut: an alert on a server version with the exported-snapshot defect (the runbook rule "no other program imports snapshots on the standby we read" cannot be checked), `pg_control_checkpoint()` callable by the runtime role, a replication connection accepted by every standby we read | the pre-flight check | P4, CDC features |
+| Hazard entries from the cut (`docs/design/cut.md` 7, 8, 10): the exported-snapshot defect with the runbook rule, the standby that hides a commit after a restart, the primary crash with asynchronous commits, and the finding that 37 of 38,107 own-way cuts were wrong next to defective importers | `docs/wal_hazards.md` with prevention tests | P5 |
+| 1.1/1.2 for a table whose schema or table name contains `"`: stock Debezium 3.7.1 stops at every start, or silently drops its rows, or delivers the rows of `"q"` as rows of `q` (H-051). P3 refuses to publish it and skips it with an alert | mode `full_refresh` (SPEC 3.5), or a fix outside stock Debezium's name parser | P4, CDC features (owner informed) |
 | 1.1/1.2 for a table the stream cannot carry: an `interval` key, or a table without a key that has a scalar `interval` column, on a source of Postgres 17 or later. P3 skips it with one alert per table; the mode `full_refresh` of SPEC 3.5 carries it | P4, CDC features |
 | 1.1/1.2 for one value: `interval 'infinity'` / `'-infinity'` in a scalar `interval` column of a source on Postgres 17 or later reaches the stream as a zero interval (the Postgres driver, before any code of ours). P3 marks and counts such rows and alerts; the repair read that makes the value exact is built on the stream's group loop (plan C3, "Ambiguous zero interval"). No P3 gate workload holds an interval column | P4, schema and types |
 
@@ -87,6 +92,8 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
 | Date | Decision | By |
 |---|---|---|
 | 2026-11-09 | The build runs in the session that failed start checks 2 and 3; it uses the session's lowercase `motherduck_token` and a salt given in chat. Consequences are in PLAN §9 | owner |
+| 2026-11-10 | Usage limit: every 15 minutes the orchestrator reads the session's rate limits; when any of them reaches 60 % used, all work pauses gracefully (each worker commits and pushes what it has, stops its clusters and jobs, writes where it stopped) and resumes after that window has reset | owner |
+| 2026-11-10 | No Fable any more: every role that named Fable (orchestrator, core-correctness workers, second reviewers) is Opus 5.5 at the same effort; stopped Fable agents are continued by new Opus agents in their worktrees (PLAN §9) | owner |
 | 2026-11-09 | Values given in chat are kept in `~/.config/cdc_flight_v2/env.local`; local commands run through `tools/with-env` | orchestrator |
 | 2026-11-09 | `duckdb==1.5.6` pinned: MotherDuck refuses a 2.0.0 client | orchestrator |
 | 2026-11-09 | Python project managed with `uv` (`pyproject.toml`, `uv.lock`), package `cdc_v2` under `src/` | orchestrator |
@@ -123,6 +130,12 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
 
 ## Questions for the owner / owed by the owner
 
+- **For your information (no ruling needed): table names with a double quote.** Stock Debezium 3.7.1 cannot stream a
+  table whose schema or table name contains `"` (measured by package K, H-051): it stops at every start, or drops
+  the table's rows without a sign, or — worst — delivers the rows of a table `"q"` as rows of the table `q` in the
+  same schema. The pipeline therefore never publishes such a table and alerts once; from P4 the mode `full_refresh`
+  can carry it. The coordinator reads SPEC 4.0 and R16 as allowing this. Nothing is reported upstream without your
+  word.
 - **Boundary guard**: not enforcing in this session, and the hourly audit does not see it. The build follows PLAN §4
   by instruction. If the owner wants the guarded session instead, start it through the launcher; it resumes from
   this file.
@@ -307,6 +320,9 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
   18 are tested), if the provider runs 17.
 - Whether the runtime role may read the timeline history over a replication connection on the provider
   (`slot.timeline_history`; it may on local 16 and 18).
+- Whether every replica the provider offers for reads accepts a replication connection from the runtime role: the
+  cut reads `IDENTIFY_SYSTEM` on the standby it was taken on, so the backfill needs one to every node it reads
+  (contract C9; the pre-flight check tests it).
 
 ## Background jobs in flight
 
@@ -314,11 +330,9 @@ Each in its own worktree and branch; the orchestrator merges. The P3 packages ar
 
 | Job | Phase | Started | Delivers |
 |---|---|---|---|
-| Package D, destination basics: **delivered** on branch `worktree-agent-a5e245130333b3efe` (`9e389cc`). Two reviews are running: the coordinator (Opus, reading only) and a second reviewer (Fable, xhigh, reading only; MotherDuck databases `cdc_v2_t_d_rv_*`) that attacks the fence, the unknown commit outcome, deadlines, the error mapping and the transition function with cases of its own and runs the package's MotherDuck tests once more on the last commit | P3 | 2026-11-10 | the second verdict (the coordinator's is in: merge after named fixes); then one fix round — `_cdc.transitions` gets the lane, a sequence that gives the order of commit, and the facts of a group; a connection's registration must fail when a take-over came in between; a machine declares which lane creates its rows; the evidence names the commit and the command that really ran — then the merge, and D's notes in the tasks of L and S |
-| Package A, apply: **second, short fix round running** on branch `worktree-agent-adbee9c1aec8e2051` (from `68df804`). The second reviewer's repeat campaigns (five campaigns, about 17,000 seeds and 400,000 records) found no silent error inside the stated preconditions; one correct history is refused with an error on every try (a key of several columns, one part changes only its form, such as `-0` to `0`, while another row moves onto the old form); two silent cases lie outside the preconditions and become rules for the backfill (a catch-up call is never repeated after a later one; a repair replaces the row) | P3 | 2026-11-10 | ten items: the refused history repaired, the start-state checks per key if they cost no round trip, `reduce_duplicates` under the spill limits, the cheaper form of the new-key check, texts. Then the reviewer's keyed campaign once more, the merge, and the sentences for design 6.1–6.5 and plan C0, C3a, C4, C10 |
-| Package K, the key rule: **delivered** on branch `worktree-agent-a7bff9175aa501995` (`f182e1e`); the coordinator reviews it after package D. Found on the way: stock Debezium cannot stream a table whose name starts with a double quote or has one after a space (the engine stops at every start), and drops a table whose name is entirely in double quotes without a sign | P3 | 2026-11-10 | the verdict; then the merge, the field names in the task of S, and a prevention for the names Debezium cannot stream |
+| Package D, destination basics: **delivered** on branch `worktree-agent-a5e245130333b3efe` (`9e389cc`). The coordinator's review is in; the second reviewer (Opus, xhigh, reading only; the first one was stopped by the spend limit, its MotherDuck test runs are kept; MotherDuck databases `cdc_v2_t_d_rv_*`) that attacks the fence, the unknown commit outcome, deadlines, the error mapping and the transition function with cases of its own and runs the package's MotherDuck tests once more on the last commit | P3 | 2026-11-10 | the second verdict (the coordinator's is in: merge after named fixes); then one fix round — `_cdc.transitions` gets the lane, a sequence that gives the order of commit, and the facts of a group; a connection's registration must fail when a take-over came in between; a machine declares which lane creates its rows; the evidence names the commit and the command that really ran — then the merge, and D's notes in the tasks of L and S |
+| Package A, apply: the last two small items before the merge, on branch `worktree-agent-adbee9c1aec8e2051` (from `6d5e87b`). The second round's campaign from zero: 10,249 seeds, 0 failures; the second reviewer's keyed program, unchanged: 3,521 seeds, 0 bad | P3 | 2026-11-10 | one case (a row inserted earlier in the same transaction whose key changes only its form) and `apply.repair_keys`; then the merge and the sentences for design 6.1–6.5 and plan C0, C3a, C4, C10 |
 | Package F, fuzzers (Opus, high): **fix round running** on branch `p3-f-fuzzers` (15 items: ledger rules, suite 1.7 again, reductions, two table shapes, the shared-memory repair of `tools/localpg`, the frame reader's allocation). Homes `pg-f<n>`, ports 55700 + 8·n; localpg self-test ports | P3 | 2026-11-10 | the four fuzzers with seeds and replay, the consumer loop of SPEC 1.3 and 3.2, their self-tests with planted defects. Owed: the fix round below |
-| Package X, second fix round (Fable; the worker that built the cut). Home `pg-cut`, ports 55600–55607. No MotherDuck | P3 | 2026-11-10 | four items: the claim about the complete checker rests on recorded runs only (or the two runs are repeated); the takers read the reader node's identity themselves; the oracle's reader no longer imports a snapshot that may not be quiet on a standby with the export defect; section 13 and C9 adjusted. Then the merge |
 
 **Package A, apply — delivered 2026-11-10; two reviews; fix round delivered, under its last checks.** The
 coordinator's verdict was "merge after a short fix round". The second reviewer (Fable) then tested the model the

@@ -65,6 +65,14 @@ or contract C7 says elsewhere, these points and that document hold.
 - Publication membership is decided when a transaction is decoded: a transaction that wrote a table before it
   joined the publication and committed after is delivered with all its rows (`source.md` section 7).
 
+## From the cut as built (package X)
+
+`catalog.observe` is a cut. On a standby its bracket comes from the takers of `cdc_v2.pg.cut` with the connection's
+settle floor, and `b ≥ group_end` is the `R0 ≥ P0` check. On a primary an observation is usable for `group_end` only
+if the `GapMark` that package S hands you at `group_end` admits it (a DDL can be decoded before snapshots see it).
+An observation made on a node other than the stream's is used only if `valid_on` holds. (Contract C9,
+`docs/design/cut.md` 13.4.)
+
 ## What may be missing when you start
 
 Packages S and B are merged, and with them X, E, D, A, P, Y, O and H. Packages V, L and F may or may not be.
@@ -88,10 +96,13 @@ You need none of the three; if F is merged, its DDL mix is one more workload for
   the upper bound of a snapshot. Use that function; do not write a second comparison.
 - Observe on the node the stream decodes on (the standby by default). On a primary the bracket is only as good
   as what packages P and X proved there; use their rule and say so.
-- The **identity** of a table is what its destination table was built for: the OID, and per column `attnum`,
-  name and type with its modifier, and the key columns. Package B records it with the plan and stores it at the
-  swap; if something is missing there, add it through migration steps of your own. `relfilenode` is **not**
-  part of it.
+- The **identity** of a table is what its destination table was built for: the OID, and per column `attnum`, name and
+  type with its modifier, and the key columns. Package B records it with the plan and stores it at the swap; if
+  something is missing there, add it through migration steps of your own. `relfilenode` is **not** part of it. As
+  built by package K, `TableFacts.identity` also holds the replica identity, the identity index's attnums and
+  `pk_deferrable` (`pg_index.indimmediate`): `confirm` answers `changed` when one of them changed, or when the
+  catalog's `replica_identity_problem` is not `None`. A rename into a name with a `name_problem` (a `"` in the schema
+  or table name, H-051) removes the table from the publication, as a drop.
 - Write the list of commands that keep the identity (the gate must answer `same`: `TRUNCATE`, `VACUUM FULL`,
   `CLUSTER`, `REINDEX`, `SET TABLESPACE`, constraints, indexes that are not the key, owner, comment, statistics)
   and of those that change it (drop and create, rename of table, schema or column, `SET SCHEMA`, add or drop a

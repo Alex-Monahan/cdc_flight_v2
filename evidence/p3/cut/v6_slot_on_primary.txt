@@ -1,0 +1,21 @@
+$ tools/cutstress run --label v6_slot_on_primary --seconds 120 --writers plain,async,subxact,abort --takers-own 2 --takers-exported 0 --slot-node primary --out evidence/p3/cut/v6_slot_on_primary.json
+load average before: 41.55 17.03 10.78
+   30s cuts=23664 transactions=122898 violations=0 waiting=100
+   60s cuts=47582 transactions=245967 violations=0 waiting=79
+   90s cuts=66509 transactions=361831 violations=0 waiting=24
+v6_slot_on_primary: OK
+  Postgres 18.6 (Homebrew), 121 s, writers plain,async,subxact,abort, disturbances none, slot on primary
+  cuts checked 86409 (not checked 0), transactions delivered 477973
+  violations of the sound rules: none
+  stream out of E order: 0
+  wrong rules caught (cuts): stmt_as_r0=800, r1_inside=800, r1_outside=4, naive_sharp=0, xmax_inside=33214, xmin_outside=40064
+  unknown set (transactions per cut)   empty     mean   max
+    base                                 0.00%    2.037   227
+    xid                                 65.37%    0.844   226
+    sharp                               67.95%    1.048   226
+    xid+sharp                           73.34%    0.761   226
+    really_visible                      68.91%    1.019   226
+  cuts_with_r0_below_received: 4
+  cuts_that_miss_a_received_transaction: 6
+  cuts_with_r0_eq_r1: 59042
+  cuts taken the own way: 86409, of them quiet (xmin = xmax): 46310 (53.6%), with a violation: 0

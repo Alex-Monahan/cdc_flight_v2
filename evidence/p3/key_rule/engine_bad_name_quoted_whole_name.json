@@ -1,0 +1,14 @@
+{
+  "event_counts": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "name": "\"q\"",
+  "outcome": "dropped",
+  "rows": 0,
+  "schema_frames": 0,
+  "test": "tests/engine/test_engine_keys.py::test_names_stock_debezium_cannot_stream[quoted whole name]",
+  "transactions": 4
+}

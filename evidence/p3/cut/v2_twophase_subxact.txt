@@ -1,0 +1,21 @@
+$ tools/cutstress run --label v2_twophase_subxact --seconds 120 --writers twophase,plain,subxact:subs=3000 --takers-own 3 --takers-exported 0 --out evidence/p3/cut/v2_twophase_subxact.json
+load average before: 5.87 5.77 7.17
+   30s cuts=36051 transactions=85739 violations=0 waiting=110
+   60s cuts=66721 transactions=155682 violations=0 waiting=131
+   90s cuts=100845 transactions=234021 violations=0 waiting=75
+v2_twophase_subxact: OK
+  Postgres 18.6 (Homebrew), 125 s, writers twophase,plain,subxact:subs=3000, disturbances none, slot on replica
+  cuts checked 141029 (not checked 0), transactions delivered 315222
+  violations of the sound rules: none
+  stream out of E order: 0
+  wrong rules caught (cuts): stmt_as_r0=1331, r1_inside=1331, r1_outside=9, naive_sharp=0, xmax_inside=48364, xmin_outside=134705
+  unknown set (transactions per cut)   empty     mean   max
+    base                                 0.00%    1.636    75
+    xid                                 56.88%    0.760    75
+    sharp                               57.75%    0.701    74
+    xid+sharp                           59.62%    0.665    74
+    really_visible                      60.54%    0.625    74
+  cuts_with_r0_below_received: 0
+  cuts_that_miss_a_received_transaction: 0
+  cuts_with_r0_eq_r1: 50023
+  cuts taken the own way: 141029, of them quiet (xmin = xmax): 6258 (4.4%), with a violation: 0

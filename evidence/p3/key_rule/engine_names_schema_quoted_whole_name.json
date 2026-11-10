@@ -1,0 +1,20 @@
+{
+  "event_counts": [
+    0,
+    1
+  ],
+  "fatal": false,
+  "rows": {
+    "m": [
+      999
+    ]
+  },
+  "schema": "\"q\"",
+  "tables_seen": [
+    [
+      "cdc_v2_e_m_fe7878",
+      "m"
+    ]
+  ],
+  "test": "tests/engine/test_engine_names.py::test_the_shapes_as_schema_names[quoted whole name]"
+}

@@ -1,0 +1,21 @@
+$ tools/cutstress run --label v8_idle --seconds 120 --writers plain:burst=1:pause=0.5 --takers-own 1 --takers-exported 0 --taker-sleep 0.01 --out evidence/p3/cut/v8_idle.json
+load average before: 6.77 9.97 9.31
+   30s cuts=1907 transactions=59 violations=0 waiting=21
+   60s cuts=3855 transactions=118 violations=0 waiting=9
+   90s cuts=5781 transactions=177 violations=0 waiting=2
+v8_idle: OK
+  Postgres 18.6 (Homebrew), 120 s, writers plain:burst=1:pause=0.5, disturbances none, slot on replica
+  cuts checked 7734 (not checked 0), transactions delivered 236
+  violations of the sound rules: none
+  stream out of E order: 0
+  wrong rules caught (cuts): stmt_as_r0=0, r1_inside=0, r1_outside=0, naive_sharp=0, xmax_inside=0, xmin_outside=0
+  unknown set (transactions per cut)   empty     mean   max
+    base                                 0.00%    1.002     2
+    xid                                100.00%    0.000     0
+    sharp                               99.77%    0.002     1
+    xid+sharp                          100.00%    0.000     0
+    really_visible                      99.77%    0.002     1
+  cuts_with_r0_below_received: 0
+  cuts_that_miss_a_received_transaction: 0
+  cuts_with_r0_eq_r1: 7714
+  cuts taken the own way: 7734, of them quiet (xmin = xmax): 7734 (100.0%), with a violation: 0

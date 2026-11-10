@@ -1,0 +1,39 @@
+{
+ "rows": 4000,
+ "quiet_wait_s": 1.0,
+ "server_version_num": 180006,
+ "server_has_the_export_defect": true,
+ "standby_snapshot_while_open": "57032591:57032594:",
+ "while_open": {
+  "source_snapshot": "one connection",
+  "equal": true,
+  "source_in_recovery": true,
+  "source_rows": 4001,
+  "destination_rows": 4001,
+  "missing_rows": 0,
+  "extra_rows": 0,
+  "seconds": 1.09
+ },
+ "while_open_with_a_row_missing_on_the_destination": {
+  "source_snapshot": "one connection",
+  "equal": false,
+  "source_in_recovery": true,
+  "source_rows": 4001,
+  "destination_rows": 4000,
+  "missing_rows": 1,
+  "extra_rows": 0,
+  "seconds": 1.08
+ },
+ "after_the_commit_an_ordinary_standby_session_sees_the_row": true,
+ "after_the_commit": {
+  "source_snapshot": "quiet exported",
+  "equal": true,
+  "source_in_recovery": true,
+  "source_rows": 4002,
+  "destination_rows": 4002,
+  "missing_rows": 0,
+  "extra_rows": 0,
+  "seconds": 0.11
+ },
+ "ok": true
+}

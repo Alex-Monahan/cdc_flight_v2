@@ -1,0 +1,23 @@
+$ tools/cutstress run --label v5_restart_crash --seconds 180 --writers plain,async,subxact,abort --takers-own 2 --takers-exported 0 --chaos restart,crash --chaos-period 10 --out evidence/p3/cut/v5_restart_crash.json
+load average before: 5.21 5.95 6.73
+   30s cuts=12759 transactions=102709 violations=0 waiting=30
+   60s cuts=21928 transactions=222998 violations=0 waiting=107
+   90s cuts=34849 transactions=351515 violations=0 waiting=10
+  120s cuts=49692 transactions=466764 violations=0 waiting=76
+  150s cuts=64047 transactions=589367 violations=0 waiting=50
+v5_restart_crash: OK
+  Postgres 18.6 (Homebrew), 187 s, writers plain,async,subxact,abort, disturbances restart,crash, slot on replica
+  cuts checked 76431 (not checked 0), transactions delivered 703213
+  violations of the sound rules: none
+  stream out of E order: 0
+  wrong rules caught (cuts): stmt_as_r0=773, r1_inside=773, r1_outside=1, naive_sharp=0, xmax_inside=30218, xmin_outside=39231
+  unknown set (transactions per cut)   empty     mean   max
+    base                                 0.00%    2.420   787
+    xid                                 63.86%    0.904   327
+    sharp                               65.61%    1.435   787
+    xid+sharp                           71.20%    0.827   327
+    really_visible                      66.79%    1.399   786
+  cuts_with_r0_below_received: 6
+  cuts_that_miss_a_received_transaction: 20
+  cuts_with_r0_eq_r1: 50566
+  cuts taken the own way: 76431, of them quiet (xmin = xmax): 37200 (48.7%), with a violation: 0

@@ -1,0 +1,121 @@
+{
+ "label": "primary_passed_remote_apply",
+ "server_version": "18.6 (Homebrew)",
+ "config": {
+  "seconds": 60.0,
+  "writers": [
+   "plain",
+   "async",
+   "subxact",
+   "long"
+  ],
+  "takers": 2,
+  "sync": "remote_apply",
+  "pause_period": 2.0,
+  "marker_period": 0.02,
+  "seed": 1
+ },
+ "started_utc": "2026-11-10T12:15:51Z",
+ "load_seconds": 61.6,
+ "violations": {},
+ "wrong_rules": {
+  "later_snapshot": 2392,
+  "status_check": 2384,
+  "xmax_ge_x": 2503,
+  "passed_flush": 10925
+ },
+ "examples": {
+  "passed_flush": {
+   "snapshot": "50072999:50075441:50072999,50075433",
+   "key": 200,
+   "e": "2/E3137048",
+   "flush": "2/E31367A0"
+  },
+  "later_snapshot": {
+   "snapshot": "50094943:50095247:50094943,50095158",
+   "delivered_but_not_seen": 1
+  },
+  "status_check": {
+   "snapshot": "50094943:50095247:50094943,50095158",
+   "delivered_but_not_seen": 1
+  },
+  "xmax_ge_x": {
+   "snapshot": "50094943:50095249:50094943,50095158,50095247",
+   "marker": 50095249
+  }
+ },
+ "checker": {
+  "cuts": 52787,
+  "in_progress_ids_listed": 87052,
+  "verdicts_checked": 25643355,
+  "cuts_the_exact_rule_accepts": 50395,
+  "passed_rule_checked": 210895,
+  "complete_cuts_discarded_by_the_status_check": 1269,
+  "cuts_with_xmin_at_or_after_a_marker": 52540,
+  "cuts_the_exact_rule_rejects": 2392,
+  "cuts_that_miss_a_delivered_transaction": 2392,
+  "of_those_discarded_by_the_status_check": 8,
+  "cuts_judged_with_a_gap_mark": 97912,
+  "cuts_a_gap_mark_refuses": 3662,
+  "blind_marks": 245,
+  "blind_marks_still_blind": 129,
+  "cuts_a_blind_mark_refuses": 4677,
+  "cuts_a_blind_mark_admits": 5123,
+  "gap_mark_empty": 2331,
+  "gap_mark_not_empty": 118,
+  "gap_mark_largest": 3
+ },
+ "wait_after_a_marker": {
+  "xmin_ge_x": {
+   "count": 2449,
+   "p50_s": 0.1439,
+   "p90_s": 0.2887,
+   "p99_s": 0.4812,
+   "max_s": 0.5839,
+   "markers_without_an_accepted_cut": 0
+  },
+  "xmin_gt_m": {
+   "count": 2449,
+   "p50_s": 0.066,
+   "p90_s": 0.2223,
+   "p99_s": 0.4287,
+   "max_s": 0.5341,
+   "markers_without_an_accepted_cut": 0
+  },
+  "exact": {
+   "count": 2449,
+   "p50_s": 0.0003,
+   "p90_s": 0.002,
+   "p99_s": 0.1349,
+   "max_s": 0.2382,
+   "markers_without_an_accepted_cut": 0
+  },
+  "gap_tracker": {
+   "count": 2377,
+   "p50_s": 0.0014,
+   "p90_s": 0.0026,
+   "p99_s": 0.0221,
+   "max_s": 0.0511,
+   "markers_without_an_accepted_cut": 0
+  }
+ },
+ "slot_dropped": true,
+ "cuts_checked": 52787,
+ "markers": 2449,
+ "transactions_delivered": 167809,
+ "e_order_violations": 0,
+ "stream": {
+  "calls": 1261,
+  "rows": 504610,
+  "page_header_before_commit": 327
+ },
+ "activity": {
+  "bursts_async": 487,
+  "bursts_long": 56,
+  "bursts_plain": 339,
+  "bursts_subxact": 122,
+  "replay_pauses": 27
+ },
+ "problems": [],
+ "ok": true
+}

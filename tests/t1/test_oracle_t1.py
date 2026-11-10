@@ -51,14 +51,14 @@ def loaded(make_source_db, make_dest_db, evidence):
         "all_detected": all(r["detected"] == r["expected_difference"] for r in RESULTS)})
 
 
-def run(src, dst, statements=(), **cfg):
+def run(src, dst, statements=(), node="primary", **cfg):
     conn = dst.connect()
     try:
         conn.execute("BEGIN TRANSACTION")
         for s in statements:
             conn.execute(s)
-        return compare(src.source(), dst.destination(conn=conn, in_transaction=True), OracleConfig(**dict(CFG, **cfg)),
-                       **at_q())
+        return compare(src.source(node=node), dst.destination(conn=conn, in_transaction=True),
+                       OracleConfig(**dict(CFG, **cfg)), **at_q())
     finally:
         try:
             conn.execute("ROLLBACK")
@@ -305,6 +305,47 @@ def test_compare_reading_from_the_replica(loaded, shared_pg):
     shared_pg.wait_replica_caught_up()
     r = compare(src.source(node="replica"), dst.destination(), OracleConfig(**CFG), **at_q())
     assert r.equal and r.source_in_recovery is True and lsn.parse(r.source_position) >= POS["q"]
+
+
+def test_mutations_are_detected_reading_from_the_replica(loaded, shared_pg):
+    """The source is read from the replica while a primary transaction is open whose first write is inside a
+    subtransaction, and a younger transaction has committed: no snapshot of the replica is quiet then.  On a
+    server with the export defect the oracle reads on one connection (docs/oracle.md, step 1), and it still
+    reports a missing row and a changed value; equal data stays equal."""
+    from cdc_v2.deadline import Deadline
+    from cdc_v2.oracle.comparison import EXPORTED, ONE_CONNECTION
+    from cdc_v2.pg.cut import export_defect, wait_replay_reached
+    src, dst, _ = loaded
+    hold = src.connect()
+    try:
+        hold.execute("BEGIN")
+        hold.execute("SAVEPOINT first_write")
+        hold.execute("INSERT INTO public.types_k (id) VALUES (100001)")      # never committed
+        src.sql("SELECT pg_current_xact_id()")                               # a younger commit: xmax moves on
+        # that commit wrote nothing else, so Postgres flushes it a little later: wait until the replica has it
+        target = insert_position(src)
+        with src.connect(node="replica") as r:
+            wait_replay_reached(r, target, Deadline.after(30))
+            snapshot = r.execute("SELECT pg_current_snapshot()::text").fetchone()[0]
+        xmin, xmax, _ = snapshot.split(":")
+        assert int(xmin) < int(xmax), snapshot                               # not quiet
+        cases = [("equal", [], None, (0, 0, 0)),
+                 ("missing_row", ["DELETE FROM public.types_k WHERE id = 5"], "public.types_k", (1, 0, 0)),
+                 ("changed_value", ["UPDATE other.big SET l_extendedprice = l_extendedprice + 0.01 "
+                                    "WHERE l_orderkey = 77"], "other.big", (0, 0, 1))]
+        for name, stmts, tname, counts in cases:
+            r = run(src, dst, stmts, node="replica", quiet_wait_s=1.0)
+            want = ONE_CONNECTION if export_defect(r.source_server_version) else EXPORTED
+            assert r.source_in_recovery is True and r.source_snapshot == want, (name, r.source_snapshot)
+            if tname is None:
+                assert r.equal, r.summary()
+                continue
+            t = table(r, tname)
+            assert not r.equal and (t.missing_rows, t.extra_rows, t.different_rows) == counts, (name, t.sample)
+            assert [x.source for x in r.tables if not x.equal] == [tname], name
+    finally:
+        hold.execute("ROLLBACK")
+        hold.close()
 
 
 def test_destination_short_of_the_position_is_refused(loaded):

@@ -9,7 +9,15 @@ How one comparison runs:
    not awaited there. Either side short of `Q` raises `PositionNotReached`: the comparison is refused, never
    reported equal. A comparison without a position must be asked for with `unpositioned=True`; its result says so.
 1. The source is read under **one snapshot**: a coordinator transaction (`REPEATABLE READ, READ ONLY`) exports its
-   snapshot, and every worker connection imports it (`SET TRANSACTION SNAPSHOT`). The destination is read inside
+   snapshot, and every worker connection imports it (`SET TRANSACTION SNAPSHOT`). On a standby whose server has
+   the export defect (`cdc_v2.pg.cut.export_defect`) an imported snapshot can be wrong, and an importer can spoil
+   rows for every other reader of that standby, unless the exported snapshot is quiet (`xmin = xmax`). There the
+   coordinator keeps a snapshot only if it is quiet, within `quiet_wait_s`; if none comes, the coordinator reads
+   alone on its own snapshot and nothing is exported or imported (`snapshot_way`). On every standby the snapshot
+   must also be settled (its `xmax` at or above the settle floor of `cdc_v2.pg.cut.settle_floor`, read once on the
+   coordinator): a standby that has just started can hide a commit that lies before its replay position, and the
+   pipeline's reads would hide the same one. An unsettled snapshot is dropped and another taken, for at most
+   `settle_wait_s`; then the comparison is refused (`PositionNotReached`). The destination is read inside
    **one transaction** on one connection. Every MotherDuck statement has a deadline; a standby that cancels the
    snapshot for a recovery conflict (SQLSTATE 40001) makes the whole comparison start again, a bounded number of
    times.
@@ -44,6 +52,7 @@ from typing import Any, Callable, Optional
 
 from cdc_v2 import lsn
 from cdc_v2.deadline import Deadline, DeadlineExceeded
+from cdc_v2.pg.cut import SnapshotBounds, export_defect, settle_floor
 
 from . import canonical as C
 from . import mdexec
@@ -83,6 +92,8 @@ class OracleConfig:
     md_statement_s: float = 1_800.0                  # one MotherDuck statement
     position_wait_s: float = 60.0                    # waiting for a standby to replay up to the position
     conflict_retries: int = 3                        # new attempts after SQLSTATE 40001 (standby recovery conflict)
+    quiet_wait_s: float = 5.0                        # standby with the export defect: wait for a quiet snapshot
+    settle_wait_s: float = 60.0                      # standby: wait for a settled snapshot, then refuse
 
 
 # ------------------------------------------------------------------------------------------------ connections
@@ -181,6 +192,7 @@ class Result:
     seconds: float
     rows_per_second: float
     config: dict
+    source_snapshot: Optional[str] = None   # how the source was read: EXPORTED, QUIET_EXPORTED or ONE_CONNECTION
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -286,33 +298,61 @@ def ctid_ranges(blocks: int, workers: int, min_blocks: int) -> list:
 # ------------------------------------------------------------------------------------------------ comparison
 
 
+#: How the source snapshot is read (`snapshot_way`).
+EXPORTED = "exported"                  # exported by the coordinator, imported by every worker
+QUIET_EXPORTED = "quiet exported"      # the same, with a quiet snapshot: safe on a server with the export defect
+ONE_CONNECTION = "one connection"      # the coordinator reads alone on its own snapshot: nothing exported
+QUIET_POLL_S = 0.05
+SETTLE_POLL_S = 0.1
+
+
+def snapshot_way(in_recovery: bool, server_version_num: int, quiet: bool, wait_over: bool) -> Optional[str]:
+    """How the source is read under the snapshot the coordinator has just taken; None: drop it and take another.
+
+    On a primary, and on a standby whose server carries the fix, an exported snapshot is right: export it.  On a
+    standby with the export defect (`cdc_v2.pg.cut.export_defect`, the one place that knows the versions) an
+    importer can see transactions the exporter does not see and can leave wrong hint bits that every other reader
+    of the standby inherits, the pipeline's readers among them, unless the snapshot is quiet (`xmin = xmax`: no
+    running transaction, nothing to lose).  There a quiet snapshot is exported; one that is not quiet is dropped
+    until the wait is over, and then the coordinator reads alone on its own snapshot.
+    """
+    if not (in_recovery and export_defect(server_version_num)):
+        return EXPORTED
+    if quiet:
+        return QUIET_EXPORTED
+    return ONE_CONNECTION if wait_over else None
+
+
 class _SourceSnapshot:
-    """A coordinator transaction that exports its snapshot, and a pool of worker connections that import it."""
+    """A coordinator transaction that exports its snapshot, and a pool of worker connections that import it; or,
+    on a standby with the export defect and no quiet snapshot within the wait, the coordinator alone."""
 
     def __init__(self, source: Source, workers: int, timeout_ms: int, position: Optional[int],
-                 wait: Deadline):
+                 wait: Deadline, quiet_wait: Optional[Callable[[], Deadline]] = None,
+                 settle_wait: Optional[Callable[[], Deadline]] = None):
         self.source = source
         self.timeout_ms = timeout_ms
         self.workers = []
         self._free: list = []
-        self._lock = threading.Lock()
+        self._cond = threading.Condition()
+        self.way: Optional[str] = None
+        self.snapshot: Optional[str] = None
         self.coord = source.connect()
         try:
-            self._open(source, workers, position, wait)
+            self._open(source, workers, position, wait, quiet_wait or (lambda: Deadline.after(5.0)),
+                       settle_wait or (lambda: Deadline.after(60.0)))
         except BaseException:
             self.close()
             raise
 
-    def _open(self, source, workers, position, wait):
-        self._setup(self.coord)
-        self.in_recovery = bool(self.coord.execute("SELECT pg_is_in_recovery()").fetchone()[0])
-        # the position is read before the snapshot exists: the snapshot then contains at least that much
+    def _reach(self, position: Optional[int], wait: Deadline) -> int:
+        """The source position, read before the snapshot exists: the snapshot then contains at least that much."""
         while True:
             pos = lsn.parse(self.coord.execute(
                 "SELECT (CASE WHEN pg_is_in_recovery() THEN pg_last_wal_replay_lsn() "
                 "ELSE pg_current_wal_insert_lsn() END)::text").fetchone()[0])
             if position is None or pos >= position:
-                break
+                return pos
             if not self.in_recovery:
                 raise PositionNotReached("source primary is at %s, before the position %s" % (
                     lsn.format(pos), lsn.format(position)))
@@ -320,10 +360,53 @@ class _SourceSnapshot:
                 raise PositionNotReached("source standby replayed only up to %s, not the position %s" % (
                     lsn.format(pos), lsn.format(position)))
             time.sleep(min(0.1, wait.remaining()))
-        self.position = pos
-        self.coord.execute("BEGIN ISOLATION LEVEL REPEATABLE READ, READ ONLY")
-        self.snapshot = self.coord.execute("SELECT pg_export_snapshot()").fetchone()[0]
+
+    def _open(self, source, workers, position, wait, quiet_wait, settle_wait):
+        self._setup(self.coord)
+        self.in_recovery = bool(self.coord.execute("SELECT pg_is_in_recovery()").fetchone()[0])
         self.version = server_version_num(self.coord)
+        # a standby: read the settle floor once on this connection, before its first snapshot (docs/design/cut.md
+        # section 8); a snapshot whose xmax is below it may hide a commit that lies before the replay position
+        floor = settle_floor(self.coord).for_connection(self.coord) if self.in_recovery else None
+        quiet_by = settle_by = None
+        while True:
+            pos = self._reach(position, wait)
+            self.coord.execute("BEGIN ISOLATION LEVEL REPEATABLE READ, READ ONLY")
+            if not self.in_recovery:           # a primary: as before
+                way = EXPORTED
+                break
+            # the first statement of the transaction takes its snapshot
+            bounds = SnapshotBounds.parse(self.coord.execute("SELECT pg_current_snapshot()::text").fetchone()[0])
+            if bounds.xmax < floor:            # not settled: drop it and take another, within the settle wait
+                self.coord.execute("ROLLBACK")
+                settle_by = settle_by or settle_wait()
+                what = ("source standby has not settled after its start: snapshot xmax %d stays below the next "
+                        "transaction id %d of its control file (no commit or abort replayed since)"
+                        % (bounds.xmax, floor))
+                try:
+                    settle_by.sleep(SETTLE_POLL_S, what)
+                except DeadlineExceeded:
+                    raise PositionNotReached(what) from None
+                continue
+            way = snapshot_way(self.in_recovery, self.version, False, False)
+            if way == EXPORTED:                # a standby with the fix: export the settled snapshot
+                break
+            quiet_by = quiet_by or quiet_wait()
+            way = snapshot_way(self.in_recovery, self.version, bounds.xmin == bounds.xmax, quiet_by.expired)
+            if way is not None:
+                break
+            self.coord.execute("ROLLBACK")
+            try:
+                quiet_by.sleep(QUIET_POLL_S, "no quiet snapshot on the source standby")
+            except DeadlineExceeded:
+                pass                           # one more snapshot, judged with the wait over
+        self.position = pos
+        self.way = way
+        if way == ONE_CONNECTION:              # no export, no import: the coordinator is the one reader
+            self.workers.append(self.coord)
+            self._free.append(self.coord)
+            return
+        self.snapshot = self.coord.execute("SELECT pg_export_snapshot()").fetchone()[0]
         for _ in range(max(1, workers)):
             c = source.connect()
             self._setup(c)
@@ -331,6 +414,17 @@ class _SourceSnapshot:
             c.execute("SET TRANSACTION SNAPSHOT '%s'" % self.snapshot.replace("'", ""))
             self.workers.append(c)
             self._free.append(c)
+
+    def _take(self):
+        with self._cond:                       # with one connection, scan jobs wait for it in turn
+            while not self._free:
+                self._cond.wait()
+            return self._free.pop()
+
+    def _give(self, c) -> None:
+        with self._cond:
+            self._free.append(c)
+            self._cond.notify()
 
     def _setup(self, c):
         c.execute("SET extra_float_digits = 1")
@@ -342,20 +436,17 @@ class _SourceSnapshot:
         c.execute("SET application_name = 'cdc_v2_oracle'")
 
     def run(self, sql: str) -> list:
-        with self._lock:
-            c = self._free.pop()
+        c = self._take()
         try:
             return c.execute(sql).fetchall()
         finally:
-            with self._lock:
-                self._free.append(c)
+            self._give(c)
 
     def stream(self, sql: str, consume: Callable[[list], None], batch: int = 5000) -> None:
         """Run sql on a snapshot connection and hand the rows to consume() in batches, without holding the whole
         result. Uses libpq's single-row mode (`Cursor.stream`), not a server-side cursor: Postgres never runs a
         DECLARE CURSOR query in parallel, which made the row pass about twice as slow."""
-        with self._lock:
-            c = self._free.pop()
+        c = self._take()
         try:
             buf: list = []
             for row in c.cursor().stream(sql):
@@ -366,11 +457,10 @@ class _SourceSnapshot:
             if buf:
                 consume(buf)
         finally:
-            with self._lock:
-                self._free.append(c)
+            self._give(c)
 
     def close(self):
-        for c in self.workers + [self.coord]:
+        for c in self.workers + ([] if self.coord in self.workers else [self.coord]):
             try:
                 c.execute("ROLLBACK")
             except Exception:                  # noqa: BLE001 - closing anyway
@@ -599,7 +689,8 @@ def compare(source: Source, destination: Destination, config: Optional[OracleCon
 def _compare_once(source, destination, cfg, position, slot_name, applied_position, deadline, attempt) -> Result:
     t0 = time.monotonic()
     timeout_ms = int(min(cfg.statement_timeout_ms, max(1.0, deadline.remaining()) * 1000))
-    snap = _SourceSnapshot(source, cfg.source_workers, timeout_ms, position, deadline.within(cfg.position_wait_s))
+    snap = _SourceSnapshot(source, cfg.source_workers, timeout_ms, position, deadline.within(cfg.position_wait_s),
+                           lambda: deadline.within(cfg.quiet_wait_s), lambda: deadline.within(cfg.settle_wait_s))
     md = None
     began = False
 
@@ -665,4 +756,5 @@ def _compare_once(source, destination, cfg, position, slot_name, applied_positio
     fmt = (lambda v: lsn.format(v) if v is not None else None)
     return Result(equal, results, missing_tables, extra_tables, position is not None, fmt(position),
                   fmt(snap.position), fmt(dest_pos), slot_name, attempt, snap.in_recovery, snap.version, rows,
-                  round(seconds, 3), round(rows / seconds, 1) if seconds > 0 else 0.0, cfg_out)
+                  round(seconds, 3), round(rows / seconds, 1) if seconds > 0 else 0.0, cfg_out,
+                  source_snapshot=snap.way)

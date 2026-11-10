@@ -204,13 +204,15 @@ class Proc:
             raise DeadlineExceeded("%s (pid %d) still running after %.1f s" % (self.name, self.pid, timeout)) from None
 
     def wait_state(self, letter, timeout, interval=0.02):
-        """Wait until ``ps`` shows the state letter (``T`` after SIGSTOP); raises DeadlineExceeded."""
+        """Wait until ``ps`` shows the state letter (``T`` after SIGSTOP); raises DeadlineExceeded. A ``ps`` that
+        misses the row of a process that has not exited (``popen.poll()`` is None) counts as "not yet"."""
         deadline = time.monotonic() + timeout
         while True:
             st = self.ps_state()
             if st is not None and st.startswith(letter):
                 return st
-            if st is None or time.monotonic() >= deadline:
+            gone = st is None and self.popen.poll() is not None
+            if gone or time.monotonic() >= deadline:
                 raise DeadlineExceeded("%s (pid %d) not in state %s within %.1f s (state %r)"
                                        % (self.name, self.pid, letter, timeout, st))
             time.sleep(interval)

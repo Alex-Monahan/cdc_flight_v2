@@ -112,7 +112,8 @@ def test_columns_types_keys_and_flags(cluster, scratch):
     assert got["full"].replica_identity_problem is None
     assert got["nokey"].key == () and "FULL" in got["nokey"].replica_identity_problem and not got["nokey"].published
     idx = got["idx"]
-    assert idx.key == ("x",) and idx.key_source == "replica identity index" and not idx.has_primary_key
+    # rule K: an identity index without a primary key is no key (the index is still named)
+    assert idx.key == () and idx.key_attnums == () and idx.key_source is None and not idx.has_primary_key
     assert idx.replica_identity == "index" and idx.replica_identity_index == "idx_x"
     assert "FULL" in idx.replica_identity_problem                 # no primary key: FULL even with USING INDEX
     assert "NOTHING" in got["nothing"].replica_identity_problem

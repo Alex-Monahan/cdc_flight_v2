@@ -1,0 +1,85 @@
+{
+ "e_order_violations_primary": 0,
+ "e_order_violations_replica": 0,
+ "transactions": [
+  {
+   "key_in_commit_order": 2,
+   "key_in_stream_order": 2,
+   "what": "small",
+   "S_begin_final_lsn": "0/5617A190",
+   "E_commit_end_lsn": "0/5617A1C0",
+   "commit_record_bytes": 48,
+   "insert_position_before_commit <= S": true,
+   "E <= insert_position_after_commit": true,
+   "E == insert_position_after_commit": true,
+   "S >= insert_position_after_previous_commit": true
+  },
+  {
+   "key_in_commit_order": 4,
+   "key_in_stream_order": 4,
+   "what": "small, inside the big one's lifetime",
+   "S_begin_final_lsn": "0/56689050",
+   "E_commit_end_lsn": "0/56689080",
+   "commit_record_bytes": 48,
+   "insert_position_before_commit <= S": true,
+   "E <= insert_position_after_commit": true,
+   "E == insert_position_after_commit": true,
+   "S >= insert_position_after_previous_commit": true
+  },
+  {
+   "key_in_commit_order": 3,
+   "key_in_stream_order": 3,
+   "what": "big (20000 rows), started before the previous one",
+   "S_begin_final_lsn": "0/56689080",
+   "E_commit_end_lsn": "0/566890B0",
+   "commit_record_bytes": 48,
+   "insert_position_before_commit <= S": true,
+   "E <= insert_position_after_commit": true,
+   "E == insert_position_after_commit": true,
+   "S >= insert_position_after_previous_commit": true
+  },
+  {
+   "key_in_commit_order": 9,
+   "key_in_stream_order": 9,
+   "what": "write inside a subtransaction",
+   "S_begin_final_lsn": "0/56689138",
+   "E_commit_end_lsn": "0/56689170",
+   "commit_record_bytes": 56,
+   "insert_position_before_commit <= S": true,
+   "E <= insert_position_after_commit": true,
+   "E == insert_position_after_commit": true,
+   "S >= insert_position_after_previous_commit": true
+  },
+  {
+   "key_in_commit_order": 10,
+   "key_in_stream_order": 10,
+   "what": "synchronous_commit = off",
+   "S_begin_final_lsn": "0/566891C8",
+   "E_commit_end_lsn": "0/566891F8",
+   "commit_record_bytes": 48,
+   "insert_position_before_commit <= S": true,
+   "E <= insert_position_after_commit": true,
+   "E == insert_position_after_commit": true,
+   "S >= insert_position_after_previous_commit": true
+  },
+  {
+   "key_in_commit_order": 11,
+   "key_in_stream_order": 11,
+   "what": "last",
+   "S_begin_final_lsn": "0/56689250",
+   "E_commit_end_lsn": "0/56689280",
+   "commit_record_bytes": 48,
+   "insert_position_before_commit <= S": true,
+   "E <= insert_position_after_commit": true,
+   "E == insert_position_after_commit": true,
+   "S >= insert_position_after_previous_commit": true
+  }
+ ],
+ "stream_order_equals_commit_order": true,
+ "standby_slot_delivers_the_same_xid_S_E": true,
+ "ok": true,
+ "slots_dropped": [
+  true,
+  true
+ ]
+}

@@ -1,0 +1,6 @@
+{
+  "listed": "table without a key, replay equals the source",
+  "name": "a\"b",
+  "not listed": "keyed",
+  "test": "tests/engine/test_engine_keys.py::test_a_listed_table_with_an_odd_name[quote]"
+}
