@@ -362,8 +362,13 @@ def _merge(parts) -> dict:
     return out
 
 
+def _show(t: C.PgColumnType, canon):
+    show = t.rule.show if not t.is_array else None
+    return show(canon) if show and canon is not None else canon
+
+
 def _display(columns, key, values) -> dict:
-    return {n: values[i] for i, (n, _, _) in enumerate(columns)}
+    return {n: _show(t, values[i]) for i, (n, t, _) in enumerate(columns)}
 
 
 def _row_diff(plan: Plan, src_rows: list, dst_rows: list, res: TableResult, limit: int):
@@ -410,7 +415,8 @@ def _diff_counts(plan: Plan, missing: Counter, sv: dict, extra: Counter, dv: dic
                     a, b = sv[h], dv[h2]
                     res.sample["different"].append({
                         "key": {plan.key[j]: k[j] for j in range(len(k))},
-                        "columns": {names[i]: {"source": a[i], "destination": b[i]}
+                        "columns": {names[i]: {"source": _show(plan.columns[i][1], a[i]),
+                                               "destination": _show(plan.columns[i][1], b[i])}
                                     for i in range(len(names)) if a[i] != b[i]}})
                 missing[h] -= 1
                 extra[h2] -= 1

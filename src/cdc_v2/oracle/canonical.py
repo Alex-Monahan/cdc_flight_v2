@@ -118,52 +118,17 @@ def _trim_zeros(s: str) -> str:
     return "(CASE WHEN strpos({s}, '.') > 0 THEN rtrim(rtrim({s}, '0'), '.') ELSE {s} END)".format(s=s)
 
 
-def _sci(s: str, cast: Callable[[str], str], signed_zero: bool) -> str:
-    """SQL (both dialects): a finite decimal or scientific number text -> '[-]0.<digits>e<exp>'.
-
-    Digits have no leading or trailing zeros. Zero becomes '0' (or '-0' if signed_zero and the text has a minus sign).
-    Only functions that Postgres and DuckDB share are used, so both servers compute the same text.
-    """
-    a = "lower(ltrim({s}, '+-'))".format(s=s)
-    mant = "split_part(%s, 'e', 1)" % a
-    exp = "(CASE WHEN strpos({a}, 'e') > 0 THEN CAST(split_part({a}, 'e', 2) AS integer) ELSE 0 END)".format(a=a)
-    ip = "split_part(%s, '.', 1)" % mant
-    fp = "split_part(%s, '.', 2)" % mant
-    digits = "(%s || %s)" % (ip, fp)
-    d1 = "ltrim(%s, '0')" % digits
-    point = "(length({ip}) + {exp} - (length({d}) - length({d1})))".format(ip=ip, exp=exp, d=digits, d1=d1)
-    d2 = "rtrim(%s, '0')" % d1
-    neg = "(substr({s}, 1, 1) = '-')".format(s=s)
-    zero = "(CASE WHEN %s THEN '-0' ELSE '0' END)" % neg if signed_zero else "'0'"
-    return ("(CASE WHEN {d2} = '' THEN {zero} ELSE (CASE WHEN {neg} THEN '-' ELSE '' END) || '0.' || {d2} || 'e' || "
-            "{p} END)").format(d2=d2, zero=zero, neg=neg, p=cast(point))
-
-
-def py_sci(s: str, signed_zero: bool = True) -> str:
-    """Python reference of `_sci`."""
-    a = s.lstrip("+-").lower()
-    mant, _, e = a.partition("e")
-    exp = int(e) if e else 0
-    ip, _, fp = mant.partition(".")
-    digits = ip + fp
-    d1 = digits.lstrip("0")
-    point = len(ip) + exp - (len(digits) - len(d1))
-    d2 = d1.rstrip("0")
-    if not d2:
-        return "-0" if signed_zero and s.startswith("-") else "0"
-    return ("-" if s.startswith("-") else "") + "0." + d2 + "e" + str(point)
-
-
 def _md_float(x: str) -> str:
-    """SQL (DuckDB): a FLOAT or DOUBLE value -> canonical float text."""
+    """SQL (DuckDB): a DOUBLE value -> canonical float text (IEEE-754 bits as 16 hex digits; NaN, ±Infinity by
+    name). `CAST(DOUBLE AS BIT)` gives the bits; the BIGINT of them, in hex, is the same as Postgres's float8send."""
     return ("(CASE WHEN isnan({x}) THEN 'NaN' WHEN isinf({x}) THEN (CASE WHEN {x} > 0 THEN 'Infinity' ELSE "
-            "'-Infinity' END) WHEN {x} = 0 THEN (CASE WHEN signbit({x}) THEN '-0' ELSE '0' END) ELSE {sci} END)"
-            ).format(x=x, sci=_sci(md_text(x), md_text, True))
+            "'-Infinity' END) ELSE lower(lpad(hex(CAST(CAST({x} AS BIT) AS BIGINT)), 16, '0')) END)").format(x=x)
 
 
 def _pg_float(x: str) -> str:
+    """SQL (Postgres): a float8 value -> canonical float text (see _md_float)."""
     return ("(CASE WHEN {x} = 'NaN' THEN 'NaN' WHEN {x} = 'Infinity' THEN 'Infinity' WHEN {x} = '-Infinity' THEN "
-            "'-Infinity' ELSE {sci} END)").format(x=x, sci=_sci(pg_text(x), pg_text, True))
+            "'-Infinity' ELSE encode(float8send({x}), 'hex') END)").format(x=x)
 
 
 def _never(md_type: MdType, x: str) -> str:
@@ -208,7 +173,17 @@ def _special_float(v: float) -> Optional[str]:
 
 def py_float8(v) -> str:
     v = float(v)
-    return _special_float(v) or py_sci(repr(v))
+    return _special_float(v) or struct.pack(">d", v).hex()
+
+
+def show_float(canon: str) -> str:
+    """Readable form of a canonical float text, for samples: '3ff8000000000000' -> '1.5 (3ff8000000000000)'."""
+    if not isinstance(canon, str) or len(canon) != 16:
+        return canon
+    try:
+        return "%r (%s)" % (struct.unpack(">d", bytes.fromhex(canon))[0], canon)
+    except ValueError:
+        return canon
 
 
 def float4_value(v: float) -> float:
@@ -217,7 +192,8 @@ def float4_value(v: float) -> float:
 
 
 def float4_repr(v: float) -> str:
-    """Shortest decimal text that reads back as the same float32 (what Postgres and DuckDB print)."""
+    """Shortest decimal text that reads back as the same float32 (what Postgres prints for a real; DuckDB's FLOAT
+    text is not always this shortest form)."""
     f = float4_value(v)
     for p in range(1, 10):
         s = "%.*g" % (p, f)
@@ -227,8 +203,8 @@ def float4_repr(v: float) -> str:
 
 
 def py_float4(v) -> str:
-    v = float4_value(float(v))
-    return _special_float(v) or py_sci(float4_repr(v))
+    """A real is canonicalised as its exact double-precision value (float32 -> float64 is exact on both servers)."""
+    return py_float8(float4_value(float(v)))
 
 
 def py_text(v) -> str:
@@ -303,6 +279,7 @@ class TypeRule:
     py: Callable[[Any], str]
     form: str                                   # one line for docs/oracle.md
     md_accepts: str = ""                        # one line for docs/oracle.md
+    show: Optional[Callable[[str], str]] = None  # readable form of a canonical text, for samples
 
     def md_or_never(self, x: str, t: MdType) -> str:
         if t.base == "UNION":
@@ -342,13 +319,13 @@ def _md_float8(x, t):
 
 def _md_float4(x, t):
     if t.base == "FLOAT":
-        return _md_float(x)
+        return _md_float("CAST(%s AS DOUBLE)" % x)
     if t.base == "DOUBLE":
-        f = "CAST(%s AS FLOAT)" % x
-        return "(CASE WHEN isnan({x}) OR CAST({f} AS DOUBLE) = {x} THEN {c} ELSE {n} END)".format(
-            x=x, f=f, c=_md_float(f), n=_never(t, x))
+        # accepted only when the double holds exactly a float32 value
+        return "(CASE WHEN isnan({x}) OR CAST(CAST({x} AS FLOAT) AS DOUBLE) = {x} THEN {c} ELSE {n} END)".format(
+            x=x, c=_md_float(x), n=_never(t, x))
     if t.base in INT_TYPES or t.base == "DECIMAL":
-        return _md_float("CAST(%s AS FLOAT)" % x)
+        return _md_float("CAST(CAST(%s AS FLOAT) AS DOUBLE)" % x)
     return None
 
 
@@ -453,13 +430,14 @@ RULES: list[TypeRule] = [
              "integer types, `DECIMAL(p,s)`, `VARCHAR` (for the text member of `UNION(DECIMAL, VARCHAR)`)"),
     TypeRule("double precision", ("double precision",),
              lambda x, c: _pg_float(x), _md_float8, py_float8,
-             "shortest round-trip digits as `[-]0.<digits>e<exp>` (`0.1` -> `0.1e0`, `1e15` -> `0.1e16`); `0`, "
-             "`-0` (sign of zero kept), `NaN`, `Infinity`, `-Infinity`",
-             "`DOUBLE`; integer types, `DECIMAL`, `FLOAT` (converted to `DOUBLE`)"),
+             "the IEEE-754 bits as 16 lowercase hex digits (`1.5` -> `3ff8000000000000`, `-0` -> "
+             "`8000000000000000`); `NaN` (any payload), `Infinity`, `-Infinity`",
+             "`DOUBLE`; integer types, `DECIMAL`, `FLOAT` (converted to `DOUBLE`)", show_float),
     TypeRule("real", ("real",),
-             lambda x, c: _pg_float(x), _md_float4, py_float4,
-             "as double precision, with the shortest digits that round-trip through float32",
-             "`FLOAT`; `DOUBLE` only when the value is exactly a float32 value; integer types, `DECIMAL`"),
+             lambda x, c: _pg_float("CAST(%s AS float8)" % x), _md_float4, py_float4,
+             "the value converted exactly to double precision, then as double precision "
+             "(`0.1::real` -> `3fb99999a0000000`)",
+             "`FLOAT`; `DOUBLE` only when the value is exactly a float32 value; integer types, `DECIMAL`", show_float),
     TypeRule("text", ("text", "character varying", "name", "citext"),
              lambda x, c: pg_text(x), _md_text, py_text,
              "the text itself (an empty string is not NULL)", "`VARCHAR`, `JSON`"),

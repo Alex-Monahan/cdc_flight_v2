@@ -93,14 +93,17 @@ def test_md_matches_reference(con, base, mdtype, values):
 
 
 def test_float_forms(con):
-    assert md_value(con, "DOUBLE", 1e15, "double precision") == "0.1e16"
-    assert md_value(con, "DOUBLE", -0.0, "double precision") == "-0"
-    assert md_value(con, "DOUBLE", 0.0, "double precision") == "0"
+    assert md_value(con, "DOUBLE", 1.5, "double precision") == "3ff8000000000000"
+    assert md_value(con, "DOUBLE", -0.0, "double precision") == "8000000000000000"
+    assert md_value(con, "DOUBLE", 0.0, "double precision") == "0000000000000000"
     assert md_value(con, "DOUBLE", float("nan"), "double precision") == "NaN"
-    assert md_value(con, "FLOAT", 0.1, "real") == "0.1e0"
+    assert md_value(con, "DOUBLE", float("-inf"), "double precision") == "-Infinity"
+    assert md_value(con, "FLOAT", 0.1, "real") == "3fb99999a0000000"
+    assert md_value(con, "FLOAT", 1048576.25, "real") == C.py_float4(1048576.25)
     # a REAL stored in a DOUBLE column is accepted only when it is exactly a float32 value
-    assert md_value(con, "DOUBLE", C.float4_value(0.1), "real") == "0.1e0"
+    assert md_value(con, "DOUBLE", C.float4_value(0.1), "real") == "3fb99999a0000000"
     assert md_value(con, "DOUBLE", 0.1, "real").startswith("!DOUBLE")
+    assert C.show_float("3ff8000000000000") == "1.5 (3ff8000000000000)"
 
 
 def test_interval(con):
@@ -133,7 +136,7 @@ def test_arrays(con):
     # (the Python client turns NaN inside a list parameter into NULL, so the list is built in SQL)
     got = con.execute("SELECT %s FROM (SELECT ['-0'::DOUBLE, 'nan'::DOUBLE, NULL] AS c)" % C.md_canon(
         "c", td, C.parse_md_type("DOUBLE[]"))).fetchone()[0]
-    assert got == C.py_canon([-0.0, float("nan"), None], td) == "[1:3]{V2:-0,V3:NaN,N}"
+    assert got == C.py_canon([-0.0, float("nan"), None], td) == "[1:3]{V16:8000000000000000,V3:NaN,N}"
     tt = C.PgColumnType("text[]", "text")
     assert md_value(con, "VARCHAR[]", ["", None], "text[]", "text") == "[1:2]{V0:,N}"
     # a list where an array of another type was expected never matches
@@ -184,22 +187,6 @@ def test_token_and_hash_sql_match_python(con):
         assert 0 <= h < 2 ** 60
 
 
-SCI_INPUTS = ["1e+15", "1000000000000000.0", "1.5e-05", "0.0001", "1e-05", "-0", "0.0", "100.0", "1.6777216e+07",
-              "16777216.0", "5e-324", "1.7976931348623157e+308", "123.456", "-2.5", "0.10000000149011612", "7"]
-
-
-@pytest.mark.parametrize("s", SCI_INPUTS)
-def test_sci_sql_matches_python(con, s):
-    sql = "SELECT %s FROM (SELECT CAST(? AS VARCHAR) AS s)" % C._sci("s", C.md_text, True)
-    assert con.execute(sql, [s]).fetchone()[0] == C.py_sci(s)
-
-
-def test_sci_examples():
-    assert C.py_sci("1e+15") == C.py_sci("1000000000000000.0") == "0.1e16"
-    assert C.py_sci("1.6777216e+07") == C.py_sci("16777216.0") == "0.16777216e8"
-    assert C.py_sci("-0") == "-0" and C.py_sci("0.0") == "0"
-
-
 # --------------------------------------------------------------------------------------------- properties
 
 @settings(max_examples=300, deadline=None)
@@ -231,6 +218,33 @@ def test_text_property(con, v):
 @given(st.datetimes(min_value=dt.datetime(1, 1, 1), max_value=dt.datetime(9999, 12, 31, 23, 59, 59, 999999)))
 def test_timestamp_property(con, v):
     assert md_value(con, "TIMESTAMP", v, "timestamp without time zone") == C.py_timestamp(v)
+
+
+def float_sample(n=20000, seed=5):
+    """Random bit patterns plus dyadic rationals (the values where two shortest texts can tie)."""
+    import random
+    r = random.Random(seed)
+    vals = [struct.unpack("d", struct.pack("Q", r.getrandbits(64)))[0] for _ in range(n)]
+    vals += [r.randint(-2 ** 40, 2 ** 40) / (2 ** r.randint(0, 12)) for _ in range(n)]
+    return [v for v in vals if not math.isnan(v)]
+
+
+def test_float_forms_in_bulk(con):
+    vals = float_sample()
+    t8, t4 = C.PgColumnType("double precision"), C.PgColumnType("real")
+    sql = ("SELECT x, %s, %s FROM (SELECT x, CASE WHEN x = 0 OR abs(x) BETWEEN 1e-37 AND 3.4e38 THEN CAST(x AS FLOAT) "
+           "END AS f FROM (SELECT unnest(?::DOUBLE[]) AS x))") % (
+        C.md_canon("x", t8, C.parse_md_type("DOUBLE")), C.md_canon("f", t4, C.parse_md_type("FLOAT")))
+    bad = [(x, d, f) for x, d, f in con.execute(sql, [vals]).fetchall()
+           if d != C.py_float8(x) or f != (C.py_float4(x) if x == 0 or 1e-37 <= abs(x) <= 3.4e38 else None)]
+    assert not bad, bad[:5]
+
+
+def test_duckdb_float_text_is_not_always_shortest(con):
+    """Why floats are compared by their bits: DuckDB's FLOAT text is not the shortest float32 text, and Postgres
+    prints some doubles with 17 digits where Python and DuckDB print 16 (rounding ties); see docs/oracle.md."""
+    assert con.execute("SELECT CAST(CAST(1048576.25 AS FLOAT) AS VARCHAR)").fetchone()[0] == "1048576.25"
+    assert C.float4_repr(1048576.25) == "1048576.2"
 
 
 def test_float4_repr_is_shortest():

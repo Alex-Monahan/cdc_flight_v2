@@ -58,17 +58,17 @@
       "type": "numeric(10,3)"
     },
     {
-      "canonical": "0.1e16",
+      "canonical": "430c6bf526340000",
       "literal": "1e15",
       "match": true,
-      "reference": "0.1e16",
+      "reference": "430c6bf526340000",
       "type": "double precision"
     },
     {
-      "canonical": "-0",
+      "canonical": "8000000000000000",
       "literal": "'-0'",
       "match": true,
-      "reference": "-0",
+      "reference": "8000000000000000",
       "type": "double precision"
     },
     {
@@ -79,59 +79,59 @@
       "type": "double precision"
     },
     {
-      "canonical": "0.5e-323",
+      "canonical": "0000000000000001",
       "literal": "5e-324",
       "match": true,
-      "reference": "0.5e-323",
+      "reference": "0000000000000001",
       "type": "double precision"
     },
     {
-      "canonical": "0.17976931348623157e309",
+      "canonical": "7fefffffffffffff",
       "literal": "1.7976931348623157e308",
       "match": true,
-      "reference": "0.17976931348623157e309",
+      "reference": "7fefffffffffffff",
       "type": "double precision"
     },
     {
-      "canonical": "0.1e0",
+      "canonical": "3fb999999999999a",
       "literal": "0.1",
       "match": true,
-      "reference": "0.1e0",
+      "reference": "3fb999999999999a",
       "type": "double precision"
     },
     {
-      "canonical": "0.1e0",
+      "canonical": "3fb99999a0000000",
       "literal": "0.1",
       "match": true,
-      "reference": "0.1e0",
+      "reference": "3fb99999a0000000",
       "type": "real"
     },
     {
-      "canonical": "0.16777216e8",
+      "canonical": "4170000000000000",
       "literal": "16777216",
       "match": true,
-      "reference": "0.16777216e8",
+      "reference": "4170000000000000",
       "type": "real"
     },
     {
-      "canonical": "-0",
+      "canonical": "8000000000000000",
       "literal": "'-0'",
       "match": true,
-      "reference": "-0",
+      "reference": "8000000000000000",
       "type": "real"
     },
     {
-      "canonical": "0.34028235e39",
+      "canonical": "47efffffe0000000",
       "literal": "3.4028235e38",
       "match": true,
-      "reference": "0.34028235e39",
+      "reference": "47efffffe0000000",
       "type": "real"
     },
     {
-      "canonical": "0.1e-44",
+      "canonical": "36a0000000000000",
       "literal": "1e-45",
       "match": true,
-      "reference": "0.1e-44",
+      "reference": "36a0000000000000",
       "type": "real"
     },
     {
@@ -139,6 +139,20 @@
       "literal": "'Infinity'",
       "match": true,
       "reference": "Infinity",
+      "type": "real"
+    },
+    {
+      "canonical": "4130000040000000",
+      "literal": "1048576.25",
+      "match": true,
+      "reference": "4130000040000000",
+      "type": "real"
+    },
+    {
+      "canonical": "c19bf31800000000",
+      "literal": "-117229056",
+      "match": true,
+      "reference": "c19bf31800000000",
       "type": "real"
     },
     {
@@ -296,10 +310,10 @@
       "type": "text[]"
     },
     {
-      "canonical": "[1:2]{V2:-0,V3:NaN}",
+      "canonical": "[1:2]{V16:8000000000000000,V3:NaN}",
       "literal": "'{-0,NaN}'",
       "match": true,
-      "reference": "[1:2]{V2:-0,V3:NaN}",
+      "reference": "[1:2]{V16:8000000000000000,V3:NaN}",
       "type": "double precision[]"
     }
   ]

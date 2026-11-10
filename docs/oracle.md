@@ -79,16 +79,17 @@ Equality is defined per Postgres type family by a canonical text that the oracle
 (`src/cdc_v2/oracle/canonical.py`). It imports nothing from the pipeline. Each family is one `TypeRule` with SQL for
 Postgres, SQL for DuckDB (given the destination column's actual type), and a Python reference that both SQL
 builders are tested against: the DuckDB side hermetically in a local DuckDB, including property-based tests (300
-random doubles, 300 random float32 values, 200 decimals, 200 texts, 200 timestamps); the Postgres side in T1
-(`canonical_postgres.json`, 43 values).
+random doubles, 300 random float32 values, 200 decimals, 200 texts, 200 timestamps) and 40,000 fixed random doubles
+and their float32 roundings; the Postgres side in T1 (`canonical_postgres.json`, 45 values, and the same 40,000
+doubles).
 
 | Family | Postgres types | Canonical form | Destination types accepted |
 |---|---|---|---|
 | integer | smallint, integer, bigint | decimal digits with an optional minus sign: `-42` | integer types, `DECIMAL(p,0)`, `VARCHAR` (text must already be canonical) |
 | boolean | boolean | `t` or `f` | `BOOLEAN` |
 | numeric | numeric | plain decimal, trailing fractional zeros removed (`1.50` -> `1.5`, `100.00` -> `100`); `NaN`, `Infinity`, `-Infinity`. Value equality: the display scale of a Postgres value is not compared | integer types, `DECIMAL(p,s)`, `VARCHAR` (for the text member of `UNION(DECIMAL, VARCHAR)`) |
-| double precision | double precision | shortest round-trip digits as `[-]0.<digits>e<exp>` (`0.1` -> `0.1e0`, `1e15` -> `0.1e16`); `0`, `-0` (sign of zero kept), `NaN`, `Infinity`, `-Infinity` | `DOUBLE`; integer types, `DECIMAL`, `FLOAT` (converted to `DOUBLE`) |
-| real | real | as double precision, with the shortest digits that round-trip through float32 | `FLOAT`; `DOUBLE` only when the value is exactly a float32 value; integer types, `DECIMAL` |
+| double precision | double precision | the IEEE-754 bits as 16 lowercase hex digits (`1.5` -> `3ff8000000000000`, `-0` -> `8000000000000000`); `NaN` (any payload), `Infinity`, `-Infinity` | `DOUBLE`; integer types, `DECIMAL`, `FLOAT` (converted to `DOUBLE`) |
+| real | real | the value converted exactly to double precision, then as double precision (`0.1::real` -> `3fb99999a0000000`) | `FLOAT`; `DOUBLE` only when the value is exactly a float32 value; integer types, `DECIMAL` |
 | text | text, character varying, name, citext | the text itself (an empty string is not NULL) | `VARCHAR`, `JSON` |
 | character | character, bpchar | the text without trailing spaces (Postgres `char(n)` semantics) | `VARCHAR` (trailing spaces removed) |
 | bytea | bytea | lowercase hex of the bytes, no prefix | `BLOB` |
@@ -179,6 +180,14 @@ for the same two states (`cli.txt`).
    NULL (`IS NULL` is false). The test loader first produced such values; the oracle reports them as different.
 4. **DuckDB reads Postgres BC dates wrongly.** `CAST('0044-03-15 BC' AS DATE)` returns 0044-03-15 AD, silently. The
    pipeline must not pass Postgres date text with ` BC` through a DuckDB cast.
+5. **Float texts differ between the servers, so floats are compared by their bits.** DuckDB's `FLOAT` text is not
+   always the shortest text that reads back as the same float32 (12,084 of 256,329 random values; for example
+   `1048576.25`, where `1048576.2` suffices and Postgres prints that). Postgres prints some doubles with 17 digits
+   where DuckDB and Python print 16 digits that read back to the same double only by round-half-even (for example
+   `-2.0604180037107712e+16` against `-2.060418003710771e+16`; found by the 40,000-value test). A first version of
+   the oracle compared shortest texts and would have reported such values as different; it now compares the
+   IEEE-754 bits (`float8send` on Postgres, `CAST(DOUBLE AS BIT)` on DuckDB). Loading is not affected: any of these
+   texts reads back to the right value. Samples show the bits with the value, for example `1.5 (3ff8000000000000)`.
 
 ### 1.6 Rate (claim)
 

@@ -299,6 +299,7 @@ PG_VALUES = [
     ("double precision", "5e-324", 5e-324), ("double precision", "1.7976931348623157e308", 1.7976931348623157e308),
     ("double precision", "0.1", 0.1), ("real", "0.1", 0.1), ("real", "16777216", 16777216.0), ("real", "'-0'", -0.0),
     ("real", "3.4028235e38", 3.4028235e38), ("real", "1e-45", 1e-45), ("real", "'Infinity'", float("inf")),
+    ("real", "1048576.25", 1048576.25), ("real", "-117229056", -117229056.0),
     ("text", "''", ""), ("varchar(5)", "'héllo'", "héllo"), ("char(5)", "'ab'", "ab"),
     ("bytea", "'\\x00ff'", b"\x00\xff"), ("date", "'2024-01-02'", dt.date(2024, 1, 2)),
     ("date", "'infinity'", "infinity"), ("date", "'0001-01-01'", dt.date(1, 1, 1)),
@@ -337,6 +338,28 @@ def test_postgres_canonical_forms_match_the_reference(source_db, evidence):
     evidence("p3/oracle").write_json("canonical_postgres", {"values": out,
                                                             "all_match": all(o["match"] for o in out)})
     assert all(o["match"] for o in out), [o for o in out if not o["match"]]
+
+
+def test_postgres_float_forms_in_bulk(source_db):
+    """40,000 doubles (random bit patterns and tie-prone dyadic values) and their float32 roundings: the Postgres
+    canonical text equals the Python reference for every one."""
+    import math
+    import random
+    import struct
+    r = random.Random(5)
+    vals = [struct.unpack("d", struct.pack("Q", r.getrandbits(64)))[0] for _ in range(20000)]
+    vals += [r.randint(-2 ** 40, 2 ** 40) / (2 ** r.randint(0, 12)) for _ in range(20000)]
+    vals = [v for v in vals if not math.isnan(v) and not math.isinf(v)]
+    t8, t4 = PgColumnType("double precision"), PgColumnType("real")
+    with source_db.connect() as c:
+        c.execute("SET extra_float_digits = 1")
+        c.execute("CREATE TEMP TABLE f AS SELECT x, CASE WHEN x = 0 OR abs(x) BETWEEN 1e-37 AND 3.4e38 THEN x::real "
+                  "END AS r FROM unnest(%s::float8[]) AS u(x)", (vals,))
+        rows = c.execute("SELECT x, %s, %s FROM f" % (pg_canon("x", t8), pg_canon("r", t4))).fetchall()
+    assert len(rows) == len(vals)
+    in_range = (lambda x: x == 0 or 1e-37 <= abs(x) <= 3.4e38)
+    bad = [(x, d, f) for x, d, f in rows if d != py_canon(x, t8) or f != (py_canon(x, t4) if in_range(x) else None)]
+    assert not bad, bad[:5]
 
 
 # ------------------------------------------------------------------------------------------------ a DuckDB finding
