@@ -14,6 +14,10 @@ dev = [
     "pytest>=8",
     "hypothesis>=6.100",
 ]
+spike = [
+    "psutil>=7.2.2",
+    "pyarrow>=26.0.1",
+]
 
 [build-system]
 requires = ["hatchling"]
