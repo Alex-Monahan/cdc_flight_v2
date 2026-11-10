@@ -1,0 +1,161 @@
+{
+  "families": {
+    "ai": {
+      "form": "array_text",
+      "type": "integer[]",
+      "values": 10
+    },
+    "at": {
+      "form": "array_text",
+      "type": "text[]",
+      "values": 10
+    },
+    "bool": {
+      "form": "bool",
+      "type": "boolean",
+      "values": 10
+    },
+    "bt": {
+      "form": "text",
+      "type": "bit(4)",
+      "values": 10
+    },
+    "by": {
+      "form": "bytes",
+      "type": "bytea",
+      "values": 10
+    },
+    "ch": {
+      "form": "text",
+      "type": "char(5)",
+      "values": 10
+    },
+    "dt": {
+      "form": "date_pg_days",
+      "type": "date",
+      "values": 10
+    },
+    "f4": {
+      "form": "float32",
+      "type": "real",
+      "values": 10
+    },
+    "f8": {
+      "form": "float64",
+      "type": "double precision",
+      "values": 10
+    },
+    "i2": {
+      "form": "int16",
+      "type": "smallint",
+      "values": 10
+    },
+    "i4": {
+      "form": "int32",
+      "type": "integer",
+      "values": 10
+    },
+    "i8": {
+      "form": "int64",
+      "type": "bigint",
+      "values": 10
+    },
+    "inet_": {
+      "form": "text",
+      "type": "inet",
+      "values": 10
+    },
+    "iv": {
+      "form": "interval_text",
+      "type": "interval",
+      "values": 10
+    },
+    "jb": {
+      "form": "text",
+      "type": "jsonb",
+      "values": 10
+    },
+    "js": {
+      "form": "text",
+      "type": "json",
+      "values": 10
+    },
+    "mn": {
+      "form": "money_text",
+      "type": "money",
+      "values": 10
+    },
+    "name_": {
+      "form": "text",
+      "type": "name",
+      "values": 10
+    },
+    "num": {
+      "form": "numeric_text",
+      "type": "numeric",
+      "values": 10
+    },
+    "num_c": {
+      "form": "numeric_text",
+      "type": "numeric(15,2)",
+      "values": 10
+    },
+    "oid_": {
+      "form": "int64",
+      "type": "oid",
+      "values": 10
+    },
+    "qchar": {
+      "form": "text",
+      "type": "\"char\"",
+      "values": 10
+    },
+    "rng": {
+      "form": "text",
+      "type": "int4range",
+      "values": 10
+    },
+    "tm": {
+      "form": "time_us",
+      "type": "time",
+      "values": 10
+    },
+    "tmz": {
+      "form": "text",
+      "type": "timetz",
+      "values": 10
+    },
+    "ts": {
+      "form": "timestamp_pg_us",
+      "type": "timestamp",
+      "values": 10
+    },
+    "txt": {
+      "form": "text",
+      "type": "text",
+      "values": 10
+    },
+    "tz": {
+      "form": "timestamptz_pg_us",
+      "type": "timestamptz",
+      "values": 10
+    },
+    "uu": {
+      "form": "text",
+      "type": "uuid",
+      "values": 10
+    },
+    "vb": {
+      "form": "text",
+      "type": "varbit",
+      "values": 10
+    },
+    "vc": {
+      "form": "text",
+      "type": "varchar(10)",
+      "values": 10
+    }
+  },
+  "test": "tests/engine/test_engine_types.py",
+  "values_checked": 310
+}

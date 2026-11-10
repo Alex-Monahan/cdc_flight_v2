@@ -1,0 +1,17 @@
+{
+  "checked": [
+    "single update",
+    "one changed two unchanged",
+    "key change",
+    "insert then update in one txn",
+    "consecutive updates",
+    "REPLICA IDENTITY FULL",
+    "text, bytea, array element equal to the placeholder or its printable part"
+  ],
+  "placeholder_collision_rows": [
+    2,
+    3
+  ],
+  "rows": 14,
+  "test": "tests/engine/test_engine_stream.py::test_unchanged_toast_h003"
+}
