@@ -444,7 +444,7 @@ differs from the sketch above, the document holds. The differences that other pa
 `heartbeat.beat(primary, deadline, slot=…)` returns the position after its own commit, and an `END` with
 `ack_position ≥` that position proves that the beat was decoded; `heartbeat.ensure` (setup role) creates the
 published table `cdc_v2.heartbeat` and `heartbeat.check` (runtime role) verifies it before streaming;
-`slot.terminate_holder(node, name, expect=…)` takes the holder pair of C2; `SlotFacts.invalid` is true when
+`slot.terminate_holder(node, name, deadline, expect=…)` takes the holder pair of C2; `SlotFacts.invalid` is true when
 `wal_status = 'lost'`, or `invalidation_reason` is set, or `conflicting` is true (Postgres 16 has no
 `invalidation_reason` and shows a slot invalidated by the WAL cap as `conflicting`); a standby's timeline comes
 from `slot.timeline_history` (`IDENTIFY_SYSTEM`), never from `pg_control_checkpoint()`, which can lag behind a

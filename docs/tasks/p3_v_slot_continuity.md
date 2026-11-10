@@ -44,6 +44,35 @@ says elsewhere, these points and that document hold.
   `confirmed_flush_lsn` back. Repeat it on Postgres 16 (`tools/localpg` runs the 16 binaries since package P's
   repair) and keep the negative control this task asks for.
 
+## From the source package as built — build on it
+
+Package P is built and reviewed. `docs/design/source.md` is the full account; where it differs from what this task
+or contract C7 says elsewhere, these points and that document hold.
+
+- `slot.facts` gives `SlotFacts` with `holder` (the pair of `HELLO`) and `invalid`: true when
+  `wal_status = 'lost'`, or `invalidation_reason` is set, or `conflicting` is true. On Postgres 16 a slot
+  invalidated by the WAL cap shows `conflicting = true` and nothing else (16 has no `invalidation_reason`); from
+  17 on `conflicting = false` and `invalidation_reason = 'wal_removed'`. Use `invalid`, not one column.
+- `slot.terminate_holder(node, name, deadline, expect=…)` ends the holder only when it is the expected pair. "Holder
+  unknown" means that another role holds the slot (the runtime role cannot see that backend's start time): an
+  alert that says so and the retry of SPEC 4.7, never a blind terminate.
+- No fact that SQL can read identifies one incarnation of a slot (measured on 16 and 18; `source.md` section 7).
+  Section 1 below stores what there is: name, system identifier, timeline, positions. A recreated slot is
+  recognised by its positions only; one that is not ahead gets an alert where it can be seen and no backfill
+  (its statistics starting again from 0 is a hint, not a proof).
+- A slot left behind by a creation that was abandoned (deadline, crash after `pg.slot_created`) is found at the
+  next attach as a slot that is "ahead" or has no stored identity: its position is taken by the rule of
+  section 4, it is never dropped and created again without a finding.
+- A standby's timeline comes from `slot.timeline_history` (`IDENTIFY_SYSTEM` over a replication connection),
+  never from `pg_control_checkpoint()`, which can lag behind a switch until the next restartpoint. The runtime
+  role may read the history on local 16 and 18.
+- Slot creation on a standby: with the heartbeat running a running-transactions record comes within about 25 s
+  (the background writer logs one at most every 15 s after important WAL and wakes every 10 s while hibernating);
+  with `EXECUTE` on `pg_log_standby_snapshot()` granted, within 1 s. The creation deadline stays well above 25 s
+  (default 120 s).
+- Refuse to stream when `wal_sender_timeout` is 0 (`ServerFacts.wal_sender_timeout_ms`, read with the slot facts).
+- Your suite reaches the crash points `pg.slot_created` and `pg.holder_terminated` of package P.
+
 ## Resources
 
 - Postgres: `tools/localpg --home ~/.cache/cdc_flight_v2/pg-v --port-base 55680`, and a second pair

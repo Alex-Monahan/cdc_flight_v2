@@ -770,7 +770,10 @@ stays in place behind every entry.
 - **Reproduction.** R: `ALTER SYSTEM SET max_slot_wal_keep_size = '64MB'; SELECT pg_reload_conf();` (T1 only), stop the
   pipeline, write 500 MB on P, `CHECKPOINT` on P, wait for a restartpoint on R (`CHECKPOINT` on R).
 - **Prevention.** Size-lag trigger (SPEC 3.6) at 50 % of the cap with the cap read from the server holding the slot;
-  alert at `wal_status = 'extended'`/`'unreserved'`; slot check treats `invalidation_reason IS NOT NULL` as slot loss.
+  alert at `wal_status = 'extended'`/`'unreserved'`; slot check treats an invalid slot as slot loss. A slot is
+  invalid when `wal_status = 'lost'`, or `invalidation_reason` is set, or `conflicting` is true (`SlotFacts.invalid`):
+  on Postgres 16 a slot invalidated by the WAL cap shows `conflicting = true` (16 has no `invalidation_reason`); from
+  17 on it shows `conflicting = false` and `invalidation_reason = 'wal_removed'` (measured in P3, package P).
 - **Why prevention.** The backlog is abandoned (and re-backfilled) deliberately before the server invalidates the slot.
 - **Test.** SPEC 1.8 invalidation test; `test_h036_size_trigger_before_cap`.
 - **Residual.** A write burst faster than our check interval can still reach the cap; then the slot-loss path runs.
@@ -839,9 +842,12 @@ Background for every entry: `docs/research/replica_decoding.md`.
 - **Reproduction.** P idle, heartbeat off; R: `SELECT pg_create_logical_replication_slot('cdc_v2_s2', 'pgoutput');` —
   blocks; P: `SELECT pg_log_standby_snapshot();` (T1 superuser) — returns. Variant: P session `BEGIN; SELECT
   txid_current();` left open — creation blocks until it ends; same with a prepared transaction.
-- **Prevention.** Our code creates the slot (not Debezium), only after verifying the primary heartbeat is running (an
-  `xl_running_xacts` record within ~15 s is then guaranteed), with a deadline (default 120 s); on expiry it cancels and
-  reports the oldest running and prepared transactions on the primary, then retries with backoff and alerts (SPEC 4.7).
+- **Prevention.** Our code creates the slot (not Debezium), only after verifying the primary heartbeat is running. That
+  guarantees a running-transactions record within about 25 s (the background writer logs one at most every 15 s after
+  important WAL and wakes every 10 s while hibernating; measured in P3, package P); with `EXECUTE` on
+  `pg_log_standby_snapshot()` granted, within 1 s. Slot creation on a standby has a deadline well above that (default
+  120 s); on expiry it cancels and reports the oldest running and prepared transactions on the primary, then retries
+  with backoff and alerts (SPEC 4.7).
 - **Why prevention.** The idle-primary case cannot occur with the heartbeat running; the long-transaction case cannot
   hang the pipeline and is reported with its cause.
 - **Test.** `test_h040_slot_create_idle_primary`, `…_with_heartbeat`, `…_blocked_by_long_tx`, `…_blocked_by_prepared_tx`.
@@ -883,7 +889,8 @@ Background for every entry: `docs/research/replica_decoding.md`.
 - **Prevention.** Preconditions checked before slot creation and at every acquisition, refusing replica mode if any fails:
   `hot_standby_feedback = on` and `primary_slot_name` set on the replica; the primary's physical slot for that replica
   exists, is valid, and its `catalog_xmin` ≤ our slot's `catalog_xmin`; `wal_level = logical` on both. Our slot check
-  (H-035) reads `invalidation_reason`/`conflicting` every 30 s and before every engine start; an invalid slot stops the
+  (H-035) reads `wal_status`, `invalidation_reason` and `conflicting` (`SlotFacts.invalid`; H-036 has the values per
+  version) every 30 s and before every engine start; an invalid slot stops the
   engine (instead of Debezium's endless retry), alerts and takes the attach-elsewhere + backfill path (SPEC 4.1).
 - **Why prevention.** The configurations that lead to invalidation are refused up front; the residual cases cannot hang
   the pipeline.

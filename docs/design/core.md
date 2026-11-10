@@ -507,17 +507,19 @@ a key is consistent after a resume (SPEC 1.6) but is read again. This is reporte
 
 ### 7.5 A table that joins the publication
 
-Changes written before the publication change are not published, even if their transaction commits later. After
-adding a table to the publication, the pipeline notes the primary's next transaction id `X`, and the table's first
-snapshot must have `xmin ≥ X`: every transaction that wrote to the table before the change has then finished and
-is `inside`. **[test]** in the discovery work of P4, including a transaction that stays open across the change.
+Publication membership is decided when a transaction is decoded: a transaction that wrote the table before
+`ALTER PUBLICATION … ADD TABLE` and committed after it was decoded with all its rows (P3, package P, Postgres 16
+and 18; `docs/design/source.md` section 7). The rule holds either way: after adding a table to the publication,
+the pipeline notes the primary's next transaction id `X`, and the table's first snapshot must have `xmin ≥ X`:
+every transaction that wrote to the table before the change has then finished and is `inside`. **[test]** measured
+in P3 for a transaction open across the change; P4's discovery work repeats it end to end.
 
 ## 8. Slot continuity
 
 Checked at every slot acquisition and every `slot.verify_interval` (default 30 s) while streaming (SPEC 1.8,
-4.1). `_cdc.stream_state` stores, next to the applied position: slot name, the server's system identifier, the
-timeline, and what identifies the slot (**[test]** which catalog values identify a recreated slot of the same
-name on Postgres 17 and 18; if there is none, a recreated slot is recognised by its positions only).
+4.1). `_cdc.stream_state` stores, next to the applied position: slot name, the server's system identifier and the
+timeline. Nothing more identifies the slot: no fact that SQL can read identifies one incarnation of a slot (P3,
+package P, Postgres 16 and 18), so a recreated slot of the same name is recognised by its positions only.
 
 A check that reads the slot and then starts the engine proves nothing: the slot can be advanced, dropped or
 recreated in between. The **attach step** therefore is:
@@ -540,7 +542,7 @@ if it can, comparing only after the attach would hide a slot that was ahead, whi
 
 | Finding | Meaning | Action |
 |---|---|---|
-| slot `confirmed_flush_lsn` ≤ applied position, same identity, applied position on the server's timeline history | continuous | stream from the slot; discard by position |
+| slot `confirmed_flush_lsn` ≤ applied position, applied position on the server's timeline history | continuous | stream from the slot; discard by position |
 | slot ahead of the applied position | changes were consumed elsewhere or the slot was advanced | alert, automatic backfill of all CDC tables, stream from the slot's position |
 | slot missing, recreated, or `wal_status = 'lost'` / invalidated | history is gone | alert, new slot, automatic backfill |
 | different system identifier, or applied position not on the timeline history | different server or diverged history (failover) | as the replica rules of SPEC 4.1 decide: continue if the position is proven to be on the new history, else alert and backfill |
@@ -553,7 +555,14 @@ position has lost nothing; it needs an alert where the recreation can be seen, a
 
 The Flight never exits because of a slot finding. The timeline history is read over a replication connection
 (`TIMELINE_HISTORY`); **[test]** that the role and the PlanetScale endpoint allow it, otherwise a failover is
-always treated as a break.
+always treated as a break. A standby's current timeline comes from `IDENTIFY_SYSTEM` over a replication connection
+(`slot.timeline_history`). `pg_control_checkpoint().timeline_id`, which the runtime role can read, can lag behind
+a switch until the next restartpoint and is not used for the decision. The runtime role may read the timeline
+history (P3, 16 and 18); PlanetScale in stage 2.
+
+A slot is invalid when `wal_status = 'lost'`, or `invalidation_reason` is set, or `conflicting` is true
+(`SlotFacts.invalid`): Postgres 16 has no `invalidation_reason` and shows a slot invalidated by the WAL cap as
+`conflicting = true`; from 17 on it shows `conflicting = false` and `invalidation_reason = 'wal_removed'`.
 
 ## 9. State machines
 
@@ -602,8 +611,8 @@ src/cdc_v2/oracle/          source/destination comparison used by every test tie
 | 3 | Canonical comparison form for UNION and NaN (6.3) | settled by the oracle (package O, `docs/oracle.md` 1.2); the keyless grouping key uses the same form (6.3) |
 | 4 | Staging tables versus direct apply (6.1) | decided by the Flight measurement in P2: direct for groups, staging tables only for 6.4 |
 | 5 | Appends by the stream lane and reads by the backfill lane on one pending log do not conflict (7.1) | P3 test on MotherDuck |
-| 6 | Identity of a recreated slot; reading the timeline history (8) | P3, stage 2 for PlanetScale |
-| 7 | Publication join rule (7.5) | P4 discovery work |
+| 6 | Identity of a recreated slot; reading the timeline history (8) | Closed for identity (P3, package P): no fact readable through SQL identifies one incarnation of a slot. Continuity rests on position (section 8). A recreated slot that is not ahead gets an alert where it can be seen and no backfill; its statistics starting again from 0 is a hint, not a proof. The timeline history is readable by the runtime role on 16 and 18; PlanetScale in stage 2 |
+| 7 | Publication join rule (7.5) | measured in P3 (package P) for a transaction open across the change; P4 discovery work repeats it end to end |
 | 8 | Guard over the Postgres endpoint; hand-over that starts the new leader before the old one stops | after P6, if the numbers ask for it |
 | 9 | Key change with unchanged TOAST values: old key on the create record, chains resolved (6.2) | P3 (1.4) and P4 (2.6) tests |
 | 10 | Several versions and missing rows after loading under several snapshots; repair read (7.3) | P3 handoff tests, workload fuzzer with TOAST values |
