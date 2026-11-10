@@ -227,3 +227,33 @@ def test_this_package_reads_no_local_wall_clock():
     users = [rel for rel, text in sources() if allowed(rel, OWN) and re.search(r"\bnow\s*\(\s*\)|current_timestamp|"
                                                                                r"get_current_time", text, re.I)]
     assert users == [], "another clock expression than md.clock_sql is used in: %r" % (users,)
+
+
+# -------------------------------------------------------------------------- from the review of apply (C4)
+_SCRATCH = re.compile(r"_cdc_apply|\bdrop\s+schema\b|\bcascade\b", re.I)
+#: Methods of the DuckDB client (1.5.6) that return a lazy `RecordBatchReader`.
+_LAZY_READERS = ("arrow", "fetch_record_batch", "fetch_arrow_reader", "to_arrow_reader")
+
+
+def test_nothing_of_this_package_drops_a_schema_or_names_a_scratch_schema_of_apply():
+    """Scratch schemas `_cdc_apply_<random>` belong to package A and live inside one lane transaction. Nothing of
+    this package cleans them up, and nothing of it drops a schema or uses CASCADE: `DROP SCHEMA ... CASCADE` of
+    tables made in the same transaction fails at COMMIT (`test_from_apply.py`)."""
+    assert _SCRATCH.search("DROP  SCHEMA x") and _SCRATCH.search("drop table t cascade")
+    assert _SCRATCH.search("SELECT 1 FROM _cdc_apply_ab12.t") and not _SCRATCH.search("DROP TABLE _cdc.cascaded")
+    found = [(rel, line) for rel, text in sources() if allowed(rel, OWN + ("testing/destination.py",))
+             for line, s in statements(text) if _SCRATCH.search(s)]
+    assert found == [], "a schema is dropped, or a scratch schema of apply is named: %r" % (found,)
+
+
+def test_the_layer_never_hands_out_the_lazy_reader_of_the_client():
+    """In DuckDB 1.5.6 `.arrow()` returns a reader that is read later, and a reader that a connection produced
+    cannot be read by a statement of the same connection. The layer reads every Arrow result completely
+    (`to_arrow_table`), in one place."""
+    calls = []
+    for rel, text in sources():
+        if allowed(rel, OWN):
+            for node in ast.walk(ast.parse(text)):
+                if isinstance(node, ast.Attribute) and (node.attr in _LAZY_READERS or "arrow_table" in node.attr):
+                    calls.append((rel, node.attr))
+    assert calls == [("md/connection.py", "to_arrow_table")], calls
