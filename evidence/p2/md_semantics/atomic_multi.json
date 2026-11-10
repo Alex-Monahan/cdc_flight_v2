@@ -1,0 +1,532 @@
+{
+  "spike": "atomic_multi",
+  "duckdb_client": "1.5.6",
+  "started_utc": "2026-11-10T02:12:49Z",
+  "note": "measured from a laptop over the public internet; performance numbers are indications only",
+  "part_a": {
+    "groups": 4,
+    "commits": 6000,
+    "checks": 18153,
+    "violations": 0,
+    "results": [
+      {
+        "role": "writer0",
+        "commits": 1500,
+        "errors": {},
+        "txn_seconds": {
+          "n": 1500,
+          "min": 0.3622920513153076,
+          "p50": 0.5243339538574219,
+          "p90": 0.5384521484375,
+          "p99": 0.6216881275177002,
+          "max": 1.0325078964233398,
+          "mean": 0.5275915056864421
+        }
+      },
+      {
+        "role": "writer3",
+        "commits": 1500,
+        "errors": {},
+        "txn_seconds": {
+          "n": 1500,
+          "min": 0.3725881576538086,
+          "p50": 0.5244960784912109,
+          "p90": 0.5398147106170654,
+          "p99": 0.6500170230865479,
+          "max": 0.9715697765350342,
+          "mean": 0.52876100842158
+        }
+      },
+      {
+        "role": "writer2",
+        "commits": 1500,
+        "errors": {},
+        "txn_seconds": {
+          "n": 1500,
+          "min": 0.3534262180328369,
+          "p50": 0.5252060890197754,
+          "p90": 0.5499818325042725,
+          "p99": 0.6581642627716064,
+          "max": 1.0028350353240967,
+          "mean": 0.5316698195139568
+        }
+      },
+      {
+        "role": "writer1",
+        "commits": 1500,
+        "errors": {},
+        "txn_seconds": {
+          "n": 1500,
+          "min": 0.3667120933532715,
+          "p50": 0.526735782623291,
+          "p90": 0.6120741367340088,
+          "p99": 0.7512969970703125,
+          "max": 1.0460739135742188,
+          "mean": 0.5447092477480571
+        }
+      },
+      {
+        "role": "reader_visibility"
+      },
+      {
+        "role": "reader_single_statement",
+        "checks": 8408,
+        "violations": 0,
+        "examples": [],
+        "errors": {}
+      },
+      {
+        "role": "reader_single_statement",
+        "checks": 8412,
+        "violations": 0,
+        "examples": [],
+        "errors": {}
+      },
+      {
+        "role": "reader_multi_statement_txn",
+        "checks": 1333,
+        "violations": 0,
+        "examples": [],
+        "errors": {}
+      }
+    ]
+  },
+  "part_b": {
+    "seen_minus_returned": {
+      "n": 1500,
+      "min": -0.0025060176849365234,
+      "p50": 0.0015921592712402344,
+      "p90": 0.06603431701660156,
+      "p99": 0.09378480911254883,
+      "max": 0.14551091194152832,
+      "mean": 0.0158211301167806
+    },
+    "seen_minus_sent": {
+      "n": 1500,
+      "min": 0.08378791809082031,
+      "p50": 0.15172910690307617,
+      "p90": 0.1779336929321289,
+      "p99": 0.23215818405151367,
+      "max": 0.320422887802124,
+      "mean": 0.1427847695350647
+    },
+    "polls": 9198,
+    "stale_reads": 0,
+    "stale_after_return": {
+      "n": 0
+    }
+  },
+  "part_c": {
+    "rows_per_txn": 600000,
+    "outcomes": {
+      "during_commit: invariant_ok=True applied=True visible_at_first_check=True client_saw_commit_ack=True": 19,
+      "during_commit: invariant_ok=True applied=True visible_at_first_check=False client_saw_commit_ack=False": 9,
+      "mid_txn: invariant_ok=True applied=False visible_at_first_check=False client_saw_commit_ack=False": 10,
+      "during_commit: invariant_ok=True applied=True visible_at_first_check=True client_saw_commit_ack=False": 1,
+      "during_commit: invariant_ok=True applied=False visible_at_first_check=False client_saw_commit_ack=False": 1
+    },
+    "trials": [
+      {
+        "trial": 1,
+        "mode": "during_commit",
+        "delay_s": 0.486,
+        "applied_at_first_check": true,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.0,
+        "invariant_ok": true,
+        "ack_seen": true
+      },
+      {
+        "trial": 2,
+        "mode": "during_commit",
+        "delay_s": 0.226,
+        "applied_at_first_check": false,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.2112870216369629,
+        "invariant_ok": true,
+        "ack_seen": false
+      },
+      {
+        "trial": 3,
+        "mode": "during_commit",
+        "delay_s": 0.976,
+        "applied_at_first_check": true,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.0,
+        "invariant_ok": true,
+        "ack_seen": true
+      },
+      {
+        "trial": 4,
+        "mode": "mid_txn",
+        "delay_s": 0.007,
+        "applied_at_first_check": false,
+        "applied_after_20s": false,
+        "landed_after_kill_s": null,
+        "invariant_ok": true,
+        "ack_seen": false
+      },
+      {
+        "trial": 5,
+        "mode": "during_commit",
+        "delay_s": 0.804,
+        "applied_at_first_check": true,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.0,
+        "invariant_ok": true,
+        "ack_seen": true
+      },
+      {
+        "trial": 6,
+        "mode": "during_commit",
+        "delay_s": 0.549,
+        "applied_at_first_check": true,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.0,
+        "invariant_ok": true,
+        "ack_seen": true
+      },
+      {
+        "trial": 7,
+        "mode": "during_commit",
+        "delay_s": 0.087,
+        "applied_at_first_check": false,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.1743781566619873,
+        "invariant_ok": true,
+        "ack_seen": false
+      },
+      {
+        "trial": 8,
+        "mode": "mid_txn",
+        "delay_s": 0.051,
+        "applied_at_first_check": false,
+        "applied_after_20s": false,
+        "landed_after_kill_s": null,
+        "invariant_ok": true,
+        "ack_seen": false
+      },
+      {
+        "trial": 9,
+        "mode": "during_commit",
+        "delay_s": 0.056,
+        "applied_at_first_check": false,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.4658629894256592,
+        "invariant_ok": true,
+        "ack_seen": false
+      },
+      {
+        "trial": 10,
+        "mode": "during_commit",
+        "delay_s": 0.65,
+        "applied_at_first_check": true,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.0,
+        "invariant_ok": true,
+        "ack_seen": true
+      },
+      {
+        "trial": 11,
+        "mode": "during_commit",
+        "delay_s": 0.105,
+        "applied_at_first_check": false,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.21216678619384766,
+        "invariant_ok": true,
+        "ack_seen": false
+      },
+      {
+        "trial": 12,
+        "mode": "mid_txn",
+        "delay_s": 0.009,
+        "applied_at_first_check": false,
+        "applied_after_20s": false,
+        "landed_after_kill_s": null,
+        "invariant_ok": true,
+        "ack_seen": false
+      },
+      {
+        "trial": 13,
+        "mode": "during_commit",
+        "delay_s": 0.637,
+        "applied_at_first_check": true,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.0,
+        "invariant_ok": true,
+        "ack_seen": true
+      },
+      {
+        "trial": 14,
+        "mode": "during_commit",
+        "delay_s": 1.24,
+        "applied_at_first_check": true,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.0,
+        "invariant_ok": true,
+        "ack_seen": true
+      },
+      {
+        "trial": 15,
+        "mode": "during_commit",
+        "delay_s": 0.186,
+        "applied_at_first_check": false,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.21985912322998047,
+        "invariant_ok": true,
+        "ack_seen": false
+      },
+      {
+        "trial": 16,
+        "mode": "mid_txn",
+        "delay_s": 0.022,
+        "applied_at_first_check": false,
+        "applied_after_20s": false,
+        "landed_after_kill_s": null,
+        "invariant_ok": true,
+        "ack_seen": false
+      },
+      {
+        "trial": 17,
+        "mode": "during_commit",
+        "delay_s": 0.941,
+        "applied_at_first_check": true,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.0,
+        "invariant_ok": true,
+        "ack_seen": true
+      },
+      {
+        "trial": 18,
+        "mode": "during_commit",
+        "delay_s": 1.422,
+        "applied_at_first_check": true,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.0,
+        "invariant_ok": true,
+        "ack_seen": true
+      },
+      {
+        "trial": 19,
+        "mode": "during_commit",
+        "delay_s": 0.866,
+        "applied_at_first_check": true,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.0,
+        "invariant_ok": true,
+        "ack_seen": true
+      },
+      {
+        "trial": 20,
+        "mode": "mid_txn",
+        "delay_s": 0.04,
+        "applied_at_first_check": false,
+        "applied_after_20s": false,
+        "landed_after_kill_s": null,
+        "invariant_ok": true,
+        "ack_seen": false
+      },
+      {
+        "trial": 21,
+        "mode": "during_commit",
+        "delay_s": 1.464,
+        "applied_at_first_check": true,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.0,
+        "invariant_ok": true,
+        "ack_seen": true
+      },
+      {
+        "trial": 22,
+        "mode": "during_commit",
+        "delay_s": 0.07,
+        "applied_at_first_check": false,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.2001967430114746,
+        "invariant_ok": true,
+        "ack_seen": false
+      },
+      {
+        "trial": 23,
+        "mode": "during_commit",
+        "delay_s": 1.288,
+        "applied_at_first_check": true,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.0,
+        "invariant_ok": true,
+        "ack_seen": true
+      },
+      {
+        "trial": 24,
+        "mode": "mid_txn",
+        "delay_s": 0.029,
+        "applied_at_first_check": false,
+        "applied_after_20s": false,
+        "landed_after_kill_s": null,
+        "invariant_ok": true,
+        "ack_seen": false
+      },
+      {
+        "trial": 25,
+        "mode": "during_commit",
+        "delay_s": 0.216,
+        "applied_at_first_check": true,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.0,
+        "invariant_ok": true,
+        "ack_seen": false
+      },
+      {
+        "trial": 26,
+        "mode": "during_commit",
+        "delay_s": 0.177,
+        "applied_at_first_check": false,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.1782231330871582,
+        "invariant_ok": true,
+        "ack_seen": false
+      },
+      {
+        "trial": 27,
+        "mode": "during_commit",
+        "delay_s": 0.463,
+        "applied_at_first_check": true,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.0,
+        "invariant_ok": true,
+        "ack_seen": true
+      },
+      {
+        "trial": 28,
+        "mode": "mid_txn",
+        "delay_s": 0.082,
+        "applied_at_first_check": false,
+        "applied_after_20s": false,
+        "landed_after_kill_s": null,
+        "invariant_ok": true,
+        "ack_seen": false
+      },
+      {
+        "trial": 29,
+        "mode": "during_commit",
+        "delay_s": 0.271,
+        "applied_at_first_check": false,
+        "applied_after_20s": false,
+        "landed_after_kill_s": null,
+        "invariant_ok": true,
+        "ack_seen": false
+      },
+      {
+        "trial": 30,
+        "mode": "during_commit",
+        "delay_s": 0.872,
+        "applied_at_first_check": true,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.0,
+        "invariant_ok": true,
+        "ack_seen": true
+      },
+      {
+        "trial": 31,
+        "mode": "during_commit",
+        "delay_s": 0.958,
+        "applied_at_first_check": true,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.0,
+        "invariant_ok": true,
+        "ack_seen": true
+      },
+      {
+        "trial": 32,
+        "mode": "mid_txn",
+        "delay_s": 0.037,
+        "applied_at_first_check": false,
+        "applied_after_20s": false,
+        "landed_after_kill_s": null,
+        "invariant_ok": true,
+        "ack_seen": false
+      },
+      {
+        "trial": 33,
+        "mode": "during_commit",
+        "delay_s": 0.822,
+        "applied_at_first_check": true,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.0,
+        "invariant_ok": true,
+        "ack_seen": true
+      },
+      {
+        "trial": 34,
+        "mode": "during_commit",
+        "delay_s": 0.094,
+        "applied_at_first_check": false,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.5595011711120605,
+        "invariant_ok": true,
+        "ack_seen": false
+      },
+      {
+        "trial": 35,
+        "mode": "during_commit",
+        "delay_s": 0.089,
+        "applied_at_first_check": false,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.19907689094543457,
+        "invariant_ok": true,
+        "ack_seen": false
+      },
+      {
+        "trial": 36,
+        "mode": "mid_txn",
+        "delay_s": 0.021,
+        "applied_at_first_check": false,
+        "applied_after_20s": false,
+        "landed_after_kill_s": null,
+        "invariant_ok": true,
+        "ack_seen": false
+      },
+      {
+        "trial": 37,
+        "mode": "during_commit",
+        "delay_s": 1.021,
+        "applied_at_first_check": true,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.0,
+        "invariant_ok": true,
+        "ack_seen": true
+      },
+      {
+        "trial": 38,
+        "mode": "during_commit",
+        "delay_s": 0.641,
+        "applied_at_first_check": true,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.0,
+        "invariant_ok": true,
+        "ack_seen": true
+      },
+      {
+        "trial": 39,
+        "mode": "during_commit",
+        "delay_s": 0.471,
+        "applied_at_first_check": true,
+        "applied_after_20s": true,
+        "landed_after_kill_s": 0.0,
+        "invariant_ok": true,
+        "ack_seen": true
+      },
+      {
+        "trial": 40,
+        "mode": "mid_txn",
+        "delay_s": 0.059,
+        "applied_at_first_check": false,
+        "applied_after_20s": false,
+        "landed_after_kill_s": null,
+        "invariant_ok": true,
+        "ack_seen": false
+      }
+    ]
+  },
+  "finished_utc": "2026-11-10T02:43:21Z"
+}

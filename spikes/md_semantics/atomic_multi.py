@@ -233,17 +233,23 @@ def part_ab(ev: Evidence, groups: int, commits: int) -> None:
 BIG = 300_000
 
 
-def crash_child(trial: int, conn) -> None:
+def crash_child(trial: int, conn, hold: bool = False) -> None:
     con = connect(DB)
-    s = con.execute("SELECT rows FROM state_c").fetchone()[0]
-    con.execute("BEGIN")
-    con.execute(f"INSERT INTO a_c SELECT range, {trial} FROM range({s}, {s + BIG})")
-    conn.send("in_txn")
-    con.execute(f"INSERT INTO b_c SELECT range, -{trial} FROM range({s}, {s + BIG})")
-    con.execute(f"UPDATE state_c SET pos = {trial}, rows = {s + BIG}")
-    conn.send("pre_commit")
-    con.execute("COMMIT")
-    conn.send("committed")
+    try:
+        s = con.execute("SELECT rows FROM state_c").fetchone()[0]
+        con.execute("BEGIN")
+        con.execute(f"INSERT INTO a_c SELECT range, {trial} FROM range({s}, {s + BIG})")
+        conn.send("in_txn")
+        con.execute(f"INSERT INTO b_c SELECT range, -{trial} FROM range({s}, {s + BIG})")
+        con.execute(f"UPDATE state_c SET pos = {trial}, rows = {s + BIG}")
+        if hold:  # all writes done, transaction left open: killed here, the server holds the rows
+            conn.send("holding")
+            time.sleep(600)
+        conn.send("pre_commit")
+        con.execute("COMMIT")
+        conn.send("committed")
+    except Exception as e:  # e.g. a conflict with the still-open transaction of the previous, killed client
+        conn.send("child_error: " + err_class(e))
     time.sleep(60)
 
 
@@ -259,18 +265,22 @@ def part_c(ev: Evidence, trials: int) -> None:
     rows_out = []
     check = CHECK_ONE.format(g="c")
     for trial in range(1, trials + 1):
-        mode = "mid_txn" if trial % 4 == 0 else "during_commit"
-        delay = rng.uniform(0, 1.5) if mode == "during_commit" else rng.uniform(0, 0.1)
+        mode = ["during_commit", "mid_txn", "open_after_all_writes"][trial % 3]
+        delay = {"during_commit": rng.uniform(0, 1.5), "mid_txn": rng.uniform(0, 0.1), "open_after_all_writes": 0}[mode]
         parent, child = ctx.Pipe()
-        p = ctx.Process(target=crash_child, args=(trial, child))
+        p = ctx.Process(target=crash_child, args=(trial, child, mode == "open_after_all_writes"))
         p.start()
-        want = "in_txn" if mode == "mid_txn" else "pre_commit"
+        want = {"mid_txn": "in_txn", "during_commit": "pre_commit", "open_after_all_writes": "holding"}[mode]
         got = None
         committed_msg = False
+        child_error = None
         while got != want:
             if not parent.poll(120):
                 break
             got = parent.recv()
+            if got.startswith("child_error"):
+                child_error = got
+                break
         time.sleep(delay)
         if parent.poll(0):
             committed_msg = parent.recv() == "committed"
@@ -287,13 +297,34 @@ def part_c(ev: Evidence, trials: int) -> None:
             if landed_after is None and r2[5] == trial:
                 landed_after = time.time() - t_kill
             time.sleep(0.2)
+        # is the state row still held by the dead client's server-side transaction? probe until free (max 180 s)
+        held_until = None
+        while time.time() - t_kill < 180:
+            try:
+                con.execute("BEGIN")
+                con.execute("UPDATE state_c SET pos = pos")
+                con.execute("ROLLBACK")
+                break
+            except Exception:
+                try:
+                    con.execute("ROLLBACK")
+                except Exception:
+                    pass
+                held_until = time.time() - t_kill
+                time.sleep(2)
+        r2 = con.execute(check).fetchone()
+        inv_ok = inv_ok and ok(r2)
+        if landed_after is None and r2[5] == trial:
+            landed_after = time.time() - t_kill
         applied1 = r1[5] == trial
         applied2 = r2[5] == trial
         key = (f"{mode}: invariant_ok={inv_ok} applied={applied2} visible_at_first_check={applied1} "
-               f"client_saw_commit_ack={committed_msg}")
+               f"client_saw_commit_ack={committed_msg} row_still_held_after_20s={held_until is not None}"
+               f"{' CHILD_ERROR' if child_error else ''}")
         outcomes[key] = outcomes.get(key, 0) + 1
         rows_out.append({"trial": trial, "mode": mode, "delay_s": round(delay, 3), "applied_at_first_check": applied1,
-                         "applied_after_20s": applied2, "landed_after_kill_s": landed_after,
+                         "applied_at_end": applied2, "landed_after_kill_s": landed_after,
+                         "state_row_held_by_dead_client_until_s": held_until, "child_error": child_error,
                          "invariant_ok": inv_ok, "ack_seen": committed_msg})
     ev.log(f"== Part C: SIGKILL of a client inside a {2 * BIG}-row transaction, {trials} trials")
     for k, n in sorted(outcomes.items()):
@@ -313,7 +344,7 @@ def main() -> None:
     ap.add_argument("--crash-trials", type=int, default=40)
     ap.add_argument("--only", default="")
     a = ap.parse_args()
-    ev = Evidence("atomic_multi")
+    ev = Evidence("atomic_multi" + ("_" + a.only if a.only else ""))
     create_db(DB)
     try:
         if a.only in ("", "ab"):
