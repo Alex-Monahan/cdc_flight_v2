@@ -557,6 +557,12 @@ class Checker:
                     self._wrong("xmax_inside", hits, rec, e1, j)
                 if e <= rec.head:
                     self.stats["cuts_that_miss_a_received_transaction"] += 1
+        # 3. Every counter row exists before the stream starts and is never deleted.  A snapshot that returns
+        #    no row for a key has lost the row (wrong hint bits do that), and step 2 would skip the key.
+        for key in list(st.idx):
+            if key not in rec.vis:
+                self.stats["rows_missing_from_a_cut"] += 1
+                self._violation("evidence", rec, e1, None, "the snapshot returns no row for key %d" % key)
         if rec.r0 < rec.head:
             self.stats["cuts_with_r0_below_received"] += 1
         if rec.r1 == rec.r0:
