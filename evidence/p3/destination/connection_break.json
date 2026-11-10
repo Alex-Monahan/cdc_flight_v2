@@ -1,0 +1,96 @@
+{
+  "command": "tools/with-env uv run -q pytest -q -m md tests/destination",
+  "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
+  "results": {
+    "fault_sites_in_a_child": {
+      "date_utc": "2026-11-10 08:56",
+      "sites": {
+        "md.commit": {
+          "check": {
+            "doubles": 0,
+            "n": 12,
+            "pos": 12,
+            "rows": 12,
+            "source": 12
+          },
+          "error_the_sut_got": [
+            "CommitUnknown"
+          ],
+          "events": [
+            "intend:9-12",
+            "error:CommitUnknown",
+            "intend:9-12",
+            "done:9-12"
+          ],
+          "seconds_until_caught_up": 3.88,
+          "transaction_at_the_fault_committed": false
+        },
+        "md.commit_reply": {
+          "check": {
+            "doubles": 0,
+            "n": 15,
+            "pos": 15,
+            "rows": 15,
+            "source": 15
+          },
+          "error_the_sut_got": [
+            "CommitUnknown"
+          ],
+          "events": [
+            "intend:12-15",
+            "error:CommitUnknown",
+            "intend:15-15",
+            "done:15-15"
+          ],
+          "seconds_until_caught_up": 0.68,
+          "transaction_at_the_fault_committed": true
+        },
+        "md.execute": {
+          "check": {
+            "doubles": 0,
+            "n": 6,
+            "pos": 6,
+            "rows": 6,
+            "source": 6
+          },
+          "error_the_sut_got": [
+            "ConnectionLost"
+          ],
+          "events": [
+            "error:ConnectionLost",
+            "intend:3-6",
+            "done:3-6"
+          ],
+          "seconds_until_caught_up": 1.36,
+          "transaction_at_the_fault_committed": false
+        },
+        "md.fence": {
+          "check": {
+            "doubles": 0,
+            "n": 9,
+            "pos": 9,
+            "rows": 9,
+            "source": 9
+          },
+          "error_the_sut_got": [
+            "ConnectionLost"
+          ],
+          "events": [
+            "intend:6-9",
+            "error:ConnectionLost",
+            "intend:6-9",
+            "done:6-9"
+          ],
+          "seconds_until_caught_up": 1.6,
+          "transaction_at_the_fault_committed": false
+        }
+      }
+    }
+  },
+  "versions": {
+    "duckdb_client": "1.5.6",
+    "platform": "Darwin arm64",
+    "python": "3.13.1"
+  },
+  "what": "a lost connection in a SUT process. fault_sites_in_a_child: a fault site raises a connection error once. real_break: the client library of the child reaches MotherDuck through a local proxy chain (environment https_proxy and grpc_proxy of the child point to the harness NetProxy, which forwards to a small CONNECT relay in the test process); the test resets or black-holes the proxy"
+}

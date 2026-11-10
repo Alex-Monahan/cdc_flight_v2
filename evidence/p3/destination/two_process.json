@@ -1,0 +1,513 @@
+{
+  "command": "tools/with-env uv run -q pytest -q -m md tests/destination",
+  "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
+  "results": {
+    "different_epochs": {
+      "by_point": {
+        "stream.commit_sent": {
+          "check": {
+            "after_the_newcomer": {
+              "doubles": 0,
+              "n": 43,
+              "pos": 43,
+              "rows": 43,
+              "source": 43
+            },
+            "after_the_old_run_ended": {
+              "doubles": 0,
+              "n": 43,
+              "pos": 43,
+              "rows": 43,
+              "source": 45
+            }
+          },
+          "newcomer": {
+            "errors_before_its_first_commit": {},
+            "exit_code": 0,
+            "ms_first_commit_after_process_start": 4306,
+            "rows": 6,
+            "takeover": {
+              "attempts": 3,
+              "conflicts": 2,
+              "epoch": 11,
+              "interrupt_earlier_after_the_takeover": {
+                "interrupted": 0,
+                "listed": 2
+              },
+              "interrupted": 2,
+              "listed": 4,
+              "ms_after_process_start": 3451,
+              "seconds": 1.736,
+              "unknown": 0
+            }
+          },
+          "old_run_after_it_went_on": {
+            "events": [
+              "error:CommitUnknown",
+              "fence_lost",
+              "exit:3"
+            ],
+            "exit_code": 3,
+            "rows": 3,
+            "seconds_to_exit": 2.98
+          },
+          "old_run_frozen_for_s": 8.2
+        },
+        "stream.committed": {
+          "check": {
+            "after_the_newcomer": {
+              "doubles": 0,
+              "n": 52,
+              "pos": 52,
+              "rows": 52,
+              "source": 52
+            },
+            "after_the_old_run_ended": {
+              "doubles": 0,
+              "n": 52,
+              "pos": 52,
+              "rows": 52,
+              "source": 54
+            }
+          },
+          "newcomer": {
+            "errors_before_its_first_commit": {},
+            "exit_code": 0,
+            "ms_first_commit_after_process_start": 2980,
+            "rows": 3,
+            "takeover": {
+              "attempts": 1,
+              "conflicts": 0,
+              "epoch": 13,
+              "interrupt_earlier_after_the_takeover": {
+                "interrupted": 0,
+                "listed": 2
+              },
+              "interrupted": 0,
+              "listed": 0,
+              "ms_after_process_start": 2107,
+              "seconds": 0.385,
+              "unknown": 0
+            }
+          },
+          "old_run_after_it_went_on": {
+            "events": [
+              "done:46-49",
+              "intend:52-54",
+              "fence_lost",
+              "exit:3"
+            ],
+            "exit_code": 3,
+            "rows": 6,
+            "seconds_to_exit": 0.56
+          },
+          "old_run_frozen_for_s": 6.5
+        },
+        "stream.fenced": {
+          "check": {
+            "after_the_newcomer": {
+              "doubles": 0,
+              "n": 34,
+              "pos": 34,
+              "rows": 34,
+              "source": 34
+            },
+            "after_the_old_run_ended": {
+              "doubles": 0,
+              "n": 34,
+              "pos": 34,
+              "rows": 34,
+              "source": 36
+            }
+          },
+          "newcomer": {
+            "errors_before_its_first_commit": {},
+            "exit_code": 0,
+            "ms_first_commit_after_process_start": 4678,
+            "rows": 6,
+            "takeover": {
+              "attempts": 3,
+              "conflicts": 2,
+              "epoch": 9,
+              "interrupt_earlier_after_the_takeover": {
+                "interrupted": 0,
+                "listed": 2
+              },
+              "interrupted": 1,
+              "listed": 4,
+              "ms_after_process_start": 3700,
+              "seconds": 1.838,
+              "unknown": 0
+            }
+          },
+          "old_run_after_it_went_on": {
+            "events": [
+              "error:CommitUnknown",
+              "fence_lost",
+              "exit:3"
+            ],
+            "exit_code": 3,
+            "rows": 3,
+            "seconds_to_exit": 3.05
+          },
+          "old_run_frozen_for_s": 8.6
+        },
+        "sut.begun": {
+          "check": {
+            "after_the_newcomer": {
+              "doubles": 0,
+              "n": 7,
+              "pos": 7,
+              "rows": 7,
+              "source": 7
+            },
+            "after_the_old_run_ended": {
+              "doubles": 0,
+              "n": 7,
+              "pos": 7,
+              "rows": 7,
+              "source": 9
+            }
+          },
+          "newcomer": {
+            "errors_before_its_first_commit": {},
+            "exit_code": 0,
+            "ms_first_commit_after_process_start": 2977,
+            "rows": 4,
+            "takeover": {
+              "attempts": 1,
+              "conflicts": 0,
+              "epoch": 3,
+              "interrupt_earlier_after_the_takeover": {
+                "interrupted": 1,
+                "listed": 3
+              },
+              "interrupted": 0,
+              "listed": 0,
+              "ms_after_process_start": 2110,
+              "seconds": 0.409,
+              "unknown": 0
+            }
+          },
+          "old_run_after_it_went_on": {
+            "events": [
+              "error:ConnectionLost",
+              "fence_lost",
+              "exit:3"
+            ],
+            "exit_code": 3,
+            "rows": 3,
+            "seconds_to_exit": 0.66
+          },
+          "old_run_frozen_for_s": 6.9
+        },
+        "sut.moved": {
+          "check": {
+            "after_the_newcomer": {
+              "doubles": 0,
+              "n": 25,
+              "pos": 25,
+              "rows": 25,
+              "source": 25
+            },
+            "after_the_old_run_ended": {
+              "doubles": 0,
+              "n": 25,
+              "pos": 25,
+              "rows": 25,
+              "source": 27
+            }
+          },
+          "newcomer": {
+            "errors_before_its_first_commit": {
+              "Conflict": 1
+            },
+            "exit_code": 0,
+            "ms_first_commit_after_process_start": 3693,
+            "rows": 6,
+            "takeover": {
+              "attempts": 1,
+              "conflicts": 0,
+              "epoch": 7,
+              "interrupt_earlier_after_the_takeover": {
+                "interrupted": 1,
+                "listed": 2
+              },
+              "interrupted": 0,
+              "listed": 0,
+              "ms_after_process_start": 2157,
+              "seconds": 0.392,
+              "unknown": 0
+            }
+          },
+          "old_run_after_it_went_on": {
+            "events": [
+              "intend:19-22",
+              "error:ConnectionLost",
+              "fence_lost",
+              "exit:3"
+            ],
+            "exit_code": 3,
+            "rows": 3,
+            "seconds_to_exit": 2.29
+          },
+          "old_run_frozen_for_s": 7.6
+        },
+        "sut.written": {
+          "check": {
+            "after_the_newcomer": {
+              "doubles": 0,
+              "n": 16,
+              "pos": 16,
+              "rows": 16,
+              "source": 16
+            },
+            "after_the_old_run_ended": {
+              "doubles": 0,
+              "n": 16,
+              "pos": 16,
+              "rows": 16,
+              "source": 18
+            }
+          },
+          "newcomer": {
+            "errors_before_its_first_commit": {},
+            "exit_code": 0,
+            "ms_first_commit_after_process_start": 2951,
+            "rows": 6,
+            "takeover": {
+              "attempts": 1,
+              "conflicts": 0,
+              "epoch": 5,
+              "interrupt_earlier_after_the_takeover": {
+                "interrupted": 1,
+                "listed": 2
+              },
+              "interrupted": 0,
+              "listed": 0,
+              "ms_after_process_start": 2091,
+              "seconds": 0.392,
+              "unknown": 0
+            }
+          },
+          "old_run_after_it_went_on": {
+            "events": [
+              "error:ConnectionLost",
+              "fence_lost",
+              "exit:3"
+            ],
+            "exit_code": 3,
+            "rows": 3,
+            "seconds_to_exit": 0.71
+          },
+          "old_run_frozen_for_s": 6.9
+        }
+      },
+      "date_utc": "2026-11-10 08:58",
+      "exit_code_3_means": "FenceLost",
+      "points": [
+        "sut.begun",
+        "sut.written",
+        "sut.moved",
+        "stream.fenced",
+        "stream.commit_sent",
+        "stream.committed"
+      ]
+    },
+    "same_epoch": {
+      "both_free": {
+        "check": {
+          "doubles": 0,
+          "n": 33,
+          "pos": 33,
+          "rows": 33,
+          "source": 33
+        },
+        "events": 30,
+        "processes": {
+          "free-a": {
+            "data_transactions": 8,
+            "errors": {
+              "Conflict": 1
+            },
+            "rows": 24
+          },
+          "free-b": {
+            "data_transactions": 2,
+            "errors": {
+              "Conflict": 6
+            },
+            "rows": 6
+          }
+        }
+      },
+      "date_utc": "2026-11-10 09:06",
+      "epoch": 1,
+      "first_frozen_at_a_point_of_its_second_transaction": {
+        "stream.commit_sent": {
+          "check": {
+            "doubles": 0,
+            "n": 78,
+            "pos": 78,
+            "rows": 78,
+            "source": 78
+          },
+          "errors_of_the_second": {
+            "Conflict": 3
+          },
+          "first_after_it_went_on": [
+            "done:72-75",
+            "error:Conflict",
+            "intend:78-78",
+            "done:78-78",
+            "exit:0"
+          ],
+          "first_holds_the_position_row": true,
+          "rows": {
+            "first": 6,
+            "second": 3
+          },
+          "second_while_the_first_is_frozen": {
+            "data_transactions": 0,
+            "errors": {
+              "Conflict": 3
+            }
+          }
+        },
+        "stream.committed": {
+          "check": {
+            "doubles": 0,
+            "n": 87,
+            "pos": 87,
+            "rows": 87,
+            "source": 87
+          },
+          "errors_of_the_second": {},
+          "first_after_it_went_on": [
+            "done:81-84",
+            "intend:87-87",
+            "done:87-87",
+            "exit:0"
+          ],
+          "first_holds_the_position_row": false,
+          "rows": {
+            "first": 6,
+            "second": 3
+          },
+          "second_while_the_first_is_frozen": "applied everything and ended"
+        },
+        "stream.fenced": {
+          "check": {
+            "doubles": 0,
+            "n": 69,
+            "pos": 69,
+            "rows": 69,
+            "source": 69
+          },
+          "errors_of_the_second": {
+            "Conflict": 3
+          },
+          "first_after_it_went_on": [
+            "done:63-66",
+            "error:Conflict",
+            "intend:69-69",
+            "done:69-69",
+            "exit:0"
+          ],
+          "first_holds_the_position_row": true,
+          "rows": {
+            "first": 6,
+            "second": 3
+          },
+          "second_while_the_first_is_frozen": {
+            "data_transactions": 0,
+            "errors": {
+              "Conflict": 3
+            }
+          }
+        },
+        "sut.begun": {
+          "check": {
+            "doubles": 0,
+            "n": 42,
+            "pos": 42,
+            "rows": 42,
+            "source": 42
+          },
+          "errors_of_the_second": {},
+          "first_after_it_went_on": [
+            "error:Conflict",
+            "intend:42-42",
+            "done:42-42",
+            "exit:0"
+          ],
+          "first_holds_the_position_row": false,
+          "rows": {
+            "first": 3,
+            "second": 6
+          },
+          "second_while_the_first_is_frozen": "applied everything and ended"
+        },
+        "sut.moved": {
+          "check": {
+            "doubles": 0,
+            "n": 60,
+            "pos": 60,
+            "rows": 60,
+            "source": 60
+          },
+          "errors_of_the_second": {
+            "Conflict": 3
+          },
+          "first_after_it_went_on": [
+            "intend:54-57",
+            "done:54-57",
+            "error:Conflict",
+            "intend:60-60",
+            "done:60-60",
+            "exit:0"
+          ],
+          "first_holds_the_position_row": true,
+          "rows": {
+            "first": 6,
+            "second": 3
+          },
+          "second_while_the_first_is_frozen": {
+            "data_transactions": 0,
+            "errors": {
+              "Conflict": 3
+            }
+          }
+        },
+        "sut.written": {
+          "check": {
+            "doubles": 0,
+            "n": 51,
+            "pos": 51,
+            "rows": 51,
+            "source": 51
+          },
+          "errors_of_the_second": {},
+          "first_after_it_went_on": [
+            "error:Conflict",
+            "intend:51-51",
+            "done:51-51",
+            "exit:0"
+          ],
+          "first_holds_the_position_row": false,
+          "rows": {
+            "first": 3,
+            "second": 6
+          },
+          "second_while_the_first_is_frozen": "applied everything and ended"
+        }
+      }
+    }
+  },
+  "versions": {
+    "duckdb_client": "1.5.6",
+    "platform": "Darwin arm64",
+    "python": "3.13.1"
+  },
+  "what": "two SUT processes on one lane of one MotherDuck database. different_epochs: an old run is frozen at a point of its second data transaction, a newcomer takes over and applies what is pending, then the old run goes on. same_epoch: two processes work with one epoch (no take-over between them); the run-again rule alone keeps them apart. The check after every step: every event applied exactly once, the counter equals the position"
+}
