@@ -51,9 +51,10 @@ heartbeat. Contract: `docs/design/p3_plan.md` C0, C1, C7. Packages Y (transform)
   precision; show by test that the runtime role sees that row of `pg_stat_activity` for a walsender of the same
   role, on a primary and on a standby, without `pg_read_all_stats`.
 - **Heartbeat.** Debezium's own heartbeat records do not advance when the WAL holds only changes of tables
-  outside the publication (measured by package E). The source-side heartbeat must therefore be something that
-  the publication carries or that the engine turns into a frame with a position (the engine frames logical
-  messages as `MESSAGE`; inside a transaction they count in the END record's `event_count`). Decide with that.
+  outside the publication (measured by package E), and they are never acknowledged (plan C2: only an `END`
+  moves the applied position). The source-side heartbeat must therefore arrive as a transaction of its own,
+  `BEGIN` … `END`, that the publication carries: a row written to a published table of ours. A
+  non-transactional logical message does not do (it has no `END`).
   A black-holed replication connection is noticed neither by the engine nor by the driver; the pipeline will
   notice it because a heartbeat it wrote does not come back. So `heartbeat.beat` returns what the stream needs
   to recognise that write when it arrives (its position on the primary and a value unique to the write).
@@ -179,11 +180,15 @@ the transaction) must be caught.
 ### 5. Heartbeat
 
 `heartbeat.beat(primary, deadline)` — the source-side write of SPEC 4.4 that makes the stream move when the
-published tables are idle. Decide between a logical message (`pg_logical_emit_message`, transactional or not)
-and a row in a heartbeat table, by what the engine can turn into a position that may be acknowledged
-(`docs/research/debezium.md`; package E's `HEARTBEAT` frame) and by what a role without table privileges can
-do; write the decision down. The write is idempotent and harmless when two runs do it. Also provide the read
-that tells how far a standby is behind the primary in bytes and, where the server gives it, in time (H-044).
+published tables are idle. The write must reach the stream as a transaction of its own (`BEGIN` … `END`): a row
+in a published heartbeat table of ours (recommended: it always gives an `END` and carries the marker), or a
+transactional logical message whose prefix is in `message.prefix.include.list`; a non-transactional message does
+not do (it has no `END`). Write the decision down with what the runtime role may do. `beat` returns the position
+at or after which the write's commit lies, so that the stream can recognise the marker by position. Provide the
+check that the heartbeat table is in the publication (a part of `publication.*`), for the attach step: without
+it an idle source never moves and the marker never comes back. The write is idempotent and harmless when two
+runs do it. Also provide the read that tells how far a standby is behind the primary in bytes and, where the
+server gives it, in time (H-044).
 
 ## Tests
 

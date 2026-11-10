@@ -35,10 +35,12 @@ them are treated as a crash: correctness never depends on a shutdown handler hav
 ## 2. Position
 
 - The **applied position** is the commit end LSN (`lsn_commit` of the END record) of the last source transaction
-  whose effects are committed in MotherDuck. It is always a transaction boundary, with one exception: when the
-  tables are idle, a group may move it to the `ack_position` of a heartbeat record (plan C2) that arrived after
-  every transaction applied so far. Both kinds are positions that the source may be told are confirmed, and the
-  position only ever moves in a committed group that contains every transaction framed before it.
+  whose effects are committed in MotherDuck. It is always a transaction boundary, and it only ever moves in a
+  committed group that contains every transaction framed before it. A heartbeat record of Debezium never moves it:
+  Debezium dispatches a heartbeat that already carries a transaction's commit position before it creates that
+  transaction's END record, so such a position can be ahead of what has been delivered (second review of package E;
+  with heartbeat positions adopted, transactions were lost in a reproduction). On an idle source the position moves
+  with the transaction of the source-side heartbeat write (SPEC 4.6, package P), which the publication carries.
 - Debezium re-sends whole transactions in commit order after a restart. A transaction whose commit LSN is ≤ the
   applied position is discarded as a whole; one whose commit LSN is greater is applied as a whole. No row-level
   position is needed for the stream, and the 32-bit transaction id is never used as a key.
@@ -54,8 +56,8 @@ them are treated as a crash: correctness never depends on a shutdown handler hav
   after the configured number of restarts takes the skip-and-backfill path of SPEC 4.3; it never restarts for ever.
 - A change row that is stored (pending log, staging) is ordered by (commit position, `seq`). `seq` alone orders
   rows only inside one engine instance: it starts at 0 again with every engine start.
-- The applied position is stored in `_cdc.stream_state` (one row per slot) and is written in the same MotherDuck
-  transaction as the data it describes.
+- The applied position is stored in `_cdc.stream_state` (one row per slot; `applied_lsn UBIGINT`, plan C0) and is
+  written in the same MotherDuck transaction as the data it describes.
 - Invariant, checked by the oracle and at every slot acquisition: slot `confirmed_flush_lsn` ≤ applied position.
 
 ## 3. Commit and acknowledge
@@ -76,7 +78,7 @@ Steps, each with a named crash point (`crashpoints.py`):
 | 5 | Fence statement for lane `stream` (section 4.2); must change exactly one row | `stream.fenced` |
 | 6 | `COMMIT` | `stream.commit_sent`, `stream.committed` |
 | 7 | Tell the engine "durable up to `:group_end`" | `stream.ack_sent` |
-| 8 | Engine: `markProcessed(record)` for the newest END or heartbeat record whose `ack_position` ≤ `:group_end`, then `markBatchFinished()` | `engine.acked` |
+| 8 | Engine: `markProcessed(record)` for the newest END record whose `ack_position` ≤ `:group_end`, then `markBatchFinished()` | `engine.acked` |
 
 Rules:
 
@@ -92,12 +94,14 @@ Rules:
 - **Unknown commit outcome** (connection lost during `COMMIT`): the stream component reconnects, reads
   `applied_lsn` and the fence, and continues from what it finds. It never assumes either outcome.
 - The engine acknowledges nothing on its own: `offset.flush.interval.ms=0`, memory offset store, and the consumer
-  calls `markProcessed` only for END or heartbeat records at or below the durable position. The pipeline says
+  calls `markProcessed` only for END records at or below the durable position. The pipeline says
   "durable" only for a position whose commit it has seen return, or has read back as the stored applied position.
 - `offset.flush.interval.ms=0` together with `heartbeat.interval.ms` is **required**, not a tuning choice: with a
   flush interval and no heartbeat, Debezium never confirms the last transaction before an idle period or a stop,
   and every restart receives it again (`docs/spike/local_streaming.md` §6). Package E proves by test that the slot's
-  `confirmed_flush_lsn` reaches the last applied transaction within a bound while the source is idle.
+  `confirmed_flush_lsn` reaches the last applied transaction within a bound while the source is idle. Debezium's
+  heartbeat records serve this only by causing the engine's batch calls on an idle source, in which a `DURABLE`
+  takes effect and is flushed; they are never marked themselves (section 2).
 - Nothing inside a transaction can be confirmed. An engine start after a large transaction that is not yet
   confirmed makes the server decode and spill it again before it sends anything (10M rows: 36 s and 2.6 GB on the
   node that holds the slot, measured locally). This time is part of the recovery time of SPEC 5.2.
@@ -315,6 +319,14 @@ invariant violation in the stream (`ApplyInvariantError`: the destination has di
 read in catch-up (7.3). Applying a change set a second time gives the same table, except for keys reported as
 unresolved.
 
+DuckDB does not write an `UPDATE` whose new value compares equal to the stored one, and keeps the old
+representation: after `SET x = 0` a stored `-0` is still `-0`, and after `SET i = INTERVAL '30 days'` a stored `1
+mon` is still `1 mon`, also through `UPDATE … FROM`, locally and on MotherDuck (package O,
+`evidence/p3/oracle/duckdb_equal_update.json`). The source and the oracle tell these values apart. For columns whose
+types have such values (real, double precision, interval, and what package A's list adds), step 3 must therefore use
+a shape that always writes the changed column; the rule that an unchanged column is never written stays. Package A
+chooses the shape and proves it against the oracle.
+
 The number of statement shapes per table depends on the table's columns, not on the data (SPEC 2.6).
 
 ### 6.3 Tables without a key
@@ -329,8 +341,14 @@ the sum of +1 for every new image and −1 for every old image (`GROUP BY` all c
 A delete that finds fewer rows than it must remove is an invariant violation: the transaction is rolled back and
 the table goes to quarantine handling (SPEC 4.0); it is never ignored.
 
-Comparison uses a canonical form for types whose values do not compare equal to themselves in MotherDuck (UNION
-members, NaN): **[test]** decide the canonical form in P3 and use the same one in the oracle.
+The grouping key must keep apart every pair of values that the source tells apart. DuckDB's `GROUP BY`, `PARTITION
+BY`, `DISTINCT` and `=` do not: `-0` and `0` form one group, NaN and −NaN one, and `1 mon`, `30 days` and `720
+hours` one; UNION values of different members compare unequal although they can stand for the same source value
+(package O, `docs/oracle.md` 1.5). The delta and the choice of rows to delete therefore use an exact key for columns
+of such types — the canonical form the oracle compares by (`docs/oracle.md` 1.2: a UNION value by its member and
+that member's rule, NaN equal to NaN, `-0` different from `0`, an interval by its three fields) — and the value
+itself elsewhere. Package A writes down the full list of destination types that need it. A source NULL in a UNION
+column is written as a real NULL: a UNION whose member holds NULL is not NULL in DuckDB. This settles open point 3.
 
 The stream path and the backfill path must produce identical destination values for identical source values; the
 type fuzzer checks this for every type, because a keyless delete can only find a row that was written the same way.
@@ -581,7 +599,7 @@ src/cdc_v2/oracle/          source/destination comparison used by every test tie
 |---|---|---|
 | 1 | Cut on a standby (7.2) is exact as described | P3 stress test |
 | 2 | `rowid` is usable to delete exactly k identical rows (6.3) | P3 test on MotherDuck |
-| 3 | Canonical comparison form for UNION and NaN (6.3) | P3, with the oracle |
+| 3 | Canonical comparison form for UNION and NaN (6.3) | settled by the oracle (package O, `docs/oracle.md` 1.2); the keyless grouping key uses the same form (6.3) |
 | 4 | Staging tables versus direct apply (6.1) | decided by the Flight measurement in P2: direct for groups, staging tables only for 6.4 |
 | 5 | Appends by the stream lane and reads by the backfill lane on one pending log do not conflict (7.1) | P3 test on MotherDuck |
 | 6 | Identity of a recreated slot; reading the timeline history (8) | P3, stage 2 for PlanetScale |
@@ -592,7 +610,7 @@ src/cdc_v2/oracle/          source/destination comparison used by every test tie
 | 11 | A schema change of a table during its own backfill | P4 schema wave; first rule: the table's backfill starts again |
 | 12 | Cut on a primary: a transaction decoded before `P0` that a later snapshot does not see yet (7.2) | P3 cut stress test proposes and proves the rule |
 | 13 | Catch-up that never converges (changes with unchanged values arrive faster than repair reads resolve them) | P4: bound the rounds, alert; P6 fuzzers |
-| 14 | Can a status update with a lower flush position move `confirmed_flush_lsn` backwards (8)? | P3, packages E and V, Postgres 16–18 |
+| 14 | Can a status update with a lower flush position move `confirmed_flush_lsn` backwards (8)? | P3, packages E and V. Not on 18.6 (E's test, repeated by the second review). 16 is repeated once `tools/localpg` runs the 16 binaries; 17 where a 17 server is available |
 | 15 | SPEC 1.3 during a re-backfill: a table that streams stays in the guarantee (7.1, "without a gap"); after a gap each table swaps on its own (SPEC 3.6) and is outside the guarantee until then, like a first backfill | decided here; reported to the owner |
 | 16 | Leader tables created by several first runs at once end as one row set (4) | P3, package L, on MotherDuck |
 | 17 | SPEC 4.2 "a newcomer exits within 10 s": measured from the first line of `main.py`; the platform's own start time varies (p95 7 s, max 21 s in the spike) and is outside our control | reported to the owner |
