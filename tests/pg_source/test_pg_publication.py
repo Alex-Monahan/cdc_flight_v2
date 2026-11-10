@@ -11,7 +11,7 @@ from cdc_v2 import lsn as lsnmod
 from cdc_v2.deadline import Deadline
 from cdc_v2.pg import catalog, errors, heartbeat, publication, replica_identity, slot
 
-from conftest import pgoutput_changes, record, wait_for
+from .conftest import pgoutput_changes, record, wait_for
 
 pytestmark = [pytest.mark.localpg, pytest.mark.timeout(300)]
 

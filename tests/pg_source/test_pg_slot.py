@@ -16,7 +16,7 @@ from cdc_v2 import lsn as lsnmod
 from cdc_v2.deadline import Deadline, DeadlineExceeded
 from cdc_v2.pg import slot, timeline
 
-from conftest import MAJOR, ROOT, pgoutput_changes, record, wait_for
+from .conftest import MAJOR, ROOT, pgoutput_changes, record, wait_for
 
 pytestmark = [pytest.mark.localpg, pytest.mark.timeout(600)]
 

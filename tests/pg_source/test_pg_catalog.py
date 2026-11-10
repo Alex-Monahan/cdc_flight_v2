@@ -10,7 +10,7 @@ from cdc_v2 import lsn as lsnmod
 from cdc_v2.deadline import Deadline
 from cdc_v2.pg import catalog
 
-from conftest import MAJOR, record
+from .conftest import MAJOR, record
 
 pytestmark = [pytest.mark.localpg, pytest.mark.timeout(600)]
 

@@ -14,7 +14,7 @@ from cdc_v2.deadline import Deadline, DeadlineExceeded
 from cdc_v2.pg import errors
 from cdc_v2.testing import netproxy as npx
 
-from conftest import PROXY_PORTS, record, wait_for
+from .conftest import PROXY_PORTS, record, wait_for
 
 pytestmark = [pytest.mark.localpg, pytest.mark.timeout(300)]
 

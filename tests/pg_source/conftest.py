@@ -6,8 +6,8 @@ Clusters (docs/design/p3_plan.md section 4, package P):
   * breakable pair (promotion, settings changes): `pg-p2`, ports 55648-55655, same major version as the run.
 TCP fault proxies of these tests use the upper ports of the main range (55644-55647 or 55652-55655).
 
-    uv run pytest -m localpg tests/pg                          # Postgres 18
-    CDC_V2_P_PG_MAJOR=16 uv run pytest -m localpg tests/pg     # Postgres 16
+    uv run pytest -m localpg tests/pg_source                          # Postgres 18
+    CDC_V2_P_PG_MAJOR=16 uv run pytest -m localpg tests/pg_source     # Postgres 16
 
 Every cluster that the session started is stopped at the end of the session.
 """
@@ -191,7 +191,7 @@ def _stop_clusters_at_end():
         from cdc_v2.testing.harness_evidence import write_evidence
         write_evidence(os.path.join(EVIDENCE_DIR, "localpg_pg%d.json" % MAJOR), {
             "what": "package P (source) tests on a private tools/localpg pair; times in seconds",
-            "command": ("CDC_V2_P_EVIDENCE=1 CDC_V2_P_PG_MAJOR=%d uv run pytest -m localpg tests/pg" % MAJOR),
+            "command": ("CDC_V2_P_EVIDENCE=1 CDC_V2_P_PG_MAJOR=%d uv run pytest -m localpg tests/pg_source" % MAJOR),
             "major": MAJOR, "server_versions": versions, "psycopg": psycopg.__version__,
             "machine_note": "shared 10-core laptop, up to three other workers running; indications only",
             "results": EVIDENCE})
