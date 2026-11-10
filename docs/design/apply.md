@@ -97,7 +97,13 @@ rules (C3a rules 2 and 3) are:
    (the key is reused) a snapshot after that holds the new row, and nothing in the destination says which. With no
    `c` at X, every destination row at X is the start row or nothing. A chain `1→5→6` resolves by this rule; a swap
    through a free key does not (it creates rows at both roots), and named case
-   `catch_up_swap_through_a_free_key_after_the_swap` shows the wrong value the rule prevents;
+   `catch_up_swap_through_a_free_key_after_the_swap` shows the wrong value the rule prevents.
+   One exception (second fix round, item 5): the root X is the final key itself and the only `c` at X is the one
+   that creates the final row (`d(K) c(K, k=K)`, or `K → L → K`). A destination row at X is then the start row or
+   the final row (with u's applied that the change set holds), and the final row's unchanged column is, by the
+   link chain the plan followed, the start row's value, with no record in between carrying another: both hold
+   the same value of that column, so either may supply it. With two creates at X an arrival between could hold
+   another value, and the key stays unresolved (named cases `round2_catch_up_*`);
 2. else, if the final row's own `c` is the first record of its key in the change set, the destination row with the
    final key, if exactly one (C3a rule 3: the snapshot already saw the row under its new name). The first record
    being a `c` means the key was free at the start (`p = 0`), so a destination row there can only be this row's;
@@ -110,12 +116,21 @@ second review (rounds with repair reads, up to 6 snapshots, unchanged-value rate
 200 seeds for both codes) the share of log records that end as an unresolved key went from 13.9 % (the code before
 this round) to 3.2 %.
 
-Idempotence (C3a): applying the same change set twice gives the same table except for keys returned as unresolved
-by either call; the caller repairs the unresolved keys of every call, a repeated one included. (Example: after
-`d(2) d(1) c(2, k=1)` with an unchanged column, the first call resolves key 2 by rule 1; the second finds root 1
-gone and rule 2 does not apply, so it reports key 2 and deletes its correct row.) Tested: named cases
-(`catch_up_*`, `twice=True`), every catch-up property example, and `test_catch_up_rounds_with_repair_reads` with
-repeated calls whose keys are all repaired.
+Idempotence (C3a): **only the immediate repeat of a call is safe**: applying the same change set twice in a row
+gives the same table except for keys returned as unresolved by either call, and the caller repairs the unresolved
+keys of every call, a repeated one included. (Example: after `d(2) d(1) c(2, k=1)` with an unchanged column, the
+first call resolves key 2 by rule 1; the second finds root 1 gone and rule 2 does not apply, so it reports key 2
+and deletes its correct row.) A call repeated after a later call is wrong without a sign: start `(1, 'a', 'B1')`,
+CS1 `d(1) c(2, 'a', big unchanged, k=1)`, CS2 `c(1, 'new', 'Z')`; CS1, CS2, CS1 gives `(2, 'a', 'Z')` and
+reports no key (the repeat takes `big` from the row CS2 wrote at the reused key 1;
+`test_apply_limits.py::test_only_the_immediate_repeat_of_a_call_is_safe`). Tested: named cases (`catch_up_*`,
+`twice=True`), every catch-up property example, and `test_catch_up_rounds_with_repair_reads` with repeated calls
+whose keys are all repaired.
+
+A repair **replaces** the key's row: in the repair's own transaction, delete every destination row of the key,
+then insert the source's row (2.6). A plain INSERT duplicates the row when a later call has already resolved a key
+that an earlier call reported (`test_apply_limits.py::test_a_repair_replaces_the_row_of_its_key`; the rounds
+property loads its repair reads this way).
 
 The bound (asserted in every rounds example): a key is unresolved only if its row at the end of the call has a
 column whose value is in no record of the change set. A planner that reports everything unresolved fails it
@@ -125,30 +140,52 @@ column whose value is in no record of the change set. A planner that reports eve
 
 Not apply's to repair (C3a), but what happens:
 
-* the delete removes all of them (it joins by key); in stream mode its count then differs from the expected one
-  and the change set raises `ApplyInvariantError` (2.5);
-* the row mover (K3) moves all of them; its count then exceeds the expected count and stream mode raises
-  `ApplyInvariantError`; catch-up never uses a root with more than one row (2.3);
+* stream mode: K1, K3 and C0 count the rows per key inside the statement and act only where a key holds what the
+  source held; the change set raises `ApplyInvariantError` (2.5);
+* catch-up: K1 removes all of them (it joins by key); catch-up never uses a root with more than one row (2.3);
 * `reduce_duplicates(tx, target, change_set)` is offered to the backfill (design 7.3 step 1): for the keys of a
   change set it keeps one row per key (`DELETE ... WHERE rowid IN (... row_number() OVER (PARTITION BY key) > 1)`).
 
 ### 2.5 Stream mode checks the start state it relies on
 
 In stream mode the destination equals the source at the start of the change set (exactly-once by position, C4).
-So a key whose first record is `c` has no destination row, and a key whose first record is `u` or `d` has exactly
-one. Both are checked, and a difference raises `ApplyInvariantError`:
+So a key whose first record is `c` (`p = 0`) has no destination row, and a key whose first record is `u` or `d`
+(`p = 1`) has exactly one. Both are checked **per key, inside the statements that act on the keys** (no extra
+round trip), and a difference raises `ApplyInvariantError`:
 
-* K1 deletes the keys with `p = 1` (except roots, which K3 moves and counts) and must remove exactly one row per
-  key; the keys with `p = 0` are added to K1, where they must remove nothing. No extra statement;
-* when no K1 would run (an insert-only change set), `ApplySettings.check_new_keys` (default on) still runs K1 for
-  the new keys: one statement. Its cost, measured locally on a table of 10 M rows with change sets of 10,000
-  inserts (`evidence/p3/apply/check_new_keys_cost.json`, medians of 5): increasing BIGINT keys 30.7 ms without,
-  31.5 ms with the check; random UUID keys 32.4 ms without, 72.2 ms with (no range pruning for random keys). On
-  MotherDuck add one round trip.
+* K1 (keys with `p = 1` whose row goes, and keys with `p = 0` that the change set creates and removes again)
+  deletes only if every key of the statement holds `p` rows; otherwise it deletes nothing, or, when no key of the
+  statement has `p = 1`, every row it finds. Its count therefore equals the number of `p = 1` keys only if every
+  key is right, whatever the sums (checked per slice of `statement_rows`);
+* K3 moves a root only if it holds exactly one row; C0 (3.4) finds exactly one row per copy root. Their counts
+  must equal the plan's. (Before the second fix round these were sums: a destination holding key 1 twice and
+  lacking key 3 passed `d(1) c(11, k=1)`, `d(3) c(13, k=3)` and kept two rows at 11; named cases `round2_4b_*`.)
+* a key with `p = 0` that ends with a row must be free: K6 inserts only at free keys
+  (`... FROM ins n ANTI JOIN t ON key(t) = n.x`), K3 and K7 move or copy onto a target with `p = 0` only if it is
+  free; their counts must equal the plan's. This is `ApplySettings.check_new_keys` (default on). An insert-only
+  change set is one statement (K6); before this round the check was an extra K1. MotherDuck from this laptop,
+  1,000,000 rows, change sets of 10,000 records, medians of 5 (`evidence/p3/apply/check_new_keys_cost.json`):
+
+  | change set | before (68df804) | after |
+  |---|---|---|
+  | inserts, BIGINT keys, check off | 361 ms, 1 round trip | 368 ms, 1 |
+  | inserts, BIGINT keys, check on | 567 ms, 2 (K1, K6) | 359 ms, 1 (K6) |
+  | inserts, UUID keys, check on | 579 ms, 2 | 378 ms, 1 |
+  | updates with an unchanged column (K3; the per-key count) | 369 ms, 1 | 386 ms, 1 |
+
+  With the switch off, two things are unchecked: an insert at a key that holds a row, and a held key moved onto a
+  key that the source did not hold but the destination does (both silent then; named cases
+  `round2_*_unchecked_with_the_switch_off`). A key created and removed inside the change set is checked in K1
+  only with the switch on;
+* two keys that the change set ends with and that the source's equality merges (`-0` and `0`, `1 mon` and
+  `30 days`) are not a source history (H-015): `ApplyInvariantError` in both modes, from the plan
+  (`review_B_two_forms_of_one_key_held_at_once`).
 
 This makes a `c` at a key that a row held before the change set loud: the second review's A1, A4 and SEG, a table
 wrongly treated as keyed, and a delete or full update of a missing row (named cases `review_*`,
-`stream_*_raises`).
+`stream_*_raises`). Known limit: the checks compare exact keys, so a create at another form of a key that a row
+the change set does not touch holds (`c(-0)` while the destination holds `0`) is not seen; it is not a source
+history either.
 
 ### 2.6 Preconditions of catch_up (proposed for C3a)
 
@@ -157,10 +194,20 @@ wrongly treated as keyed, and a delete or full update of a missing row (named ca
    for the pending log to reach that point.** Otherwise the call can take an unchanged value from a destination
    row that a later transaction (outside the call) put under a reused key, and nothing in the call shows the
    reuse. `test_catch_up_split_before_the_newest_snapshot` (strict `xfail`) shows the wrong value when the rule is
-   broken.
+   broken. **A call is repeated only directly after itself**: once a later change set has been applied to the
+   table, an earlier one is never applied again (2.3; the repeat can take a value from a row the later call wrote,
+   without a sign).
 2. **The row of an unresolved key is deleted.** It is stale by definition, and a later call (the next round) would
    otherwise take values from it. The repair read loads it again; it must cover every reported key, including keys
-   the source no longer holds.
+   the source no longer holds. **A repair replaces the key's row**: in the repair's own transaction it deletes
+   every destination row of the key and then inserts the source's row (or nothing, if the source has none). A
+   plain INSERT duplicates the row when a later call resolved the key before the repair ran (2.3).
+
+Proposal, not built: apply could offer the repair statement, so that the backfill cannot get it wrong:
+`repair_keys(tx, target: Target, meta: TableMeta, rows: pa.Table, settings=None) -> ApplyCounts`, where `rows`
+holds the repair read (destination column names and types; the keys to clear are the keys of `rows` plus an
+optional `keys: pa.Table` of reported keys that the source no longer holds); it would send one DELETE by exact
+key and one INSERT, in the caller's transaction, and count both.
 
 ### 2.7 Other readings of C3a (contract notes)
 
@@ -222,35 +269,48 @@ each runs only when the plan says it has work.
 | Shape | Statement | Rows |
 |---|---|---|
 | lookup | `SELECT c.ci, count(t.k) FROM cand c LEFT JOIN t ON key GROUP BY ALL` | catch-up only: candidate roots |
-| K1 | `DELETE FROM t USING del n WHERE key(t) = n.x` | stream: keys with `p = 1`; catch-up: every key of the change set, but not a root that will be moved |
+| K1 | `DELETE FROM t USING del n WHERE key(t) = n.x` (stream: `AND (every key of del holds p rows OR no key of del has p = 1)`) | stream: keys with `p = 1`, and keys with `p = 0` that end without a row; catch-up: every key of the change set; never a root that will be moved or copied |
+| C0 | `SELECT n.ci, t.rowid FROM copy_roots n JOIN t ON key(t) = n.rx` | 3.4 only: the row id of each copy root |
 | K2 | `UPDATE t SET d = CASE WHEN need THEN sentinel ELSE t.d END, ... FROM upd n WHERE key(t) = n.rx AND (need ...)` | root rows whose always-present FLOAT/DOUBLE/INTERVAL/STRUCT column changes (5.2) |
-| K3 | `UPDATE t SET key = n.key, c = n.c ... FROM upd n WHERE key(t) = n.rx` — keys and always-present columns | every `upd` row; the count must equal the plan's |
-| K7, K8 | `INSERT INTO t SELECT n.key, CASE WHEN n.h THEN n.c ELSE t.c END ... FROM copy n JOIN t ON key(t) = n.rx`; `DELETE FROM t USING copy n WHERE key(t) = n.rx` | 3.4 only |
+| K3 | `UPDATE t SET key = n.key, c = n.c ... FROM upd n WHERE key(t) = n.rx` — keys and always-present columns (stream: `upd` joined to the count of rows per root, `= 1`, and to the targets with `p = 0` that are free) | every `upd` row; the count must equal the plan's |
+| K7, K8 | `INSERT INTO t SELECT n.key, CASE WHEN n.h THEN n.c ELSE t.c END ... FROM copy n JOIN t ON t.rowid = n.rid`; `DELETE FROM t WHERE rowid IN (SELECT rid FROM copy)` | 3.4 only |
 | K4.i | `UPDATE t SET c = sentinel(n.c) FROM upd n WHERE key(t) = n.x AND n.h AND need` | column i, if its type is affected (5.2) |
 | K5.i | `UPDATE t SET c = n.c FROM upd n WHERE key(t) = n.x AND n.h AND ex(t.c) IS DISTINCT FROM ex(n.c)` | one per unchanged-possible column that some `upd` row supplies, and per always-present LIST/MAP/UNION column |
-| K6 | `INSERT INTO t (cols) SELECT a<i> FROM ins` | complete final rows |
+| K6 | `INSERT INTO t (cols) SELECT n.a<i> FROM ins n` (stream with `check_new_keys`: `ANTI JOIN t ON key(t) = n.x`) | complete final rows |
 
 The full SQL of every shape for a sample table is in `evidence/p3/apply/shapes.json` (generated from 120 random
-change sets; one text per shape). The number of shapes is at most `6 + (unchanged-possible columns) + (LIST/MAP/
+change sets; one text per shape). The number of shapes is at most `7 + (unchanged-possible columns) + (LIST/MAP/
 UNION columns that cannot be unchanged) + (affected unchanged-possible columns)`: it depends on the columns only
 (`Shapes.shape_bound`, asserted by `test_statement_shapes_depend_on_columns_only`). DELETE and INSERT from local
 data run in slices of `ApplySettings.statement_rows` (default 1,000,000) rows: bounded hand-over (design 6.1);
 the statement count grows, the shapes do not.
 
-Why it is right, in order:
+Why it is right, in order (the order is K1, C0, K2, K3, K7, K8, K4/K5, K6):
 
-1. K1 removes every destination row whose key the change set touches, except roots of moved rows. After it, the
-   keys of the change set hold nothing but roots.
-2. K3 moves each root row to its final key and writes the key and every always-present column, in **one**
-   statement, so a permutation of keys (a swap or rotation through a free key, moves that land on keys other moves leave) is a parallel assignment: the join reads the
-   rows before any is changed. Nothing unchanged is written, nothing is read into the client.
-3. K5 writes, per column, the values the change set supplied, only for rows that carry one, and only where the
+1. K1 removes every destination row whose key the change set touches, except roots of moved or copied rows.
+   After it, the keys of the change set hold nothing but roots, each its own row.
+2. C0 reads the row id of every copy root (3.4) while no statement of the call has moved or inserted a row: each
+   root key holds exactly its own row (checked).
+3. K3 moves each root row to its final key and writes the key and every always-present column, in **one**
+   statement, so a permutation of keys (a swap or rotation through a free key, moves that land on keys other
+   moves leave) is a parallel assignment: the join reads the rows before any is changed. It joins on the roots of
+   `upd` only; those hold their own rows (step 1), and no copy has been inserted yet, so it never meets a copy.
+   Nothing unchanged is written, nothing is read into the client.
+4. K7 and K8 find each copy's old row by its row id (step 2), never by its key. A K3 move may have put another row
+   at the copy root's exact key (second fix round X1: `-0,1 → 0,2` copied while `5,5 → -0,1` moves), a copy may
+   land on the key that another copy leaves (`0,2 → -0,3`, then `-0,1 → 0,2`), or the keys may form a ring with a
+   move (`-0,1 → 0,2`, `0,2 → 5,5`, `5,5 → -0,1`): the row ids are the same rows in every case. Row ids are
+   stable in the transaction: K1 deletes other rows, K2/K3 update other rows in place (no LIST/MAP/UNION column,
+   5.4). A copy lands on its final key after every move, so no later statement joins on it but K4/K5/K6 at other
+   final keys. Every mixture of moves and form-only key changes therefore meets only the rows each step means
+   (named cases `round2_*`, the campaign's `keyed_form` kind).
+5. K5 writes, per column, the values the change set supplied, only for rows that carry one, and only where the
    value differs exactly. An unchanged value is never written (it is not in the SET list for that row) and never
    read into the client (SPEC 2.6).
-4. K6 inserts complete final rows; their keys are free after K1.
+6. K6 inserts complete final rows; their keys are free after K1, K3 and K8.
 
 Round trips (local form): a change set of complete images on a table with a key is K1 + K6 (insert-only: K6);
-on a table without a key L1 + L2; an insert-only change set is K1 (the check of 2.5) + K6; partial images add K3 and
+on a table without a key L1 + L2; an insert-only change set is K6 (the check of 2.5 is inside it); partial images add K3 and
 one K5 per supplied unchanged-possible column (the cost of "never written"; a single combined `SET c = CASE WHEN
 n.h THEN n.c ELSE t.c END` would be one statement but assigns unchanged columns their own value, see the report).
 The relation form adds the plan's tables (about 20 statements). Measured counts: `md_cases.json`,
@@ -276,7 +336,10 @@ change: Java compares the doubles by bits). Exact keys keep the two apart, so th
 finds rows by key). Such a row with values from its root is copied instead (K7: the root's unchanged values are
 copied on the server; K8 deletes the root). This is the only place where an unchanged value is rewritten, and only
 for this case. It also applies to a composite key when one DOUBLE or INTERVAL part changes only in form while
-another part changes (found by the review: K3 would set the other part and leave the stored `-0`).
+another part changes (found by the review: K3 would set the other part and leave the stored `-0`). The root is
+found by its row id (C0, read before any row moves), so that a move onto the root's old form in the same call
+does not make it two rows (second fix round, X1; order in 3.2). A table with a column named `rowid` has it renamed
+around the statements when the change set holds a copy (4.3).
 
 ## 4. Statements for a table without a key
 
@@ -302,7 +365,7 @@ net to nothing (named cases `keyless_*`).
 ### 4.3 A column named `rowid`
 
 A column named `rowid` (any case) hides DuckDB's row id. Apply renames it inside the caller's transaction
-(`ALTER TABLE ... RENAME COLUMN`, shapes R1 and R2), runs L1 or `reduce_duplicates` with the temporary name, and
+(`ALTER TABLE ... RENAME COLUMN`, shapes R1 and R2), runs L1, the copy of 3.4 or `reduce_duplicates` with the temporary name, and
 renames it back; a roll-back undoes the rename. Tested locally and on MotherDuck.
 
 ## 5. DuckDB and MotherDuck behaviours this package relies on or avoids
@@ -415,4 +478,21 @@ how many examples it took (`campaign_local.json`, `negative_controls_examples_to
   where the rows dominate; merging steps would lower it.
 * `join_wrap` covers DATE, TIMESTAMP and TIMESTAMP WITH TIME ZONE; the other timestamp precisions are not produced
   by C3 today.
-* DuckDB errors (a value that does not fit a column, a constraint) pass through unchanged and can name a value.
+* Towards package D's lane (D is reviewed, not merged; the stand-in `tests/apply/apply_standin.py` stays until
+  then, and replacing it by D's lane is a separate small step after D's merge):
+  * a statement that the destination refuses (a value that does not fit a column, a constraint) reaches the
+    caller as D's `md.StatementError`, with the class of the error and the kind of statement, never a value. Apply
+    catches nothing of D's: `DestinationError`, `DeadlineExceeded` and `LaneMisuse` pass through unchanged (with
+    the stand-in, DuckDB's own exception passes through, and its text can name a value);
+  * apply relies on the count of `execute` only for INSERT, UPDATE and DELETE without `RETURNING` (it sends no
+    `RETURNING`);
+  * the names apply passes to `tx.register` match `^[a-z_][a-z0-9_]{0,62}$` (`cdc_v2_apply_<relation>`; the
+    stand-in asserts it);
+  * a deadline is a `Deadline` object or None; apply passes none of its own;
+  * the cursors of the shared planning database set their options with `SET SESSION`, never a plain `SET`
+    (a plain `SET arrow_lossless_conversion` is global and would reach the other calls of the thread;
+    `test_planning_settings_stay_with_the_cursor`).
+* `reduce_duplicates` plans a local change set in the same planning database as `apply_group`, under the same
+  `ApplySettings` (spill directory required; `ApplySpillFull` beyond the limits).
+* Catch-up rule 1 with two creates at the root key (`d(K) c(K, k=K)` twice, each taking a value from the start
+  row) stays unresolved, although it could be resolved (2.3).

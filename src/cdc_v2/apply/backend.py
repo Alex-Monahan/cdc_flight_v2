@@ -275,7 +275,7 @@ class RemoteBackend:
             return data
         L = duckdb.connect(":memory:")                       # a few keys: no spill
         try:
-            L.execute("SET arrow_lossless_conversion = true")
+            L.execute("SET SESSION arrow_lossless_conversion = true")
             L.register("fetched", data)
             return L.execute("SELECT %s FROM fetched" % ", ".join("CAST(%s AS %s) AS %s" % (c.a, c.dtype.sql(), c.a)
                                                                  for c in keys)).to_arrow_table()
