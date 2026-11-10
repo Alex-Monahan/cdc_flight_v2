@@ -353,7 +353,10 @@ class Engine:
         with os.fdopen(fd, "w") as f:
             for k, v in p.items():
                 f.write("%s=%s\n" % (k, v.replace("\\", "\\\\")))
-        cmd = [STATE["java"], "-Xmx" + heap, "-XX:ActiveProcessorCount=2", *jvm_opts,
+        # JVM unified logging writes warnings to stdout by default (and JFR prints "Started recording" there):
+        # stdout carries our binary frames, so every JVM message is sent to stderr.
+        cmd = [STATE["java"], "-Xmx" + heap, "-XX:ActiveProcessorCount=2", "-Xlog:disable",
+               "-Xlog:all=warning:stderr", *jvm_opts,
                "-cp", CLASSES + os.pathsep + STATE["cp"], "cdc_v2.engine.EngineMain", props_path]
         ccmd = [sys.executable, os.path.join(HERE, "consumer.py"), "--stats", self.stats_path,
                 "--jvm-log", self.log_path, "--decode", decode]
@@ -597,6 +600,8 @@ def tx_test(name, n_rows, props=None, heap="1g", jvm_opts=(), timeout=600, jfr=F
            "settings": {k: v for k, v in (props or {}).items()}, "started": ok}
     if not ok:
         rec["warnings"] = eng.interesting_log()
+        rec["jvm_log_tail"] = [ln[:300] for ln in eng.log_lines()[-30:] if "password" not in ln.lower()]
+        rec["consumer_rc"] = eng.consumer.poll()
         eng.stop(signal.SIGKILL)
         result("tx_test", **rec)
         return rec
@@ -630,7 +635,8 @@ def tx_test(name, n_rows, props=None, heap="1g", jvm_opts=(), timeout=600, jfr=F
     if not done and eng.jvm_pid and alive(eng.jvm_pid):
         rc, dump, _ = sh([STATE["home"] + "/bin/jcmd", str(eng.jvm_pid), "Thread.print"], timeout=60)
         blocks = [b for b in dump.split("\n\n") if ("debezium" in b or "cdc_v2" in b or "pool-" in b)]
-        rec["stall_thread_dump"] = [b[:1500] for b in blocks[:8]]
+        rec["stall_thread_dump"] = [b[:6000] if "change-event-source" in b else b[:1200] for b in blocks[:10]]
+        rec["stall_jvm_stat"] = [ln for ln in eng.log_lines() if ln.startswith("CDCV2 STAT")][-1:]
         rec["stall_stats"] = eng.stats()
         rec["stall_slot"] = pgf.slot_state()
     all_cpu = cw_all.stop()
