@@ -327,7 +327,12 @@ Finished and merged:
   in a UNION column must be written as a real NULL; DuckDB reads a Postgres BC date text as an AD date and float
   texts differ between the two servers (both go to the transform package). After the merge the harness test of
   the TCP proxy against Postgres was changed to take its cluster from the same fixture. The default test run now
-  takes about 50 s (to be cut).
+  takes about 50 s (to be cut). The coordinator checked the four must-fixes again on `main`: all closed; one hole
+  found and closed (a named home that was not built yet, given without a port base, would have been built on the
+  default home's ports — the fixtures now refuse it). The same re-check found the rule "only `END` records are
+  acknowledged" sound; the sentences that still relied on a heartbeat position are corrected (plan 6.2, tasks of E,
+  P, S), and C2, C8 and C10 gained one rule each (an `END` without `lsn_commit` is `FATAL`; the table list and
+  standby reads of a gate comparison; every reposition is followed by a new engine).
 - 2026-11-10 — Local streaming rate of stock Debezium on the replica's slot (§2 A 5, part 2):
   `spikes/local_throughput/stream_*.py`, `spikes/local_throughput/java/FactsMain.java`,
   `docs/spike/local_streaming.md`, `evidence/p2/local_streaming/`. **Indications only, laptop numbers.** One
