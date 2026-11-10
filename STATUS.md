@@ -78,6 +78,7 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
 | 1.7 crash points at every step of a schema change | P4, schema and types |
 | 1.9 schema change applied in place (P3 has the life of a catalog finding, which ends in a drop or a backfill); the full quarantine machine (P3 has the exit to `quarantined` and the operator's re-backfill) | P4 |
 | 1.7 soak of at least 1 h with at least 200 faults | a short soak at the P3 gate; the full one in the P6 campaign |
+| 1.1/1.2 for a table the stream cannot carry: an `interval` key, or a table without a key that has a scalar `interval` column, on a source of Postgres 17 or later. P3 skips it with one alert per table; the mode `full_refresh` of SPEC 3.5 carries it | P4, CDC features |
 | 1.1/1.2 for one value: `interval 'infinity'` / `'-infinity'` in a scalar `interval` column of a source on Postgres 17 or later reaches the stream as a zero interval (the Postgres driver, before any code of ours). P3 marks and counts such rows and alerts; the repair read that makes the value exact is built on the stream's group loop (plan C3, "Ambiguous zero interval"). No P3 gate workload holds an interval column | P4, schema and types |
 
 ## Decisions
@@ -318,11 +319,11 @@ Each in its own worktree and branch; the orchestrator merges. The P3 packages ar
 | Package F, fuzzers (Opus, high): **fix round running** on branch `p3-f-fuzzers` (15 items: ledger rules, suite 1.7 again, reductions, two table shapes, the shared-memory repair of `tools/localpg`, the frame reader's allocation). Homes `pg-f<n>`, ports 55700 + 8·n; localpg self-test ports | P3 | 2026-11-10 | the four fuzzers with seeds and replay, the consumer loop of SPEC 1.3 and 3.2, their self-tests with planted defects. Owed: the fix round below |
 | Package X, fix round (Fable; the worker that built the cut). Home `pg-cut`, ports 55600–55607. No MotherDuck | P3 | 2026-11-10 | the items listed below; then the coordinator checks it again and it is merged |
 
-**Package A, apply — delivered 2026-11-10; two reviews; fix round delivered, under its last checks.** The coordinator's verdict was
-"merge after a short fix round". The second reviewer (Fable) then tested the model the package is built on —
-"a key is a queue of row versions, because a deferred unique constraint lets a transaction hold two rows of one
-key" — and found sequences for which it gives a wrong table, silently, in both modes. That question was settled
-by measurement before anything was fixed:
+**Package A, apply — delivered 2026-11-10; two reviews; fix round delivered, under its last checks.** The
+coordinator's verdict was "merge after a short fix round". The second reviewer (Fable) then tested the model the
+package is built on — "a key is a queue of row versions, because a deferred unique constraint lets a transaction hold
+two rows of one key" — and found sequences for which it gives a wrong table, silently, in both modes. That question
+was settled by measurement before anything was fixed:
 
 - **Measured** (`tests/pg_source/test_pg_keys.py`, Postgres 16.6 and 18.6, evidence
   `evidence/p3/source/replica_identity_keys_pg*.json`, hazard H-015): a deferrable unique index cannot be a
