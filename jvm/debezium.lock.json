@@ -1,0 +1,593 @@
+{
+ "format": "cdc_v2.artifact-lock/1",
+ "description": "Runtime jars of the stock Debezium embedded engine and PostgreSQL connector, resolved by jvm/make_lock.py from jvm/pom.xml. Fetched from Maven Central by cdc_v2.artifacts.",
+ "debezium_version": "3.7.1.Final",
+ "java_release": 21,
+ "total_size": 40204549,
+ "artifacts": [
+  {
+   "name": "activation-1.1.1.jar",
+   "coords": "javax.activation:activation:1.1.1",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/javax/activation/activation/1.1.1/activation-1.1.1.jar",
+   "size": 69409,
+   "sha256": "ae475120e9fcd99b4b00b38329bd61cdc5eb754eee03fe66c01f50e137724f99"
+  },
+  {
+   "name": "aopalliance-repackaged-3.0.6.jar",
+   "coords": "org.glassfish.hk2.external:aopalliance-repackaged:3.0.6",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/glassfish/hk2/external/aopalliance-repackaged/3.0.6/aopalliance-repackaged-3.0.6.jar",
+   "size": 27419,
+   "sha256": "a82b6d1a348324ef88dc807c7cd7aaf633985cbff7b30036fb61a1b86981d840"
+  },
+  {
+   "name": "checker-qual-3.55.1.jar",
+   "coords": "org.checkerframework:checker-qual:3.55.1",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/checkerframework/checker-qual/3.55.1/checker-qual-3.55.1.jar",
+   "size": 241885,
+   "sha256": "857658c8bdcbff794949a8d9922f88d63ee3751c203c7cd7d21ea97f9e745288"
+  },
+  {
+   "name": "classgraph-4.8.179.jar",
+   "coords": "io.github.classgraph:classgraph:4.8.179",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/io/github/classgraph/classgraph/4.8.179/classgraph-4.8.179.jar",
+   "size": 576120,
+   "sha256": "16558357f234052370109127a45d69a9bd6d8646925594792634486dc48b159d"
+  },
+  {
+   "name": "connect-api-4.3.1.jar",
+   "coords": "org.apache.kafka:connect-api:4.3.1",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/org/apache/kafka/connect-api/4.3.1/connect-api-4.3.1.jar",
+   "size": 113910,
+   "sha256": "5ce6158d453d2d84ab3509260fff872c67fb532a51519da6acafc6835bc48cfe"
+  },
+  {
+   "name": "connect-file-4.3.1.jar",
+   "coords": "org.apache.kafka:connect-file:4.3.1",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/org/apache/kafka/connect-file/4.3.1/connect-file-4.3.1.jar",
+   "size": 18408,
+   "sha256": "e330c491309d8f839f2abd7260c72a3687d6d82ecf2ba0f7699a46d41a46dcac"
+  },
+  {
+   "name": "connect-json-4.3.1.jar",
+   "coords": "org.apache.kafka:connect-json:4.3.1",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/org/apache/kafka/connect-json/4.3.1/connect-json-4.3.1.jar",
+   "size": 36059,
+   "sha256": "ebd6d4900eb6835f30c6ce74b5f6d4a4fdc19e0a4a1de8da2f4463ea3ef20e41"
+  },
+  {
+   "name": "connect-runtime-4.3.1.jar",
+   "coords": "org.apache.kafka:connect-runtime:4.3.1",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/org/apache/kafka/connect-runtime/4.3.1/connect-runtime-4.3.1.jar",
+   "size": 836401,
+   "sha256": "9df3d2f78f8a1740af358dd78ccdf1396559223e0cfbf1a697ab9363dead6175"
+  },
+  {
+   "name": "connect-transforms-4.3.1.jar",
+   "coords": "org.apache.kafka:connect-transforms:4.3.1",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/org/apache/kafka/connect-transforms/4.3.1/connect-transforms-4.3.1.jar",
+   "size": 121083,
+   "sha256": "060bb300977304b53f9aebe79a3298c06a3d4240cb58b01e06eaa75abf4168eb"
+  },
+  {
+   "name": "debezium-api-3.7.1.Final.jar",
+   "coords": "io.debezium:debezium-api:3.7.1.Final",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/io/debezium/debezium-api/3.7.1.Final/debezium-api-3.7.1.Final.jar",
+   "size": 32781,
+   "sha256": "a634063e48dd377c7d99551214507886ce0cdfe20f0e509462079b2dbeb01cfe"
+  },
+  {
+   "name": "debezium-config-3.7.1.Final.jar",
+   "coords": "io.debezium:debezium-config:3.7.1.Final",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/io/debezium/debezium-config/3.7.1.Final/debezium-config-3.7.1.Final.jar",
+   "size": 81206,
+   "sha256": "4c9489d34461d8ebe01ad94ef32371bbc17131be80c4d04426e0fc392d9a59e0"
+  },
+  {
+   "name": "debezium-connect-plugins-3.7.1.Final.jar",
+   "coords": "io.debezium:debezium-connect-plugins:3.7.1.Final",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/io/debezium/debezium-connect-plugins/3.7.1.Final/debezium-connect-plugins-3.7.1.Final.jar",
+   "size": 241898,
+   "sha256": "9123f855a92ecbea8770c7bcca5cef76fa175b2bbe0d53dcd505e15592ed0826"
+  },
+  {
+   "name": "debezium-connector-common-3.7.1.Final.jar",
+   "coords": "io.debezium:debezium-connector-common:3.7.1.Final",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/io/debezium/debezium-connector-common/3.7.1.Final/debezium-connector-common-3.7.1.Final.jar",
+   "size": 1103476,
+   "sha256": "93e0545524e53d8e84f10b53817d1b0c2102177be6762b3d1519acf4fe26928e"
+  },
+  {
+   "name": "debezium-connector-postgres-3.7.1.Final.jar",
+   "coords": "io.debezium:debezium-connector-postgres:3.7.1.Final",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/io/debezium/debezium-connector-postgres/3.7.1.Final/debezium-connector-postgres-3.7.1.Final.jar",
+   "size": 437420,
+   "sha256": "f556c54932f32b56db6c3314ff8049f7cd181a3b19ad581fc07deec2be391071"
+  },
+  {
+   "name": "debezium-embedded-3.7.1.Final.jar",
+   "coords": "io.debezium:debezium-embedded:3.7.1.Final",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/io/debezium/debezium-embedded/3.7.1.Final/debezium-embedded-3.7.1.Final.jar",
+   "size": 109680,
+   "sha256": "75cc0b116e4d76f9235a0599af1792842839b891e58423acaa6872c887a49781"
+  },
+  {
+   "name": "debezium-kafka-adapters-3.7.1.Final.jar",
+   "coords": "io.debezium:debezium-kafka-adapters:3.7.1.Final",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/io/debezium/debezium-kafka-adapters/3.7.1.Final/debezium-kafka-adapters-3.7.1.Final.jar",
+   "size": 20491,
+   "sha256": "10ea896b9c6779bb78095715ee06a484ad07ba474165d39cba5b28cb40bf56f9"
+  },
+  {
+   "name": "debezium-openlineage-api-3.7.1.Final.jar",
+   "coords": "io.debezium:debezium-openlineage-api:3.7.1.Final",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/io/debezium/debezium-openlineage-api/3.7.1.Final/debezium-openlineage-api-3.7.1.Final.jar",
+   "size": 17139,
+   "sha256": "08bcf7641e8d3433b2c27f2ca56272c33395246bd58ab83648420668fc4a808f"
+  },
+  {
+   "name": "debezium-storage-api-3.7.1.Final.jar",
+   "coords": "io.debezium:debezium-storage-api:3.7.1.Final",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/io/debezium/debezium-storage-api/3.7.1.Final/debezium-storage-api-3.7.1.Final.jar",
+   "size": 5361,
+   "sha256": "13a9c900ad2d008403e9490b347699d6bc8c378acf0891b41daa0fbb86e3ffd5"
+  },
+  {
+   "name": "debezium-storage-kafka-3.7.1.Final.jar",
+   "coords": "io.debezium:debezium-storage-kafka:3.7.1.Final",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/io/debezium/debezium-storage-kafka/3.7.1.Final/debezium-storage-kafka-3.7.1.Final.jar",
+   "size": 25003,
+   "sha256": "e2694bd8d8c3da8b1f2e2fee0ad3b6c2e3d664d81726decfb92e18f882f411da"
+  },
+  {
+   "name": "debezium-util-3.7.1.Final.jar",
+   "coords": "io.debezium:debezium-util:3.7.1.Final",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/io/debezium/debezium-util/3.7.1.Final/debezium-util-3.7.1.Final.jar",
+   "size": 191471,
+   "sha256": "54277b7eca8f25960aa3bf04c604d722784c1eb40db55adb2ab902a75028f75d"
+  },
+  {
+   "name": "hk2-api-3.0.6.jar",
+   "coords": "org.glassfish.hk2:hk2-api:3.0.6",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/glassfish/hk2/hk2-api/3.0.6/hk2-api-3.0.6.jar",
+   "size": 207576,
+   "sha256": "c049a21a9fd9316c7e291a2bc28835f70d25affb623dc1599a83b6b84ec83a4f"
+  },
+  {
+   "name": "hk2-locator-3.0.6.jar",
+   "coords": "org.glassfish.hk2:hk2-locator:3.0.6",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/glassfish/hk2/hk2-locator/3.0.6/hk2-locator-3.0.6.jar",
+   "size": 205288,
+   "sha256": "e2664d21b017c3aa1518b913264602bea604edc54d356103c10afba99abd04fc"
+  },
+  {
+   "name": "hk2-utils-3.0.6.jar",
+   "coords": "org.glassfish.hk2:hk2-utils:3.0.6",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/glassfish/hk2/hk2-utils/3.0.6/hk2-utils-3.0.6.jar",
+   "size": 132025,
+   "sha256": "fc84d85a0744b576d9ec7db5845eeb998ed532a9450dd19c8c922c3ee6926206"
+  },
+  {
+   "name": "jackson-annotations-2.21.jar",
+   "coords": "com.fasterxml.jackson.core:jackson-annotations:2.21",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.21/jackson-annotations-2.21.jar",
+   "size": 82104,
+   "sha256": "53ca085f4a150f703f49e1aabd935bd03b43e1ea3d55d135438292af22cef56b"
+  },
+  {
+   "name": "jackson-core-2.21.2.jar",
+   "coords": "com.fasterxml.jackson.core:jackson-core:2.21.2",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-core/2.21.2/jackson-core-2.21.2.jar",
+   "size": 595531,
+   "sha256": "12e8655b100267b44d0f14d01b1f5082a5105e616174dc4307be1a761e92407b"
+  },
+  {
+   "name": "jackson-databind-2.21.2.jar",
+   "coords": "com.fasterxml.jackson.core:jackson-databind:2.21.2",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.21.2/jackson-databind-2.21.2.jar",
+   "size": 1701926,
+   "sha256": "8c982f01f148d805f0aaac2339011244757e0df7c6ff8951f2fa3f433b8ed849"
+  },
+  {
+   "name": "jackson-datatype-jdk8-2.21.2.jar",
+   "coords": "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.21.2",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/com/fasterxml/jackson/datatype/jackson-datatype-jdk8/2.21.2/jackson-datatype-jdk8-2.21.2.jar",
+   "size": 36037,
+   "sha256": "e581bbf3fc5622d16b57366dd41e10fc56921fb202879de2ef487f87dd9b30e7"
+  },
+  {
+   "name": "jackson-datatype-jsr310-2.21.2.jar",
+   "coords": "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.21.2",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/com/fasterxml/jackson/datatype/jackson-datatype-jsr310/2.21.2/jackson-datatype-jsr310-2.21.2.jar",
+   "size": 136578,
+   "sha256": "a083d57cd1c4a28fefcc6bd071740779eb7fc1c22a3c1b40451b5477c443f02f"
+  },
+  {
+   "name": "jackson-jakarta-rs-base-2.21.2.jar",
+   "coords": "com.fasterxml.jackson.jakarta.rs:jackson-jakarta-rs-base:2.21.2",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/com/fasterxml/jackson/jakarta/rs/jackson-jakarta-rs-base/2.21.2/jackson-jakarta-rs-base-2.21.2.jar",
+   "size": 32888,
+   "sha256": "40f4c57a2e6f34505338da188724e7ace7b343dde3964b76a12c993cdedad1af"
+  },
+  {
+   "name": "jackson-jakarta-rs-json-provider-2.21.2.jar",
+   "coords": "com.fasterxml.jackson.jakarta.rs:jackson-jakarta-rs-json-provider:2.21.2",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/com/fasterxml/jackson/jakarta/rs/jackson-jakarta-rs-json-provider/2.21.2/jackson-jakarta-rs-json-provider-2.21.2.jar",
+   "size": 17289,
+   "sha256": "ca969ea798efedc4b56589505fab51eb69c11a361b2e7583855593fc8690a666"
+  },
+  {
+   "name": "jackson-module-blackbird-2.21.2.jar",
+   "coords": "com.fasterxml.jackson.module:jackson-module-blackbird:2.21.2",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/com/fasterxml/jackson/module/jackson-module-blackbird/2.21.2/jackson-module-blackbird-2.21.2.jar",
+   "size": 64417,
+   "sha256": "5ed62cdcd357a24b73de9280e167aa014d7b4c17d04823844d482274cf07097e"
+  },
+  {
+   "name": "jackson-module-jakarta-xmlbind-annotations-2.21.2.jar",
+   "coords": "com.fasterxml.jackson.module:jackson-module-jakarta-xmlbind-annotations:2.21.2",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/com/fasterxml/jackson/module/jackson-module-jakarta-xmlbind-annotations/2.21.2/jackson-module-jakarta-xmlbind-annotations-2.21.2.jar",
+   "size": 32333,
+   "sha256": "f507551c823b137c8487275fc171652a78a4f083732e349e1d3cb42e568dd7e4"
+  },
+  {
+   "name": "jakarta.activation-2.0.1.jar",
+   "coords": "com.sun.activation:jakarta.activation:2.0.1",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/com/sun/activation/jakarta.activation/2.0.1/jakarta.activation-2.0.1.jar",
+   "size": 62154,
+   "sha256": "b9e24b7dd6e07495562ea96531be3130c96dba4d78e1dfd88adbbdebf4332871"
+  },
+  {
+   "name": "jakarta.activation-api-2.1.0.jar",
+   "coords": "jakarta.activation:jakarta.activation-api:2.1.0",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/jakarta/activation/jakarta.activation-api/2.1.0/jakarta.activation-api-2.1.0.jar",
+   "size": 63473,
+   "sha256": "56e8d994095fe49c28138c60291482f66f18d12ac2b720e938697dce6a3135c7"
+  },
+  {
+   "name": "jakarta.annotation-api-2.1.1.jar",
+   "coords": "jakarta.annotation:jakarta.annotation-api:2.1.1",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/jakarta/annotation/jakarta.annotation-api/2.1.1/jakarta.annotation-api-2.1.1.jar",
+   "size": 26141,
+   "sha256": "5f65fdaf424eee2b55e1d882ba9bb376be93fb09b37b808be6e22e8851c909fe"
+  },
+  {
+   "name": "jakarta.inject-api-2.0.1.jar",
+   "coords": "jakarta.inject:jakarta.inject-api:2.0.1",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/jakarta/inject/jakarta.inject-api/2.0.1/jakarta.inject-api-2.0.1.jar",
+   "size": 10681,
+   "sha256": "f7dc98062fccf14126abb751b64fab12c312566e8cbdc8483598bffcea93af7c"
+  },
+  {
+   "name": "jakarta.servlet-api-6.0.0.jar",
+   "coords": "jakarta.servlet:jakarta.servlet-api:6.0.0",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/jakarta/servlet/jakarta.servlet-api/6.0.0/jakarta.servlet-api-6.0.0.jar",
+   "size": 347613,
+   "sha256": "c034eb1afb158987dbb53a5fea0cadf611c8dae8daadd59c44d9d5ab70129cef"
+  },
+  {
+   "name": "jakarta.validation-api-3.0.2.jar",
+   "coords": "jakarta.validation:jakarta.validation-api:3.0.2",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/jakarta/validation/jakarta.validation-api/3.0.2/jakarta.validation-api-3.0.2.jar",
+   "size": 93298,
+   "sha256": "291c25e6910cc6a7ebd96d4c6baebf6d7c37676c5482c2d96146e901b62c1fc9"
+  },
+  {
+   "name": "jakarta.ws.rs-api-3.1.0.jar",
+   "coords": "jakarta.ws.rs:jakarta.ws.rs-api:3.1.0",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/jakarta/ws/rs/jakarta.ws.rs-api/3.1.0/jakarta.ws.rs-api-3.1.0.jar",
+   "size": 154815,
+   "sha256": "6b3b3628b8b4aedda0d24c3354335e985497d8ef3c510b8f3028e920d5b8663d"
+  },
+  {
+   "name": "jakarta.xml.bind-api-3.0.1.jar",
+   "coords": "jakarta.xml.bind:jakarta.xml.bind-api:3.0.1",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/jakarta/xml/bind/jakarta.xml.bind-api/3.0.1/jakarta.xml.bind-api-3.0.1.jar",
+   "size": 128941,
+   "sha256": "b8fb4bee3ff5b5c1ef77144d8411316018d7bbd41fcf1ede0646f7978546b867"
+  },
+  {
+   "name": "javassist-3.30.2-GA.jar",
+   "coords": "org.javassist:javassist:3.30.2-GA",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/javassist/javassist/3.30.2-GA/javassist-3.30.2-GA.jar",
+   "size": 794714,
+   "sha256": "eba37290994b5e4868f3af98ff113f6244a6b099385d9ad46881307d3cb01aaf"
+  },
+  {
+   "name": "javax.activation-api-1.2.0.jar",
+   "coords": "javax.activation:javax.activation-api:1.2.0",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/javax/activation/javax.activation-api/1.2.0/javax.activation-api-1.2.0.jar",
+   "size": 56674,
+   "sha256": "43fdef0b5b6ceb31b0424b208b930c74ab58fac2ceeb7b3f6fd3aeb8b5ca4393"
+  },
+  {
+   "name": "jaxb-api-2.3.1.jar",
+   "coords": "javax.xml.bind:jaxb-api:2.3.1",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/javax/xml/bind/jaxb-api/2.3.1/jaxb-api-2.3.1.jar",
+   "size": 128076,
+   "sha256": "88b955a0df57880a26a74708bc34f74dcaf8ebf4e78843a28b50eae945732b06"
+  },
+  {
+   "name": "jersey-client-3.1.10.jar",
+   "coords": "org.glassfish.jersey.core:jersey-client:3.1.10",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/glassfish/jersey/core/jersey-client/3.1.10/jersey-client-3.1.10.jar",
+   "size": 306530,
+   "sha256": "96cf86c23b515da20a30a39633a920f12a420d1e5f02c55ef5577ca2694d11c6"
+  },
+  {
+   "name": "jersey-common-3.1.10.jar",
+   "coords": "org.glassfish.jersey.core:jersey-common:3.1.10",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/glassfish/jersey/core/jersey-common/3.1.10/jersey-common-3.1.10.jar",
+   "size": 1247201,
+   "sha256": "b8df5de87d48d6abf555f340755a056c8cb29a660af958e959db8a4cb3552b54"
+  },
+  {
+   "name": "jersey-container-servlet-3.1.10.jar",
+   "coords": "org.glassfish.jersey.containers:jersey-container-servlet:3.1.10",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/glassfish/jersey/containers/jersey-container-servlet/3.1.10/jersey-container-servlet-3.1.10.jar",
+   "size": 31995,
+   "sha256": "4aadc66d2d36afb273b3898581d6aa51e0f992308d56fd51b8e3201efa461f67"
+  },
+  {
+   "name": "jersey-container-servlet-core-3.1.10.jar",
+   "coords": "org.glassfish.jersey.containers:jersey-container-servlet-core:3.1.10",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/glassfish/jersey/containers/jersey-container-servlet-core/3.1.10/jersey-container-servlet-core-3.1.10.jar",
+   "size": 75398,
+   "sha256": "fd15e7e37215d772ccdae8d4076c41a11ad3fec9ca88a1f8a8f6dacf4663bb69"
+  },
+  {
+   "name": "jersey-hk2-3.1.10.jar",
+   "coords": "org.glassfish.jersey.inject:jersey-hk2:3.1.10",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/glassfish/jersey/inject/jersey-hk2/3.1.10/jersey-hk2-3.1.10.jar",
+   "size": 77963,
+   "sha256": "00ed71c496a856ac1f73272482a7abe27b5a96b823c29cc08f4b708c8d3e647e"
+  },
+  {
+   "name": "jersey-server-3.1.10.jar",
+   "coords": "org.glassfish.jersey.core:jersey-server:3.1.10",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/glassfish/jersey/core/jersey-server/3.1.10/jersey-server-3.1.10.jar",
+   "size": 982603,
+   "sha256": "1b33a9be417b72f7ceef3afe9780781b66122b0f1db78f2f82502988072cfab0"
+  },
+  {
+   "name": "jetty-alpn-client-12.0.34.jar",
+   "coords": "org.eclipse.jetty:jetty-alpn-client:12.0.34",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-alpn-client/12.0.34/jetty-alpn-client-12.0.34.jar",
+   "size": 7177,
+   "sha256": "dde78ab533961bb853a8ce5a23a90d4dd54cd6522e9e7f90566ca7f44e035ef9"
+  },
+  {
+   "name": "jetty-client-12.0.34.jar",
+   "coords": "org.eclipse.jetty:jetty-client:12.0.34",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-client/12.0.34/jetty-client-12.0.34.jar",
+   "size": 355323,
+   "sha256": "b77b7535a809c78af71126b90aed0836cc9f9ac80d32e5cbf7a07025ace14401"
+  },
+  {
+   "name": "jetty-ee10-servlet-12.0.34.jar",
+   "coords": "org.eclipse.jetty.ee10:jetty-ee10-servlet:12.0.34",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/eclipse/jetty/ee10/jetty-ee10-servlet/12.0.34/jetty-ee10-servlet-12.0.34.jar",
+   "size": 441263,
+   "sha256": "08030501c5868ba348e0e349121cb3493586c29d438c725bf76b0559e8d5f5ed"
+  },
+  {
+   "name": "jetty-ee10-servlets-12.0.34.jar",
+   "coords": "org.eclipse.jetty.ee10:jetty-ee10-servlets:12.0.34",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/eclipse/jetty/ee10/jetty-ee10-servlets/12.0.34/jetty-ee10-servlets-12.0.34.jar",
+   "size": 50966,
+   "sha256": "bf9fe841e09f39d498838965b57e52b79f12e7bd5e259e645cc9e0a6cbe96426"
+  },
+  {
+   "name": "jetty-http-12.0.34.jar",
+   "coords": "org.eclipse.jetty:jetty-http:12.0.34",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-http/12.0.34/jetty-http-12.0.34.jar",
+   "size": 440877,
+   "sha256": "63890ecc5bb8bf26c4dd0952ef2d0d3dd3f7434b37b21e51f7ea8dfbe96b9dc0"
+  },
+  {
+   "name": "jetty-io-12.0.34.jar",
+   "coords": "org.eclipse.jetty:jetty-io:12.0.34",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-io/12.0.34/jetty-io-12.0.34.jar",
+   "size": 340357,
+   "sha256": "3704daeb82b39041ee5e6f810636c2fcb9a10476cdbf0fd067e584ed3110d66a"
+  },
+  {
+   "name": "jetty-security-12.0.34.jar",
+   "coords": "org.eclipse.jetty:jetty-security:12.0.34",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-security/12.0.34/jetty-security-12.0.34.jar",
+   "size": 145161,
+   "sha256": "e9a595eff775859a5461c0ce05e27ace5182ee1fdc1b17016453fa41ca0e1560"
+  },
+  {
+   "name": "jetty-server-12.0.34.jar",
+   "coords": "org.eclipse.jetty:jetty-server:12.0.34",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-server/12.0.34/jetty-server-12.0.34.jar",
+   "size": 637195,
+   "sha256": "fb7a1401b7b2358e9cb975764c54fac72fcecd7ae5199369041118603cd3fd7d"
+  },
+  {
+   "name": "jetty-session-12.0.34.jar",
+   "coords": "org.eclipse.jetty:jetty-session:12.0.34",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-session/12.0.34/jetty-session-12.0.34.jar",
+   "size": 117356,
+   "sha256": "a161ae531c5d6a695f17a547fdf90746dcd929f1abac5c60c7061a6fb20d346f"
+  },
+  {
+   "name": "jetty-util-12.0.34.jar",
+   "coords": "org.eclipse.jetty:jetty-util:12.0.34",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-util/12.0.34/jetty-util-12.0.34.jar",
+   "size": 698022,
+   "sha256": "3f8906cd72428d87dbbc0bd915192ce0f426e9db7805d3b0337588c1b6d7206e"
+  },
+  {
+   "name": "jose4j-0.9.6.jar",
+   "coords": "org.bitbucket.b_c:jose4j:0.9.6",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/bitbucket/b_c/jose4j/0.9.6/jose4j-0.9.6.jar",
+   "size": 299502,
+   "sha256": "7314af50cde9c99e8eaf43eee617a23edcc6bb43036221064355094999d837ef"
+  },
+  {
+   "name": "kafka-clients-4.3.1.jar",
+   "coords": "org.apache.kafka:kafka-clients:4.3.1",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/4.3.1/kafka-clients-4.3.1.jar",
+   "size": 10204032,
+   "sha256": "52501b7b47510c66f898871adaf6d2968ab7246561d44ced43643a8a587f0b36"
+  },
+  {
+   "name": "lz4-java-1.10.2.jar",
+   "coords": "at.yawk.lz4:lz4-java:1.10.2",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/at/yawk/lz4/lz4-java/1.10.2/lz4-java-1.10.2.jar",
+   "size": 1002267,
+   "sha256": "252dabd586d22149a31661a8afc1a50747714eb1a298bd4a6e780c8c91a13866"
+  },
+  {
+   "name": "maven-artifact-3.9.15.jar",
+   "coords": "org.apache.maven:maven-artifact:3.9.15",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/apache/maven/maven-artifact/3.9.15/maven-artifact-3.9.15.jar",
+   "size": 58856,
+   "sha256": "f154c31f15ac97c37b9cdf9f8d63cde5053c470d2daf54df7dfd3bb3c9e501c6"
+  },
+  {
+   "name": "osgi-resource-locator-1.0.3.jar",
+   "coords": "org.glassfish.hk2:osgi-resource-locator:1.0.3",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/glassfish/hk2/osgi-resource-locator/1.0.3/osgi-resource-locator-1.0.3.jar",
+   "size": 19479,
+   "sha256": "aab5d7849f7cfcda2cc7c541ba1bd365151d42276f151c825387245dfde3dd74"
+  },
+  {
+   "name": "plexus-utils-3.6.1.jar",
+   "coords": "org.codehaus.plexus:plexus-utils:3.6.1",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/codehaus/plexus/plexus-utils/3.6.1/plexus-utils-3.6.1.jar",
+   "size": 272101,
+   "sha256": "05a63effd67e2d6b9d610cc82e2bd7473289d34802e57a529b28110f28af5679"
+  },
+  {
+   "name": "postgresql-42.7.13.jar",
+   "coords": "org.postgresql:postgresql:42.7.13",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.13/postgresql-42.7.13.jar",
+   "size": 1220948,
+   "sha256": "6e0e4cc2d8cae902084f8a2b18728b073a6fd9d1f87c9d8bff8f298c18185b93"
+  },
+  {
+   "name": "protobuf-java-3.25.5.jar",
+   "coords": "com.google.protobuf:protobuf-java:3.25.5",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/com/google/protobuf/protobuf-java/3.25.5/protobuf-java-3.25.5.jar",
+   "size": 1875414,
+   "sha256": "8540247fad9e06baefa8fb45eb313802d019f485f14300e0f9d6b556ed88e753"
+  },
+  {
+   "name": "sketches-java-0.8.2.jar",
+   "coords": "com.datadoghq:sketches-java:0.8.2",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/com/datadoghq/sketches-java/0.8.2/sketches-java-0.8.2.jar",
+   "size": 128833,
+   "sha256": "b24c3d175556eb381ef2b2f0a7dffe7cb1fb7a9f893f41260822b5ec6cb13cca"
+  },
+  {
+   "name": "slf4j-api-1.7.36.jar",
+   "coords": "org.slf4j:slf4j-api:1.7.36",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.jar",
+   "size": 41125,
+   "sha256": "d3ef575e3e4979678dc01bf1dcce51021493b4d11fb7f1be8ad982877c16a1c0"
+  },
+  {
+   "name": "slf4j-simple-1.7.36.jar",
+   "coords": "org.slf4j:slf4j-simple:1.7.36",
+   "scope": "compile",
+   "url": "https://repo1.maven.org/maven2/org/slf4j/slf4j-simple/1.7.36/slf4j-simple-1.7.36.jar",
+   "size": 15333,
+   "sha256": "2f39bed943d624dfa8f4102d0571283a10870b6aa36f197a8a506f147010c10f"
+  },
+  {
+   "name": "snappy-java-1.1.10.7.jar",
+   "coords": "org.xerial.snappy:snappy-java:1.1.10.7",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/org/xerial/snappy/snappy-java/1.1.10.7/snappy-java-1.1.10.7.jar",
+   "size": 2338496,
+   "sha256": "4c766cb3f855415ee734b2392949a0b6f12a60879334a74518deaf6270d32e36"
+  },
+  {
+   "name": "swagger-annotations-2.2.39.jar",
+   "coords": "io.swagger.core.v3:swagger-annotations:2.2.39",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/io/swagger/core/v3/swagger-annotations/2.2.39/swagger-annotations-2.2.39.jar",
+   "size": 49585,
+   "sha256": "ea3017076809f8104ff8a130dc4c12db8c67595aa1d978104a9beca8277a7d29"
+  },
+  {
+   "name": "zstd-jni-1.5.6-10.jar",
+   "coords": "com.github.luben:zstd-jni:1.5.6-10",
+   "scope": "runtime",
+   "url": "https://repo1.maven.org/maven2/com/github/luben/zstd-jni/1.5.6-10/zstd-jni-1.5.6-10.jar",
+   "size": 7305999,
+   "sha256": "b6c3237e24b8252a5a9c3a0e1ae30ef8f323412e74bd358548b7a9e527d676df"
+  }
+ ]
+}

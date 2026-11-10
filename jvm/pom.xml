@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Dependency declaration of our JVM program (candidate B, PLAN §2).
+
+  This pom is used ON THE DEVELOPMENT MACHINE ONLY, by jvm/make_lock.py, to resolve the runtime closure of stock
+  Debezium into jvm/debezium.lock.json. The Flight never runs Maven: it downloads exactly the locked jars from Maven
+  Central (src/cdc_v2/jarfetch.py, SHA-256 verified, fail closed) and compiles jvm/src with the JDK's javac.
+  Nothing from Debezium is committed and no Debezium class is patched or shadowed (SPEC R2).
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>cdc_v2</groupId>
+  <artifactId>cdc_v2-engine</artifactId>
+  <version>0.0.0</version>
+  <packaging>jar</packaging>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.release>21</maven.compiler.release>
+    <!-- Newest stable (.Final) Debezium on Maven Central on 2026-11-09 -->
+    <version.debezium>3.7.1.Final</version.debezium>
+    <!-- Kafka version Debezium 3.7.1.Final is built against (debezium-build-parent: version.kafka) -->
+    <version.kafka>4.3.1</version.kafka>
+    <version.slf4j>1.7.36</version.slf4j>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>io.debezium</groupId>
+      <artifactId>debezium-api</artifactId>
+      <version>${version.debezium}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.debezium</groupId>
+      <artifactId>debezium-embedded</artifactId>
+      <version>${version.debezium}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.debezium</groupId>
+      <artifactId>debezium-connector-postgres</artifactId>
+      <version>${version.debezium}</version>
+    </dependency>
+    <!-- Debezium's JSON output format (DebeziumEngine.create(Json.class)) needs Kafka's JsonConverter; it is a
+         test-scope dependency of debezium-embedded, so it is declared here. Used only for the JSON comparison. -->
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>connect-json</artifactId>
+      <version>${version.kafka}</version>
+    </dependency>
+    <!-- Logging backend for slf4j; matches the slf4j-api 1.7.36 that Debezium and Kafka resolve to. Logs to stderr. -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>${version.slf4j}</version>
+    </dependency>
+  </dependencies>
+</project>
