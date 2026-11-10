@@ -56,7 +56,7 @@ green on T1 (local primary and standby, real MotherDuck, local JVM).
 | O | Oracle, T1 harness, evidence writer, workload generator and observer | Opus | **merged** (fix round included) |
 | X | The cut: where a snapshot lies in the stream | Opus (was Fable) | **merged** (`1cd62c9`; three reviews, three fix rounds; with it the oracle's reader on a standby was repaired) |
 | E | Engine: the JVM program around stock Debezium, frames, the Python side | Opus | **merged** (two reviews, two fix rounds) |
-| D | Destination basics: lanes, fence, deadlines, errors, `_cdc` schema, transition function, alert records | Opus (was Fable) | **delivered** (`9e389cc`); two reviews: the coordinator **merge after named fixes**, the second reviewer **not yet** (one unexplained result at the fence on MotherDuck, defects in the error mapping, the state module and the migrations); **fix round running** (Opus, xhigh; 16 items) |
+| D | Destination basics: lanes, fence, deadlines, errors, `_cdc` schema, transition function, alert records | Opus (was Fable) | **fix round delivered** (`161d847`, 16 items). The unexplained fence result was **a real breach**, now fixed: DuckDB 1.5.6 and MotherDuck do not record a write of an unchanged value into a column right after a checkpoint, so a take-over that wrote only the epoch did not conflict with an old run's fence statement and both committed (8 in 681 rounds). The take-over and the registration now also write the fence counter: 0 breaches in 1,001 rounds. Re-check by the coordinator and a second attack on the fence (Opus, xhigh) are running |
 | A | Apply: the statements over a change set, keyed and keyless | Opus | **merged** (`a6728f9`; two reviews, three fix rounds; with `apply.repair_keys` for the backfill) |
 | P | Source: connections, catalog and its observation, publication, slot, slot facts, timeline, heartbeat | Opus | **merged** (with the repair of `tools/localpg` for Postgres 16; one fix after the review) |
 | L | Leadership: guard, take-over, heartbeat, hand-over, bootstrap, platform interface | Opus (was Fable) | task written; after D |
@@ -129,6 +129,12 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
 
 ## Questions for the owner / owed by the owner
 
+- **For your information: a breach of the fence, found and fixed (package D).** DuckDB 1.5.6, and MotherDuck with
+  it, does not see a write of an unchanged value into a column as a conflict when that column has had no update since
+  it was last written or checkpointed. The leader's take-over and an old run's fence statement could therefore both
+  commit (8 times in 681 rounds; 5 of them wrote data after the take-over). Every statement that must exclude another
+  writer now writes a changed value; 0 breaches in 1,001 rounds since. Whether to report this upstream is yours to
+  decide (after the coordinator says whether it is a defect or documented behaviour).
 - **From the apply package (two questions).** (1) A table whose key column can be TOASTed (a long text or bytea
   key) needs `REPLICA IDENTITY FULL`, because Postgres can send the key of such a row as "unchanged"; that costs
   more WAL on every update. Working rule until you rule: refuse such a table without `FULL` (with F-7). (2) Apply
