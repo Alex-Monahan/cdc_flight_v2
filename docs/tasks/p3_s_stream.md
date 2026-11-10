@@ -235,7 +235,8 @@ block (fence, `COMMIT`: package D).
   for every group before it is applied, at a point where the answer can still take a table out of the group. It
   runs beside the client-side work of the group, not after it, so that it adds one round trip to the source and
   no more; it is a blocking call with a deadline like any other. Your stand-in answers `same`; package T builds
-  the real one.
+  the real one. `tables.on_group(tx, group_end)` (C10) is called in every group and every idle position step,
+  immediately before `backfill.on_group`; your stand-in does nothing.
 - A test helper (under `tests/`, importable by packages F, V, B and T) that starts the whole local path for a
   set of tables: publication, slot, destination tables built from the transform plans, routing `streaming`, the
   pipeline as a process group, and handles to crash it at a named point, freeze it, and wait for a position.

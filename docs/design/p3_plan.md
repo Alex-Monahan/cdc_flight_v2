@@ -449,15 +449,22 @@ As delivered by package X; its report defines the interface, and this section is
   sent through a backfill in P3: from the first transaction that carries the new version, its changes are not
   applied to the visible table, and a backfill request (after a gap) is enacted in that group. The schema wave of
   P4 replaces this by a change in place (design 6.5).
-- **Catalog gate.** Debezium's records name a table by schema and name only, and a drop and recreate, or a
-  dropped and added column of the same name and type, can leave the `SCHEMA` frame unchanged (H-007, H-008). So
-  before a group is applied, S calls `tables.confirm(group_end, tables, deadline) -> {table: same | changed}`.
-  Package T builds it on `catalog.observe` (C7): an observation whose lower bracket `b` is ≥ `group_end` must
-  show, for each table of the group, the identity that the destination table was built for (OID; per column
-  `attnum`, name, type). A table that is not `same` leaves the visible path in that group: its rows are not
-  applied. What follows (a drop, a fresh table, a backfill) is enacted by T in the first group whose end is ≥
-  the observation's upper bracket `a`. The cost is one catalog round trip per group. Until T is merged, S's
-  stand-in answers `same`.
+- **Catalog gate.** Debezium's records name a table by schema and name only, and a drop and recreate, or a dropped
+  and added column of the same name and type, can leave the `SCHEMA` frame unchanged (H-007, H-008). So before a
+  group is applied, S calls `tables.confirm(group_end, tables, deadline) -> {table: same | changed}`. Package T
+  builds it on `catalog.observe` (C7): an observation whose lower bracket `b` is ≥ `group_end` must show, for each
+  table of the group, the identity that the destination table was built for (OID; per column `attnum`, name, type;
+  the key columns). A table that is not `same` leaves the visible path in that group: its rows are not applied. What
+  follows is enacted by T in `tables.on_group(tx, group_end)`, which S calls in every group and every idle position
+  step, immediately before `backfill.on_group`: in the first group after the stream has passed the observation (its
+  end is greater than the upper bracket `a`, design 7.2). The cost is one catalog round trip per group. Until T is
+  merged, S's stand-ins answer `same` and do nothing.
+- **The destination follows the source's names** (P3 rule). For each replicated name: absent at the source → the
+  destination table is dropped, or renamed under `on_source_drop: retain`; present with another OID → the old
+  destination table is dropped (or renamed) and a backfill of the new table is requested, in the same group; the
+  same OID with other columns → the schema rule above. A backfill that follows such a finding is entered only past
+  `a`, so that its pending log never holds a row of the earlier table. A rename is therefore a drop of the old name
+  and, if the new name is replicated, a fresh table; the rename in place of SPEC 2.2 is P4.
 - S runs a group again after `Conflict`, a bounded number of times, building its statements again when the
   conflict came from a DDL (a swap changes the catalog).
 - A table that fails to apply `apply.max_table_attempts` times (default 3) leaves the stream: state `quarantined`,
