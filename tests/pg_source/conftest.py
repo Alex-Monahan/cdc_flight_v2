@@ -161,7 +161,9 @@ class Cluster:
 
 _clusters: dict[str, Cluster] = {}
 EVIDENCE: dict = {}
-EVIDENCE_DIR = os.path.join(ROOT, "evidence", "p3", "source")
+# CDC_V2_P_EVIDENCE_DIR names another directory under evidence/p3 (package K writes to evidence/p3/key_rule)
+EVIDENCE_DIR = os.path.join(ROOT, "evidence", "p3", os.environ.get("CDC_V2_P_EVIDENCE_DIR", "source"))
+assert os.path.dirname(os.path.relpath(EVIDENCE_DIR, os.path.join(ROOT, "evidence", "p3"))) == "", EVIDENCE_DIR
 
 
 def record(section: str, key: str, value) -> None:
