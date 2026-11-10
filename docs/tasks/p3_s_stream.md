@@ -159,7 +159,16 @@ them; take the names of the fields from there).
   was sent for the group, the new engine delivers it again. If the frame and the catalog still differ after
   `stream.max_key_restarts` (default 2) at one position, it is a failure of that table (section 7).
 - A table that the catalog refuses (`identity_problem`: for example a deferrable primary key without `REPLICA
-  IDENTITY FULL`) is not streamed: routing `skip`, alert with the catalog's message.
+  IDENTITY FULL`) is not streamed: routing `skip`, alert with the catalog's message. So is a table with a
+  `name_problem` (a `"` in its schema or table name, H-051); it is never in the publication.
+- Restart the engine with a fresh list also on package T's `key_changed`: a key made deferrable is a drop and
+  re-add of the key, and whether Debezium then sends a new `SCHEMA` frame was not measured.
+- **A FATAL that names a table** (`fatal.schema`, `fatal.table`; for example an update of a table without a key
+  that arrived without an old image, after somebody changed its replica identity) is a failure of that table, not
+  of the stream: routing `skip`, one alert and quarantine at once, with no loop of restarts; start the engine
+  again without the table in its include list (`table.exclude.list` is a protected setting); the table comes back
+  through a backfill after a gap once the catalog's `replica_identity_problem` is `None` again. Test it with a
+  live change of replica identity while the stream runs.
 - Gate workload (SPEC 1.4 names "swaps inside one transaction, under default and full replica identity"): one
   table with a deferrable primary key and `REPLICA IDENTITY FULL`, with a swap of two keys in one statement and
   with "insert a duplicate, then delete the old row" (`tests/pg_source/test_pg_keys.py` has both). It takes the

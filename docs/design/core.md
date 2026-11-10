@@ -258,14 +258,20 @@ take-over and cancel).
 **Which tables have a key (rule K).** A table *has a key* when it has a primary key that is not deferrable
 (`pg_index.indimmediate`) and its replica identity is `DEFAULT`, `FULL`, or `USING INDEX` on the primary key's own
 index. Its key is the primary key. Every other table that can be published is a *table without a key* and needs
-`REPLICA IDENTITY FULL`: a table with no primary key (also when it has unique indexes), and a table whose primary
-key is deferrable. Why: an immediate key is checked row by row, so in the decoded stream no two rows hold one key
-after any record; a deferrable key allows two rows with one key inside a transaction, and a record that names only
-a key then does not say which row it means (H-015, measured on Postgres 16.6 and 18.6). The catalog
-(`cdc_v2.pg.catalog`) is the one authority. The engine is told which tables are without a key and sends the old
-image for them; the consumer checks at every table frame that the engine's key flag equals the catalog's, and a
-difference is an error, never ignored. What a table without a key costs: its history is a plain changelog (SPEC
-8.2), and its backfill reads the whole table under one snapshot (7.4).
+`REPLICA IDENTITY FULL`: a table with no primary key (also when it has unique indexes), and a table whose primary key
+is deferrable. Why: an immediate key is checked row by row, so in the decoded stream no two rows hold one key after
+any record; a deferrable key allows two rows with one key inside a transaction, and a record that names only a key
+then does not say which row it means (H-015, measured on Postgres 16.6 and 18.6). The catalog (`cdc_v2.pg.catalog`) is
+the one authority. The engine is told which tables are without a key and sends the old image for them; the consumer
+checks at every table frame that the engine's key flag equals the catalog's, and a difference is an error, never
+ignored. What a table without a key costs: its history is a plain changelog (SPEC 8.2), and its backfill reads the
+whole table under one snapshot (7.4). As built (package K): the list is `EngineSettings.keyless_tables`, read at
+engine start. For a listed table the engine ignores Debezium's key, which would take a deferrable primary key and,
+when a table has no primary key, its unique index (also on a nullable column, also a deferrable constraint;
+`docs/design/engine.md` 4a). An update or delete of a table without a key that arrives without an old image stops the
+engine with a FATAL that names the table. A schema or table name that contains `"` is not streamed at all (H-051:
+stock Debezium stops at every start, or delivers the rows of `"q"` as rows of `q` in the same schema without an
+error); the catalog refuses it.
 
 The destination's equality on the mapped key must not be coarser than the source's: two keys that the source
 calls different must be different in the destination. The type mapping of a key column and any transform on it

@@ -11,7 +11,7 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
   package, the engine and the transform are merged; the apply package is reviewed twice and its fix round is checked
   (verdict: merge; the second reviewer's repeat campaigns found one correct history that is refused, so it is in a second, short fix round); the question the second
   review raised — which tables have a key — is measured and decided (rule K, below) and has a small package of its
-  own, which is reviewed (merge after three fixes) and in its fix round; the cut's fix round is checked (verdict: merge after one text fix) and it is in a second,
+  own, which is merged; the cut's fix round is checked (verdict: merge after one text fix) and it is in a second,
   short round; the destination basics are delivered, reviewed once (merge after named fixes) and under the second reviewer's attack; round 1 of the fuzzers (against a toy replicator) is reviewed
   and in its fix round; the task file of every package is written.
 - Stage 2 (PlanetScale) cannot start: of its names only `PLANETSCALE_ORG` and `PLANETSCALE_DATABASE` are in the env
@@ -65,7 +65,7 @@ green on T1 (local primary and standby, real MotherDuck, local JVM).
 | F | Fuzzers (stream, workload, fault, leadership), the consumer loop of 1.3 and 3.2 | Opus | **round 1 delivered** (branch `p3-f-fuzzers`, against a toy replicator); coordinator: merge after a fix round (below), **running**; round 2, against the real system, after S, L, B, V |
 | B | Backfill and hand-off | Opus (was Fable) | task written; after X, S, A, P, Y |
 | T | The catalog gate, truncate, drop and recreate, the document and the test over all state machines | Opus | task written; after S, B |
-| K | The key rule: the catalog reads whether a primary key is deferrable, the engine is told which tables are without a key, what Debezium calls a key is measured (added 2026-11-10) | Opus | **delivered** (`f182e1e`; task `docs/tasks/p3_k_key_rule.md`); the coordinator: **merge after three fixes**; **fix round running**; S waits for it |
+| K | The key rule: the catalog reads whether a primary key is deferrable, the engine is told which tables are without a key, what Debezium calls a key is measured (added 2026-11-10) | Opus | **merged** (`947aabd`; one review, one fix round) |
 
 At most four workers write at once (PLAN §3). The coordinator (Opus, xhigh) writes no code: it reviewed the plan
 and reviews every package branch before its merge; D, L, S, V, B and the acknowledgement path of E get a second
@@ -79,6 +79,7 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
 | 1.7 crash points at every step of a schema change | P4, schema and types |
 | 1.9 schema change applied in place (P3 has the life of a catalog finding, which ends in a drop or a backfill); the full quarantine machine (P3 has the exit to `quarantined` and the operator's re-backfill) | P4 |
 | 1.7 soak of at least 1 h with at least 200 faults | a short soak at the P3 gate; the full one in the P6 campaign |
+| 1.1/1.2 for a table whose schema or table name contains `"`: stock Debezium 3.7.1 stops at every start, or silently drops its rows, or delivers the rows of `"q"` as rows of `q` (H-051). P3 refuses to publish it and skips it with an alert | mode `full_refresh` (SPEC 3.5), or a fix outside stock Debezium's name parser | P4, CDC features (owner informed) |
 | 1.1/1.2 for a table the stream cannot carry: an `interval` key, or a table without a key that has a scalar `interval` column, on a source of Postgres 17 or later. P3 skips it with one alert per table; the mode `full_refresh` of SPEC 3.5 carries it | P4, CDC features |
 | 1.1/1.2 for one value: `interval 'infinity'` / `'-infinity'` in a scalar `interval` column of a source on Postgres 17 or later reaches the stream as a zero interval (the Postgres driver, before any code of ours). P3 marks and counts such rows and alerts; the repair read that makes the value exact is built on the stream's group loop (plan C3, "Ambiguous zero interval"). No P3 gate workload holds an interval column | P4, schema and types |
 
@@ -125,6 +126,12 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
 
 ## Questions for the owner / owed by the owner
 
+- **For your information (no ruling needed): table names with a double quote.** Stock Debezium 3.7.1 cannot stream a
+  table whose schema or table name contains `"` (measured by package K, H-051): it stops at every start, or drops
+  the table's rows without a sign, or — worst — delivers the rows of a table `"q"` as rows of the table `q` in the
+  same schema. The pipeline therefore never publishes such a table and alerts once; from P4 the mode `full_refresh`
+  can carry it. The coordinator reads SPEC 4.0 and R16 as allowing this. Nothing is reported upstream without your
+  word.
 - **Boundary guard**: not enforcing in this session, and the hourly audit does not see it. The build follows PLAN §4
   by instruction. If the owner wants the guarded session instead, start it through the launcher; it resumes from
   this file.
@@ -318,7 +325,6 @@ Each in its own worktree and branch; the orchestrator merges. The P3 packages ar
 |---|---|---|---|
 | Package D, destination basics: **delivered** on branch `worktree-agent-a5e245130333b3efe` (`9e389cc`). The coordinator's review is in; the second reviewer (Opus, xhigh, reading only; the first one was stopped by the spend limit, its MotherDuck test runs are kept; MotherDuck databases `cdc_v2_t_d_rv_*`) that attacks the fence, the unknown commit outcome, deadlines, the error mapping and the transition function with cases of its own and runs the package's MotherDuck tests once more on the last commit | P3 | 2026-11-10 | the second verdict (the coordinator's is in: merge after named fixes); then one fix round — `_cdc.transitions` gets the lane, a sequence that gives the order of commit, and the facts of a group; a connection's registration must fail when a take-over came in between; a machine declares which lane creates its rows; the evidence names the commit and the command that really ran — then the merge, and D's notes in the tasks of L and S |
 | Package A, apply: **second, short fix round running** on branch `worktree-agent-adbee9c1aec8e2051` (from `68df804`). The second reviewer's repeat campaigns (five campaigns, about 17,000 seeds and 400,000 records) found no silent error inside the stated preconditions; one correct history is refused with an error on every try (a key of several columns, one part changes only its form, such as `-0` to `0`, while another row moves onto the old form); two silent cases lie outside the preconditions and become rules for the backfill (a catch-up call is never repeated after a later one; a repair replaces the row) | P3 | 2026-11-10 | ten items: the refused history repaired, the start-state checks per key if they cost no round trip, `reduce_duplicates` under the spill limits, the cheaper form of the new-key check, texts. Then the reviewer's keyed campaign once more, the merge, and the sentences for design 6.1–6.5 and plan C0, C3a, C4, C10 |
-| Package K, the key rule: **delivered** on branch `worktree-agent-a7bff9175aa501995` (`f182e1e`); the coordinator's verdict: merge after three fixes (the catalog's table identity must include the replica identity, or the catalog gate misses a change from `FULL` to `DEFAULT`; a name rule in the catalog; two evidence files produced again by real runs); **fix round running**, with the time limits of one harness test in the default run. Found on the way: stock Debezium cannot stream a table whose name starts with a double quote or has one after a space (the engine stops at every start), and drops a table whose name is entirely in double quotes without a sign | P3 | 2026-11-10 | the verdict; then the merge, the field names in the task of S, and a prevention for the names Debezium cannot stream |
 | Package F, fuzzers (Opus, high): **fix round running** on branch `p3-f-fuzzers` (15 items: ledger rules, suite 1.7 again, reductions, two table shapes, the shared-memory repair of `tools/localpg`, the frame reader's allocation). Homes `pg-f<n>`, ports 55700 + 8·n; localpg self-test ports | P3 | 2026-11-10 | the four fuzzers with seeds and replay, the consumer loop of SPEC 1.3 and 3.2, their self-tests with planted defects. Owed: the fix round below |
 | Package X, second fix round (the worker that built the cut was stopped by the spend limit; an Opus worker, xhigh, continues it in the same worktree). Home `pg-cut`, ports 55600–55607. No MotherDuck | P3 | 2026-11-10 | four items: the claim about the complete checker rests on recorded runs only (or the two runs are repeated); the takers read the reader node's identity themselves; the oracle's reader no longer imports a snapshot that may not be quiet on a standby with the export defect; section 13 and C9 adjusted. Then the merge |
 
