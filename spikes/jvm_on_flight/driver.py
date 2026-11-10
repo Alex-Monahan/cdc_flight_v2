@@ -717,7 +717,8 @@ def phase_profile():
     pg_up()
     prepare()
     n = int(os.environ.get("CDC_V2_TPUT_ROWS", "1000000"))
-    tx_test("profile_default", n, {}, "1g", (), timeout=300, jfr=True)
+    if "skip_jfr" not in os.environ.get("CDC_V2_TPUT_ONLY", ""):
+        tx_test("profile_default", n, {}, "1g", (), timeout=300, jfr=True)
     only = [x for x in os.environ.get("CDC_V2_TPUT_ONLY", "").split(",") if x and x != "all"]
     for name, props, opts in PROFILE_VARIANTS:
         if not only or name in only:
@@ -730,6 +731,10 @@ PROFILE_VARIANTS = [
     ("decimal_string", {"decimal.handling.mode": "string"}, ()),
     ("decimal_double", {"decimal.handling.mode": "double"}, ()),
     ("parallelgc_decimal_double", {"decimal.handling.mode": "double"}, ("-XX:+UseParallelGC",)),
+    # Debezium's statistics metrics (DDSketch measurements published on their own thread)
+    ("no_statistics_metrics", {"statistics.metrics.enabled": "false"}, ()),
+    ("combined_best", {"statistics.metrics.enabled": "false", "decimal.handling.mode": "double",
+                       "max.batch.size": "8192", "max.queue.size": "32768"}, ("-XX:+UseParallelGC",)),
 ]
 
 
