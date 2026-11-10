@@ -73,6 +73,10 @@ def test_tls_verify_full_and_no_silent_fallback(cluster):
     with pytest.raises(errors.PermissionDenied) as ei:
         pg.connect(bad, Deadline.after(10))
     assert "wrong-password-123" not in str(ei.value) and "localhost" not in str(ei.value)
+    gone = cluster.settings("primary").with_(dbname="cdc_v2_no_such_db_x")      # the server's message names it
+    with pytest.raises(errors.SourceError) as ei:
+        pg.connect(gone, Deadline.after(10))
+    assert "cdc_v2_no_such_db_x" not in str(ei.value) and "cdc_v2_no_such_db_x" not in repr(gone)
 
 
 def test_statement_deadline_cancels_and_closes(cluster):

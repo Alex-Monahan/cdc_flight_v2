@@ -77,7 +77,7 @@ class PgConnection:
         self.server_version_num: int = raw.info.server_version
         self._in_recovery: bool | None = None
         self._broken = False
-        self._secrets = (node.host, node.user)
+        self._secrets = (node.host, node.user, node.dbname)
         # Our own duplicate of the connection's socket, kept for the connection's lifetime: a shutdown from the
         # watchdog always reaches this connection's socket, never a reused descriptor number of another one.
         try:
@@ -329,7 +329,7 @@ def connect(target: str | NodeSettings, deadline: Deadline, *, replication: bool
     with lock:
         if "conn" not in box and "error" not in box:
             box["abandoned"] = True
-    secrets = (node.host, node.user) + ((password,) if password else ())
+    secrets = (node.host, node.user, node.dbname) + ((password,) if password else ())
     del password
     kw.pop("password", None)
     if box.get("abandoned"):

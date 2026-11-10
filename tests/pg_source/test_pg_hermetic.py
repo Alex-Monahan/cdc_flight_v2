@@ -31,6 +31,9 @@ def test_password_is_never_shown():
         assert "pw-secret-1234" not in text
     assert p.reveal() == "pw-secret-1234"
     assert "db.invalid" not in repr(n) and "db.invalid" not in repr(SourceSettings(nodes={"primary": n}))
+    named = node(dbname="orders_db_x", user="role_x")           # neither the database nor the role is shown
+    for text in (repr(named), str(named), repr(SourceSettings(nodes={"primary": named}))):
+        assert "orders_db_x" not in text and "role_x" not in text
     with pytest.raises(TypeError):
         import pickle
         pickle.dumps(p)
@@ -163,6 +166,9 @@ def test_error_classification_deadline_and_cancel():
                       errors.ConnectionLost)
     assert isinstance(errors.classify(ConnectionResetError()), errors.ConnectionLost)
     assert errors.scrub("pw is hunter22 at hx", ("hunter22", "hx")) == "pw is <redacted> at <redacted>"
+    missing = errors.classify(E("3D000", 'database "orders_db_x" does not exist'), what="connect",
+                              secrets=("db.invalid", "role_x", "orders_db_x"))
+    assert "orders_db_x" not in str(missing) and missing.sqlstate == "3D000"
 
 
 # ----------------------------------------------------------------------------------------------- connect: deadlines

@@ -76,7 +76,8 @@ RECOVERY_CONFLICT_TEXT = "conflict with recovery"
 
 
 def scrub(text: str, secrets: tuple[str, ...] = ()) -> str:
-    """Replace every given secret-like value (password, host, user name) in a message by a placeholder."""
+    """Replace every given secret-like value (password, host, user name, database name) in a message by a
+    placeholder."""
     out = text or ""
     for s in sorted({s for s in secrets if s and len(s) >= 2}, key=len, reverse=True):
         out = out.replace(s, "<redacted>")

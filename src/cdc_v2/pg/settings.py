@@ -103,7 +103,7 @@ class NodeSettings:
 
     host: str = field(repr=False)
     port: int
-    dbname: str
+    dbname: str = field(repr=False)
     user: str = field(repr=False)
     password: Password | None = field(default=None, compare=False)
     tls: str = "verify-full"
