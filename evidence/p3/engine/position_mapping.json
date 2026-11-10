@@ -1,0 +1,41 @@
+{
+  "rule": "BEGIN positions.lsn < B.final_lsn = C.commit_lsn (start of the commit record); END ack_position = positions.lsn_commit = positions.lsn = C.end_lsn (end of the commit record)",
+  "test": "tests/engine/test_engine_attach.py::test_positions_map_to_pgoutput_begin_and_commit",
+  "transactions": [
+    {
+      "begin.lsn": "0/DECA9A0",
+      "end.ack_position": "0/DECAAD0",
+      "pgoutput.B.final_lsn": "0/DECAAA0",
+      "pgoutput.C.commit_lsn": "0/DECAAA0",
+      "pgoutput.C.end_lsn": "0/DECAAD0"
+    },
+    {
+      "begin.lsn": "0/DECAAD0",
+      "end.ack_position": "0/DECAC40",
+      "pgoutput.B.final_lsn": "0/DECAC10",
+      "pgoutput.C.commit_lsn": "0/DECAC10",
+      "pgoutput.C.end_lsn": "0/DECAC40"
+    },
+    {
+      "begin.lsn": "0/DECAC40",
+      "end.ack_position": "0/DECAE50",
+      "pgoutput.B.final_lsn": "0/DECAE20",
+      "pgoutput.C.commit_lsn": "0/DECAE20",
+      "pgoutput.C.end_lsn": "0/DECAE50"
+    },
+    {
+      "begin.lsn": "0/DECAE50",
+      "end.ack_position": "0/DECB100",
+      "pgoutput.B.final_lsn": "0/DECB0D0",
+      "pgoutput.C.commit_lsn": "0/DECB0D0",
+      "pgoutput.C.end_lsn": "0/DECB100"
+    },
+    {
+      "begin.lsn": "0/DECB100",
+      "end.ack_position": "0/DECB450",
+      "pgoutput.B.final_lsn": "0/DECB420",
+      "pgoutput.C.commit_lsn": "0/DECB420",
+      "pgoutput.C.end_lsn": "0/DECB450"
+    }
+  ]
+}

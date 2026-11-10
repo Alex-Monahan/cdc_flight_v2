@@ -1,0 +1,15 @@
+{
+  "engine_alive_at_bound": true,
+  "fault": "blackhole",
+  "message": "",
+  "old_walsender_gone": true,
+  "outcome": "no end within 150 s",
+  "proxy_stats": {
+    "accepted": 7,
+    "closed_by_fault": 0,
+    "reset_by_fault": 0
+  },
+  "seconds": 150.0,
+  "slot_active_after_kill": false,
+  "test": "tests/engine/test_engine_attach.py::test_broken_source_connection_through_the_proxy[blackhole]"
+}

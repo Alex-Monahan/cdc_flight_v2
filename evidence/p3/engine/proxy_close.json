@@ -1,0 +1,15 @@
+{
+  "engine_alive_at_bound": false,
+  "fault": "close",
+  "message": "org.apache.kafka.connect.errors.ConnectException: An exception occurred in the change event producer. This connector will be stopped. (caused by org.postgresql.util.PSQLException: An I/O error occurred while sending to the backend.; java.io.EOFException: )",
+  "old_walsender_gone": true,
+  "outcome": "EngineFatal",
+  "proxy_stats": {
+    "accepted": 7,
+    "closed_by_fault": 2,
+    "reset_by_fault": 0
+  },
+  "seconds": 5.53,
+  "slot_active_after_kill": false,
+  "test": "tests/engine/test_engine_attach.py::test_broken_source_connection_through_the_proxy[close]"
+}

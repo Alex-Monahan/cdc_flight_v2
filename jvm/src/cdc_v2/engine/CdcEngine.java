@@ -136,6 +136,10 @@ public final class CdcEngine {
             FrameGen.main(java.util.Arrays.copyOfRange(args, 1, args.length));
             return;
         }
+        if (args.length == 1 && args[0].equals("--repl-probe")) {
+            ReplProbe.main();
+            return;
+        }
         if (args.length >= 1 && args[0].equals("--splitmix")) {
             for (int i = 1; i < args.length; i++) {
                 System.out.println(Long.toUnsignedString(Crash.splitmix64(Long.parseUnsignedLong(args[i]))));

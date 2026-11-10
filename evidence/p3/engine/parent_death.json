@@ -1,0 +1,5 @@
+{
+  "jvm_gone_after_s": 0.059,
+  "slot_inactive_after_s": 0.068,
+  "test": "tests/engine/test_engine_attach.py::test_parent_death_ends_the_jvm_and_frees_the_slot"
+}

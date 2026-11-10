@@ -1,0 +1,131 @@
+{
+  "runs": [
+    {
+      "applied_rows": 1194,
+      "cf_at_start": "0/DFB5E50",
+      "first_after_cf": true,
+      "first_txn_ack": "0/DFB60B0",
+      "how": "killed",
+      "step": {
+        "kill_after": 5.3810286691055245
+      }
+    },
+    {
+      "applied_rows": 1965,
+      "cf_at_start": "0/DFE0148",
+      "first_after_cf": true,
+      "first_txn_ack": "0/DFE02F8",
+      "how": "killed",
+      "step": {
+        "kill_after": 3.370621756411413
+      }
+    },
+    {
+      "applied_rows": 2361,
+      "cf_at_start": "0/DFFB870",
+      "first_after_cf": true,
+      "first_txn_ack": "0/DFFBA20",
+      "how": "killed",
+      "step": {
+        "kill_after": 1.6280310770469595
+      }
+    },
+    {
+      "applied_rows": 2526,
+      "cf_at_start": "0/E009C90",
+      "first_after_cf": true,
+      "first_txn_ack": "0/E009E40",
+      "how": "EngineExited -9",
+      "step": {
+        "crash": {
+          "action": "kill",
+          "hit": "seed:1:5",
+          "point": "engine.ack_marking"
+        }
+      }
+    },
+    {
+      "applied_rows": 2898,
+      "cf_at_start": "0/E009C90",
+      "first_after_cf": true,
+      "first_txn_ack": "0/E009E40",
+      "how": "EngineExited -9",
+      "step": {
+        "crash": {
+          "action": "kill",
+          "hit": "seed:2:5",
+          "point": "engine.ack_marking"
+        }
+      }
+    },
+    {
+      "applied_rows": 3228,
+      "cf_at_start": "0/E009C90",
+      "first_after_cf": true,
+      "first_txn_ack": "0/E009E40",
+      "how": "EngineExited -9",
+      "step": {
+        "crash": {
+          "action": "kill",
+          "hit": "seed:3:5",
+          "point": "engine.ack_marking"
+        }
+      }
+    },
+    {
+      "applied_rows": 3312,
+      "cf_at_start": "0/E028BB0",
+      "first_after_cf": true,
+      "first_txn_ack": "0/E028D60",
+      "how": "EngineExited -9",
+      "step": {
+        "crash": {
+          "action": "kill",
+          "hit": "seed:1:5",
+          "point": "engine.acked"
+        }
+      }
+    },
+    {
+      "applied_rows": 3564,
+      "cf_at_start": "0/E028BB0",
+      "first_after_cf": true,
+      "first_txn_ack": "0/E028D60",
+      "how": "EngineExited -9",
+      "step": {
+        "crash": {
+          "action": "kill",
+          "hit": "seed:2:5",
+          "point": "engine.acked"
+        }
+      }
+    },
+    {
+      "applied_rows": 4137,
+      "cf_at_start": "0/E028BB0",
+      "first_after_cf": true,
+      "first_txn_ack": "0/E028D60",
+      "how": "EngineExited -9",
+      "step": {
+        "crash": {
+          "action": "kill",
+          "hit": "seed:3:5",
+          "point": "engine.acked"
+        }
+      }
+    },
+    {
+      "applied_rows": 4161,
+      "cf_at_start": "0/E04A800",
+      "first_after_cf": true,
+      "first_txn_ack": "0/E04A9B0",
+      "how": "stopped",
+      "step": {
+        "timeout": 300,
+        "until_done": true
+      }
+    }
+  ],
+  "seed": 4242,
+  "test": "tests/engine/test_engine_ack.py::test_restart_after_random_kills_and_java_crash_points"
+}

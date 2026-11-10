@@ -1,0 +1,8 @@
+{
+  "error": "EngineFatal",
+  "exit_status": 1,
+  "message": "org.apache.kafka.connect.errors.ConnectException: An exception occurred in the change event producer. This connector will be stopped. (caused by org.postgresql.util.PSQLException: Database connection failed when reading from copy; java.io.EOFException: )",
+  "seconds_to_end": 0.52,
+  "slot_active_5s_later": false,
+  "test": "tests/engine/test_engine_attach.py::test_terminated_walsender_ends_the_engine_and_the_slot_is_not_taken_again"
+}
