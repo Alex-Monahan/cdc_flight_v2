@@ -384,9 +384,35 @@ section 8 says. Nothing on the source is fenced by the leader epoch, so every so
 when a deposed run repeats it: `publication.ensure` only adds, the heartbeat write is idempotent, and a slot is
 dropped only by an explicit operator action or by the enactment of a slot finding.
 
-### C8 Oracle and T1 harness (package O), C9 Cut (package X)
+### C8 Oracle and T1 harness (package O)
 
-As delivered by those packages; their reports define the interfaces, and this section is completed when they merge.
+Details in `docs/oracle.md`. What binds every package that writes a gate test:
+
+- Every gate test decides equality only with `cdc_v2.oracle.compare(source, destination, config, position=Q)`.
+  `Q` comes from `Workload.quiesce()` or `Workload.pause()`. `compare` refuses a source snapshot or a destination
+  state that is not at or past `Q`, and it refuses an empty comparison. A comparison without a position must be
+  asked for by name and is never a gate result.
+- A gate test passes only if `result.equal` holds and every table's `fallback_columns` is empty or declared by
+  the test.
+- The compared tables are listed explicitly (`OracleConfig.tables`, `table_map`). Heartbeat, canary and `_cdc*`
+  objects are never compared.
+- The applied-position lookup that `wait_for_applied` and `compare` use is provided by package S (by slot name);
+  until then the `_cdc.stream_state` reader of the oracle is a stand-in.
+- Waiting takes a `cdc_v2.deadline.Deadline`; evidence is written only through
+  `cdc_v2.testing.harness_evidence.write_evidence` (C0).
+- T1 sources and destinations come only from the fixtures in `tests/conftest.py` (section 4 says which cluster
+  and which database prefix they use). Destructive drills use the fixture `private_cluster`.
+- Workloads come from `cdc_v2.testing.workload`, with a seed and a replay log. Its transfers observer detects
+  splits of transfer transactions only; other invariants across tables are package F's.
+- The oracle shares no code with Y or A, and the pipeline never imports `cdc_v2.oracle` or `cdc_v2.testing`.
+- Canonical comparison (design open point 3, settled here): floats compare by bits with all NaNs equal, so `-0`
+  and `0` differ; intervals compare by months, days and microseconds, so `1 mon` and `30 days` differ; a UNION
+  column compares by member and by the rule of the member's source family; a source NULL is a real NULL in the
+  destination, never a UNION member that holds NULL.
+
+### C9 Cut (package X)
+
+As delivered by package X; its report defines the interface, and this section is completed when it merges.
 
 ### C10 Stream and backfill (packages S, B, V, T)
 
@@ -445,6 +471,27 @@ never touched; every command names its port.
 
 TCP fault proxies listen on 55440–55459 (package H); a worker that needs proxies of its own takes ports from the
 upper half of its own range.
+
+**The shared T1 fixtures** (`tests/conftest.py`, package O) follow the same rule through the environment:
+
+| Variable | Meaning | A package worker sets it to |
+|---|---|---|
+| `CDC_V2_PG_HOME`, `CDC_V2_PG_PORT_BASE` | the cluster on which the fixtures create one private database (`cdc_v2_t_<random>`) per test, for tests that do not disturb the cluster | its own home and port base from the table |
+| `CDC_V2_MD_PREFIX` | prefix of the MotherDuck databases the fixtures create (must start with `cdc_v2_t_`) | its own prefix, for example `cdc_v2_t_s_` |
+| `CDC_V2_T1_SHARED=1` | allows the default home (ports 55432–55439) | never: the default home is for the orchestrator's gate runs |
+
+Without a named home and without `CDC_V2_T1_SHARED=1` the fixtures fail with a message that says what to set.
+Tests that kill, promote, reconfigure or fill a cluster take the fixture `private_cluster`: a primary and a
+standby of their own on a block of 8 ports leased under a file lock from 55840–56095 (32 blocks), removed when
+the test ends. Every worker may use these leased blocks; nothing else listens there.
+
+Why no cluster is shared between workers even for harmless tests: a replayed `ACCESS EXCLUSIVE` lock stalls the
+replay of a standby for every stream that decodes there, one worker's WAL load slows every other slot, and the
+limits on slots and senders are per cluster.
+
+Fixed ranges, for reference (a default-run test of package O asserts that the leased range misses all of them):
+55432–55439 default home, 55440–55459 TCP proxies, 55460–55467 `localpg` self-tests, 55500–55509 throughput
+spike, 55600–55607 cut stress, 55620–55823 the homes of the table above.
 
 ## 5. Reviews
 
