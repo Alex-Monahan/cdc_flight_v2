@@ -10,11 +10,9 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
   continues without waiting. **P3 Core: in progress** (table below): the fault harness, the oracle, the source
   package, the engine, the transform and the apply package are merged; the question the second review raised — which
   tables have a key — is measured and decided (rule K, below) and has a small package of its own, which is merged; the
-  cut is merged; the destination basics are reviewed twice and in a fix round of sixteen items (the first is one
-  unexplained result at the fence: once in 30 runs on MotherDuck an old run's empty transaction was answered
-  "committed" after a take-over; it did not recur in 237 further cases and is now being reproduced with full
-  diagnostics); round 1 of the fuzzers (against a toy replicator) is merged; the task file of every package is
-  written.
+  cut is merged; the destination basics finished their fix round: the unexplained fence result was a real breach (a
+  write of an unchanged value after a checkpoint is not seen as a conflict), now fixed and under its last checks;
+  round 1 of the fuzzers (against a toy replicator) is merged; the task file of every package is written.
 - Stage 2 (PlanetScale) cannot start: of its names only `PLANETSCALE_ORG` and `PLANETSCALE_DATABASE` are in the env
   file (checked again at the P1 gate). The service token and the connection values are owed by the owner.
 
@@ -340,7 +338,7 @@ Each in its own worktree and branch; the orchestrator merges. The P3 packages ar
 
 | Job | Phase | Started | Delivers |
 |---|---|---|---|
-| Package D, destination basics: **delivered** on branch `worktree-agent-a5e245130333b3efe` (`9e389cc`). The coordinator's review is in; the second reviewer (Opus, xhigh, reading only; the first one was stopped by the spend limit, its MotherDuck test runs are kept; MotherDuck databases `cdc_v2_t_d_rv_*`) that attacks the fence, the unknown commit outcome, deadlines, the error mapping and the transition function with cases of its own and runs the package's MotherDuck tests once more on the last commit | P3 | 2026-11-10 | the second verdict (the coordinator's is in: merge after named fixes); then one fix round — `_cdc.transitions` gets the lane, a sequence that gives the order of commit, and the facts of a group; a connection's registration must fail when a take-over came in between; a machine declares which lane creates its rows; the evidence names the commit and the command that really ran — then the merge, and D's notes in the tasks of L and S |
+| Package D, destination basics: **fix round delivered** (`161d847`). The coordinator re-checks it; a second reviewer (Opus, xhigh, reading only; MotherDuck databases `cdc_v2_t_d_rv2_*`) maps exactly which writes DuckDB and MotherDuck record for conflicts and attacks the fence after the fix | P3 | 2026-11-10 | the two verdicts; then the merge, the sentences for core 4.2 and 4.5, plan C4 and C5, and D's notes in the tasks of L, S, V, B, T |
 
 **Package A, apply — delivered 2026-11-10; two reviews; fix round delivered, under its last checks.** The
 coordinator's verdict was "merge after a short fix round". The second reviewer (Fable) then tested the model the
