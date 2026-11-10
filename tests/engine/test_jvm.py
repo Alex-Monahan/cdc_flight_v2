@@ -178,6 +178,16 @@ def test_java_refuses_a_weakened_configuration(artifacts, key, value):
     assert "secret-pw-xyz" not in msg and "secret-pw-xyz" not in err
 
 
+@pytest.mark.parametrize("value", ["s\x00", "s", "s\x00t", "\x00t\x00", "s\x00\x00", "s\x00t\x00u\x00"])
+def test_java_refuses_a_malformed_list_of_tables_without_a_key(artifacts, value):
+    """cdc_v2.keyless.tables (rule K) that is not a sequence of (schema, table) names each ended by NUL: FATAL."""
+    props = base_props()
+    props["cdc_v2.keyless.tables"] = value
+    frames, code, err = run_with_config(artifacts, props)
+    assert code == 1 and len(frames) == 1 and isinstance(frames[0], F.Fatal), (code, frames, err[-500:])
+    assert "Refused" in frames[0].error_class
+
+
 def test_java_held_list_bound_and_end_without_lsn_commit(artifacts):
     p = java(artifacts, "--held-selftest")
     r = json.loads(p.stdout.strip().splitlines()[-1])

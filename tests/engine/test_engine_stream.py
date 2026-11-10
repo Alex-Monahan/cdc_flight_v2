@@ -80,10 +80,16 @@ def test_operations_transactions_and_event_counts(pair, scenario, artifacts):
                                                                     "insert into {s}.t values (41, 'q')", "commit"]),
         ("marker", ["insert into {s}.t values (999, 'end')"]),
     ]
-    with Engine(sc.settings(table_include=include, message_prefixes=("cdc_v2_.*",)), None, artifacts) as eng:
+    # t2 has a deferrable primary key: by rule K a table without a key, so it is listed (test_engine_keys.py)
+    with Engine(sc.settings(table_include=include, message_prefixes=("cdc_v2_.*",), keyless_tables=((s, "t2"),)),
+                None, artifacts) as eng:
         for _name, sts in cases:
             run_sql(pair, [st.format(s=s) for st in sts])
         col = Collector(eng).run(lambda c: any(r["a0"] == 999 for r in c.rows_of("t")), timeout=120)
+        eng.stop(Deadline.after(20))
+    # the same slot again (nothing was acknowledged), t2 only and without the list: Debezium's key decides
+    with Engine(sc.settings(table_include="%s.t2" % s), None, artifacts) as eng:
+        unlisted = Collector(eng).run(lambda c: len(c.rows_of("t2")) >= 6, timeout=120)
         eng.stop(Deadline.after(20))
     txns = col.txns
     # every END count equals the records of its transaction
@@ -102,9 +108,18 @@ def test_operations_transactions_and_event_counts(pair, scenario, artifacts):
     assert [(r["op"], r["a0"], r["k0"]) for _tb, r in chain.rows] == [("d", 1, None), ("c", 10, 1), ("d", 10, None),
                                                                      ("c", 11, 10)]
     swap = txns[txns.index(chain) + 2]
-    ops = sorted((r["op"], r["a0"], r["k0"]) for _tb, r in swap.rows)
+    # listed (rule K): a stream without a key; Debezium still splits each key change into a delete and a create,
+    # and every record carries its complete image, in WAL order
+    sch_t2 = next(v for k, v in col.schemas.items() if k[1] == "t2")
+    assert not sch_t2.has_key and sch_t2.key_positions == ()
+    assert [(r["op"], r["b0"], r["b1"], r["a0"], r["a1"]) for _tb, r in swap.rows] == [
+        ("d", 2, "b", None, None), ("c", None, None, 11, "b"), ("d", 11, "e", None, None), ("c", None, None, 2, "e")]
+    assert not any(k.startswith("k") for _tb, r in swap.rows for k in r)
+    # without the list Debezium's key decides: a delete with the key only and a create that names the old key
+    assert next(v for k, v in unlisted.schemas.items() if k[1] == "t2").has_key
+    ops = sorted((r["op"], r["a0"], r["k0"]) for r in unlisted.rows_of("t2")[2:])
     assert ops == [("c", 2, 11), ("c", 11, 2), ("d", 2, None), ("d", 11, None)]
-    for tb, r in swap.rows:
+    for r in unlisted.rows_of("t2")[2:]:
         if r["op"] == "c":                        # the full new image travels with the create
             assert r["a1"] == {2: "e", 11: "b"}[r["a0"]]
     # keyless: old image in b<i>, new in a<i>

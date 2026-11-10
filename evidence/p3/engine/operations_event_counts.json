@@ -33,7 +33,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.t",
+          "cdc_v2_e_ed5189d0.t",
           3
         ]
       ],
@@ -71,7 +71,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.t",
+          "cdc_v2_e_ed5189d0.t",
           1
         ]
       ],
@@ -91,7 +91,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.t",
+          "cdc_v2_e_ed5189d0.t",
           1
         ]
       ],
@@ -111,7 +111,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.t",
+          "cdc_v2_e_ed5189d0.t",
           4
         ]
       ],
@@ -158,7 +158,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.t2",
+          "cdc_v2_e_ed5189d0.t2",
           2
         ]
       ],
@@ -187,7 +187,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.t2",
+          "cdc_v2_e_ed5189d0.t2",
           4
         ]
       ],
@@ -198,7 +198,7 @@
           "t2",
           [
             "d",
-            2,
+            null,
             null
           ]
         ],
@@ -208,7 +208,7 @@
           [
             "c",
             11,
-            2
+            null
           ]
         ],
         [
@@ -216,7 +216,7 @@
           "t2",
           [
             "d",
-            11,
+            null,
             null
           ]
         ],
@@ -226,7 +226,7 @@
           [
             "c",
             2,
-            11
+            null
           ]
         ]
       ]
@@ -234,7 +234,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.k",
+          "cdc_v2_e_ed5189d0.k",
           3
         ]
       ],
@@ -272,7 +272,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.k",
+          "cdc_v2_e_ed5189d0.k",
           1
         ]
       ],
@@ -292,7 +292,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.k",
+          "cdc_v2_e_ed5189d0.k",
           1
         ]
       ],
@@ -312,7 +312,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.k",
+          "cdc_v2_e_ed5189d0.k",
           1
         ]
       ],
@@ -328,11 +328,11 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.t",
+          "cdc_v2_e_ed5189d0.k",
           1
         ],
         [
-          "cdc_v2_e_b725b302.k",
+          "cdc_v2_e_ed5189d0.t",
           1
         ]
       ],
@@ -353,7 +353,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.parent",
+          "cdc_v2_e_ed5189d0.parent",
           1
         ]
       ],
@@ -373,7 +373,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.child",
+          "cdc_v2_e_ed5189d0.child",
           1
         ]
       ],
@@ -393,11 +393,11 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.parent",
+          "cdc_v2_e_ed5189d0.parent",
           1
         ],
         [
-          "cdc_v2_e_b725b302.child",
+          "cdc_v2_e_ed5189d0.child",
           1
         ]
       ],
@@ -418,7 +418,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.seqt",
+          "cdc_v2_e_ed5189d0.seqt",
           1
         ]
       ],
@@ -438,7 +438,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.seqt",
+          "cdc_v2_e_ed5189d0.seqt",
           1
         ]
       ],
@@ -454,11 +454,11 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.t",
+          "io.debezium.connector.postgresql.LogicalDecodingMessageMonitor$LogicalDecodingMessageId@4684d119",
           1
         ],
         [
-          "io.debezium.connector.postgresql.LogicalDecodingMessageMonitor$LogicalDecodingMessageId@7a85ac69",
+          "cdc_v2_e_ed5189d0.t",
           1
         ]
       ],
@@ -483,7 +483,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.t",
+          "cdc_v2_e_ed5189d0.t",
           1
         ]
       ],
@@ -508,7 +508,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.t",
+          "cdc_v2_e_ed5189d0.t",
           2
         ]
       ],
@@ -537,12 +537,12 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.t",
-          2
+          "cdc_v2_e_ed5189d0.k",
+          1
         ],
         [
-          "cdc_v2_e_b725b302.k",
-          1
+          "cdc_v2_e_ed5189d0.t",
+          2
         ]
       ],
       "event_count": 3,
@@ -579,7 +579,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.t",
+          "cdc_v2_e_ed5189d0.t",
           1
         ]
       ],
@@ -604,7 +604,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.t",
+          "cdc_v2_e_ed5189d0.t",
           1
         ]
       ],
@@ -624,7 +624,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_b725b302.t",
+          "cdc_v2_e_ed5189d0.t",
           1
         ]
       ],

@@ -1,0 +1,34 @@
+{
+  "event_counts": [
+    1,
+    1,
+    1
+  ],
+  "fatal": false,
+  "rows": {
+    "b.c": [
+      2
+    ],
+    "c": [
+      1
+    ],
+    "m": [
+      999
+    ]
+  },
+  "tables_seen": [
+    [
+      "<s>",
+      "b.c"
+    ],
+    [
+      "<s>",
+      "m"
+    ],
+    [
+      "<s>.b",
+      "c"
+    ]
+  ],
+  "test": "tests/engine/test_engine_names.py::test_dotted_schema_and_dotted_table_that_print_alike"
+}

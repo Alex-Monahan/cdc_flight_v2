@@ -1,0 +1,27 @@
+{
+  "event_counts": [
+    2,
+    1,
+    1
+  ],
+  "fatal": false,
+  "rows": {
+    "m": [
+      999
+    ],
+    "q": [
+      1,
+      2,
+      3
+    ]
+  },
+  "tables_seen": [
+    [
+      "m"
+    ],
+    [
+      "q"
+    ]
+  ],
+  "test": "tests/engine/test_engine_names.py::test_quoted_name_next_to_the_plain_name"
+}

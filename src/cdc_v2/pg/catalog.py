@@ -79,9 +79,9 @@ class SourceTable:
     rls_applies_to_reader: bool    # row_security_active(): policies filter what the reading role sees (H-039)
     columns: tuple[Column, ...]
     max_attnum: int                # highest attnum including dropped columns: gaps in `columns` are dropped ones
-    key: tuple[str, ...]           # primary key columns, or else the replica identity index, in key order
-    key_attnums: tuple[int, ...]
-    key_source: str | None         # 'primary key' | 'replica identity index' | None
+    key: tuple[str, ...]           # rule K: the primary key columns in key order when the table has a key, else ()
+    key_attnums: tuple[int, ...]   # the same as attnums; () for every table without a key (rule K)
+    key_source: str | None         # 'primary key' when the table has a key (rule K), else None
     has_primary_key: bool
     replica_identity: str          # default | index | full | nothing
     replica_identity_index: str | None
@@ -89,35 +89,71 @@ class SourceTable:
     published: bool                # in our publication (directly or through a partition ancestor)
     publication_columns: tuple[str, ...] | None   # column list of our publication for this table (H-023)
     publication_row_filter: str | None
+    primary_key_deferrable: bool = False   # the primary key is DEFERRABLE (pg_index.indimmediate is false)
 
     @property
     def qualified(self) -> tuple[str, str]:
         return (self.schema, self.name)
 
     @property
+    def has_key(self) -> bool:
+        """Rule K (core design section 6): the table has a key, its primary key. False for every other table."""
+        return has_key(self.has_primary_key, self.primary_key_deferrable, self.replica_identity,
+                       self.replica_identity_index_is_key)
+
+    @property
+    def name_problem(self) -> str | None:
+        """The name rule: a double quote in the schema or table name means the table is not streamed (stock
+        Debezium 3.7.1 stops with FATAL or drops the records of such names; docs/design/engine.md 4a, H-051). The
+        message never holds the name."""
+        return name_problem(self.schema, self.name)
+
+    @property
     def replica_identity_problem(self) -> str | None:
-        """Why the table cannot be published as it is, or None. A table without a primary key needs
-        REPLICA IDENTITY FULL (also with USING INDEX: Debezium gives such a table no key); a table with a primary
-        key needs DEFAULT, FULL, or an index identity that is the primary key's index (H-014)."""
-        return identity_problem(self.has_primary_key, self.replica_identity, self.replica_identity_index_is_key)
+        """Why the table cannot be published as it is, or None. A table without a primary key, and a table whose
+        primary key is deferrable, needs REPLICA IDENTITY FULL (also with USING INDEX: such a table has no key by
+        rule K); a table with an immediate primary key needs DEFAULT, FULL, or an index identity that is the primary
+        key's index (H-014, H-015)."""
+        return identity_problem(self.has_primary_key, self.replica_identity, self.replica_identity_index_is_key,
+                                pk_deferrable=self.primary_key_deferrable)
 
     def hash(self) -> str:
         """Stable hash of everything in this value."""
         return _hash(asdict(self))
 
     def shape_hash(self) -> str:
-        """Hash of what a destination table is built for: OID, names, columns (attnum, name, type), key, replica
-        identity. Not relfilenode, row security or publication membership."""
+        """Hash of what a destination table is built for: OID, names, columns (attnum, name, type), the key facts
+        (rule K's answer, key columns, deferrability of the primary key) and replica identity. Not relfilenode, row
+        security or publication membership."""
         return _hash({"oid": self.oid, "schema": self.schema, "name": self.name,
                       "columns": [(c.attnum, c.name, c.type_oid, c.typmod, c.type_name) for c in self.columns],
-                      "key": self.key_attnums, "replica_identity": self.replica_identity})
+                      "key": self.key_attnums, "has_key": self.has_key,
+                      "pk_deferrable": self.primary_key_deferrable, "replica_identity": self.replica_identity})
 
 
-def identity_problem(has_pk: bool, replident: str, index_is_pk: bool) -> str | None:
+def name_problem(schema: str, name: str) -> str | None:
+    """See SourceTable.name_problem."""
+    where = [w for w, n in (("schema", schema), ("table", name)) if '"' in n]
+    if not where:
+        return None
+    return "%s name contains a double quote: stock Debezium cannot stream it" % " and ".join(where)
+
+
+def has_key(has_pk: bool, pk_deferrable: bool, replident: str, index_is_pk: bool) -> bool:
+    """Rule K (core design section 6): a table has a key when it has a primary key that is not deferrable and its
+    replica identity is DEFAULT, FULL, or USING INDEX on the primary key's own index. Every other table that can be
+    published is a table without a key and needs REPLICA IDENTITY FULL."""
+    return bool(has_pk and not pk_deferrable
+                and (replident in ("default", "full") or (replident == "index" and index_is_pk)))
+
+
+def identity_problem(has_pk: bool, replident: str, index_is_pk: bool, *, pk_deferrable: bool = False) -> str | None:
     if replident == "full":
         return None
     if not has_pk:
         return "no primary key: needs REPLICA IDENTITY FULL (replica identity is %s)" % replident
+    if pk_deferrable:
+        return "primary key is deferrable: needs REPLICA IDENTITY FULL (replica identity is %s)" % replident
     if replident == "default" or (replident == "index" and index_is_pk):
         return None
     if replident == "nothing":
@@ -171,7 +207,8 @@ ORDER BY a.attrelid, a.attnum
 
 _KEYS_SQL = """
 SELECT i.indrelid, i.indexrelid, i.indisprimary, i.indisreplident, ic.relname,
-       ARRAY(SELECT i.indkey[k] FROM generate_series(0, i.indnkeyatts - 1) k)        -- key columns, not INCLUDE
+       ARRAY(SELECT i.indkey[k] FROM generate_series(0, i.indnkeyatts - 1) k),       -- key columns, not INCLUDE
+       i.indimmediate
 FROM pg_index i JOIN pg_class ic ON ic.oid = i.indexrelid
 WHERE i.indrelid = ANY(%s) AND (i.indisprimary OR i.indisreplident)
 """
@@ -307,8 +344,10 @@ def _build_tables(rows, cols, keys, pub, types, names_by_oid) -> list[SourceTabl
             by_attnum[attnum] = col
         pk = next((k for k in keys_by.get(oid, []) if k[2]), None)
         ri = next((k for k in keys_by.get(oid, []) if k[3]), None)
-        key_row = pk or (ri if replident == "i" else None)
-        key_attnums = tuple(int(a) for a in key_row[5]) if key_row else ()
+        pk_deferrable = bool(pk is not None and not pk[6])
+        ri_is_pk = bool(ri and pk and ri[1] == pk[1])
+        keyed = has_key(pk is not None, pk_deferrable, REPLIDENT.get(replident, replident), ri_is_pk)
+        key_attnums = tuple(int(a) for a in pk[5]) if keyed else ()
         p = pub_by.get(oid)
         via_ancestor = next((pub_by[a] for a in (ancestors or []) if a in pub_by), None)
         prow = p or via_ancestor
@@ -322,12 +361,12 @@ def _build_tables(rows, cols, keys, pub, types, names_by_oid) -> list[SourceTabl
             rls_forced=rlsforce, rls_applies_to_reader=bool(rlsactive), columns=tuple(columns),
             max_attnum=max_attnum or 0,
             key=tuple(by_attnum[a].name for a in key_attnums if a in by_attnum), key_attnums=key_attnums,
-            key_source="primary key" if pk else ("replica identity index" if key_row else None),
+            key_source="primary key" if keyed else None,
             has_primary_key=pk is not None, replica_identity=REPLIDENT.get(replident, replident),
             replica_identity_index=ri[4] if ri else None,
-            replica_identity_index_is_key=bool(ri and pk and ri[1] == pk[1]),
+            replica_identity_index_is_key=ri_is_pk,
             published=all_tables or prow is not None, publication_columns=pcols,
-            publication_row_filter=p[2] if p is not None else None))
+            publication_row_filter=p[2] if p is not None else None, primary_key_deferrable=pk_deferrable))
     return out
 
 
@@ -362,26 +401,35 @@ class TableFacts:
     published: bool                                # in our publication, directly or through a partition ancestor
     publication_has_column_list: bool
     publication_has_row_filter: bool
+    pk_deferrable: bool = False                    # the primary key is DEFERRABLE (pg_index.indimmediate is false)
 
     @property
     def columns(self) -> tuple[ColumnFacts, ...]:
         return tuple(c for c in self.all_columns if not c.dropped)
 
     @property
+    def has_key(self) -> bool:
+        """Rule K, as SourceTable.has_key."""
+        return has_key(bool(self.pk_attnums), self.pk_deferrable, self.replica_identity,
+                       self.replica_identity_index_is_key)
+
+    @property
     def key_attnums(self) -> tuple[int, ...]:
-        if self.pk_attnums:
-            return self.pk_attnums
-        return self.replica_identity_index_attnums or () if self.replica_identity == "index" else ()
+        """Rule K: the primary key's attnums when the table has a key, else ()."""
+        return self.pk_attnums if self.has_key else ()
 
     @property
     def identity(self) -> tuple:
         """What a destination table is built for (package T): OID; per live column attnum, name, type, modifier;
-        the key columns. Not relfilenode."""
-        return (self.oid, tuple((c.attnum, c.name, c.type_oid, c.typmod) for c in self.columns), self.key_attnums)
+        the key columns (rule K); the replica identity, the attnums of the identity index (USING INDEX) and the
+        deferrability of the primary key, which decide what old image the stream carries. Not relfilenode."""
+        return (self.oid, tuple((c.attnum, c.name, c.type_oid, c.typmod) for c in self.columns), self.key_attnums,
+                self.replica_identity, self.replica_identity_index_attnums, self.pk_deferrable)
 
     @property
     def replica_identity_problem(self) -> str | None:
-        return identity_problem(bool(self.pk_attnums), self.replica_identity, self.replica_identity_index_is_key)
+        return identity_problem(bool(self.pk_attnums), self.replica_identity, self.replica_identity_index_is_key,
+                                pk_deferrable=self.pk_deferrable)
 
 
 @dataclass(frozen=True)
@@ -450,7 +498,8 @@ SELECT c.oid, n.nspname, c.relname, c.relfilenode, c.relreplident, c.relkind, c.
           SELECT 1 FROM pg_publication_rel pa
           WHERE pa.prpubid IN (SELECT oid FROM pub)
             AND pa.prrelid IN (SELECT relid FROM pg_partition_ancestors(c.oid)))) AS published,
-       pr.prattrs IS NOT NULL AS has_cols, pr.prqual IS NOT NULL AS has_filter
+       pr.prattrs IS NOT NULL AS has_cols, pr.prqual IS NOT NULL AS has_filter,
+       (SELECT NOT i.indimmediate FROM pg_index i WHERE i.indrelid = c.oid AND i.indisprimary) AS pk_deferrable
 FROM rels JOIN pg_class c ON c.oid = rels.oid JOIN pg_namespace n ON n.oid = c.relnamespace
 LEFT JOIN pg_publication_rel pr ON pr.prrelid = c.oid AND pr.prpubid IN (SELECT oid FROM pub)
 LEFT JOIN LATERAL (
@@ -531,7 +580,7 @@ def _observe_pipeline(node, publication, schemas, rel, where, deadline):
 def _build_observation(b, a, in_recovery, snap, facts, pub, requested) -> CatalogObservation:
     tables_ = {}
     for (oid, nsp, rel, filenode, replident, relkind, persistence, ispart, attnums, attnames, typids, typmods,
-         dropped, gens, hasdefs, pk, ri, ri_is_pk, published, has_cols, has_filter) in facts:
+         dropped, gens, hasdefs, pk, ri, ri_is_pk, published, has_cols, has_filter, pk_def) in facts:
         cols = tuple(ColumnFacts(attnum=attnums[i], name=attnames[i], type_oid=typids[i], typmod=typmods[i],
                                  dropped=dropped[i], generated=GENERATED.get(gens[i], gens[i]),
                                  has_default=hasdefs[i]) for i in range(len(attnums or [])))
@@ -542,7 +591,8 @@ def _build_observation(b, a, in_recovery, snap, facts, pub, requested) -> Catalo
                                   all_columns=cols, pk_attnums=tuple(pk or ()),
                                   replica_identity_index_attnums=tuple(ri) if ri is not None else None,
                                   replica_identity_index_is_key=bool(ri_is_pk), published=published,
-                                  publication_has_column_list=has_cols, publication_has_row_filter=has_filter)
+                                  publication_has_column_list=has_cols, publication_has_row_filter=has_filter,
+                                  pk_deferrable=bool(pk_def))
     by_name = {(t.schema, t.name): t for t in tables_.values()}
     pubfacts = None
     if pub:
@@ -609,6 +659,10 @@ def _published(t) -> bool:
     return bool(getattr(t, "published", False))
 
 
+def _pk_deferrable(t) -> bool:
+    return bool(getattr(t, "primary_key_deferrable", getattr(t, "pk_deferrable", False)))
+
+
 def diff(old, new) -> CatalogDiff:
     """What changed between two reads: two CatalogObservations, two lists of SourceTable, or mappings OID -> value.
     Column identity is the attnum: a rename keeps it, a drop and add allocates a new one (H-008)."""
@@ -640,7 +694,8 @@ def diff(old, new) -> CatalogDiff:
         ch = TableChange(
             oid=oid, schema=b.schema, name=b.name, columns_added=added, columns_dropped=dropped, columns_renamed=ren,
             columns_retyped=rety, rewritten=a.relfilenode != b.relfilenode,
-            key_changed=tuple(a.key_attnums) != tuple(b.key_attnums),
+            key_changed=(tuple(a.key_attnums) != tuple(b.key_attnums)
+                         or _pk_deferrable(a) != _pk_deferrable(b)),
             replica_identity_changed=(a.replica_identity, b.replica_identity)
             if a.replica_identity != b.replica_identity else None,
             persistence_changed=(a.persistence, b.persistence) if a.persistence != b.persistence else None,

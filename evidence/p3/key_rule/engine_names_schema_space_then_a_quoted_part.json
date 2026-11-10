@@ -1,0 +1,8 @@
+{
+  "event_counts": [],
+  "fatal": true,
+  "rows": {},
+  "schema": "x \"q\"",
+  "tables_seen": [],
+  "test": "tests/engine/test_engine_names.py::test_the_shapes_as_schema_names[space then a quoted part]"
+}
