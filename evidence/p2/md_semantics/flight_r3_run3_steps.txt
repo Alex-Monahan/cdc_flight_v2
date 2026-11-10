@@ -1,0 +1,7 @@
+BOOT fetched commit 70d6ee938180 in 0.3 s; 2 step(s)
+STEP 0 apply_txn.py  start
+STEP 0 apply_txn.py exit 0 after 236.9 s
+STEP 1 bulk_load.py  start
+STEP 1 bulk_load.py exit 0 after 254.0 s
+BOOT done in 491.2 s, failed steps: 0
+run 3: status=SUCCEEDED, exit_code=0, started_at=2026-11-10T03:21:15.853+00:00, ended_at=2026-11-10T03:29:30.978+00:00
