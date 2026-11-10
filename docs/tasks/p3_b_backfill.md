@@ -39,6 +39,17 @@ protocol with cases of its own.
   H-039, H-044, H-046, H-048. Where a hazard says **[test]** and the fact decides a backfill read, the test is
   yours unless a merged package's document already answers it; then cite it.
 
+## From the engine as built — build on it
+
+Package E is built and reviewed. `docs/design/engine.md` is the full account; where it differs from what this task
+says elsewhere, these points and that document hold.
+
+- Rows of a table that is being backfilled arrive in ordinary `ROWS` frames. Package Y's cross-path test is the
+  guarantee that the text of a chunk and the transport forms of the stream give equal destination values; a type
+  that fails it is a finding for Y, not something to convert a second way here.
+- A table that the stream quarantined because the engine cannot read one of its values (package S) is backfilled
+  "after a gap": its `P0` and its hand-off follow the same rules as any other gap.
+
 ## What may be missing when you start
 
 Packages X, E, D, A, P, Y, S and O are merged. Package V (slot continuity) may or may not be: its finding reaches
