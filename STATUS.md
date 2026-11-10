@@ -25,7 +25,7 @@ Last updated: 2026-11-09, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 | Spike (PLAN §2 A) | State | Report |
 |---|---|---|
 | 4 Flight SQL functions, platform facts | done | `docs/spike/flight_platform.md` |
-| 3 MotherDuck semantics | running | `docs/spike/md_semantics.md` |
+| 3 MotherDuck semantics | laptop part done and merged; the network-bound measurements are being repeated inside an F16 Flight | `docs/spike/md_semantics.md` |
 | 1 JVM and stock Debezium on a Flight | running | `docs/spike/jvm_on_flight.md` |
 | 2 Run semantics | running | `docs/spike/run_semantics.md` |
 | 5 Local throughput (first indication) | part 1 (read rate from the replica) running; part 2 (stock Debezium streaming rate) waits for the JVM program of spike 1 | `docs/spike/local_throughput.md` |
@@ -92,7 +92,7 @@ Each in its own worktree and branch (Opus, high effort); the orchestrator merges
 
 | Job | Phase | Started | Delivers |
 |---|---|---|---|
-| Spike worker: MotherDuck semantics | P2 (§2 A 3) | 2026-11-09 | `spikes/md_semantics/`, `docs/spike/md_semantics.md`, `evidence/p2/md_semantics/` |
+| Spike worker: MotherDuck semantics, second part — the same measurements inside an F16 Flight (`cdc_v2_spike_md*`) | P2 (§2 A 3) | 2026-11-09 | `flights/spike_md/`, additions to `docs/spike/md_semantics.md`, `evidence/p2/md_semantics/flight_*` |
 | Spike worker: JVM and stock Debezium on a Flight | P2 (§2 A 1) | 2026-11-09 | `flights/spike_jvm/`, `docs/spike/jvm_on_flight.md`, `evidence/p2/jvm_on_flight/` |
 | Spike worker: run semantics | P2 (§2 A 2) | 2026-11-09 | `flights/spike_runs/`, `docs/spike/run_semantics.md`, `evidence/p2/run_semantics/` |
 | Spike worker: local read throughput (private cluster, home `pg-spike-tp`, ports 55500–55509; MotherDuck database `cdc_v2_spike_tp`) | P2 (§2 A 5, part 1) | 2026-11-09 | `spikes/local_throughput/`, `docs/spike/local_throughput.md`, `evidence/p2/local_throughput/` |
@@ -102,6 +102,13 @@ one 10M-row transaction). It reuses the JVM program of the JVM spike and the pri
 
 Finished and merged:
 
+- 2026-11-09 — MotherDuck semantics, laptop part (§2 A 3): `spikes/md_semantics/`, `docs/spike/md_semantics.md`,
+  `evidence/p2/md_semantics/`. Design consequences (binding for P3 unless the Flight run changes them): heartbeat
+  time comes from `uuid_extract_timestamp(uuidv7())` because `now()` is computed by the client; destination tables
+  carry no keys or indexes and apply is `DELETE … USING` + `INSERT`; the leader record stores the leader's
+  connection id and a takeover interrupts that connection (a dead client's open transaction otherwise holds its rows
+  for about 30 s); the fence is the last statement before `COMMIT`; the leader row is only ever updated; parallel
+  appliers have separate state rows; many source transactions share one destination commit; `TimeZone` is `UTC`.
 - 2026-11-09 — Hazard research, first pass (P5, started early): `docs/research/debezium.md` (pin, delivery contract,
   recommended configuration), `docs/research/replica_decoding.md` (standby decoding in Postgres 16–18, PlanetScale's
   public documentation, what stage 2 must test first), `docs/wal_hazards.md` (H-001 to H-050, every prevention still
