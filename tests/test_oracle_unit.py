@@ -61,6 +61,17 @@ def test_row_diff_sample_is_bounded():
     assert r.missing_rows == 50 and len(r.sample["missing"]) == 3
 
 
+def test_diff_counts_with_capped_values_is_truncated_but_exact():
+    from collections import Counter
+    p = plan()
+    sv = {h: (a, b) for h, a, b in rows(("1", "a"))}
+    missing = Counter({h: 1 for h in sv})
+    missing[12345] = 3                                      # values of this hash were not kept
+    r = K.TableResult("public.t", "public.t")
+    K._diff_counts(p, missing, sv, Counter(), {}, r, 10)
+    assert r.missing_rows == 4 and r.truncated and len(r.sample["missing"]) == 1
+
+
 def test_ctid_ranges():
     assert K.ctid_ranges(10, 4, 256) == [""]
     rs = K.ctid_ranges(10_000, 4, 256)

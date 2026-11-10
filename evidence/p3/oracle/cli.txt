@@ -1,8 +1,8 @@
 $ tools/oracle --source-port 55432 --source-db <db> --dest-db <db> --chunk-rows 500 --json -
 exit 0
-oracle: EQUAL (3 tables, 3014 rows, 2.1 s, 1427 rows/s)
+oracle: EQUAL (3 tables, 3014 rows, 2.3 s, 1299 rows/s)
 
 after deleting row id=7 on the destination:
 exit 1
-oracle: DIFFERENT (3 tables, 3014 rows, 2.8 s, 1090 rows/s)
+oracle: DIFFERENT (3 tables, 3014 rows, 2.8 s, 1092 rows/s)
   public.types_k: source 7 rows, destination 6 rows, missing 1, extra 0, different 0

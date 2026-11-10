@@ -10,6 +10,1909 @@
     "public.dups": 7,
     "public.types_k": 7
   },
-  "mutations": [],
+  "mutations": [
+    {
+      "detail": {
+        "missing_extra_different": [
+          1,
+          0,
+          0
+        ],
+        "sample": {
+          "different": [],
+          "extra": [],
+          "missing": [
+            {
+              "c_bigint": "0",
+              "c_bool": "f",
+              "c_bytea": "0a",
+              "c_char": "x",
+              "c_date": "0",
+              "c_double": "Infinity",
+              "c_double_arr": "[1:1]{V1:0}",
+              "c_int": "0",
+              "c_int_arr": "[1:1]{V1:0}",
+              "c_interval": "0:-1:-1",
+              "c_json": "\"str\"",
+              "c_jsonb": "\"str\"",
+              "c_num": "0.0001",
+              "c_num_arr": "[1:1]{V1:0}",
+              "c_num_u": "-Infinity",
+              "c_real": "Infinity",
+              "c_smallint": "0",
+              "c_text": "a'quote",
+              "c_text_arr": "[1:1]{V0:}",
+              "c_time": "86399999999",
+              "c_ts": "0",
+              "c_tstz": "0",
+              "c_tstz_arr": "[1:1]{V1:0}",
+              "c_uuid": "6f9619ff-8b86-d011-b42d-00c04fc964ff",
+              "c_varchar": "x",
+              "id": "5"
+            }
+          ]
+        },
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "missing_row",
+      "seconds": 1.0,
+      "statements": [
+        "DELETE FROM public.types_k WHERE id = 5"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          1,
+          0
+        ],
+        "sample": {
+          "different": [],
+          "extra": [
+            {
+              "c_bigint": null,
+              "c_bool": null,
+              "c_bytea": null,
+              "c_char": null,
+              "c_date": null,
+              "c_double": null,
+              "c_double_arr": null,
+              "c_int": null,
+              "c_int_arr": null,
+              "c_interval": null,
+              "c_json": null,
+              "c_jsonb": null,
+              "c_num": null,
+              "c_num_arr": null,
+              "c_num_u": null,
+              "c_real": null,
+              "c_smallint": null,
+              "c_text": null,
+              "c_text_arr": null,
+              "c_time": null,
+              "c_ts": null,
+              "c_tstz": null,
+              "c_tstz_arr": null,
+              "c_uuid": null,
+              "c_varchar": null,
+              "id": "100"
+            }
+          ],
+          "missing": []
+        },
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "extra_row",
+      "seconds": 1.488,
+      "statements": [
+        "INSERT INTO public.types_k (id) VALUES (100)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          1,
+          0
+        ],
+        "sample": {
+          "different": [],
+          "extra": [
+            {
+              "c_bigint": "3",
+              "c_bool": "t",
+              "c_bytea": "ab00",
+              "c_char": "ab",
+              "c_date": "19724",
+              "c_double": "0.1e0",
+              "c_double_arr": "[1:2]{V2:-0,V7:0.1e301}",
+              "c_int": "2",
+              "c_int_arr": "[1:3]{V1:1,N,V1:3}",
+              "c_interval": "14:3:14706000007",
+              "c_json": "{\"b\": 1,  \"a\":2}",
+              "c_jsonb": "{\"a\": [1, 2.50], \"b\": 1}",
+              "c_num": "12345.6789",
+              "c_num_arr": "[1:2]{V3:1.5,V3:NaN}",
+              "c_num_u": "1.5",
+              "c_real": "0.1e0",
+              "c_smallint": "1",
+              "c_text": "hello",
+              "c_text_arr": "[1:3]{V1:x,V0:,N}",
+              "c_time": "3723000004",
+              "c_ts": "1704067200000001",
+              "c_tstz": "1704067200000001",
+              "c_tstz_arr": "[1:1]{V16:1704067200000000}",
+              "c_uuid": "6f9619ff-8b86-d011-b42d-00c04fc964ff",
+              "c_varchar": "v",
+              "id": "2"
+            }
+          ],
+          "missing": []
+        },
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "duplicate_key_row",
+      "seconds": 1.595,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * FROM public.types_k WHERE id = 2"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          1,
+          0,
+          0
+        ],
+        "sample": {
+          "different": [],
+          "extra": [],
+          "missing": [
+            {
+              "c_bigint": null,
+              "c_bool": null,
+              "c_bytea": null,
+              "c_char": null,
+              "c_date": null,
+              "c_double": null,
+              "c_double_arr": null,
+              "c_int": null,
+              "c_int_arr": null,
+              "c_interval": null,
+              "c_json": null,
+              "c_jsonb": null,
+              "c_num": null,
+              "c_num_arr": null,
+              "c_num_u": null,
+              "c_real": null,
+              "c_smallint": null,
+              "c_text": null,
+              "c_text_arr": null,
+              "c_time": null,
+              "c_ts": null,
+              "c_tstz": null,
+              "c_tstz_arr": null,
+              "c_uuid": null,
+              "c_varchar": null,
+              "id": "1"
+            }
+          ]
+        },
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "all_null_row_missing",
+      "seconds": 0.992,
+      "statements": [
+        "DELETE FROM public.types_k WHERE id = 1"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          1,
+          0,
+          0
+        ],
+        "sample": {
+          "different": [],
+          "extra": [],
+          "missing": [
+            {
+              "a": "1",
+              "b": "x",
+              "c": "1.5"
+            }
+          ]
+        },
+        "table": "public.dups"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "keyless_one_identical_row_less",
+      "seconds": 0.738,
+      "statements": [
+        "DELETE FROM public.dups WHERE rowid = (SELECT min(rowid) FROM public.dups WHERE a = 1)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          1,
+          0
+        ],
+        "sample": {
+          "different": [],
+          "extra": [
+            {
+              "a": "1",
+              "b": "x",
+              "c": "1.5"
+            }
+          ],
+          "missing": []
+        },
+        "table": "public.dups"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "keyless_one_identical_row_more",
+      "seconds": 0.89,
+      "statements": [
+        "INSERT INTO public.dups SELECT * FROM public.dups WHERE a = 1 LIMIT 1"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          1,
+          0
+        ],
+        "sample": {
+          "different": [],
+          "extra": [
+            {
+              "a": "2",
+              "b": null,
+              "c": null
+            }
+          ],
+          "missing": []
+        },
+        "table": "public.dups"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "keyless_identical_null_row_more",
+      "seconds": 0.837,
+      "statements": [
+        "INSERT INTO public.dups SELECT * FROM public.dups WHERE a = 2 LIMIT 1"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          1,
+          1,
+          0
+        ],
+        "sample": {
+          "different": [],
+          "extra": [
+            {
+              "a": null,
+              "b": null,
+              "c": "0"
+            }
+          ],
+          "missing": [
+            {
+              "a": null,
+              "b": "",
+              "c": "0"
+            }
+          ]
+        },
+        "table": "public.dups"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "keyless_empty_string_becomes_null",
+      "seconds": 0.836,
+      "statements": [
+        "UPDATE public.dups SET b = NULL WHERE a IS NULL"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          1,
+          0,
+          0
+        ],
+        "sample": {
+          "different": [],
+          "extra": [],
+          "missing": [
+            {
+              "l_comment": "carefully final packages 81dc9bdb52d04dc2",
+              "l_commitdate": "9299",
+              "l_discount": "0.02",
+              "l_extendedprice": "1690.58",
+              "l_linenumber": "3",
+              "l_linestatus": "F",
+              "l_orderkey": "1234",
+              "l_partkey": "8638",
+              "l_quantity": "35",
+              "l_receiptdate": "9278",
+              "l_returnflag": "N",
+              "l_shipdate": "9269",
+              "l_shipinstruct": "NONE",
+              "l_shipmode": "REG AIR",
+              "l_suppkey": "16042",
+              "l_tax": "0.01"
+            }
+          ]
+        },
+        "table": "other.big"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "big_table_row_missing",
+      "seconds": 0.859,
+      "statements": [
+        "DELETE FROM other.big WHERE l_orderkey = 1234"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": {
+          "different": [
+            {
+              "columns": {
+                "l_extendedprice": {
+                  "destination": "105.5",
+                  "source": "105.49"
+                }
+              },
+              "key": {
+                "l_linenumber": "1",
+                "l_orderkey": "77"
+              }
+            }
+          ],
+          "extra": [],
+          "missing": []
+        },
+        "table": "other.big"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "big_table_last_digit",
+      "seconds": 1.0,
+      "statements": [
+        "UPDATE other.big SET l_extendedprice = l_extendedprice + 0.01 WHERE l_orderkey = 77"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_smallint": {
+                "destination": "2",
+                "source": "1"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "smallint",
+      "seconds": 1.58,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (c_smallint + 1 AS c_smallint) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_int": {
+                "destination": "3",
+                "source": "2"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "integer",
+      "seconds": 1.622,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (c_int + 1 AS c_int) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_bigint": {
+                "destination": "-9223372036854775807",
+                "source": "-9223372036854775808"
+              }
+            },
+            "key": {
+              "id": "3"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "bigint_boundary",
+      "seconds": 1.53,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (c_bigint + 1 AS c_bigint) FROM public.types_k WHERE id = 3",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 3)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_bool": {
+                "destination": "f",
+                "source": "t"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "boolean",
+      "seconds": 1.607,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (NOT c_bool AS c_bool) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_bool": {
+                "destination": "f",
+                "source": null
+              }
+            },
+            "key": {
+              "id": "1"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "boolean_null",
+      "seconds": 1.44,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (false AS c_bool) FROM public.types_k WHERE id = 1",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 1)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_num": {
+                "destination": "12345.679",
+                "source": "12345.6789"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "numeric_last_digit",
+      "seconds": 1.474,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (c_num + 0.0001 AS c_num) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_num_u": {
+                "destination": "1.51",
+                "source": "1.5"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "numeric_union_decimal_member",
+      "seconds": 1.543,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (1.51::DECIMAL(38,10) AS c_num_u) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_num_u": {
+                "destination": "Infinity",
+                "source": "NaN"
+              }
+            },
+            "key": {
+              "id": "3"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "numeric_nan_to_infinity",
+      "seconds": 1.537,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE ('Infinity' AS c_num_u) FROM public.types_k WHERE id = 3",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 3)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_num_u": {
+                "destination": "!null",
+                "source": "NaN"
+              }
+            },
+            "key": {
+              "id": "3"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "numeric_nan_to_null",
+      "seconds": 1.527,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (NULL AS c_num_u) FROM public.types_k WHERE id = 3",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 3)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_num_u": {
+                "destination": "123456789012345678901234567890.123456788",
+                "source": "123456789012345678901234567890.123456789"
+              }
+            },
+            "key": {
+              "id": "6"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "numeric_wide_last_digit",
+      "seconds": 1.508,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE ('123456789012345678901234567890.123456788' AS c_num_u) FROM public.types_k WHERE id = 6",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 6)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_real": {
+                "destination": "0.10000001e0",
+                "source": "0.1e0"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "real_one_ulp",
+      "seconds": 1.547,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (nextafter(c_real, 1::FLOAT) AS c_real) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_real": {
+                "destination": "0",
+                "source": "-0"
+              }
+            },
+            "key": {
+              "id": "3"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "real_negative_zero",
+      "seconds": 1.442,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (0 AS c_real) FROM public.types_k WHERE id = 3",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 3)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_real": {
+                "destination": "0.1e1",
+                "source": "NaN"
+              }
+            },
+            "key": {
+              "id": "4"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "real_nan",
+      "seconds": 1.52,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (1 AS c_real) FROM public.types_k WHERE id = 4",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 4)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_double": {
+                "destination": "0.10000000000000002e0",
+                "source": "0.1e0"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "double_one_ulp",
+      "seconds": 1.537,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (nextafter(c_double, 1) AS c_double) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_double": {
+                "destination": "0",
+                "source": "-0"
+              }
+            },
+            "key": {
+              "id": "3"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "double_negative_zero_vs_zero",
+      "seconds": 1.445,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (0.0 AS c_double) FROM public.types_k WHERE id = 3",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 3)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_double": {
+                "destination": "0.1e1",
+                "source": "NaN"
+              }
+            },
+            "key": {
+              "id": "4"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "double_nan_to_number",
+      "seconds": 1.519,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (1.0 AS c_double) FROM public.types_k WHERE id = 4",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 4)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_double": {
+                "destination": "NaN",
+                "source": "0.1e0"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "double_number_to_nan",
+      "seconds": 1.536,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE ('nan'::DOUBLE AS c_double) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_double": {
+                "destination": "-Infinity",
+                "source": "Infinity"
+              }
+            },
+            "key": {
+              "id": "5"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "double_infinity_sign",
+      "seconds": 1.444,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE ('-inf'::DOUBLE AS c_double) FROM public.types_k WHERE id = 5",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 5)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_text": {
+                "destination": null,
+                "source": ""
+              }
+            },
+            "key": {
+              "id": "3"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "text_empty_to_null",
+      "seconds": 1.504,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (NULL AS c_text) FROM public.types_k WHERE id = 3",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 3)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_text": {
+                "destination": "",
+                "source": null
+              }
+            },
+            "key": {
+              "id": "1"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "text_null_to_empty",
+      "seconds": 1.537,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE ('' AS c_text) FROM public.types_k WHERE id = 1",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 1)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_text": {
+                "destination": "hellO",
+                "source": "hello"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "text_one_char",
+      "seconds": 1.54,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE ('hellO' AS c_text) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_text": {
+                "destination": "h\u00e9llo world \u2713",
+                "source": "h\u00e9llo w\u00f6rld \u2713"
+              }
+            },
+            "key": {
+              "id": "4"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "text_unicode",
+      "seconds": 1.539,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE ('h\u00e9llo world \u2713' AS c_text) FROM public.types_k WHERE id = 4",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 4)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_varchar": {
+                "destination": "w",
+                "source": "v"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "varchar",
+      "seconds": 1.533,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE ('w' AS c_varchar) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_char": {
+                "destination": "ac",
+                "source": "ab"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "char",
+      "seconds": 1.643,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE ('ac' AS c_char) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_bytea": {
+                "destination": "ab01",
+                "source": "ab00"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "bytea_one_byte",
+      "seconds": 1.62,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE ('\\xAB\\x01'::BLOB AS c_bytea) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_bytea": {
+                "destination": null,
+                "source": ""
+              }
+            },
+            "key": {
+              "id": "3"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "bytea_empty_to_null",
+      "seconds": 1.527,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (NULL AS c_bytea) FROM public.types_k WHERE id = 3",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 3)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_date": {
+                "destination": "19725",
+                "source": "19724"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "date_one_day",
+      "seconds": 1.622,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (c_date + 1 AS c_date) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_date": {
+                "destination": "2932896",
+                "source": "infinity"
+              }
+            },
+            "key": {
+              "id": "3"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "date_infinity",
+      "seconds": 1.52,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (DATE '9999-12-31' AS c_date) FROM public.types_k WHERE id = 3",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 3)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_time": {
+                "destination": "3723000005",
+                "source": "3723000004"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "time_one_microsecond",
+      "seconds": 1.623,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (c_time + INTERVAL 1 MICROSECOND AS c_time) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_time": {
+                "destination": "86399999999",
+                "source": "86400000000"
+              }
+            },
+            "key": {
+              "id": "3"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "time_24h",
+      "seconds": 1.525,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (TIME '23:59:59.999999' AS c_time) FROM public.types_k WHERE id = 3",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 3)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_ts": {
+                "destination": "1704067200000002",
+                "source": "1704067200000001"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "timestamp_one_microsecond",
+      "seconds": 1.624,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (c_ts + INTERVAL 1 MICROSECOND AS c_ts) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_ts": {
+                "destination": "9215576668800000000",
+                "source": "infinity"
+              }
+            },
+            "key": {
+              "id": "3"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "timestamp_infinity",
+      "seconds": 1.438,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (TIMESTAMP '294000-01-01' AS c_ts) FROM public.types_k WHERE id = 3",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 3)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_tstz": {
+                "destination": "1704067200000002",
+                "source": "1704067200000001"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "timestamptz_one_microsecond",
+      "seconds": 1.442,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (c_tstz + INTERVAL 1 MICROSECOND AS c_tstz) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_interval": {
+                "destination": "0:30:0",
+                "source": "1:0:0"
+              }
+            },
+            "key": {
+              "id": "3"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "interval_month_vs_30_days",
+      "seconds": 1.439,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (INTERVAL 30 DAY AS c_interval) FROM public.types_k WHERE id = 3",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 3)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_interval": {
+                "destination": "14:3:14706000008",
+                "source": "14:3:14706000007"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "interval_one_microsecond",
+      "seconds": 1.57,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (c_interval + INTERVAL 1 MICROSECOND AS c_interval) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_uuid": {
+                "destination": "6f9619ff-8b86-d011-b42d-00c04fc964fe",
+                "source": "6f9619ff-8b86-d011-b42d-00c04fc964ff"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "uuid",
+      "seconds": 1.491,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE ('6f9619ff-8b86-d011-b42d-00c04fc964fe' AS c_uuid) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_json": {
+                "destination": "{\"b\": 1, \"a\":2}",
+                "source": "{\"b\": 1,  \"a\":2}"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "json_whitespace",
+      "seconds": 1.535,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE ('{\"b\": 1, \"a\":2}' AS c_json) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_jsonb": {
+                "destination": "{\"a\": [1, 2.5], \"b\": 1}",
+                "source": "{\"a\": [1, 2.50], \"b\": 1}"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "jsonb_value",
+      "seconds": 1.555,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE ('{\"a\": [1, 2.5], \"b\": 1}' AS c_jsonb) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_int_arr": {
+                "destination": "[1:3]{V1:1,V1:0,V1:3}",
+                "source": "[1:3]{V1:1,N,V1:3}"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "int_array_element",
+      "seconds": 1.452,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE ([1, 0, 3] AS c_int_arr) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_int_arr": {
+                "destination": "[1:2]{V1:1,V1:3}",
+                "source": "[1:3]{V1:1,N,V1:3}"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "int_array_null_element_dropped",
+      "seconds": 1.543,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE ([1, 3] AS c_int_arr) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_text_arr": {
+                "destination": "[1:3]{V1:x,N,N}",
+                "source": "[1:3]{V1:x,V0:,N}"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "text_array_empty_to_null",
+      "seconds": 1.48,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (['x', NULL, NULL] AS c_text_arr) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_num_arr": {
+                "destination": "[1:2]{V3:1.6,V3:NaN}",
+                "source": "[1:2]{V3:1.5,V3:NaN}"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "numeric_array_element",
+      "seconds": 1.537,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE ([1.6::DECIMAL(38,10)::UNION(n DECIMAL(38,10), s VARCHAR), c_num_arr[2]] AS c_num_arr) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_double_arr": {
+                "destination": "[1:2]{V1:0,V7:0.1e301}",
+                "source": "[1:2]{V2:-0,V7:0.1e301}"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "double_array_negative_zero",
+      "seconds": 1.562,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE ([0.0, 1e300] AS c_double_arr) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_tstz_arr": {
+                "destination": "[1:1]{V16:1704067200000001}",
+                "source": "[1:1]{V16:1704067200000000}"
+              }
+            },
+            "key": {
+              "id": "2"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "timestamptz_array_one_microsecond",
+      "seconds": 1.451,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE ([c_tstz_arr[1] + INTERVAL 1 MICROSECOND] AS c_tstz_arr) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_extra_different": [
+          0,
+          0,
+          1
+        ],
+        "sample": [
+          {
+            "columns": {
+              "c_int_arr": {
+                "destination": null,
+                "source": "{}"
+              }
+            },
+            "key": {
+              "id": "3"
+            }
+          }
+        ],
+        "table": "public.types_k"
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "empty_array_to_null",
+      "seconds": 1.506,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE (NULL AS c_int_arr) FROM public.types_k WHERE id = 3",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 3)"
+      ]
+    },
+    {
+      "detail": {
+        "note": "char(n) ignores trailing spaces"
+      },
+      "detected": false,
+      "expected_difference": false,
+      "mutation": "char_trailing_spaces",
+      "seconds": 0.731,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE ('ab    ' AS c_char) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "note": "value equality for numeric"
+      },
+      "detected": false,
+      "expected_difference": false,
+      "mutation": "numeric_display_scale",
+      "seconds": 0.683,
+      "statements": [
+        "INSERT INTO public.types_k SELECT * REPLACE ('1.5000'::VARCHAR AS c_num_u) FROM public.types_k WHERE id = 2",
+        "DELETE FROM public.types_k WHERE rowid = (SELECT min(rowid) FROM public.types_k WHERE id = 2)"
+      ]
+    },
+    {
+      "detail": {
+        "missing_columns": [
+          "c_text"
+        ]
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "missing_column",
+      "seconds": 0.622,
+      "statements": [
+        "ALTER TABLE public.types_k DROP COLUMN c_text"
+      ]
+    },
+    {
+      "detail": {
+        "extra_columns": [
+          "zz"
+        ]
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "extra_column",
+      "seconds": 0.755,
+      "statements": [
+        "ALTER TABLE public.types_k ADD COLUMN zz INTEGER"
+      ]
+    },
+    {
+      "detail": {
+        "missing_tables": [
+          "public.dups"
+        ]
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "missing_table",
+      "seconds": 0.529,
+      "statements": [
+        "DROP TABLE public.dups"
+      ]
+    },
+    {
+      "detail": {
+        "extra_tables": [
+          "public.extra_t"
+        ]
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "extra_table",
+      "seconds": 0.738,
+      "statements": [
+        "CREATE TABLE public.extra_t (a INTEGER)"
+      ]
+    },
+    {
+      "detail": {
+        "different": 6
+      },
+      "detected": true,
+      "expected_difference": true,
+      "mutation": "boolean_column_became_integer",
+      "seconds": 1.514,
+      "statements": [
+        "ALTER TABLE public.types_k ALTER COLUMN c_bool TYPE INTEGER"
+      ]
+    },
+    {
+      "detail": {
+        "extra_tables": []
+      },
+      "detected": false,
+      "expected_difference": false,
+      "mutation": "cdc_and_staging_schemas",
+      "seconds": 0.686,
+      "statements": [
+        "CREATE SCHEMA _cdc",
+        "CREATE TABLE _cdc.stream_state (slot VARCHAR, applied_lsn VARCHAR)",
+        "CREATE SCHEMA _cdc_stage_7",
+        "CREATE TABLE _cdc_stage_7.t (a INTEGER)"
+      ]
+    }
+  ],
   "what": "each mutation of the destination, applied inside a transaction and compared by the oracle"
 }

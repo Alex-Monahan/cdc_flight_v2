@@ -15,11 +15,13 @@ How one comparison runs:
    independent of row order and counts duplicates: tables are compared as multisets. The source scan is split into
    `ctid` ranges and runs on several snapshot connections at once; the destination scan runs at the same time.
 4. **Row pass**, only for buckets whose count or sum differ (at most `max_diff_buckets` per table, `bucket_batch` at
-   a time): both sides return the canonical columns of the rows in those buckets, and the multiset difference gives
-   missing rows, extra rows and, for tables with a key, rows whose key matches but whose values differ.
+   a time): the destination's row hashes in those buckets are counted (integers only); the source rows of those
+   buckets are streamed and matched against the counter, so only unmatched rows are kept (missing rows); the hashes
+   left over are extra rows, and only their values are fetched from the destination. For tables with a key, a
+   missing and an extra row with the same key are reported as one row whose values differ.
 
-Memory: the client holds one (count, sum) per bucket and the rows of at most `bucket_batch` buckets (about
-`chunk_rows` rows each). Nothing else is materialised on the client.
+Memory: the client holds one (count, sum) per bucket, the destination row hashes of at most `bucket_batch` buckets,
+and the values of differing rows only (at most `row_fetch_limit` per side and batch; counts stay exact beyond it).
 """
 from __future__ import annotations
 
@@ -52,6 +54,7 @@ class OracleConfig:
     sample_limit: int = 10             # rows per category in a table's sample
     max_diff_buckets: int = 16         # differing buckets examined row by row, per table
     bucket_batch: int = 4              # buckets fetched together in the row pass
+    row_fetch_limit: int = 10_000      # differing rows per side and batch whose values are kept (counts stay exact)
     source_workers: int = 4            # snapshot connections that scan ctid ranges in parallel
     min_blocks_per_range: int = 256    # tables smaller than this are scanned by one connection
     tables: Optional[list] = None      # ['schema.table', ...]; default: every user table of the source
@@ -224,10 +227,17 @@ def checksum_sql(inner: str) -> str:
     return "SELECT %s, count(*), sum(%s) FROM (%s) AS _q GROUP BY %s" % (B, H, inner, B)
 
 
-def rows_sql(inner: str, canon: dict, columns: list, buckets: list) -> str:
+def rows_sql(inner: str, canon: dict, columns: list, buckets: list, hashes: Optional[list] = None) -> str:
+    """Row hash and canonical columns of the rows in `buckets` (and, if given, with one of `hashes`)."""
     cols = ", ".join(canon[n] for n, _, _ in columns) or "NULL"
-    return "SELECT %s, %s FROM (%s) AS _q WHERE %s IN (%s)" % (
-        H, cols, inner, B, ", ".join(str(int(b)) for b in buckets))
+    where = "%s IN (%s)" % (B, ", ".join(str(int(b)) for b in buckets))
+    if hashes is not None:
+        where += " AND %s IN (%s)" % (H, ", ".join(str(int(h)) for h in hashes) or "NULL")
+    return "SELECT %s, %s FROM (%s) AS _q WHERE %s" % (H, cols, inner, where)
+
+
+def hashes_sql(inner: str, buckets: list) -> str:
+    return "SELECT %s FROM (%s) AS _q WHERE %s IN (%s)" % (H, inner, B, ", ".join(str(int(b)) for b in buckets))
 
 
 def ctid_ranges(blocks: int, workers: int, min_blocks: int) -> list:
@@ -293,6 +303,22 @@ class _SourceSnapshot:
             with self._lock:
                 self._free.append(c)
 
+    def stream(self, sql: str, consume: Callable[[list], None], batch: int = 5000) -> None:
+        """Run sql on a snapshot connection through a server-side cursor; consume() gets the rows in batches."""
+        with self._lock:
+            c = self._free.pop()
+        try:
+            with c.cursor(name="cdc_v2_oracle_rows") as cur:
+                cur.execute(sql)
+                while True:
+                    rows = cur.fetchmany(batch)
+                    if not rows:
+                        break
+                    consume(rows)
+        finally:
+            with self._lock:
+                self._free.append(c)
+
     def close(self):
         for c in self.workers + [self.coord]:
             try:
@@ -349,8 +375,16 @@ def _row_diff(plan: Plan, src_rows: list, dst_rows: list, res: TableResult, limi
 
     sc, sv = index(src_rows)
     dc, dv = index(dst_rows)
-    missing = sc - dc
-    extra = dc - sc
+    _diff_counts(plan, sc - dc, sv, dc - sc, dv, res, limit)
+
+
+def _diff_counts(plan: Plan, missing: Counter, sv: dict, extra: Counter, dv: dict, res: TableResult, limit: int):
+    """Fill counts and the sample from the multiset difference: missing / extra row hashes with their counts, and
+    the canonical values of (at least some of) those rows. Rows whose values were not fetched are counted but
+    neither paired by key nor sampled; the result is then marked truncated."""
+    missing, extra = Counter(missing), Counter(extra)
+    if any(h not in sv for h in missing) or any(h not in dv for h in extra):
+        res.truncated = True
     names = [n for n, _, _ in plan.columns]
     kpos = [names.index(k) for k in plan.key]
 
@@ -359,8 +393,11 @@ def _row_diff(plan: Plan, src_rows: list, dst_rows: list, res: TableResult, limi
             return tuple(vals[i] for i in kpos)
         extra_by_key: dict = {}
         for h, n in extra.items():
-            extra_by_key.setdefault(key_of(dv[h]), []).append(h)
+            if h in dv:
+                extra_by_key.setdefault(key_of(dv[h]), []).append(h)
         for h in list(missing):
+            if h not in sv:
+                continue
             k = key_of(sv[h])
             cands = extra_by_key.get(k)
             while cands and missing[h] > 0:
@@ -382,13 +419,60 @@ def _row_diff(plan: Plan, src_rows: list, dst_rows: list, res: TableResult, limi
     for h, n in missing.items():
         res.missing_rows += n
         for _ in range(n):
-            if len(res.sample["missing"]) < limit:
+            if len(res.sample["missing"]) < limit and h in sv:
                 res.sample["missing"].append(_display(plan.columns, plan.key, sv[h]))
     for h, n in extra.items():
         res.extra_rows += n
         for _ in range(n):
-            if len(res.sample["extra"]) < limit:
+            if len(res.sample["extra"]) < limit and h in dv:
                 res.sample["extra"].append(_display(plan.columns, plan.key, dv[h]))
+
+
+def _row_pass(plan: Plan, snap: "_SourceSnapshot", md, cfg: OracleConfig, res: TableResult, pool, batch: list,
+              ranges: list, pg: tuple, mdq: tuple) -> None:
+    """Row-level comparison of some buckets with bounded memory.
+
+    1. The destination's row hashes in the buckets (integers only) go into a counter.
+    2. The source rows of the buckets are streamed (hash and canonical columns); a row whose hash the counter still
+       holds is matched and dropped, any other row is kept as missing (values for at most `row_fetch_limit` hashes).
+    3. Hashes left in the counter are extra rows; only their values are fetched from the destination.
+    """
+    pcanon, prow, pkey, src_sql = pg
+    mcanon, mrow, mkey, dst_sql = mdq
+    dst = Counter()
+    cur = md.execute(hashes_sql(_inner(C.hash60_md, mrow, mkey, plan.buckets, dst_sql, "", False), batch))
+    while True:
+        rows = cur.fetchmany(100_000)
+        if not rows:
+            break
+        for (h,) in rows:
+            dst[int(h)] += 1
+    lock = threading.Lock()
+    missing, svals = Counter(), {}
+
+    def consume(rows):
+        with lock:
+            for r in rows:
+                h = int(r[0])
+                if dst[h] > 0:
+                    dst[h] -= 1
+                    continue
+                missing[h] += 1
+                if h not in svals and len(svals) < cfg.row_fetch_limit:
+                    svals[h] = tuple(r[1:])
+
+    jobs = [pool.submit(snap.stream, rows_sql(_inner(C.hash60_pg, prow, pkey, plan.buckets, src_sql, w, True),
+                                              pcanon, plan.columns, batch), consume) for w in ranges]
+    for f in jobs:
+        f.result()
+    extra = +dst
+    dvals = {}
+    if extra:
+        want = sorted(extra)[:cfg.row_fetch_limit]
+        for r in md.execute(rows_sql(_inner(C.hash60_md, mrow, mkey, plan.buckets, dst_sql, "", True), mcanon,
+                                     plan.columns, batch, want)).fetchall():
+            dvals.setdefault(int(r[0]), tuple(r[1:]))
+    _diff_counts(plan, missing, svals, extra, dvals, res, cfg.sample_limit)
 
 
 def _compare_table(plan: Plan, snap: _SourceSnapshot, md, cfg: OracleConfig, res: TableResult, pool):
@@ -412,12 +496,8 @@ def _compare_table(plan: Plan, snap: _SourceSnapshot, md, cfg: OracleConfig, res
     res.truncated = len(differing) > len(examine)
     for i in range(0, len(examine), max(1, cfg.bucket_batch)):
         batch = examine[i:i + cfg.bucket_batch]
-        src_jobs = [pool.submit(snap.run, rows_sql(_inner(C.hash60_pg, prow, pkey, plan.buckets, src_sql, w, True),
-                                                   pcanon, plan.columns, batch)) for w in ranges]
-        drows = md.execute(rows_sql(_inner(C.hash60_md, mrow, mkey, plan.buckets, dst_sql, "", True),
-                                    mcanon, plan.columns, batch)).fetchall()
-        srows = [r for f in src_jobs for r in f.result()]
-        _row_diff(plan, srows, drows, res, cfg.sample_limit)
+        _row_pass(plan, snap, md, cfg, res, pool, batch, ranges, (pcanon, prow, pkey, src_sql),
+                  (mcanon, mrow, mkey, dst_sql))
         res.examined_buckets += len(batch)
     res.equal = (not differing and not res.missing_columns and not res.extra_columns)
 

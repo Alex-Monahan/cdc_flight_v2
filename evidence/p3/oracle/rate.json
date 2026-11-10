@@ -1,0 +1,41 @@
+{
+  "client_peak_rss_mb": 399.3,
+  "config": {
+    "chunk_rows": 100000,
+    "source_workers": 4
+  },
+  "equal": {
+    "buckets": 51,
+    "rows_per_second": 209645.9,
+    "seconds": 23.85
+  },
+  "machine": {
+    "cpus": 10
+  },
+  "one_row_changed": {
+    "differing_buckets": 1,
+    "rows_per_second": 105039.6,
+    "sample": [
+      {
+        "columns": {
+          "l_extendedprice": {
+            "destination": "0.01",
+            "source": "0"
+          }
+        },
+        "key": {
+          "l_linenumber": "7",
+          "l_orderkey": "2500000"
+        }
+      }
+    ],
+    "seconds": 47.601
+  },
+  "rows": 5000000,
+  "setup_seconds": {
+    "motherduck_generate": 11.5,
+    "postgres_generate": 50.2
+  },
+  "source_table_bytes": 1068007424,
+  "what": "oracle rate on a TPC-H lineitem-width table (16 columns), laptop, source = local primary, destination = MotherDuck over the public internet"
+}
