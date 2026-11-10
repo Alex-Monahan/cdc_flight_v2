@@ -652,3 +652,23 @@ def test_no_connection_and_no_thread_is_left(no_leftovers):
     assert td.wait_no_leftovers(5.0)
     assert md.open_connections() == 0 and not md.background_threads()
     assert threading.active_count() == before
+
+
+def test_times_are_read_as_integer_microseconds(led):
+    """The client needs the module `pytz` to hand out a TIMESTAMPTZ value, and `pytz` is not a dependency. So the
+    layer reads the clock as integer microseconds, and a caller reads a time column with `epoch_us` or a cast."""
+    c = led.connect("look")
+    c.execute("CREATE TABLE seen (k INTEGER, seen_at TIMESTAMPTZ)")
+    c.execute("INSERT INTO seen SELECT 1, %s" % md.clock_sql)
+    us = c.fetchone("SELECT epoch_us(seen_at) FROM seen")[0]
+    assert isinstance(us, int) and us > 1_600_000_000_000_000
+    assert isinstance(c.clock_us(), int) and abs(c.clock_us() - us) < 60_000_000
+    assert c.fetchone("SELECT CAST(seen_at AS VARCHAR) FROM seen")[0].startswith("20")
+    try:
+        import pytz  # noqa: F401
+    except ImportError:
+        with pytest.raises(Exception) as info:
+            c.fetchone("SELECT seen_at FROM seen")
+        assert type(info.value).__name__ == "InvalidInputException" and "pytz" in str(info.value)
+        assert c.generation == 1                                  # not taken for a lost connection
+        assert c.fetchone("SELECT count(*) FROM seen")[0] == 1    # and the connection goes on
