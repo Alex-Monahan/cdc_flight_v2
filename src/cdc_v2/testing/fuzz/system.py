@@ -334,7 +334,15 @@ class PgSystem(System):
 SYSTEMS = {"toy": "tests/fuzz/toy/system.py:ToySystem"}
 
 
+_LOAD_LOCK = __import__("threading").RLock()
+
+
 def _load(spec: str):
+    with _LOAD_LOCK:                       # campaign workers load a system at the same time: never half a module
+        return _load_locked(spec)
+
+
+def _load_locked(spec: str):
     path, _, attr = spec.partition(":")
     full = REPO / path
     name = "cdc_v2_fuzz_sys_" + full.stem
