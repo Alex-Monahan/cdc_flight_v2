@@ -126,6 +126,23 @@ exception); a T0 test compares it with the declaration in the package.
   position through a `stream` lane, can be told to stop making progress, to hang in a commit, to ignore
   `FenceLost` (to show that the fence, not good behaviour, is what protects), and has D's lane crash points.
 
+### 4. What the fuzzers of round 2 need from you (plan 6.2, "From the review of F")
+
+Package F points its leadership fuzzer and its crash suite at your code after you are merged:
+
+- **Crash points** for the take-over (before and after its commit), the release, the heartbeat and the start of
+  the pipeline, each declared through `cdc_v2.crashpoints`; a point that is reached only on some paths says so
+  in its declaration. The bootstrap cannot import the package before the clone: say how its points are declared
+  and reached all the same, and test that the two lists agree.
+- **`LocalPlatform` reports every run**: state, start, end and exit code, readable from another process, and it
+  starts and cancels runs on request. The fuzzer drives at least 3 competing runs through it.
+- **Epoch and run identity for the stream.** The batch machine of package S writes the epoch and the run id into
+  the row it appends to `_cdc.transitions` for every committed group; that row, not the fence, is what the
+  fuzzer reads to check "never two writers". Give S both values in the form C12 names, and say in your document
+  which value identifies a run across the bootstrap and the pipeline.
+- Your alerts (`takeover`, `contending_flight`) are rows that `alerts.emit` wrote, or the case of step 3 that
+  you documented; the fuzzer counts them.
+
 ## Tests
 
 T0 (default run; local DuckDB, timings in tenths of seconds):
