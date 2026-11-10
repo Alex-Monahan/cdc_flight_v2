@@ -136,12 +136,16 @@ def main():
     st = Stats(a.stats)
     log = open(a.jvm_log, "ab", buffering=0)
     st.d["spawn_at"] = time.time()
-    p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log, bufsize=0)
+    # Frames arrive on a dedicated pipe; the JVM's own stdout (unified logging, JFR messages) goes to the log.
+    rfd, wfd = os.pipe()
+    cmd = [c.replace("@FRAMES_FD@", str(wfd)) for c in cmd]
+    p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=log, stderr=log, bufsize=0, pass_fds=(wfd,))
+    os.close(wfd)
     st.d["jvm_pid"] = p.pid
     st.write(force=True)
     signal.signal(signal.SIGTERM, lambda *_: p.send_signal(signal.SIGTERM))
     sink = open(a.sink, "ab") if a.sink else None
-    out = os.fdopen(p.stdout.fileno(), "rb", buffering=1 << 20, closefd=False)
+    out = os.fdopen(rfd, "rb", buffering=1 << 20)
     try:
         while True:
             hdr = read_exact(out, HDR.size)

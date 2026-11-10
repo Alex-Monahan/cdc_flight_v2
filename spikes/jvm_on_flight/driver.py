@@ -356,7 +356,7 @@ class Engine:
         # JVM unified logging writes warnings to stdout by default (and JFR prints "Started recording" there):
         # stdout carries our binary frames, so every JVM message is sent to stderr.
         cmd = [STATE["java"], "-Xmx" + heap, "-XX:ActiveProcessorCount=2", "-Xlog:disable",
-               "-Xlog:all=warning:stderr", *jvm_opts,
+               "-Xlog:all=warning:stderr", "-Dcdc_v2.frames=/dev/fd/@FRAMES_FD@", *jvm_opts,
                "-cp", CLASSES + os.pathsep + STATE["cp"], "cdc_v2.engine.EngineMain", props_path]
         ccmd = [sys.executable, os.path.join(HERE, "consumer.py"), "--stats", self.stats_path,
                 "--jvm-log", self.log_path, "--decode", decode]

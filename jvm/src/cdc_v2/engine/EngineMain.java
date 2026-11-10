@@ -105,8 +105,14 @@ public final class EngineMain {
         long eofGraceMs = Long.parseLong(props.getProperty("cdc_v2.eof.grace.ms", "3000"));
         boolean exitOnEof = Boolean.parseBoolean(props.getProperty("cdc_v2.exit.on.stdin.eof", "true"));
         int outBuffer = Integer.parseInt(props.getProperty("cdc_v2.stdout.buffer", "1048576"));
-        out = new DataOutputStream(new BufferedOutputStream(new java.io.FileOutputStream(java.io.FileDescriptor.out), outBuffer));
-        // fd 1 carries binary frames only: anything a library prints with System.out goes to stderr instead.
+        // Frames go to a dedicated pipe (cdc_v2.frames, e.g. /dev/fd/3) when given: the JVM itself writes to fd 1
+        // (unified logging, JFR start-up messages), which would corrupt a binary stream on stdout.
+        String framesPath = System.getProperty("cdc_v2.frames", props.getProperty("cdc_v2.frames", ""));
+        java.io.OutputStream sink = framesPath.isEmpty()
+                ? new java.io.FileOutputStream(java.io.FileDescriptor.out)
+                : new java.io.FileOutputStream(framesPath);
+        out = new DataOutputStream(new BufferedOutputStream(sink, outBuffer));
+        // Anything a library prints with System.out goes to stderr instead.
         System.setOut(System.err);
         // Keep only Debezium/Kafka keys for the engine.
         Properties engineProps = new Properties();
