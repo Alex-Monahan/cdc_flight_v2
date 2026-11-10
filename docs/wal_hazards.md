@@ -816,3 +816,302 @@ stays in place behind every entry.
 - **Why prevention.** A filtered read becomes impossible; it fails loudly.
 - **Test.** `test_h039_rls_backfill_fails_loudly`.
 - **Residual.** None.
+
+---
+
+## G. Specific to decoding on a replica (SPEC R17)
+
+Background for every entry: `docs/research/replica_decoding.md`.
+
+### H-040 Slot creation on a standby waits (idle primary, long or prepared transactions)
+
+- **What.** `CREATE_REPLICATION_SLOT`/`pg_create_logical_replication_slot` on the replica does not return.
+- **Mechanism.** The standby needs `xl_running_xacts` records from the primary; an idle primary writes none
+  (bgwriter logs one at most every 15 s and only after other WAL, `pg:src/backend/postmaster/bgwriter.c`), and the
+  snapshot builder waits for every transaction running at the first record to finish (`SnapBuildWaitSnapshot`: "During
+  recovery we can't enforce that, so we'll have to wait") **[src]**, **[doc]** (logicaldecoding-explanation). Debezium's
+  internal `create.slot.command.timeout` is 90 s, then it retries **[src]**. `pg_log_standby_snapshot()` is superuser-only
+  by default **[doc]**.
+- **Reproduction.** P idle, heartbeat off; R: `SELECT pg_create_logical_replication_slot('cdc_v2_s2', 'pgoutput');` —
+  blocks; P: `SELECT pg_log_standby_snapshot();` (T1 superuser) — returns. Variant: P session `BEGIN; SELECT
+  txid_current();` left open — creation blocks until it ends; same with a prepared transaction.
+- **Prevention.** Our code creates the slot (not Debezium), only after verifying the primary heartbeat is running (an
+  `xl_running_xacts` record within ~15 s is then guaranteed), with a deadline (default 120 s); on expiry it cancels and
+  reports the oldest running and prepared transactions on the primary, then retries with backoff and alerts (SPEC 4.7).
+- **Why prevention.** The idle-primary case cannot occur with the heartbeat running; the long-transaction case cannot
+  hang the pipeline and is reported with its cause.
+- **Test.** `test_h040_slot_create_idle_primary`, `…_with_heartbeat`, `…_blocked_by_long_tx`, `…_blocked_by_prepared_tx`.
+- **Residual.** Slot creation is delayed for as long as a long transaction stays open on the primary (seconds to hours);
+  the backfill that follows a slot loss waits for it.
+
+### H-041 Walreceiver not streaming when Debezium starts (NULL receive LSN)
+
+- **What.** The replica restarted, or lost its connection to the primary, and Debezium starts.
+- **Mechanism.** In recovery Debezium reads the current position with `pg_last_wal_receive_lsn()`, which "returns NULL"
+  if streaming replication "is disabled, or if it has not yet started" **[doc]**, and passes it to
+  `LogSequenceNumber.valueOf(String)` without a null check (`PostgresConnection.currentXLogLocation`, used by
+  `PostgresOffsetContext.initialContext` at every streaming start without a stored offset) **[src]** — expected
+  `NullPointerException` **[test]**.
+- **Reproduction.** R: restart with `primary_conninfo` pointing at a closed port (or stop P), start the pipeline.
+- **Prevention.** Start guard: before starting the engine in replica mode, require `pg_stat_wal_receiver.status =
+  'streaming'` and a non-null `pg_last_wal_receive_lsn()` on the replica; otherwise wait (bounded) and alert; the same
+  check runs in the periodic health check (a replica that stopped receiving cannot meet SPEC 5.2 anyway, so the
+  `replica.fallback_after` rule of SPEC 4.1 applies).
+- **Why prevention.** Debezium is never started in the state that crashes it.
+- **Test.** `test_h041_receiver_down_at_start` (expect the guard, no JVM start, alert, automatic start after the receiver
+  recovers).
+- **Residual.** If the receiver stops between the guard and Debezium's query, the JVM fails and the supervisor restarts it
+  through the guard.
+
+### H-042 Slot invalidation by recovery conflict (`rows_removed`, `wal_level_insufficient`) and Debezium's endless retry
+
+- **What.** The standby invalidates our slot while replaying.
+- **Mechanism.** `rows_removed`: replaying a catalog cleanup record whose horizon ≥ the slot's `catalog_xmin`
+  invalidates it immediately, without `max_standby_streaming_delay` grace (`ResolveRecoveryConflictWithSnapshot` →
+  `InvalidateObsoleteReplicationSlots(RS_INVAL_HORIZON, …)`, `pg:src/backend/storage/ipc/standby.c`) **[src]**; it happens
+  when feedback is off, interrupted (restart without a physical slot), or never reached a new primary.
+  `wal_level_insufficient`: the primary lowered `wal_level` **[doc]**. Debezium does not read `invalidation_reason` and
+  retries forever while reporting RUNNING (debezium/dbz#2430, reproduced on a 16 standby) **[doc]**.
+- **Reproduction.** R: `ALTER SYSTEM SET hot_standby_feedback = off;` reload; P: `CREATE TABLE cdc_v2_tmp (a int); DROP
+  TABLE cdc_v2_tmp; VACUUM pg_class; VACUUM pg_attribute;` while the slot lags; R: `SELECT invalidation_reason, conflicting
+  FROM pg_replication_slots;` → `rows_removed`, `t`. The debezium/dbz#2430 recipe (SIGKILL the standby, VACUUM on P during
+  the outage, without a physical slot) also works.
+- **Prevention.** Preconditions checked before slot creation and at every acquisition, refusing replica mode if any fails:
+  `hot_standby_feedback = on` and `primary_slot_name` set on the replica; the primary's physical slot for that replica
+  exists, is valid, and its `catalog_xmin` ≤ our slot's `catalog_xmin`; `wal_level = logical` on both. Our slot check
+  (H-035) reads `invalidation_reason`/`conflicting` every 30 s and before every engine start; an invalid slot stops the
+  engine (instead of Debezium's endless retry), alerts and takes the attach-elsewhere + backfill path (SPEC 4.1).
+- **Why prevention.** The configurations that lead to invalidation are refused up front; the residual cases cannot hang
+  the pipeline.
+- **Test.** `test_h042_feedback_off_refused`, `test_h042_rows_removed_detected` (forced as above; expect stop, alert,
+  backfill, oracle), `test_h042_wal_level_lowered`.
+- **Residual.** Primary-side events we do not control (physical slot dropped by the provider, failover to a primary that
+  lacks our feedback) still invalidate the slot; answered by backfill.
+
+### H-043 The replica loses its WAL source or is replaced
+
+- **What.** The primary removes WAL the replica has not received (physical slot invalidated or absent), or the provider
+  replaces/rebuilds the replica.
+- **Mechanism.** A replica that falls behind `wal_keep_size` without a valid physical slot can no longer stream and must
+  be rebuilt **[doc]** (runtime-config-replication); a rebuilt replica has no logical slots — they are local objects and
+  are never synchronised to cascading standbys (walsender.c) **[src]**. PlanetScale replaces failed replicas
+  automatically **[doc]**.
+- **Reproduction.** T1: `tools/localpg add-standby`, move the pipeline to it, then `tools/localpg reset` of that standby (or
+  drop its physical slot on P, write past `wal_keep_size`).
+- **Prevention.** Not preventable by us. Earliest detection: periodic check of `pg_stat_wal_receiver` on the replica and
+  of the replica's physical slot (`wal_status`, `invalidation_reason`) on the primary; slot absence or a changed
+  `system_identifier`/start time of the replica at acquisition ⇒ SPEC 4.1 path (another replica, new slot, backfill).
+- **Why prevention.** —; the design ensures detection before any change is acknowledged from a different server.
+- **Test.** `test_h043_replica_replaced` (oracle after automatic backfill), `test_h043_physical_slot_invalidated`.
+- **Residual.** Backfill cost after every replica replacement.
+
+### H-044 Replay lag, replay pauses, apply delay
+
+- **What.** Decoding on a standby is slower than commits on the primary.
+- **Mechanism.** The logical walsender on a standby sends only what has been replayed (`WalSndWaitForWal` uses
+  `GetXLogReplayRecPtr` in recovery) **[src]**; replay waits up to `max_standby_streaming_delay` (30 s) for conflicting
+  queries, is delayed by `recovery_min_apply_delay`, and stops entirely under `pg_wal_replay_pause()` **[doc]**. All of it
+  is latency in SPEC 5.2.
+- **Reproduction.** R: `SELECT pg_wal_replay_pause();` then commit on P: nothing decoded until `pg_wal_replay_resume()`;
+  R: `ALTER SYSTEM SET recovery_min_apply_delay = '1min';`.
+- **Prevention.** Guard at acquisition and every health check: refuse replica mode if `recovery_min_apply_delay > 0` or
+  replay is paused (`pg_get_wal_replay_pause_state() <> 'not paused'`), alert, and follow SPEC 4.1's fallback timer;
+  publish replay lag (`now() - pg_last_xact_replay_timestamp()`, receive vs replay LSN) in `_cdc` metrics; our own replica
+  sessions are designed not to delay replay (H-048).
+- **Why prevention.** Configurations that make the latency target impossible are refused; the rest is measured.
+- **Test.** `test_h044_replay_paused_detected`, `test_h044_apply_delay_refused`, canary latency under background load
+  (SPEC 5.2).
+- **Residual.** Replay lag caused by load on the replica or by the provider remains and is part of the latency budget.
+
+### H-045 Promotion of the decoding replica; timeline switch when following a new primary
+
+- **What.** (a) Our replica is promoted; (b) the primary fails over to another standby and our replica must follow it.
+- **Mechanism.** (a) Walsenders on a promoted standby exit ("terminating walsender process after promotion") and the
+  local slot survives (walsender.c) **[src]**; Debezium switches from receive-LSN to `pg_current_wal_lsn()` per call
+  **[src]**. (b) Logical decoding reads across a timeline switch (`XLogReadDetermineTimeline`) **[src]**, but if our
+  replica received WAL beyond the new primary's switch point it has diverged and must be rewound or rebuilt (slot lost);
+  semi-synchronous commit means our replica may be the one ahead **[doc]** (PlanetScale ops philosophy). The new primary
+  learns our `catalog_xmin` only after our replica reconnects (H-042).
+- **Reproduction.** (a) `tools/localpg promote` of the decoding replica mid-stream. (b) T1 with primary P, our replica R
+  and standby S: promote S, re-point R (`primary_conninfo` to S, `recovery_target_timeline = 'latest'`), with R ahead of S
+  in one variant (stop S's receiver before the last commits on P).
+- **Prevention.** At every (re)connection: record `pg_is_in_recovery()`, `timeline_id` and the replica's identity with the
+  applied position; continue without backfill only when the slot is valid and `confirmed_flush_lsn` ≤ applied (proved
+  continuity, SPEC 4.1); in case (a) the pipeline is now decoding on a primary — it reports "primary mode (promoted
+  replica)" and SPEC 4.1's rules decide whether to stay (no backfill) or move (backfill); in case (b) any divergence
+  (rewind/rebuild, timeline history showing our applied LSN beyond the switch point) forces the backfill path. Never apply
+  changes decoded on a timeline that does not contain the applied position.
+- **Why prevention.** Continuity is proven from slot and timeline facts before any change is applied after a switch.
+- **Test.** `test_h045_promote_decoding_replica`, `test_h045_follow_new_primary`, `…_replica_ahead_diverged`.
+- **Residual.** Provider-managed re-pointing on PlanetScale is opaque; stage 2 measures it.
+
+### H-046 The slot's catalog horizon holds back vacuum on the primary
+
+- **What.** Our replica slot's `catalog_xmin` (and any long snapshot of ours on the replica) is fed back to the primary.
+- **Mechanism.** `hot_standby_feedback` passes `xmin` and `catalog_xmin` upstream; the primary keeps them in the replica's
+  physical slot and VACUUM "cannot remove catalog tuples deleted by any later transaction" **[doc]** (view docs;
+  hot-standby docs on bloat; logicaldecoding-explanation caution about wraparound).
+- **Reproduction.** Stop the pipeline for an hour with the slot in place; P: `SELECT slot_name, catalog_xmin,
+  age(catalog_xmin), xmin, age(xmin) FROM pg_replication_slots;` — the physical slot's horizon stays put; catalog bloat
+  grows under DDL churn.
+- **Prevention.** Lag trigger (R21) bounds how far behind the slot can be while the Flight runs; periodic check alerts when
+  `age(catalog_xmin)` or `age(xmin)` of the replica's physical slot exceeds a threshold (default 50 M xids); backfill and
+  refresh reads on the replica use short chunked transactions, never multi-hour snapshots; an abandoned slot (Flight
+  stopped longer than the lag bound) is dropped by the next leader before it creates a new one (SPEC 3.6 path).
+- **Why prevention.** Our horizon is bounded in age and duration by design.
+- **Test.** `test_h046_horizon_alert`, `test_h046_backfill_snapshot_duration` (no backfill transaction on the replica
+  longer than the chunk deadline).
+- **Residual.** While the Flight is not running at all (owner disabled it), the slot holds the horizon until a run drops
+  it; the runbook says so.
+
+### H-047 Replica addressing is not deterministic
+
+- **What.** The connection to "the replica" reaches different servers over time.
+- **Mechanism.** PlanetScale routes `|replica` users to replicas; for dedicated read replicas it "distributes connections
+  across the read-only instances", PgBouncer (6432) supports no replica routing and no replication protocol, and a failed
+  replica's connections are re-routed "to the other available replica" **[doc]** (replicas, dedicated-read-replicas,
+  operations-philosophy pages). A logical slot exists on one server only; reaching another server finds no slot or a
+  different slot of the same name.
+- **Reproduction.** Stage 2: open several `|replica` connections and compare server identity (`inet_server_addr()`,
+  `pg_postmaster_start_time()`, `pg_stat_wal_receiver.sender_host`, presence of our slot) **[test]**. T1 analogue: a TCP
+  proxy that alternates between two standbys.
+- **Prevention.** Replica identity check at every connection (replication and SQL): a server fingerprint recorded at slot
+  creation (postmaster start time, `inet_server_addr()` where meaningful, the slot's creation facts) must match;
+  mismatch ⇒ treat as "different replica": never create a second slot silently, never stream from a slot of the same name
+  on another server without the continuity check (H-035); if the provider cannot give a deterministic endpoint, replica
+  mode is not available there and the owner decides (SPEC 4.1, D17).
+- **Why prevention.** No change is decoded from a server whose identity is not the one that owns our position.
+- **Test.** `test_h047_alternating_proxy` (T1), stage 2 addressing experiment.
+- **Residual.** Depends on the provider; finding F-10.
+
+### H-048 Recovery conflicts between our replica sessions and replay
+
+- **What.** Our backfill reads, refresh queries and catalog polls on the replica conflict with WAL replay.
+- **Mechanism.** `ACCESS EXCLUSIVE` locks replayed from the primary (DDL, `TRUNCATE`, vacuum truncation) conflict with
+  our `ACCESS SHARE` locks; cleanup records conflict with our snapshots unless feedback is on; replay waits up to
+  `max_standby_streaming_delay`, then cancels our query **[doc]** (hot-standby, "Handling Query Conflicts"). While replay
+  waits, decoding of **every** table waits (H-044).
+- **Reproduction.** R: `BEGIN; SELECT count(*) FROM cdc_v2_t; SELECT pg_sleep(60);` (holding the lock); P: `TRUNCATE
+  cdc_v2_t;` — replay stalls for 30 s, then R's session is cancelled.
+- **Prevention.** Design rules for replica sessions: backfill chunks bounded in duration (well below
+  `max_standby_streaming_delay`, read from the replica at start); no transaction held open across chunks except the
+  hand-off snapshot, which itself is bounded; catalog polls with `statement_timeout` of a few seconds; cancelled chunks are
+  retried (SPEC 3.7). Metrics: `pg_stat_database_conflicts` deltas.
+- **Why prevention.** No session of ours can hold replay back for more than one bounded chunk.
+- **Test.** `test_h048_ddl_during_backfill` (replay delay ≤ chunk deadline; backfill completes; oracle), SPEC 4.5
+  conflicting-lock test.
+- **Residual.** Other users' long queries on the same replica can still delay replay; measured as replay lag.
+
+### H-049 Decoder spill on the decoding server
+
+- **What.** Large transactions spill to `pg_replslot/<slot>/` on the replica.
+- **Mechanism.** Beyond `logical_decoding_work_mem` the reorder buffer spills to disk on the server running the walsender
+  **[doc]**; protocol 1 cannot stream instead (H-020). A 10M-row transaction at lineitem width spills gigabytes on the
+  replica; a full disk stops the replica (and on PlanetScale may trigger storage autoscaling, H-038).
+- **Reproduction.** H-001 reproduction; R: `SELECT spill_txns, spill_count, spill_bytes FROM pg_stat_replication_slots;`
+  and `du` of `pg_replslot/cdc_v2_slot` (T1).
+- **Prevention.** Sizing rule recorded in the runbook and checked at start: `logical_decoding_work_mem` and free disk on
+  the replica versus the largest expected transaction; periodic check of `spill_bytes` growth with an alert; the size-lag
+  trigger counts spill.
+- **Why prevention.** We cannot avoid the spill with protocol 1; we can make sure it fits and is visible.
+- **Test.** `test_h049_spill_metrics_and_alert` (10M-row transaction, spill observed, alert threshold).
+- **Residual.** Spill volume is inherent to stock Debezium's protocol 1; finding F-3.
+
+### H-050 Slow Debezium start-up versus the hand-over budget
+
+- **What.** Start-up cost grows with the number of tables and types.
+- **Mechanism.** The connector loads the full type registry and refreshes the schema of every captured table at
+  streaming start even with `snapshot.mode=no_data` (debezium/dbz#1595 open; debezium/dbz#2041 fixed in 3.7.0) **[doc]**;
+  SPEC 5.2 wants latency back under 30 s within 120 s of a hand-over, and the run starts a JVM from scratch (PLAN §2 A 1).
+- **Reproduction.** T1 database with 5 000 tables and 500 custom types; time from JVM start to first record.
+- **Prevention.** Measure in P2/P7; keep Debezium's `table.include.list` limited to discovered, approved tables; budget
+  checked in a test; if the budget fails, start the next leader's JVM in a warm-standby state (connected, not streaming)
+  before the old leader releases — **[test]** whether that is compatible with the single-consumer slot.
+- **Why prevention.** The hand-over budget is verified, not assumed.
+- **Test.** `test_h050_startup_budget` (large catalog; assert start-up ≤ the share of the 120 s budget assigned to it).
+- **Residual.** Large catalogs on the source make hand-over slower.
+
+---
+
+## Summary table
+
+| Hazard | Prevention (short) | Test | Status |
+|---|---|---|---|
+| H-001 Oversized transactions | applier stages whole transactions with bounded memory; END-count check; byte-bounded JVM queue | `test_h001_10m_*` | proposed |
+| H-002 Oversized rows/values (1 GB limits) | size guard + alert; heap sized for 256 MB values; poison-pill skip → backfill via binary COPY | `test_h002_*` | proposed |
+| H-003 Unchanged-TOAST placeholders | NUL-containing placeholder; custom converter marks for bytea/arrays; hand-off guarantees row presence | `test_h003_*` | proposed |
+| H-004 Add/drop column, defaults | catalog fence; constant defaults applied in place; volatile default/rewrite ⇒ table backfill | `test_h004_*` | proposed |
+| H-005 Type changes, `USING` rewrites | rewrite/narrowing ⇒ backfill; metadata-only widening in place; per-column checksum | `test_h005_*` | proposed |
+| H-006 DDL+DML in one transaction; out-of-band lookups | applier ignores Debezium keys/defaults; uses fenced catalog facts | `test_h006_*` | proposed |
+| H-007 Drop/recreate (new OID), table rename | table identity by OID via fence; recreate ⇒ fresh table + snapshot; rename in place | `test_h007_*` | proposed |
+| H-008 Rename vs drop+add | catalog fence with WAL bracket and attnums; ambiguous ⇒ backfill | `test_h008_*` | proposed |
+| H-009 Undecodable types | `include.unknown.datatypes=true`; type mapping table | `test_h009_*` | proposed |
+| H-010 Numeric specials/precision | `decimal.handling.mode=string`; D10 mapping | `test_h010_*` | proposed |
+| H-011 Temporal extremes | `time.precision.mode=structured`; `interval.handling.mode=string`; pinned GUCs | `test_h011_*` | proposed |
+| H-012 Other lossy mappings (varbit, arrays, money, LOs) | our CustomConverter → text; LO documented | `test_h012_*` | proposed |
+| H-013 Encoding and session GUCs | require UTF8; pin walsender GUCs via `options` | `test_h013_*` | proposed |
+| H-014 Replica identity missing (source writes fail) | set REPLICA IDENTITY FULL before `ADD TABLE`; fence re-checks | `test_h014_*` | proposed |
+| H-015 Key changes, FULL duplicates | per-transaction net-effect collapse; multiplicity for keyless | `test_h015_*` | proposed |
+| H-016 TRUNCATE variants | `skipped.operations=none`; via_root=false; start-up config assertion | `test_h016_*` | proposed |
+| H-017 Logical messages | memory offsets; transactional atomicity; size guard | `test_h017_*` | proposed |
+| H-018 Origin messages | never filter origins; assert stream params | `test_h018_*` | proposed |
+| H-019 Two-phase transactions | no `two_phase`; alert on old prepared transactions | `test_h019_*` | proposed |
+| H-020 Streamed transactions | version pin; pin-upgrade checklist | `test_h020_*` | proposed |
+| H-021 Partition attach/detach/drop | via_root=false; fence tracks `pg_inherits`; snapshot on attach; removal on detach | `test_h021_*` | proposed |
+| H-022 Generated/identity columns | `publish_generated_columns=stored`; destination-computed or keyed re-read for virtual | `test_h022_*` | proposed |
+| H-023 Column lists, row filters | never used; fence detects tampering | `test_h023_*` | proposed |
+| H-024 Keepalives, sender timeouts | status interval ≤ timeout/3; capped GC pauses; supervisor deadlines | `test_h024_*` | proposed |
+| H-025 Redelivery after restart | applied commit LSN in destination; discard ≤ applied | `test_h025_*` | proposed |
+| H-026 Empty/unpublished floods | heartbeat row in the publication every 10 s | `test_h026_*` | proposed |
+| H-027 Debezium stored-offset defects | MemoryOffsetBackingStore; slot is restart point | `test_h027_*` | proposed |
+| H-028 Debezium ack ahead of durable position | markProcessed only after destination commit; `lsn.flush.mode=connector` | `test_h028_*` | proposed |
+| H-029 Timeline change after failover (primary mode) | timeline + history check; fence old primary; synced-slot check | `test_h029_*` | proposed |
+| H-030 Unlogged tables, persistence changes | never published; full refresh or reported; fence detects SET LOGGED | `test_h030_*` | proposed |
+| H-031 Long-running transactions pin the slot | retention vs confirmed check; report oldest xact; alert at 25 % of cap | `test_h031_*` | proposed |
+| H-032 Case-colliding column names (Debezium refuses) | never published; full refresh; fence on renames | `test_h032_*` | proposed |
+| H-033 Enum/type DDL | fence detects type OID change; restart Debezium child before next change | `test_h033_*` | proposed |
+| H-034 Publication missing/recreated | publication before slot (visible on replica); `autocreate=disabled`; publication OID tracked | `test_h034_*` | proposed |
+| H-035 Slot advanced/dropped/recreated/consumed externally | slot check at acquisition and every 30 s; identity + position | SPEC 1.8 tests | proposed |
+| H-036 WAL-cap invalidation | size-lag trigger at 50 % of cap; `wal_status` alerts | `test_h036_*` | proposed |
+| H-037 Idle-slot timeout (18) | setting checked; refused if shorter than 10 × hand-over gap | `test_h037_*` | proposed |
+| H-038 WAL retention grows billed storage | limits below autoscaling headroom; baseline first | `test_h038_*` | proposed |
+| H-039 RLS/privileges filter backfill reads | `row_security=off` in read sessions; BYPASSRLS check | `test_h039_*` | proposed |
+| H-040 Slot creation waits on the standby | our code creates the slot after the heartbeat runs; deadline + cause report | `test_h040_*` | proposed |
+| H-041 Receiver not streaming at start (NULL LSN) | start guard on `pg_stat_wal_receiver` | `test_h041_*` | proposed |
+| H-042 Recovery-conflict invalidation; endless retry | feedback + physical slot preconditions; our slot check stops the engine | `test_h042_*` | proposed |
+| H-043 Replica loses WAL source / replaced | detection + SPEC 4.1 attach-elsewhere + backfill | `test_h043_*` | proposed |
+| H-044 Replay lag, pause, apply delay | refuse paused/delayed replicas; replay-lag metrics | `test_h044_*` | proposed |
+| H-045 Promotion and timeline switch (replica mode) | continuity proof from slot + timeline; divergence ⇒ backfill | `test_h045_*` | proposed |
+| H-046 Catalog horizon held back on primary | age alerts; short replica snapshots; drop abandoned slots | `test_h046_*` | proposed |
+| H-047 Non-deterministic replica addressing | server fingerprint check at every connection | `test_h047_*` | proposed |
+| H-048 Recovery conflicts with our replica sessions | bounded chunks; timeouts; retries | `test_h048_*` | proposed |
+| H-049 Decoder spill on the replica | sizing check; spill metrics and alert | `test_h049_*` | proposed |
+| H-050 Slow Debezium start-up | measured budget; limited include list; warm standby **[test]** | `test_h050_*` | proposed |
+
+## Findings that affect SPEC or PLAN (for the orchestrator)
+
+- **F-1** Stock Debezium does not check slot validity and retries forever on an invalidated slot (H-042, H-036;
+  debezium/dbz#2430). Our slot check is not optional.
+- **F-2** On a standby only `publication.autocreate.mode=disabled` is safe; `filtered` has inverted validation logic in
+  3.7.1 and `all_tables` combined with PostgreSQL 18 delivers nothing without an error (H-034; debezium.md §2.3).
+- **F-3** Protocol 1 only (no streaming of in-progress transactions): rows committed after a ≥ 10M-row transaction wait
+  for it (head-of-line). SPEC 5.2's max ≤ 60 s cannot hold while such a transaction is in flight, and that window is not
+  among R19's exclusions; the owner should rule (exclude "large-transaction windows" or accept the measured value).
+  Spill on the replica is a related cost (H-001, H-049).
+- **F-4** Changes lost through third-party DDL on our publication (drop/recreate) are repaired by backfill, not prevented
+  (H-034).
+- **F-5** Debezium decodes pgoutput text as UTF-8 unconditionally: a non-UTF8 database cannot be streamed losslessly
+  (H-013).
+- **F-6** Debezium refuses tables whose column names differ only in case; such tables must use full refresh (H-032).
+- **F-7** Automatic publication maintenance changes source behaviour: keyless tables need `REPLICA IDENTITY FULL` *before*
+  being added (or the application's UPDATE/DELETE fail), which adds full-row WAL volume on the primary and needs table
+  ownership; published tables cannot be set UNLOGGED (H-014). On PlanetScale (no superuser) `FOR ALL TABLES` is
+  impossible, every table is added individually by an owner (debezium.md §2.3). SPEC R17/7.2's list of primary-side
+  actions should include these.
+- **F-8** Generated columns are not in the WAL (virtual: never; stored: only on 18 with `publish_generated_columns`);
+  SPEC 2.4/R16 need a ruling on how they are delivered (H-022).
+- **F-9** Unlogged tables cannot be streamed and cannot be read on a replica (H-030).
+- **F-10** PlanetScale documents no logical decoding on replicas and documents load-balanced replica routing; replica
+  mode may require a deterministic per-instance endpoint (H-047; replica_decoding.md §10).
+- **F-11** The heartbeat of SPEC 4.4 must write a table that is **in the publication**; otherwise pgoutput sends nothing
+  and the slot does not advance (H-026).
