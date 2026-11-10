@@ -190,7 +190,9 @@ Commands to the engine, one per line on standard input:
 - `DURABLE <position>` — the destination commit at this position is durable. The engine marks as processed the
   newest `END` record that it holds whose `ack_position` is at or below it, and then finishes the batch
   bookkeeping. It acknowledges nothing else, ever. The pipeline sends `DURABLE p` only for p ≤ an applied
-  position it has seen committed.
+  position it has seen committed, none before the attach decision (design 8), and none below the applied position
+  of that decision. The engine sends the server no flush position before its first `DURABLE`, so it never moves
+  the slot backwards, also on a server that would allow it (design 8, open point 14).
 - `STOP` — stop reading the slot, close the engine, exit 0.
 - End of input means the parent is gone: the engine halts at once without acknowledging anything.
 
@@ -444,8 +446,8 @@ differs from the sketch above, the document holds. The differences that other pa
 `heartbeat.beat(primary, deadline, slot=…)` returns the position after its own commit, and an `END` with
 `ack_position ≥` that position proves that the beat was decoded; `heartbeat.ensure` (setup role) creates the
 published table `cdc_v2.heartbeat` and `heartbeat.check` (runtime role) verifies it before streaming;
-`slot.terminate_holder(node, name, deadline, expect=…)` takes the holder pair of C2; `SlotFacts.invalid` is true when
-`wal_status = 'lost'`, or `invalidation_reason` is set, or `conflicting` is true (Postgres 16 has no
+`slot.terminate_holder(node, name, deadline, expect=…)` takes the holder pair of C2; `SlotFacts.invalid` is true
+when `wal_status = 'lost'`, or `invalidation_reason` is set, or `conflicting` is true (Postgres 16 has no
 `invalidation_reason` and shows a slot invalidated by the WAL cap as `conflicting`); a standby's timeline comes
 from `slot.timeline_history` (`IDENTIFY_SYSTEM`), never from `pg_control_checkpoint()`, which can lag behind a
 switch; no fact identifies one incarnation of a slot; `pg.connect` puts the session settings into the startup

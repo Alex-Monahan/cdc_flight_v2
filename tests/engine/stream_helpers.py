@@ -6,6 +6,8 @@ import time
 from cdc_v2.deadline import Deadline, DeadlineExceeded
 from cdc_v2.stream import frames as F
 
+LONG = os.environ.get("CDC_V2_E_LONG") == "1"      # the long variants of the engine tests
+
 
 class Txn:
     def __init__(self, begin):

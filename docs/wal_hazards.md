@@ -745,7 +745,9 @@ stays in place behind every entry.
 - **What.** Another session calls `pg_replication_slot_advance`, `pg_logical_slot_get_changes`, drops and re-creates the
   slot, or streams from it.
 - **Mechanism.** Any of these moves `confirmed_flush_lsn` past changes we never applied, or replaces the slot (new
-  `restart_lsn`, new catalog horizon); Debezium does not notice with `no_validation` **[src]**.
+  `restart_lsn`, new catalog horizon); Debezium does not notice with `no_validation` **[src]**. A replication client
+  that sends a status update with a lower flush position also moves `confirmed_flush_lsn` back on a server without
+  the guard of 13.22, 14.19, 15.14, 16.10, 17.6 and 18.0 (measured on 16.6; not on 18.6) **[test]**.
 - **Reproduction.** R: `SELECT pg_replication_slot_advance('cdc_v2_slot', pg_last_wal_replay_lsn());` while the pipeline
   is stopped; or `SELECT pg_drop_replication_slot('cdc_v2_slot'); SELECT pg_create_logical_replication_slot('cdc_v2_slot',
   'pgoutput');`.
@@ -754,11 +756,17 @@ stays in place behind every entry.
   consistent point plus `catalog_xmin` lower bound; on 17+ also `inactive_since` history) still plausible
   (`restart_lsn` never decreases between our observations except after a server crash we observed); otherwise alert +
   automatic backfill, no exit (SPEC 1.8). `active_pid` belonging to a session that is not ours ⇒ alert (contending
-  consumer).
+  consumer). The slot is read before our engine starts, and our engine never sends a flush position below the one it
+  started from (core design 8), so we never move the slot backwards ourselves. Preflight warns when the server's
+  minor release has no guard (P4).
 - **Why prevention.** No change is applied from a slot whose continuity is not proven.
 - **Test.** The four SPEC 1.8 tests (`pg_replication_slot_advance`, drop-and-recreate, changes consumed by another
   session, invalidation by `max_slot_wal_keep_size`).
 - **Residual.** A drop-and-recreate between two checks while we are disconnected is detected at the next acquisition.
+  On a server without the guard, a foreign client that streams from our slot, confirms a position above our applied
+  position and then one at or below it puts the slot back where the check expects it: not found by the slot check,
+  and what the server sends for the range in between is not measured. Runbook rule: nothing else streams from our
+  slot (P5).
 
 ### H-036 Slot invalidation by the WAL cap (`wal_removed`)
 

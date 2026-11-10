@@ -12,8 +12,6 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-LONG = os.environ.get("CDC_V2_E_LONG") == "1"
-
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "jvm: needs a local JVM and the locked Debezium jars (opt-in: -m jvm)")

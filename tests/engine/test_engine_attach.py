@@ -252,8 +252,18 @@ def repl_probe(pair, artifacts, slot, pub, start, flush):
     return p.stdout
 
 
-def test_lower_flush_position_does_not_move_the_slot_back(pair, scenario, artifacts):
-    """Open point 14 of the core design: a status update with a flush position below confirmed_flush_lsn."""
+# First minor release of each branch with "Never move a replication slot's confirmed-flush position backwards"
+# (Postgres commit of 2025-05-19, back-patched through 13); 18.0 has it from the start.
+CONFIRMED_FLUSH_GUARD = {13: 130022, 14: 140019, 15: 150014, 16: 160010, 17: 170006}
+
+
+def test_lower_flush_position_and_the_slot(pair, scenario, artifacts):
+    """Open point 14 of the core design: a status update with a flush position below confirmed_flush_lsn.
+
+    A server with the guard keeps the slot where it is (measured on 18.6); a server without it moves the slot back to
+    the position sent (measured on 16.6). Our engine sends no flush position before its first DURABLE, so by itself
+    it moves the slot in neither case.
+    """
     sc = scenario("create table {s}.w (id int primary key)")
     for i in range(3):
         pair.p("insert into %s.w values (%d)" % (sc.schema, i))
@@ -272,9 +282,13 @@ def test_lower_flush_position_does_not_move_the_slot_back(pair, scenario, artifa
         during_engine = pair.slot(sc.slot)[0]
         eng.stop(Deadline.after(20))
     version = pair.r("show server_version")[0][0]
+    num = int(pair.r("show server_version_num")[0][0])
+    guarded = num >= CONFIRMED_FLUSH_GUARD.get(num // 10000, 0)
     evidence("slot_flush_backwards_pg%s.json" % version.split(".")[0], {
-        "test": "tests/engine/test_engine_attach.py::test_lower_flush_position_does_not_move_the_slot_back",
-        "server_version": version, "confirmed_flush_before_advance": old, "after_advance": advanced,
+        "test": "tests/engine/test_engine_attach.py::test_lower_flush_position_and_the_slot",
+        "server_version": version, "server_has_the_guard": guarded,
+        "confirmed_flush_before_advance": old, "after_advance": advanced,
         "after_status_updates_with_flush_at_the_old_position": after_probe, "while_engine_streams": during_engine,
         "probe": out.strip()})
-    assert after_probe == advanced and during_engine == advanced
+    assert after_probe == (advanced if guarded else old)
+    assert during_engine == after_probe
