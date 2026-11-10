@@ -50,7 +50,17 @@ Last updated: 2026-11-09, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 
 ## Background jobs in flight
 
-- Implementation worker: `tools/localpg` (started 2026-11-09).
+All started 2026-11-09, each in its own worktree and branch (Opus, high effort); the orchestrator merges.
+
+| Job | Phase | Delivers |
+|---|---|---|
+| Implementation worker: `tools/localpg` | P1 | the tool, `tests/localpg/`, `docs/localpg.md`, `evidence/p1/localpg.md` |
+| Spike worker: Flight tooling and platform facts | P2 (§2 A 4) | `tools/flightctl`, `docs/spike/flight_platform.md`, `evidence/p2/flight_platform/` |
+| Spike worker: MotherDuck semantics | P2 (§2 A 3) | `spikes/md_semantics/`, `docs/spike/md_semantics.md`, `evidence/p2/md_semantics/` |
+| Hazard researcher: Debezium facts, replica decoding, hazard catalog | P5 research, started early | `docs/research/debezium.md`, `docs/research/replica_decoding.md`, `docs/wal_hazards.md` |
+
+Waiting for the Flight tooling: the spikes for JVM start-up on a Flight (§2 A 1) and run semantics (§2 A 2).
+Waiting for `tools/localpg`: the local throughput spike (§2 A 5).
 
 ## Changes to the secret scanner, its tests or `.secretscan-allow` (for the owner's review)
 
