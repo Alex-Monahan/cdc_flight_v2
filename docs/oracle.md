@@ -91,6 +91,20 @@ attach mode.
    this change, run the same way, left that row invisible to every reader of the standby and then reported an
    extra destination row that the source does have (`oracle_standby_before_the_fix.json`). The version table
    is shared with the pipeline: if it is wrong, both are.
+
+   **On every standby the snapshot must be settled** (`docs/design/cut.md` section 8). A standby that has just
+   started can hide a committed transaction whose commit record lies before its replay position, until it
+   replays the next commit or abort; the pipeline's reads of that standby would hide the same transaction, and
+   the comparison would say EQUAL falsely. So the oracle reads the standby's settle floor once on the
+   coordinator connection, before its first snapshot (`cdc_v2.pg.cut.settle_floor`: the next transaction id of
+   the checkpoint in the control file), and uses a snapshot only if its `xmax` is at or above it. What it waits
+   for is one replayed commit or abort on the source; the pipeline's heartbeat writes one every 10 s. It drops an
+   unsettled snapshot and takes another every 0.1 s, for at most `settle_wait_s` (default 60 s, never past the
+   comparison's deadline); then it refuses the comparison with `PositionNotReached` ("source standby has not
+   settled after its start"), never with a result. A settled snapshot then goes through the export rule above.
+   On a primary nothing changes. Tested in `tests/test_oracle_unit.py`
+   (`test_on_a_standby_the_oracle_uses_only_a_settled_snapshot`). At most, a comparison on a standby waits
+   `position_wait_s` + `settle_wait_s` + `quiet_wait_s` (60 + 60 + 5 s) before it reads.
 2. **One destination transaction** on one connection (`BEGIN TRANSACTION` ... `ROLLBACK`). A caller may pass its own
    connection with an open transaction (`Destination(conn=..., in_transaction=True)`); the mutation tests use this.
    Every MotherDuck statement has a deadline (`md_statement_s`, default 1,800 s, never past the comparison's

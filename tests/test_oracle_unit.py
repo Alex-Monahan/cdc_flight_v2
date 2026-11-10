@@ -259,6 +259,7 @@ POSITION_SQL = ("SELECT (CASE WHEN pg_is_in_recovery() THEN pg_last_wal_replay_l
 BEGIN_RR = "BEGIN ISOLATION LEVEL REPEATABLE READ, READ ONLY"
 SNAPSHOT_SQL = "SELECT pg_current_snapshot()::text"
 EXPORT_SQL = "SELECT pg_export_snapshot()"
+SETTLE_SQL = "SELECT next_xid, pg_is_in_recovery() FROM pg_control_checkpoint()"
 
 
 @pytest.fixture
@@ -278,8 +279,9 @@ def clock(monkeypatch):
 class _FakePg:
     """A Postgres connection that answers the statements of the oracle's source reader and logs them."""
 
-    def __init__(self, in_recovery, version, snapshots=()):
-        self.in_recovery, self.version = in_recovery, version
+    def __init__(self, in_recovery, version, snapshots=(), floor="0:3"):
+        self.in_recovery, self.version, self.floor = in_recovery, version, floor
+        self.autocommit = True                   # as Source.connect() opens them
         self.snapshots = iter(snapshots)
         self.log = []
         self.inside = 0
@@ -299,6 +301,8 @@ class _FakePg:
             rows = [(next(self.snapshots),)]
         elif sql == EXPORT_SQL:
             rows = [("00000003-0000001B-1",)]
+        elif sql == SETTLE_SQL:
+            rows = [(self.floor, self.in_recovery)]
         elif sql.startswith("SELECT 'scan"):
             with self.lock:                      # a scan: count sessions that use this connection at once
                 self.inside += 1
@@ -331,10 +335,11 @@ class _FakeSource(K.Source):
         return c
 
 
-def _reader(in_recovery, version, snapshots, quiet_wait_s=5.0):
-    coord = _FakePg(in_recovery, version, snapshots)
+def _reader(in_recovery, version, snapshots, quiet_wait_s=5.0, floor="0:3", settle_wait_s=60.0):
+    coord = _FakePg(in_recovery, version, snapshots, floor)
     src = _FakeSource(coord, lambda: _FakePg(in_recovery, version))
-    snap = K._SourceSnapshot(src, 4, 60_000, 0x2000, Deadline.after(60), lambda: Deadline.after(quiet_wait_s))
+    snap = K._SourceSnapshot(src, 4, 60_000, 0x2000, Deadline.after(60), lambda: Deadline.after(quiet_wait_s),
+                             lambda: Deadline.after(settle_wait_s))
     return snap, src, coord
 
 
@@ -392,10 +397,44 @@ def test_on_a_standby_with_the_defect_and_no_quiet_snapshot_the_oracle_reads_on_
     assert coord.log.count("ROLLBACK") == coord.log.count(BEGIN_RR)   # closed once, nothing left open
 
 
-def test_on_a_primary_and_on_a_fixed_standby_the_oracle_reader_is_unchanged(clock):
-    for in_recovery, version in ((False, 180006), (True, 180007), (False, 160015)):
-        snap, src, coord = _reader(in_recovery, version, [])
+def test_on_a_primary_the_oracle_reader_is_unchanged(clock):
+    for version in (180006, 160015, 180007):
+        snap, src, coord = _reader(False, version, [])
         assert snap.way == K.EXPORTED and len(src.opened) == 5
-        assert SNAPSHOT_SQL not in coord.log                       # no extra statement
+        assert SNAPSHOT_SQL not in coord.log and SETTLE_SQL not in coord.log      # no extra statement
         assert coord.log[-3:] == [POSITION_SQL, BEGIN_RR, EXPORT_SQL]
         assert clock["now"] == 0.0
+
+
+def test_on_a_standby_with_the_fix_the_oracle_exports_a_settled_snapshot(clock):
+    snap, src, coord = _reader(True, 180007, ["700:705:"])
+    assert snap.way == K.EXPORTED and len(src.opened) == 5            # not quiet, but the server has the fix
+    assert coord.log.index(SETTLE_SQL) < coord.log.index(BEGIN_RR)     # the floor is read before the snapshot
+    assert coord.log[-4:] == [POSITION_SQL, BEGIN_RR, SNAPSHOT_SQL, EXPORT_SQL]
+    assert clock["now"] == 0.0
+
+
+def test_on_a_standby_the_oracle_uses_only_a_settled_snapshot(clock):
+    """A standby that has just started can hide a commit that lies before its replay position, until its
+    snapshots' xmax reaches the next transaction id of its control file (docs/design/cut.md section 8).  The
+    oracle drops such snapshots, on every server version, and refuses the comparison after its settle wait."""
+    for version, settled_way in ((180006, K.QUIET_EXPORTED), (180007, K.EXPORTED)):
+        clock["now"] = 0.0
+        snap, src, coord = _reader(True, version, ["700:700:", "700:700:", "702:702:"], floor="0:701")
+        assert snap.way == settled_way and snap.snapshot      # the quiet but unsettled snapshots were dropped
+        assert coord.log.count(BEGIN_RR) == 3 and coord.log.count("ROLLBACK") == 2
+        assert coord.log.count(SETTLE_SQL) == 1 and coord.log.index(SETTLE_SQL) < coord.log.index(BEGIN_RR)
+        assert clock["now"] == pytest.approx(2 * K.SETTLE_POLL_S)
+    # a standby that never settles: refused after the wait, never compared, nothing left open
+    clock["now"] = 0.0
+    coord = _FakePg(True, 180006, ["700:700:"] * 1000, floor="0:701")
+    src = _FakeSource(coord, lambda: _FakePg(True, 180006))
+    with pytest.raises(K.PositionNotReached, match="has not settled") as info:
+        K._SourceSnapshot(src, 4, 60_000, 0x2000, Deadline.after(60), lambda: Deadline.after(5.0),
+                          lambda: Deadline.after(2.0))
+    assert "700" in str(info.value) and "701" in str(info.value)
+    assert clock["now"] == pytest.approx(2.0) and src.opened == [coord]
+    # every snapshot was dropped, and the reader closed once more on the refusal: nothing is left open
+    assert coord.log.count("ROLLBACK") == coord.log.count(BEGIN_RR) + 1 and coord.log[-1] == "ROLLBACK"
+    assert EXPORT_SQL not in coord.log
+    assert K.OracleConfig().settle_wait_s == 60.0
