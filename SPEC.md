@@ -1,8 +1,8 @@
-# Postgres → MotherDuck CDC Flight — Build Spec v4 (DRAFT for refinement)
+# Postgres → MotherDuck CDC Flight — Build Spec v4
 
-Status: **draft, revision 2 (2026-11-09)** — the owner's decisions on D1 and D4–D13 are folded in. Nothing is built
-until the owner signs off on this document and `PLAN.md`. Items marked **[OPEN Dn]** are still to be confirmed; each
-has a proposed default that applies if not changed.
+Status: **revision 3 (2026-11-09)** — every decision D1–D17 is resolved by the owner (§5); nothing is open. The owner
+starts the build by handing this document and `PLAN.md` to the build orchestrator; nothing is built before that.
+The build starts fully local and moves to PlanetScale later (PLAN §1).
 
 ## 0. Sources and precedence
 
@@ -22,8 +22,8 @@ Target score: **214 / 215** (item 7.3 is capped at 4 by ruling R10). Every other
 | R1 | Clean-slate implementation. The only reused artifact is the rubric file. | all |
 | R2 | **Stock Debezium**: unmodified released Debezium artifacts, version pinned. No forks, no patched or shadowed classes. Configuration and our own code around it are allowed. | 7.1, all streaming |
 | R3 | Debezium is required for the streaming (WAL) path. Snapshots/backfills use **another approach** whenever Debezium's snapshot cannot reach the R5 target (expected: direct parallel reads from Postgres). | 3.x, 1.6 |
-| R4 | Runs as a **MotherDuck Flight**. The Flight's `main.py` is a small bootstrap that **clones this git repo** at a pinned commit and runs it (avoids the Flight source-size limit). | packaging |
-| R5 | Performance target for 3.1 and 5.1: **100K rows per second** at **TPC-H `lineitem` row width** (16 columns), graded on an **F16** Flight (2 vCPU / 16 GB). **[OPEN D2]** "100K rows" is read as rows/second. | 3.1, 5.1 |
+| R4 | Runs as a **MotherDuck Flight**. The Flight's `main.py` is a small bootstrap that **clones this git repo** at a pinned commit and runs it (avoids the Flight source-size limit). The repository is public (R23), so the clone needs no credential. | packaging |
+| R5 | Performance target for 3.1 and 5.1: **100K rows per second** at **TPC-H `lineitem` row width** (16 columns), graded on an **F16** Flight (2 vCPU / 16 GB). "100K rows" means rows per second, for backfill and for CDC apply. The Flight stays on F16: a shortfall is answered by improving the measured number, never by a larger Flight. | 3.1, 5.1 |
 | R6 | Transaction atomicity (1.3) **must hold at benchmark rate**. The benchmark may use one table; multiple tables replicating in parallel must be supported and tested. | 1.3, 5.1, 5.3 |
 | R7 | 3.2: a staged load followed by drop-and-rename inside one `BEGIN`/`COMMIT` scores 5. | 3.2 |
 | R8 | A heartbeat and a signal table on the primary are acceptable and count as "light". | 4.4, 7.2 |
@@ -33,18 +33,19 @@ Target score: **214 / 215** (item 7.3 is capped at 4 by ruling R10). Every other
 | R12 | 4.3: the problematic-WAL cases must be **discovered up front and prevented**, not merely recovered from. | 4.3 |
 | R13 | 6.2: alerts go to **a Slack channel and a MotherDuck table**. | 6.2 |
 | R14 | Implementer decides the SCD2 shape, PII config surface and salt source (see 8.2, 8.3). | 8.x |
-| R15 | Test source is the owner's **PlanetScale Postgres** instance, plus a local Postgres for hermetic fault injection. | testing |
+| R15 | Test source is the owner's **PlanetScale Postgres** instance. The build starts as a fully local project and moves to PlanetScale when the owner provides its credentials (PLAN §1). Development and hermetic fault injection use a **local Postgres primary and replica** on the latest stable Postgres major version, installed with Homebrew and run as native processes — never in Docker or any other container. The PlanetScale instance is a development instance: the owner allows its configuration and contents to be changed however the build needs, with one hard limit — nothing may change what the instance costs (PLAN §5). | testing |
 | R16 | Rubric clarifications already in the file stay binding: `money`/`inet` (and comparably obscure types) delivered losslessly **as text** is 5/5 and **refusing** to deliver a value is never acceptable (2.4); rename-swap is 5 and no complexity is added just to reach `CREATE OR REPLACE` (3.2); heartbeat writes go to the primary on a separate connection while CDC reads from the replica (7.2). | 2.4, 3.2, 7.2 |
-| R17 | **Replica first.** By default the pipeline loads the primary as little as possible: WAL decoding, snapshot and backfill reads and catalog polling run against a replica. The primary only receives the light heartbeat, the optional signal table and publication maintenance. Decoding from the primary is a supported, non-default mode. | 7.2, 4.1, 4.4, 2.3 |
-| R18 | **Concurrency guard.** A starting run checks for a healthy heartbeat from an existing run. If there is one, it does not start. If there is none, it starts, kills the existing run and becomes the leader. The Flight is scheduled every minute, and this same check performs the hand-over when a run ends at the platform's run-time limit. | 4.2, 5.2 |
+| R17 | **Replica first.** By default the pipeline loads the primary as little as possible: WAL decoding, snapshot and backfill reads and catalog polling run against a replica. The primary only receives the light heartbeat, the optional signal table and publication maintenance. Decoding from the primary is a supported, non-default mode. On PlanetScale, decoding from a replica is tested extensively first and must be made to work. | 7.2, 4.1, 4.4, 2.3 |
+| R18 | **Concurrency guard.** A starting run checks for a healthy heartbeat from an existing run. If there is one, it does not start. If there is none, it starts, kills the existing run and becomes the leader. The Flight is scheduled every minute, and this same check performs the hand-over when a run ends at the platform's run-time limit. There is no separate watchdog Flight; the cost of the every-minute runs is accepted. | 4.2, 5.2 |
 | R19 | Latency: p99 ≤ 30 s and max ≤ 60 s. Run hand-over, failover and a table's own backfill are excluded from the statistic but reported. | 5.2 |
 | R20 | New tables replicate automatically, with global PII rules applied first. A configuration switch turns automatic replication of new tables off. | 2.3, 8.3 |
 | R21 | The pipeline may be at most **2 hours** behind: the lag trigger is 2 hours of overall WAL lag time (not per-table lag) that is not shrinking. No per-table shedding. | 3.6 |
-| R22 | The solution must be battle-tested and extremely robust: extensive testing and extensive fuzzing, with the quantitative minimums of the robustness bar in §4. | 4.3, 1.7, all |
+| R22 | The solution must be battle-tested and extremely robust: extensive testing and extensive fuzzing, with the quantitative minimums of the robustness bar in §4, including a 24-hour soak. | 4.3, 1.7, all |
+| R23 | The repository is **public**. No secret, key, credential, hostname, database user name or connection string is ever committed, and the PlanetScale organisation and database are never named. A secret scan runs before every commit and every push and is never bypassed; committed evidence is redacted. | all |
 
 ## 2. Platform facts the design must respect
 
-- Flight sizes are F4, F16 and F32; this project is graded on **F16**. Maximum run time is 8 hours
+- Flight sizes are F4, F16 and F32; this project is built, measured and graded on **F16** only. Maximum run time is 8 hours
   (Business/Enterprise) or 1 hour (Lite). The Flight is therefore scheduled **every minute**: the 4.2 guard makes every
   run but the leader exit at once, and performs the hand-over when a run ends (R18).
 - Flight source is one `main.py` (≤ 200 KB) plus requirements (≤ 20 KB). Only `git` is preinstalled: no JVM. Local disk
@@ -52,7 +53,8 @@ Target score: **214 / 215** (item 7.3 is capped at 4 by ruling R10). Every other
 - A Flight runs as the account that created it. This project's Flights are created by a dedicated MotherDuck service
   account that can see only this project's databases.
 - Secrets arrive as environment variables. No secret value may appear in source, config, arguments, logs, alerts or
-  MotherDuck tables.
+  MotherDuck tables. This repository is public (R23): nothing committed — code, tests, documentation, evidence, logs —
+  may contain a secret, a hostname, a database user name or a connection string.
 - Loading MotherDuck row by row is not acceptable; all writes are set-based batches.
 - Local emulation is never proof of Flight behaviour. Every performance number and every item marked *(Flight)* below
   is measured in a real Flight run.
@@ -181,7 +183,7 @@ shedding. Any resulting gap in a history table (8.2) is recorded explicitly. Not
 as it is still shrinking.
 
 **3.7 Resume mid-backfill (5).** Progress is recorded per table and per chunk in MotherDuck (local disk is not
-durable). After a crash or a run handover, completed chunks are not read again: total source rows read ≤ 1.1 × table
+durable). After a crash or a run hand-over, completed chunks are not read again: total source rows read ≤ 1.1 × table
 size for a kill at 50 %, and the oracle passes.
 
 ### §4 Failure detection and recovery
@@ -200,9 +202,16 @@ exceeded), the Flight attaches to another configured replica, creates a new slot
 primary failover the Flight resumes from the synced slot with no backfill once continuity is proven, and backfills
 automatically if the slot is absent, unsynced or invalid. Both modes are tested with a real failover on PlanetScale
 *(Flight)* and with a local primary/standby pair. If no replica is configured the Flight runs in primary mode and says
-so in its status. **[OPEN D15]** all replicas unavailable: proposed — keep retrying and alerting for 15 minutes
-(configurable, or never), then fall back to primary mode until a replica returns. **[OPEN D17]** if the provider does
-not permit logical decoding on a replica, primary mode with snapshot reads on the replica becomes the default there.
+so in its status.
+
+*All replicas unavailable:* the Flight keeps retrying and alerting for 15 minutes (`replica.fallback_after`,
+configurable; `never` disables the fallback), then runs in primary mode until a replica has been healthy again for the
+same period, and then returns to replica mode. Each switch follows the slot rules above: resume only when position
+continuity is proven, otherwise backfill automatically.
+
+*PlanetScale:* logical decoding on a replica is expected to be available. The PlanetScale spike tests it extensively as the first
+step on PlanetScale (PLAN §2 B), and the build must make replica mode work there. Primary mode may become the default
+on a provider only after a documented, exhausted effort that the owner has reviewed.
 
 **4.2 Concurrent Flights (5).** Per R18. A *leader record* in MotherDuck holds the run id, Flight id, a monotonically
 increasing fencing epoch, a heartbeat time and a state. The leader refreshes the heartbeat every 10 s, and only while
@@ -222,9 +231,17 @@ rejected and shuts itself down when it sees a newer epoch. *Planned hand-over:* 
 exits just before a minute boundary; the next scheduled run takes over through the same guard. A dead or hung leader
 is replaced within 90 s plus start-up. Tests: 3 simultaneous starts; `SIGSTOP`/`SIGCONT` of the leader across a
 takeover; kill of the leader; a hung component with a live process; 100 consecutive hand-overs under load with the
-oracle. **[OPEN D14]** the spike must confirm that the platform starts a scheduled run while another run of the same
-Flight is active, and what 1,440 short runs a day cost; fallback: a small F4 watchdog Flight performs the same check
-every minute and starts the main Flight on demand.
+oracle.
+
+There is **no separate watchdog Flight**: the every-minute schedule is the only start mechanism and the cost of its
+short runs is accepted. A run must therefore never stay alive without a healthy heartbeat. The Flight's bootstrap
+process stays minimal and acts as the last-resort watchdog of the pipeline process: if the heartbeat has not been
+refreshed for 60 s — the supervisor could not restore progress, or the leader record cannot be written — the whole run
+hard-exits (process exit, not a graceful shutdown that could itself hang), and the next scheduled run takes over.
+Test: with the entire pipeline process tree frozen (`SIGSTOP`), the run has exited within 90 s. The spike measures
+what the platform does with a scheduled start while a run of the same Flight is active (start, skip or queue) and what
+the short runs cost. If such starts are skipped or queued, a frozen run is replaced only after it has exited; the
+hard-exit rule is what bounds that time, and the measured worst case is reported to the owner.
 
 **4.3 Problematic WAL messages (5).** Per R12 the deliverable is `docs/wal_hazards.md`: a researched catalog of every
 class of WAL content or stream behaviour that can stall, crash or corrupt the pipeline, each with a reproduction, a
@@ -264,8 +281,11 @@ once the cause is removed.
 
 **5.1 Large changes (5) *(Flight)*.** Single transactions of ≥ 10M rows (insert, update, delete) are applied
 correctly and atomically (R6) with bounded memory. Target apply rate 100K rows/s at `lineitem` width on F16 (R5).
-**[OPEN D3]** if the measured ceiling of stock Debezium streaming on F16 is below the target, the choice between a
-larger Flight (F32) and accepting the measured number returns to the owner with data.
+The Flight stays on F16. If stock Debezium streaming measures below the target, work continues on F16 to raise the
+number — batch and queue sizes, JVM settings, the hand-off format between the Debezium process and the applier, and
+apply parallelism that preserves R6 — and the result states the measured rate, the bottleneck analysis and the tuning
+log. A shortfall that remains after tuning is exhausted is reported to the owner with that data and scored as measured;
+a larger Flight is not an option.
 
 **5.2 Low latency (5) *(Flight)*.** Per R19. Latency = source commit on the primary → visible, so replica replay lag
 is included. A canary row is written every 5 s and its latency is logged in MotherDuck. Pass = **p99 ≤ 30 s and max
@@ -334,10 +354,12 @@ excluding or masking one is a config validation error.
 - Grading is done by subagents with fresh context that did not write the code, against this document. Reviewer-judged
   items (R11) use a separate reviewer.
 - *(Flight)* items are graded only on real Flight runs against PlanetScale, on F16.
+- Evidence is committed to a public repository (R23). The test harness redacts hostnames, user names, tokens and
+  connection strings when it writes an evidence file; the secret scan blocks the commit otherwise.
 
 ### Robustness bar (R22)
 
-The build is not finished until all of the following hold. The quantities are proposed minimums (**[OPEN D16]**).
+The build is not finished until all of the following hold. The quantities are minimums accepted by the owner.
 
 - **Workload fuzzer**: randomized DDL, DML and transaction shapes (sizes, interleavings, savepoints and rollbacks,
   multi-table transactions) checked against the oracle: ≥ 1,000 seeds and ≥ 100 cumulative hours, on local Postgres
@@ -352,30 +374,24 @@ The build is not finished until all of the following hold. The quantities are pr
   the applier; truncated or corrupted input is detected and contained, never applied.
 - **Leadership fuzzer**: random starts, pauses, kills and hand-overs of ≥ 3 competing runs: never two writers, never a
   lost or duplicated change; ≥ 1,000 rounds.
-- **Soak**: 72 hours on a real Flight against PlanetScale with scheduled hand-overs, ≥ 2 forced failovers, one
-  lag-triggered backfill, continuous oracle checks and the 5.2 canary.
+- **Soak**: 24 hours on a real F16 Flight against PlanetScale in replica mode, with `run.max_runtime` set to 1 hour
+  so that at least 20 hand-overs occur, ≥ 2 forced failovers, one lag-triggered backfill (its thresholds may be
+  lowered for the soak; the values used are reported), continuous oracle checks and the 5.2 canary.
 - Every failure found becomes a seeded regression test. After a fix to correctness code, the counters of the affected
   fuzzer restart from zero.
 - Fresh-context graders must attack with cases that are not in the hazard catalog; any finding reopens the item.
 
 ## 5. Decisions
 
-### Still open
-
-| # | Decision | Proposed default |
-|---|---|---|
-| D2 | Meaning of "100K rows" | rows per second, for backfill and for CDC apply |
-| D3 | Stock Debezium streaming measured below 100K rows/s on F16 | decide with spike data: F32, or accept the measured number |
-| D14 | Platform behaviour and cost of a run scheduled every minute | use it if the spike confirms it; otherwise a small F4 watchdog Flight does the check |
-| D15 | All replicas unavailable | retry and alert for 15 min, then fall back to primary mode until a replica returns |
-| D16 | Quantities of the robustness bar (§4) | as listed |
-| D17 | Provider does not permit logical decoding on a replica | primary mode + failover slot, snapshot reads on the replica |
+No decision is open.
 
 ### Resolved by the owner (2026-11-09)
 
 | # | Decision | Resolution |
 |---|---|---|
 | D1 | Flight size for grading | F16 (R5) |
+| D2 | Meaning of "100K rows" | rows per second, for backfill and for CDC apply (R5) |
+| D3 | Stock Debezium streaming measured below 100K rows/s on F16 | stay on F16 and keep improving the measured number; report it with the tuning log (R5, 5.1) |
 | D4 | "Consistently under 30 seconds" | p99 ≤ 30 s, max ≤ 60 s over 24 h; hand-over, failover and own backfill excluded but reported (R19) |
 | D5 | "Short interval" for discovery | 30 s poll, table present ≤ 60 s, automatic by pattern, with an off switch (R20) |
 | D6 | "Incremental refresh" | cursor column + lookback + optional reconcile (3.5) |
@@ -386,3 +402,7 @@ The build is not finished until all of the following hold. The quantities are pr
 | D11 | Destructive DDL | mirrored by default; per-table `on_source_drop: retain` (1.5) |
 | D12 | Operations schema | `_cdc` in the destination database (6.1) |
 | D13 | Run-time limit | every-minute schedule; the leader releases before `run.max_runtime`; the next run takes over through the 4.2 guard (R18) |
+| D14 | Every-minute schedule | used as the only start mechanism; no separate watchdog Flight; cost accepted; a run without a healthy heartbeat hard-exits (R18, 4.2) |
+| D15 | All replicas unavailable | retry and alert for 15 min, then primary mode until a replica is healthy again (4.1) |
+| D16 | Robustness quantities | accepted as listed in §4, with a 24-hour soak (R22) |
+| D17 | Logical decoding on a PlanetScale replica | expected to work: tested extensively first and made to work; primary mode as a provider default only after a documented, exhausted effort reviewed by the owner (R17, 4.1) |
