@@ -11,7 +11,7 @@
     "closed_by_fault": 0,
     "reset_by_fault": 2
   },
-  "seconds": 0.47,
+  "seconds": 0.54,
   "server_walsender_ended_at_s": null,
   "slot_active_after_kill": false,
   "test": "tests/engine/test_engine_attach.py::test_broken_source_connection_through_the_proxy[reset]",

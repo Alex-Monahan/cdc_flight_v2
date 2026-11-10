@@ -2,147 +2,147 @@
   "lag_transactions": 3,
   "lives": [
     {
-      "cf_at_start": "0/63ED7A18",
+      "cf_at_start": "0/704F57C8",
       "crash": null,
-      "first_txn_ack": "0/63ED7B60",
+      "first_txn_ack": "0/704F58D8",
       "how": "killed",
       "kill_after": 5.3810286691055245,
-      "rows_applied": 1179
+      "rows_applied": 1182
     },
     {
-      "cf_at_start": "0/63F0A730",
+      "cf_at_start": "0/70528878",
       "crash": null,
-      "first_txn_ack": "0/63F0A7E0",
+      "first_txn_ack": "0/70528928",
       "how": "killed",
       "kill_after": 3.370621756411413,
-      "rows_applied": 1949
+      "rows_applied": 1915
     },
     {
-      "cf_at_start": "0/63F2C178",
+      "cf_at_start": "0/70548678",
       "crash": null,
-      "first_txn_ack": "0/63F2C228",
+      "first_txn_ack": "0/70548728",
       "how": "killed",
       "kill_after": 1.6280310770469595,
-      "rows_applied": 2320
+      "rows_applied": 2275
     },
     {
-      "cf_at_start": "0/63F3C2E0",
+      "cf_at_start": "0/70558260",
       "crash": {
         "action": "kill",
         "hit": "seed:1:5",
         "point": "engine.ack_marking"
       },
-      "first_txn_ack": "0/63F3C390",
+      "first_txn_ack": "0/70558310",
       "how": "EngineExited -9",
       "kill_after": null,
-      "rows_applied": 2501
+      "rows_applied": 2321
     },
     {
-      "cf_at_start": "0/63F3C2E0",
+      "cf_at_start": "0/70558260",
       "crash": {
         "action": "kill",
         "hit": "seed:2:5",
         "point": "engine.ack_marking"
       },
-      "first_txn_ack": "0/63F3C390",
+      "first_txn_ack": "0/70558310",
       "how": "EngineExited -9",
       "kill_after": null,
-      "rows_applied": 2515
+      "rows_applied": 2330
     },
     {
-      "cf_at_start": "0/63F3C2E0",
+      "cf_at_start": "0/70558260",
       "crash": {
         "action": "kill",
         "hit": "seed:3:5",
         "point": "engine.ack_marking"
       },
-      "first_txn_ack": "0/63F3C390",
+      "first_txn_ack": "0/70558310",
       "how": "EngineExited -9",
       "kill_after": null,
-      "rows_applied": 2993
+      "rows_applied": 2959
     },
     {
-      "cf_at_start": "0/63F59610",
+      "cf_at_start": "0/705623B8",
       "crash": {
         "action": "kill",
         "hit": "seed:1:5",
         "point": "engine.acked"
       },
-      "first_txn_ack": "0/63F596C0",
+      "first_txn_ack": "0/70562468",
       "how": "EngineExited -9",
       "kill_after": null,
-      "rows_applied": 3144
+      "rows_applied": 3083
     },
     {
-      "cf_at_start": "0/63F59610",
+      "cf_at_start": "0/705623B8",
       "crash": {
         "action": "kill",
         "hit": "seed:2:5",
         "point": "engine.acked"
       },
-      "first_txn_ack": "0/63F596C0",
+      "first_txn_ack": "0/70562468",
       "how": "EngineExited -9",
       "kill_after": null,
-      "rows_applied": 3218
+      "rows_applied": 3126
     },
     {
-      "cf_at_start": "0/63F59610",
+      "cf_at_start": "0/705623B8",
       "crash": {
         "action": "kill",
         "hit": "seed:3:5",
         "point": "engine.acked"
       },
-      "first_txn_ack": "0/63F596C0",
+      "first_txn_ack": "0/70562468",
       "how": "EngineExited -9",
       "kill_after": null,
-      "rows_applied": 3692
+      "rows_applied": 3705
     },
     {
-      "cf_at_start": "0/63F77EA8",
+      "cf_at_start": "0/7059A180",
       "crash": {
         "action": "kill",
         "hit": "seed:1:5",
         "point": "engine.flush_sent"
       },
-      "first_txn_ack": "0/63F77F58",
+      "first_txn_ack": "0/7059A230",
       "how": "EngineExited -9",
       "kill_after": null,
-      "rows_applied": 3917
+      "rows_applied": 3936
     },
     {
-      "cf_at_start": "0/63F80408",
+      "cf_at_start": "0/7059D6C0",
       "crash": {
         "action": "kill",
         "hit": "seed:2:5",
         "point": "engine.flush_sent"
       },
-      "first_txn_ack": "0/63F804B8",
+      "first_txn_ack": "0/7059D770",
       "how": "EngineExited -9",
       "kill_after": null,
-      "rows_applied": 4129
+      "rows_applied": 4186
     },
     {
-      "cf_at_start": "0/63F84378",
+      "cf_at_start": "0/705ADCF8",
       "crash": {
         "action": "kill",
         "hit": "seed:3:5",
         "point": "engine.flush_sent"
       },
-      "first_txn_ack": "0/63F84428",
+      "first_txn_ack": "0/705ADDA8",
       "how": "EngineExited -9",
       "kill_after": null,
-      "rows_applied": 4430
+      "rows_applied": 4468
     },
     {
-      "cf_at_start": "0/63F982F0",
+      "cf_at_start": "0/705BB9D8",
       "crash": null,
-      "first_txn_ack": "0/63F983A0",
+      "first_txn_ack": "0/705BBA88",
       "how": "stopped",
       "kill_after": null,
-      "rows_applied": 4454
+      "rows_applied": 4492
     }
   ],
-  "rows": 4454,
+  "rows": 4492,
   "seed": 4242,
   "test": "tests/engine/test_engine_ack.py::test_restart_after_random_kills_and_java_crash_points",
   "violations": 0

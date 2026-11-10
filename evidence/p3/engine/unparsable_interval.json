@@ -4,7 +4,7 @@
       "fatal_causes": [
         [
           "org.apache.kafka.connect.errors.ConnectException",
-          "Error while processing event at offset {transaction_id=580035, lsn_proc=1876188200, lsn_events_processed=1, messageType=INSERT, lsn_commit=1876188200, lsn=1876188200, txId=580035, ts_usec=1794302640627118}"
+          "Error while processing event at offset {transaction_id=689794, lsn_proc=2149298128, lsn_events_processed=1, messageType=INSERT, lsn_commit=2149298128, lsn=2149298128, txId=689794, ts_usec=1794303491213027}"
         ],
         [
           "org.apache.kafka.connect.errors.ConnectException",
@@ -22,114 +22,13 @@
       "fatal_class": "org.apache.kafka.connect.errors.ConnectException",
       "fatal_message": "An exception occurred in the change event producer. This connector will be stopped.",
       "fatal_positions": {
-        "lsn": 1876188200,
-        "lsn_commit": 1876188200,
-        "lsn_proc": 1876188200,
+        "lsn": 2149298128,
+        "lsn_commit": 2149298128,
+        "lsn_proc": 2149298128,
         "messageType": "BEGIN",
-        "transaction_id": "580035",
-        "ts_usec": 1794302640627118,
-        "txId": 580035
-      },
-      "fatal_table": ".",
-      "frames_before_fatal": [
-        [
-          "Hello",
-          ""
-        ],
-        [
-          "Begin",
-          ""
-        ],
-        [
-          "Schema",
-          "ok"
-        ],
-        [
-          "Rows",
-          "ok"
-        ],
-        [
-          "End",
-          ""
-        ],
-        [
-          "Begin",
-          ""
-        ]
-      ],
-      "seconds_to_fatal": 1.51
-    },
-    {
-      "fatal_causes": [
-        [
-          "org.apache.kafka.connect.errors.ConnectException",
-          "Error while processing event at offset {transaction_id=580035, lsn_proc=1876188200, lsn_events_processed=1, messageType=INSERT, lsn_commit=1876188200, lsn=1876188200, txId=580035, ts_usec=1794302640627118}"
-        ],
-        [
-          "org.apache.kafka.connect.errors.ConnectException",
-          ""
-        ],
-        [
-          "org.postgresql.util.PSQLException",
-          "SQLState 42820"
-        ],
-        [
-          "java.lang.NumberFormatException",
-          ""
-        ]
-      ],
-      "fatal_class": "org.apache.kafka.connect.errors.ConnectException",
-      "fatal_message": "An exception occurred in the change event producer. This connector will be stopped.",
-      "fatal_positions": {
-        "lsn": 1876187920,
-        "lsn_proc": 1876187920,
-        "messageType": "BEGIN",
-        "transaction_id": "580034",
-        "ts_usec": 1794302640619434,
-        "txId": 580034
-      },
-      "fatal_table": ".",
-      "frames_before_fatal": [
-        [
-          "Hello",
-          ""
-        ],
-        [
-          "Begin",
-          ""
-        ]
-      ],
-      "seconds_to_fatal": 1.56
-    },
-    {
-      "fatal_causes": [
-        [
-          "org.apache.kafka.connect.errors.ConnectException",
-          "Error while processing event at offset {transaction_id=580035, lsn_proc=1876188200, lsn_events_processed=1, messageType=INSERT, lsn_commit=1876188200, lsn=1876188200, txId=580035, ts_usec=1794302640627118}"
-        ],
-        [
-          "org.apache.kafka.connect.errors.ConnectException",
-          ""
-        ],
-        [
-          "org.postgresql.util.PSQLException",
-          "SQLState 42820"
-        ],
-        [
-          "java.lang.NumberFormatException",
-          ""
-        ]
-      ],
-      "fatal_class": "org.apache.kafka.connect.errors.ConnectException",
-      "fatal_message": "An exception occurred in the change event producer. This connector will be stopped.",
-      "fatal_positions": {
-        "lsn": 1876188200,
-        "lsn_commit": 1876188200,
-        "lsn_proc": 1876188200,
-        "messageType": "BEGIN",
-        "transaction_id": "580035",
-        "ts_usec": 1794302640627118,
-        "txId": 580035
+        "transaction_id": "689794",
+        "ts_usec": 1794303491213027,
+        "txId": 689794
       },
       "fatal_table": ".",
       "frames_before_fatal": [
@@ -159,6 +58,124 @@
         ]
       ],
       "seconds_to_fatal": 1.39
+    },
+    {
+      "fatal_causes": [
+        [
+          "org.apache.kafka.connect.errors.ConnectException",
+          "Error while processing event at offset {transaction_id=689794, lsn_proc=2149298128, lsn_events_processed=1, messageType=INSERT, lsn_commit=2149298128, lsn=2149298128, txId=689794, ts_usec=1794303491213027}"
+        ],
+        [
+          "org.apache.kafka.connect.errors.ConnectException",
+          ""
+        ],
+        [
+          "org.postgresql.util.PSQLException",
+          "SQLState 42820"
+        ],
+        [
+          "java.lang.NumberFormatException",
+          ""
+        ]
+      ],
+      "fatal_class": "org.apache.kafka.connect.errors.ConnectException",
+      "fatal_message": "An exception occurred in the change event producer. This connector will be stopped.",
+      "fatal_positions": {
+        "lsn": 2149298128,
+        "lsn_commit": 2149298128,
+        "lsn_proc": 2149298128,
+        "messageType": "BEGIN",
+        "transaction_id": "689794",
+        "ts_usec": 1794303491213027,
+        "txId": 689794
+      },
+      "fatal_table": ".",
+      "frames_before_fatal": [
+        [
+          "Hello",
+          ""
+        ],
+        [
+          "Begin",
+          ""
+        ],
+        [
+          "Schema",
+          "ok"
+        ],
+        [
+          "Rows",
+          "ok"
+        ],
+        [
+          "End",
+          ""
+        ],
+        [
+          "Begin",
+          ""
+        ]
+      ],
+      "seconds_to_fatal": 1.36
+    },
+    {
+      "fatal_causes": [
+        [
+          "org.apache.kafka.connect.errors.ConnectException",
+          "Error while processing event at offset {transaction_id=689794, lsn_proc=2149298128, lsn_events_processed=1, messageType=INSERT, lsn_commit=2149298128, lsn=2149298128, txId=689794, ts_usec=1794303491213027}"
+        ],
+        [
+          "org.apache.kafka.connect.errors.ConnectException",
+          ""
+        ],
+        [
+          "org.postgresql.util.PSQLException",
+          "SQLState 42820"
+        ],
+        [
+          "java.lang.NumberFormatException",
+          ""
+        ]
+      ],
+      "fatal_class": "org.apache.kafka.connect.errors.ConnectException",
+      "fatal_message": "An exception occurred in the change event producer. This connector will be stopped.",
+      "fatal_positions": {
+        "lsn": 2149298128,
+        "lsn_commit": 2149298128,
+        "lsn_proc": 2149298128,
+        "messageType": "BEGIN",
+        "transaction_id": "689794",
+        "ts_usec": 1794303491213027,
+        "txId": 689794
+      },
+      "fatal_table": ".",
+      "frames_before_fatal": [
+        [
+          "Hello",
+          ""
+        ],
+        [
+          "Begin",
+          ""
+        ],
+        [
+          "Schema",
+          "ok"
+        ],
+        [
+          "Rows",
+          "ok"
+        ],
+        [
+          "End",
+          ""
+        ],
+        [
+          "Begin",
+          ""
+        ]
+      ],
+      "seconds_to_fatal": 1.48
     }
   ],
   "test": "tests/engine/test_engine_values.py::test_unparsable_interval_ends_in_fatal_without_the_value",

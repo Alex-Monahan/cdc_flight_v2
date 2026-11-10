@@ -12,7 +12,7 @@
     "reset_by_fault": 0
   },
   "seconds": 150.0,
-  "server_walsender_ended_at_s": 59.4,
+  "server_walsender_ended_at_s": 59.8,
   "slot_active_after_kill": false,
   "test": "tests/engine/test_engine_attach.py::test_broken_source_connection_through_the_proxy[blackhole]",
   "wal_sender_timeout": "60s (default)"

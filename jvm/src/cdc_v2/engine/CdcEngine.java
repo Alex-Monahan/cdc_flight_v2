@@ -22,7 +22,6 @@ import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -617,16 +616,6 @@ public final class CdcEngine {
             return dflt;
         }
         return s.parameters().getOrDefault(key, dflt);
-    }
-
-    static final class Pending {
-        final long ack;
-        final RecordChangeEvent<SourceRecord> record;
-
-        Pending(long ack, RecordChangeEvent<SourceRecord> record) {
-            this.ack = ack;
-            this.record = record;
-        }
     }
 
     static final class Consumer implements DebeziumEngine.ChangeConsumer<RecordChangeEvent<SourceRecord>> {

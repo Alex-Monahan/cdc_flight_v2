@@ -5,19 +5,19 @@
       "behind": 15,
       "confirmed_end": 19985,
       "durable_for_end": 20000,
-      "seconds": 0.8
+      "seconds": 0.71
     },
     {
       "behind": 15,
       "confirmed_end": 35985,
       "durable_for_end": 36000,
-      "seconds": 0.71
+      "seconds": 0.7
     },
     {
       "behind": 0,
       "confirmed_end": 60000,
       "durable_for_end": 60000,
-      "seconds": 0.71
+      "seconds": 0.7
     }
   ],
   "stated_bound_end_records": 28,

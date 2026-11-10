@@ -224,7 +224,7 @@ never holds or marks a heartbeat record, a HEARTBEAT frame has no `ack_position`
 refused by the decoder: unused payload bytes), and a non-transactional MESSAGE is not held either. HEARTBEAT frames
 can arrive anywhere, also between BEGIN and END; they show that the engine is alive and they cause the batch calls in
 which a DURABLE takes effect on an idle source. Measured in `end_only_heartbeat_storm.json`
-(`heartbeat.interval.ms=1`): 96 of 1,052 HEARTBEAT frames carried the commit position of the END that followed them.
+(`heartbeat.interval.ms=1`): 162 of 1,056 HEARTBEAT frames carried the commit position of the END that followed them.
 
 The `ack_position` of an END is `lsn_commit` of its offset, exactly the value
 `PostgresStreamingChangeEventSource.commitOffset` sends; an END whose offset has no `lsn_commit` stops the engine with
@@ -255,8 +255,8 @@ entry at every thinning and stopped following while the pipeline was more than a
 committer is not thread safe; it is used only on the engine's thread). After `markBatchFinished` the memory offset
 store flushes at once (`offset.flush.interval.ms=0`) and the task sets a commit flag; the next `poll()` calls
 `commitOffset`, which sends the flush position to the walsender. Bound on an idle source: **`heartbeat.interval.ms`
-+ 1 s** (one heartbeat interval until the next batch call, one poll, the flush); measured max 0.31 s at 300 ms and
-0.25 s at 500 ms (`idle_ack_bound.json`, 5 runs each). Busy: within one batch and one poll.
++ 1 s** (one heartbeat interval until the next batch call, one poll, the flush); measured max 0.30 s at 300 ms and
+0.26 s at 500 ms (`idle_ack_bound.json`, 5 runs each). Busy: within one batch and one poll.
 
 **Crash points.** `engine.ack_marking` (before `markProcessed`), `engine.acked` (after `markBatchFinished`: the
 flush is not sent yet) and `engine.flush_sent`: the first batch after an acknowledgement, which Debezium's `poll()`
@@ -274,12 +274,13 @@ sent before the sample. With WAL for unpublished tables only, neither the slot n
 `test_end_only_acknowledgement_under_a_heartbeat_storm`: 40,000 single-row and 2,000 message-only transactions,
 heartbeat interval 1 ms, a pipeline stand-in to the new contract (applied position = the `ack_position` of the last
 END applied, three transactions behind, DURABLE only for that, HEARTBEAT ignored, unapplied work and unread frames
-dropped at each kill), kills at random points: 0 samples above DURABLE, nothing missing, nothing doubled.
+dropped at each kill), three kills at random points (after 24,928, 27,732 and 29,548 rows applied): 0 samples
+above DURABLE, nothing missing, nothing doubled.
 `test_restart_after_random_kills_and_java_crash_points`: the same stand-in under continuous writes, 3 random kills
-and kills at the three Java crash points with 3 seeds each (all 9 reached): 4,454 rows, none missing or doubled, the
+and kills at the three Java crash points with 3 seeds each (all 9 reached): 4,492 rows, none missing or doubled, the
 first transaction of every life above the slot's position at start. Negative control
 (`test_negative_control_one_end_ahead_is_caught`): a stand-in that sends DURABLE one END ahead of what it applied is
-caught (49 samples with the slot above the applied position).
+caught (52 samples with the slot above the applied position).
 
 `ack_position` mapped to the replication protocol (`test_positions_map_to_pgoutput_begin_and_commit`, against a
 second slot peeked with Debezium's options): END `ack_position` = `positions.lsn_commit` = `positions.lsn` = the
@@ -320,7 +321,7 @@ sent flush = old for 3 s; and our engine streamed for 3 s). The Postgres 18 sour
 - **Black hole** (proxy drops everything both ways): the engine did **not** end within 150 s. The proxy's kernel
   acknowledges TCP, so neither TCP keepalives nor any timeout of pgjdbc or Debezium fires. HEARTBEAT frames (interval
   1 s) kept arriving for 8.2 s after the hole opened and then stopped (`proxy_blackhole.json`), so the stream can
-  detect the hole by the absence of HEARTBEAT frames; the walsender on the server ended after 59.4 s
+  detect the hole by the absence of HEARTBEAT frames; the walsender on the server ended after 59.8 s
   (`wal_sender_timeout` 60 s). A silent connection is found by SPEC 4.6's end-to-end heartbeat marker
   (and the supervisor's 120 s silence rule) in the pipeline, which kills the engine. pgjdbc exposes only
   `tcpKeepAlive` (on/off, OS default timers: 2 h on Linux); idle/interval/count can only be set through a custom
@@ -402,14 +403,15 @@ parse never reaches our code. Measured on the Postgres 18.6 pair (`test_engine_v
 
 - **`interval '2562047788 hours'`** (hour part above 2^31): pgjdbc's `PGInterval` fails (`NumberFormatException`
   inside `PSQLException`, SQLState 42820) in Debezium's decoding thread, and the engine ends with FATAL after
-  1.4–1.6 s (`unparsable_interval.json`). Before FATAL: HELLO, and whatever of the queue the poll loop had handed
-  over, never anything of the failing transaction beyond its BEGIN (in three attempts: once only the BEGIN of the
-  transaction before it; twice that transaction complete and the BEGIN of the failing one). Never a partial ROWS of
+  1.4–1.5 s (`unparsable_interval.json`). Before FATAL: HELLO, and whatever of the queue the poll loop had handed
+  over, never anything of the failing transaction beyond its BEGIN (in one run of three attempts: once only the BEGIN of the
+  transaction before it, twice that transaction complete and the BEGIN of the failing one; in the final run all
+  three complete). Never a partial ROWS of
   the failing transaction. FATAL carries the position fields of the last record handed over; its cause message
   `Error while processing event at offset {…}` names the failing event's offset (`txId`, `lsn`), the same in every
   attempt. The table is not known to the engine (the failure is in Debezium's thread, before a record exists).
   Neither the value nor a marker column of the row appears in the FATAL frame, the JVM output or the Python log. A
-  restart ends again at the same transaction, 1.4–1.6 s after the start. **With the table left out of
+  restart ends again at the same transaction, 1.4–1.5 s after the start. **With the table left out of
   `table.include.list` the transaction passes**: it arrives as BEGIN and END with `event_count` 0 and the stream goes
   on (the next transaction's row arrives). So package S can quarantine one table: find the candidate tables (those
   with a column of a type in this class, here `interval`; or by elimination), restart the engine with them excluded,

@@ -1,12 +1,12 @@
 {
-  "commit_to_end_frame_s": 8.57,
+  "commit_to_end_frame_s": 8.23,
   "heap_mb": 512,
-  "insert_s": 4.34,
-  "jvm_peak_rss_mb": 645.5,
+  "insert_s": 4.13,
+  "jvm_peak_rss_mb": 578.8,
   "max_rows_per_frame": 8192,
   "note": "indication only: shared development machine, source on the same host",
   "rows": 1000000,
-  "rows_frames": 133,
-  "rows_per_s_after_commit": 116656,
+  "rows_frames": 131,
+  "rows_per_s_after_commit": 121450,
   "test": "tests/engine/test_engine_stream.py::test_large_transaction_bounded_memory"
 }

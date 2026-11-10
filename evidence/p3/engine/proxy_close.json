@@ -3,7 +3,7 @@
   "fault": "close",
   "heartbeat_frames_during_fault": 9,
   "heartbeat_interval_ms": 1000,
-  "last_heartbeat_frame_at_s": 8.1,
+  "last_heartbeat_frame_at_s": 8.2,
   "message": "org.apache.kafka.connect.errors.ConnectException: An exception occurred in the change event producer. This connector will be stopped. (caused by org.postgresql.util.PSQLException: SQLState 08006; java.io.EOFException: )",
   "outcome": "EngineFatal",
   "proxy_stats": {
@@ -11,7 +11,7 @@
     "closed_by_fault": 2,
     "reset_by_fault": 0
   },
-  "seconds": 9.46,
+  "seconds": 9.04,
   "server_walsender_ended_at_s": 1.0,
   "slot_active_after_kill": false,
   "test": "tests/engine/test_engine_attach.py::test_broken_source_connection_through_the_proxy[close]",
