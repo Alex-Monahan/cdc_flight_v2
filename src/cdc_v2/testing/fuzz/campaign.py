@@ -99,6 +99,7 @@ class Campaign:
         system = make_system(self.system, lease, self.source_node, self.options)
         workdir = RUNS_DIR / self.id / ("%s-%s-%d" % (self.fuzzer, system.name, seed))
         register_root(RUNS_DIR, "<runs>")
+        register_root(REPO, "<repo>")
         if self.fuzzer == "leadership":
             from .leadership import LeadershipRun
             workdir.mkdir(parents=True, exist_ok=True)

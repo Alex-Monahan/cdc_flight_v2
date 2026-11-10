@@ -37,25 +37,70 @@ GROUPS = {
 
 
 class _Leases:
-    """One home per worker thread, for the crash runner's parallel scenarios."""
+    """At most `n` homes for the crash runner's scenarios, checked out by a scenario's system when it sets up and
+    given back when it tears down (the runner makes new worker threads for every call, so a home per thread would
+    keep growing; every running cluster also holds System V shared memory, which the machine has little of)."""
 
-    def __init__(self):
-        self.local = threading.local()
+    def __init__(self, n):
+        self.n = n
+        self.free = []
         self.all = []
-        self.lock = threading.Lock()
+        self.cond = threading.Condition()
+
+    def checkout(self):
+        with self.cond:
+            while not self.free and len(self.all) >= self.n:
+                self.cond.wait(5)
+            if self.free:
+                return self.free.pop()
+            lease = pool.acquire(wait_s=600)
+            self.all.append(lease)
+            return lease
+
+    def give_back(self, lease):
+        with self.cond:
+            self.free.append(lease)
+            self.cond.notify()
 
     def get(self):
-        lease = getattr(self.local, "lease", None)
-        if lease is None:
-            lease = pool.acquire(wait_s=600)
-            self.local.lease = lease
-            with self.lock:
-                self.all.append(lease)
-        return lease
+        """A home for sequential use by the caller (taken out of the shared set until release)."""
+        return self.checkout()
 
     def release(self):
         for lease in self.all:
             lease.release()
+
+
+class _LazyLease:
+    """Stands in for a lease until the scenario sets up; then checks one out of `_Leases` and gives it back after
+    teardown. The crash runner's probe instance never sets up and so never holds a home."""
+
+    def __init__(self, leases):
+        self._leases, self._lease = leases, None
+
+    def __getattr__(self, name):
+        if self._lease is None:
+            self._lease = self._leases.checkout()
+        return getattr(self._lease, name)
+
+    def give_back(self):
+        if self._lease is not None:
+            self._leases.give_back(self._lease)
+            self._lease = None
+
+
+def _scenario_system(system_name, leases, source_node):
+    lazy = _LazyLease(leases)
+    sysm = make_system(system_name, lazy, source_node)
+    teardown = sysm.teardown
+
+    def teardown_and_give_back():
+        try:
+            teardown()
+        finally:
+            lazy.give_back()
+    sysm.teardown = teardown_and_give_back
+    return sysm
 
 
 def run_suite(system_name: str, out_dir: Path, repo: Path, source_node: str = "replica", seeds=(1, 2, 3),
@@ -65,12 +110,13 @@ def run_suite(system_name: str, out_dir: Path, repo: Path, source_node: str = "r
     work = pool.CACHE / "fuzz" / "suite" / time.strftime("%Y%m%dT%H%M%S", time.gmtime())
     work.mkdir(parents=True, exist_ok=True)
     register_root(work, "<run>")
-    leases = _Leases()
+    register_root(repo, "<repo>")
+    leases = _Leases(max(1, workers))
     summary = {"system": system_name, "source_node": source_node, "seeds": list(seeds), "parts": {}}
     t0 = time.monotonic()
     try:
         def factory():
-            return make_system(system_name, leases.get(), source_node)
+            return _scenario_system(system_name, leases, source_node)
 
         probe = factory()
         pts = list(points or probe.crash_points())
