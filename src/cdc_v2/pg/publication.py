@@ -159,7 +159,7 @@ def ensure(primary: PgConnection, tables: Iterable, *, publication: str = DEFAUL
                 created = True
                 crash_point("pg.publication_changed")
             except errors.SourceError as e:
-                if e.sqlstate != "42710":           # created by someone else meanwhile
+                if e.sqlstate not in ("42710", "23505"):      # created by someone else meanwhile
                     raise
             continue
         missing = [p for p in pairs if not st.has(*p) and not st.all_tables]
@@ -179,7 +179,7 @@ def ensure(primary: PgConnection, tables: Iterable, *, publication: str = DEFAUL
                                                                   ", ".join(qualified(*p) for p in missing)),
                             deadline=deadline, what="publication.add")
         except errors.SourceError as e:
-            if e.sqlstate in ("42710", "42704") and attempt < 2:     # added (or publication dropped) meanwhile
+            if e.sqlstate in ("42710", "23505", "42704") and attempt < 2:   # added (or dropped) meanwhile
                 continue
             raise
         crash_point("pg.publication_changed")

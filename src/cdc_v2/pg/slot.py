@@ -239,8 +239,12 @@ def nudge_method(primary: PgConnection, deadline: Deadline) -> str:
     pg_log_standby_snapshot(), else 'write' (a non-transactional logical message: WAL that the background writer
     follows with a running-transactions record within about 15 s), else 'none'."""
     row = primary.execute(
-        "SELECT has_function_privilege('pg_catalog.pg_log_standby_snapshot()', 'EXECUTE'), "
-        "has_function_privilege('pg_catalog.pg_logical_emit_message(boolean, text, text)', 'EXECUTE')",
+        "SELECT coalesce(bool_or(has_function_privilege(p.oid, 'EXECUTE')) FILTER "
+        "                (WHERE p.proname = 'pg_log_standby_snapshot'), false), "
+        "       coalesce(bool_or(has_function_privilege(p.oid, 'EXECUTE')) FILTER "
+        "                (WHERE p.proname = 'pg_logical_emit_message'), false) "
+        "FROM pg_proc p WHERE p.pronamespace = 'pg_catalog'::regnamespace "
+        "AND p.proname IN ('pg_log_standby_snapshot', 'pg_logical_emit_message')",
         deadline=deadline, what="slot.nudge_method")[0]
     return "standby_snapshot" if row[0] else ("write" if row[1] else "none")
 

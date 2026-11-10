@@ -421,13 +421,14 @@ rels AS (
   WHERE (n.nspname, c.relname) IN (SELECT * FROM unnest(%(schemas)s::text[], %(names)s::text[]))
   UNION
   SELECT pr.prrelid FROM pg_publication_rel pr WHERE pr.prpubid IN (SELECT oid FROM pub)
-)
+),
+f AS (
 SELECT c.oid, n.nspname, c.relname, c.relfilenode, c.relreplident, c.relkind, c.relpersistence, c.relispartition,
        a.attnums, a.attnames, a.atttypids, a.atttypmods, a.attdropped, a.attgenerated, a.atthasdef,
-       (SELECT i.indkey::int2[] FROM pg_index i WHERE i.indrelid = c.oid AND i.indisprimary),
-       (SELECT i.indkey::int2[] FROM pg_index i WHERE i.indrelid = c.oid AND i.indisreplident),
-       (SELECT i.indisprimary FROM pg_index i WHERE i.indrelid = c.oid AND i.indisreplident),
-       pr.prrelid IS NOT NULL, pr.prattrs IS NOT NULL, pr.prqual IS NOT NULL
+       (SELECT i.indkey::int2[] FROM pg_index i WHERE i.indrelid = c.oid AND i.indisprimary) AS pk,
+       (SELECT i.indkey::int2[] FROM pg_index i WHERE i.indrelid = c.oid AND i.indisreplident) AS ri,
+       (SELECT i.indisprimary FROM pg_index i WHERE i.indrelid = c.oid AND i.indisreplident) AS ri_is_pk,
+       pr.prrelid IS NOT NULL AS published, pr.prattrs IS NOT NULL AS has_cols, pr.prqual IS NOT NULL AS has_filter
 FROM rels JOIN pg_class c ON c.oid = rels.oid JOIN pg_namespace n ON n.oid = c.relnamespace
 LEFT JOIN pg_publication_rel pr ON pr.prrelid = c.oid AND pr.prpubid IN (SELECT oid FROM pub)
 LEFT JOIN LATERAL (
@@ -438,18 +439,27 @@ LEFT JOIN LATERAL (
          array_agg(atthasdef ORDER BY attnum) AS atthasdef
   FROM pg_attribute WHERE attrelid = c.oid AND attnum > 0) a ON true
 WHERE c.relkind IN ('r', 'p')
+),
+hdr AS MATERIALIZED (
+SELECT pg_is_in_recovery() AS rec,
+       CASE WHEN pg_is_in_recovery() THEN pg_last_wal_replay_lsn() ELSE pg_current_wal_insert_lsn() END::text AS a,
+       pg_current_snapshot()::text AS snap,
+       (SELECT to_jsonb(p) FROM pg_publication p WHERE p.pubname = %(pub)s) AS pubjson
+)
+SELECT hdr.rec, hdr.a, hdr.snap, hdr.pubjson, f.* FROM hdr LEFT JOIN f ON true
 """
 
-_PUBFACTS_SQL = "SELECT to_jsonb(p) FROM pg_publication p WHERE p.pubname = %s"
 
 
 def observe(node: PgConnection, names: Iterable[tuple[str, str]] = (), *, publication: str = "cdc_v2_pub",
             deadline: Deadline) -> CatalogObservation:
     """One observation of the catalog fence (H-008): the facts of every table in `names` and every table in our
-    publication, with the bracket (b, a). On a standby b and a are pg_last_wal_replay_lsn() read before and inside
-    the REPEATABLE READ transaction whose snapshot holds the facts; on a primary pg_current_wal_insert_lsn().
+    publication, with the bracket (b, a). On a standby b and a are pg_last_wal_replay_lsn(), on a primary
+    pg_current_wal_insert_lsn(): b is read by a statement that has finished before the facts are read; the facts,
+    the publication, pg_current_snapshot() and a are read by one statement, so they share that statement's snapshot
+    (the equivalent of one REPEATABLE READ transaction), and a is evaluated after the snapshot was taken.
 
-    All statements travel in one pipeline: one network round trip. A recovery conflict raises
+    Both statements travel in one pipeline: one network round trip. A recovery conflict raises
     `errors.RecoveryConflict` (read again); a failed read is never an answer."""
     import time as _time
     t0 = _time.monotonic()
@@ -486,19 +496,14 @@ def _observe_pipeline(node, publication, schemas, rel, where, deadline):
         raw = node.raw
         with raw.pipeline() as p:
             c_b = raw.execute("SELECT pg_is_in_recovery(), " + where, prepare=False)
-            raw.execute("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY", prepare=False)
             c_facts = raw.execute(_OBSERVE_SQL, {"pub": publication, "schemas": schemas, "names": rel},
                                   prepare=False)
-            c_pub = raw.execute(_PUBFACTS_SQL, (publication,), prepare=False)
-            c_a = raw.execute("SELECT pg_is_in_recovery(), " + where + ", pg_current_snapshot()::text",
-                              prepare=False)
-            raw.execute("COMMIT", prepare=False)
             p.sync()
             rec_b, b = c_b.fetchone()
-            facts = c_facts.fetchall()
-            pubrow = c_pub.fetchone()
-            rec_a, a, snap = c_a.fetchone()
-    return rec_b, b, facts, pubrow, rec_a, a, snap
+            rows = c_facts.fetchall()
+    rec_a, a, snap, pub = rows[0][:4]
+    facts = [r[4:] for r in rows if r[4] is not None]
+    return rec_b, b, facts, (pub,) if pub is not None else None, rec_a, a, snap
 
 
 def _build_observation(b, a, in_recovery, snap, facts, pub, requested) -> CatalogObservation:

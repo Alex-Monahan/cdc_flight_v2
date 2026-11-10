@@ -50,8 +50,8 @@ class HeartbeatWrite:
     marker: str           # uuid text, unique to this write; the stream finds it in the heartbeat row
     n: int                # the row's counter after this write
     xid: int              # the writing transaction's id (64-bit, pg_current_xact_id)
-    lower: int            # pg_current_wal_insert_lsn() inside the transaction, before COMMIT: commit end > lower
-    upper: int            # pg_current_wal_insert_lsn() after COMMIT returned: commit end ≤ upper
+    lower: int            # pg_current_wal_insert_lsn() inside the transaction: lower ≤ start of the commit record
+    upper: int            # pg_current_wal_insert_lsn() after COMMIT returned: end of the commit record ≤ upper
 
 
 _BEAT_SQL = """
@@ -66,8 +66,8 @@ SELECT up.n, pg_current_xact_id()::text, pg_current_wal_insert_lsn()::text FROM 
 def beat(primary: PgConnection, slot: str, *, deadline: Deadline, schema: str = SCHEMA,
          table: str = TABLE) -> HeartbeatWrite:
     """One heartbeat write on the primary (its own connection, autocommit). Returns what the stream needs to
-    recognise the write when it arrives: the marker, the transaction id and a bracket (lower, upper] around its
-    commit end position."""
+    recognise the write when it arrives: the marker, the transaction id and a bracket around its commit record:
+    lower ≤ commit start < commit end ≤ upper (the commit end is the END frame's position)."""
     marker = str(uuid.uuid4())
     sql = _BEAT_SQL.format(t=qualified(schema, table))
     with primary.transaction(deadline, what="heartbeat.beat"):
