@@ -1,0 +1,45 @@
+{
+  "about": "Reductions of real failures of the toy's variants to seeded regression tests (item 7 of the fix round; docs/testing/fuzzers.md section 5).",
+  "reductions": [
+    {
+      "after": {
+        "entries": 1,
+        "faults": 0,
+        "rounds": 1,
+        "writers": 1
+      },
+      "before": {
+        "entries": 20,
+        "faults": 0,
+        "rounds": 1,
+        "writers": 2
+      },
+      "both_replays_fail": true,
+      "clean": false,
+      "commit": "29f9c8f736417f5187a786dd4dd03e8f08913393",
+      "fuzzer": "workload",
+      "id": "workload-toy-split-replica-s101-a6bc667",
+      "outcome": "violation",
+      "reduction": {
+        "entries": 1,
+        "faults": 0,
+        "from_entries": 20,
+        "from_faults": 0,
+        "replays": 12,
+        "reproduced": true,
+        "seconds": 30.5
+      },
+      "regression_test": "tests/fuzz/regressions/test_workload_toy_split_replica_s101_a6bc667.py",
+      "regression_test_exit": 0,
+      "regression_test_summary": [
+        "XFAIL tests/fuzz/regressions/test_workload_toy_split_replica_s101_a6bc667.py::test_workload_toy_split_replica_s101_a6bc667_planted_bug_is_still_found - planted bug of the toy: the case must keep failing it"
+      ],
+      "replays_of_the_reduced_case": [
+        "violation",
+        "violation"
+      ],
+      "seed": 101,
+      "system": "toy:split"
+    }
+  ]
+}

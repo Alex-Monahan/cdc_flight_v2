@@ -57,21 +57,27 @@ tools/fuzz clean                     # what killed campaigns left, by the names 
 | `<fuzzer>/runs.jsonl` | one line per run: fuzzer, system, `self_test`, tier, source mode, seed, commit, `clean`, start (UTC), `duration_s`, counts (rounds, transactions, rolled back, final rows, checkpoints, observations), faults counted per kind and `no_effect` per kind (with up to 20 `faults_without_effect` and their proof), outcome, reason, `failure_id`, the observers' reports, the checkpoints |
 | `<fuzzer>/failures/<id>/` | `failure.json` (seed, outcome, reason, `regression_test`, later `fixed_commit`), `bundle/` (record, oracle result, fault log, events and log tails; generated data only, redacted; a replay log above 256 KiB stays in the local bundle), after reduction `case.json` |
 | `ledger.json` | only from `tools/fuzz status --write`: per fuzzer, system, tier and mode the seeds, hours (sum of run durations), faults in total and per kind, `no_effect` per kind, rounds, outcomes, failures open and fixed, the restart commit and why, each number next to its minimum of SPEC §4 with met / not met, the weights of the schedule and the kinds not attacked, the exempt commits |
-| `exempt.json` | `{"exempt": [{"commit": …, "reason": …}]}`: commits that touch an affecting path without changing behaviour; `status` lists each for review |
+| `exempt.json` | `{"exempt": [{"commit": …, "reason": …}]}`: commits that touch an affecting path without changing behaviour; `tools/fuzz status` prints every entry in full, every time, for the orchestrator's review at each gate |
 
-**Counter restart** (SPEC §4). `ledger.AFFECTS` names per fuzzer the paths whose change affects it: the pipeline's
-source (`src/cdc_v2/{stream,apply,md,pg,transform,backfill,state,leader}`, `supervisor.py`, `pipeline.py`,
-`config.py`, …), the engine (`jvm/src`) and the bootstrap (`flights/cdc_v2`); never documents or tests. The restart
-commit of a fuzzer is the newest commit that touches one of them and is not exempt. Only runs made on that commit or
-a descendant (`git merge-base --is-ancestor`), on a clean tree, are counted. *Clean* means no change to a tracked file
-outside `evidence/` (the ledger is written while campaigns run). Runs of a self-test system (the toy) are shown
-apart and never count toward the bar.
+**Counter restart** (SPEC §4; plan 6.2, "The ledger of SPEC section 4"). `ledger.AFFECTS` names per fuzzer the
+paths whose change restarts its counters: the pipeline's source (`src/cdc_v2/{stream,apply,md,pg,transform,backfill,
+state,leader}`, `supervisor.py`, `pipeline.py`, `config.py`, …), the engine (`jvm/src`), the bootstrap
+(`flights/cdc_v2`); the pins (`ledger.PINS`: `jvm/debezium.lock.json`, `jvm/jdk.lock.json`, `uv.lock`,
+`pyproject.toml` — a changed pinned dependency is a change to correctness code); and the measuring instrument
+(`ledger.INSTRUMENT`: `src/cdc_v2/testing/` — the fuzz package, the workload generator, the fault harness —, the
+oracle `src/cdc_v2/oracle/`, `crashpoints.py`, `faultsites.py`, `evidence.py`, `tools/fuzz`), because counts made
+with a weaker instrument do not mean what SPEC says. Never documents or tests. The only way around a restart is an
+entry in `exempt.json` with its reason. A run is counted only if no non-exempt commit of HEAD's history that touches
+one of these paths is missing from the run's commit (`git rev-list <run>..HEAD -- <paths>`, merges ignored), and the
+tree was clean. *Clean* means no change, and no new file, outside `evidence/` (the ledger is written while
+campaigns run). Runs of a self-test system (the toy) are shown apart and never count toward the bar.
 
 **Minimums** (`ledger.MINIMUMS`): workload ≥ 1,000 seeds and ≥ 100 h; fault ≥ 500 seeds, ≥ 100 h, ≥ 10,000 faults,
 ≥ 100 counted injections for every kind the system supports, zero divergences; leadership ≥ 1,000 rounds; value ≥
 1,000,000 values per family (P4). For workload and fault, SPEC asks for local Postgres and PlanetScale, replica and
-primary mode: the totals are summed over those four combinations and `combos.missing` must be empty (contract note
-3).
+primary mode: until the owner rules, the bar is met when its totals are met and each of the four combinations holds
+at least `ledger.COMBO_FRACTION` (a quarter) of each quantity (seeds, hours, faults); `tools/fuzz status` prints the
+numbers per combination (contract note 3).
 
 ## 2. The toy replicator and its wrong variants
 
@@ -104,6 +110,13 @@ It supports every workload feature but DDL. The fuzzers found two defects in it 
 slot created on a primary needs a `READ ONLY` transaction (the standby had hidden it), and after a promotion the old
 primary must be removed or `localpg up` starts it again as a second primary.
 
+Fix round: a deferrable primary key is no key for the toy (rule K, core design section 6: `indimmediate` is
+required), so `w_dk` is applied as a table without a key; an unchanged (TOASTed) value of a table without a key is
+taken from the old image that `REPLICA IDENTITY FULL` carries (it inserted NULL before — that bug is kept as the
+variant `keyless_toast_null`); a table that fails to apply `max_table_attempts` (3) times leaves the stream: it is
+recorded in `_cdc.toy_quarantine` in a fenced transaction, with an event, and the stream goes on without it
+(contract C10's quarantine exit), so that with the self-report ignored the oracle decides.
+
 **Wrong variants** — one switch each (`toy:<variant>`), each a real class of bug. Results:
 `evidence/p3/fuzzers/variants.json` (found by, after how many seeds and seconds; the correct toy on the same seeds).
 
@@ -117,6 +130,15 @@ primary must be removed or `localpg up` starts it again as a second primary.
 | `skip_on_reconnect` | after a lost source connection continues from the slot's newest position | fault fuzzer (network, backends) | `diverged` (oracle); earlier runs `violation` (transfer sum) |
 | `swallow` | ignores an apply error of one table and moves the position on | workload fuzzer | `violation` (debit/credit loop); earlier runs `diverged` |
 | `trust_frames` | applies frames without checking checksum, sequence or count, and a transaction cut off before its END | stream fuzzer | `diverged` (oracle: a changed value) |
+| `keyless_toast_null` | an unchanged TOASTed value of a table without a key is applied as NULL | workload fuzzer (shape `keyless_toast`) | see the table of the fix round below |
+| `deferrable_by_key` | a table with a deferrable primary key and FULL is applied by its key (rule K broken) | workload fuzzer (shape `deferrable_key`) | see the table of the fix round below |
+
+The variant table has two more rows that check the signal, not only the finding: `ack_early_oracle` and
+`position_apart_oracle` run the fault fuzzer with the toy's own `ApplyInvariantError` report ignored
+(`--ignore-self-report`), so that the oracle must find the lost or doubled change; `swallow_dest_errors` runs the
+fault fuzzer with destination errors only and `conflict_rate=0`, so that `swallow` is found without the toy's
+simulated conflicts. Each row of `variants.json` names the signal that found it (`oracle`, `consumer loop (<check>)`,
+`writer log`, `system self-report`, `catch-up deadline`); a row with a required signal counts as found only by it.
 
 Result (`evidence/p3/fuzzers/variants.json`, commit ffdd6f4, `no_fence` row at 4dffb64): every variant was found on
 the first seed it was run with (bound: 6 seeds for the fault fuzzer, 4 for workload and stream, 3 for leadership),
@@ -210,6 +232,11 @@ TRUNCATE, DDL where supported — plus four new `Features` for the consumer loop
 | `ledger` | `w_debit`, `w_credit` | the two totals are equal (book, rebook, cancel; the side written first varies) |
 | `large_marked` | `w_bulk(id, batch, v)`, `w_bulk_mark(batch, n)` | a batch of `large_txn_rows` rows is visible with its marker row, or not at all (deleted again later, also in one transaction) |
 | `large_rollback` | the same | a rolled-back large insert is never visible |
+| `keyless_toast` | `w_nkt(w, tag, n, big)`, no key, `REPLICA IDENTITY FULL` | updates leave the TOASTed `big` unchanged (`unchanged-toast-datum` in the new image); found by the oracle |
+| `deferrable_key` | `w_dk(id PRIMARY KEY DEFERRABLE INITIALLY DEFERRED, w, v)`, FULL | a swap of two keys in one statement; a duplicate key inserted and the old row deleted before the commit (rule K: a table without a key) |
+
+Both are off by default, so existing seeds keep their plans (checked against the generator of `main` and of round 1
+for several seeds and feature sets); the toy turns them on.
 
 Each keeps the generator's properties: every session's plan is a function of the seed; the interleaving is in the
 replay log. *Can find*: lost, duplicated, reordered or partially applied transactions visible in the end state or
@@ -294,8 +321,12 @@ real system it asserts that the case passes, so it fails until the fix lands.
 point with seeds 1, 2, 3 through the crash runner (a point never reached is a failure) and the points immediately
 before a commit again with `kill_later`; one fault-fuzzer run each for the network faults, the destination errors,
 source backend termination, slot loss and the full spill area (every kind of the group must have had its effect);
-a randomized soak with every supported kind (this round: 15 minutes, at least 200 counted faults; SPEC: ≥ 1 h and
-≥ 200). Pass = oracle equality after every run. `summary.json`, `crash_summary.json`, `crash_ledger.jsonl` and
+a randomized soak with every supported kind. For a system that is not a self-test the soak lasts at least
+3,600 s by default, and `all_passed` needs at least 3,600 s and at least 200 faults that had an effect (SPEC 1.7);
+injections without effect are counted apart and never toward the 200. The toy may run a 15-minute soak, and its
+summary is labelled a self-test; the minimum of 200 is not lowered for anything. `--smoke` runs a short routine
+suite whose summary is labelled a smoke run and whose soak never passes (`all_passed` is never true). The summary
+names the commit and whether the tree was clean. Pass = oracle equality after every run. `summary.json`, `crash_summary.json`, `crash_ledger.jsonl` and
 `runs.jsonl` are the format of the evidence of SPEC 1.7.
 
 **Result on the toy (commit d4deb59, before the review fixes of section 11):** 42 of 42 crash-point scenarios
@@ -308,6 +339,19 @@ budget; `evidence/p3/fuzzers/suite-1.7-toy-replica/` holds the run as it was (`a
 reasons).
 
 ## 7. Tests
+
+**The full self-test of the fuzzers** must run before round 2 and whenever the fuzz package (or anything in
+`ledger.INSTRUMENT`) changes, on a clean tree, with its evidence committed:
+
+```sh
+tools/fuzz variants                                         # every row, 2 workers; evidence/p3/fuzzers/variants.json
+tools/fuzz suite-1.7 --system toy --workers 1               # the self-test suite: 15-minute soak, >= 200 faults
+tools/fuzz stream-offline --negative-controls --out evidence/p3/fuzzers/stream_offline.json   # 20,000 cases
+tools/fuzz status --write
+```
+
+The offline stream fuzzer runs 100,000 cases (`--cases 100000`) when the frame format or the decoder changes. A
+routine check between those times is `tools/fuzz suite-1.7 --system toy --smoke` plus the default test run.
 
 ```sh
 uv run -q pytest -q tests/fuzz/test_fuzz_unit.py                                   # default run, about 3 s
@@ -331,17 +375,20 @@ started again, nothing left behind.
 2. *Clean tree* for the counter rule means no change to a tracked file outside `evidence/`: the ledger is itself
    written during campaigns, and counting it as a change would make every second run dirty.
 3. SPEC §4's "≥ 1,000 seeds and ≥ 100 cumulative hours, on local Postgres and on PlanetScale, in replica mode and in
-   primary mode" is read as: the totals over the four combinations, and each combination with at least one counted
-   run. If the owner means the quantities per combination, `against()` is applied per group already; only the
-   `bar_met` rule changes.
+   primary mode": until the owner rules, a bar with that clause is met when its totals are met and each of the four
+   combinations holds at least a quarter of each quantity (`ledger.COMBO_FRACTION`, one named constant; plan 6.2).
 4. SPEC gives the stream fuzzer no quantity; the ledger reports its cases, detections and undetected classes only.
-5. The toy's only ambient error is a simulated destination write-write conflict (`conflict_rate`), modelled on
-   MotherDuck's (C4: run again after `Conflict`). Without some ambient error, no workload-only run can show an
-   error-handling bug such as `swallow`.
+5. For the toy only: its only ambient error is a simulated destination write-write conflict (`conflict_rate`),
+   modelled on MotherDuck's (C4: run again after `Conflict`). The variant table shows that `swallow` is also found
+   without it, by the fault fuzzer's destination errors with `conflict_rate=0` (row `swallow_dest_errors`).
 6. A run ends as `diverged` when the system reports its own `ApplyInvariantError` three times during a catch-up, so
    that a lost change costs seconds, not the 90 s deadline; `stuck` remains the outcome when nothing is reported.
-7. `infrastructure` also covers a failure of the workload on the source (which would leave the generator's model
-   ahead of the source); with the load paused for primary kills it has not happened.
+7. `infrastructure` is an allow-list (plan 6.2): a failure of the workload at the source is `infrastructure` only when
+   it is a lost connection (`OperationalError`, SQLSTATE class 08 or 57P01–57P03) while an injected fault is active
+   or healed less than 3 s ago (`run.FaultWindow`); the load of a primary kill is paused and runs no writer. Every
+   other source error fails the run (`error`), because the pipeline itself can break the application's writes
+   (H-014: SQLSTATE 55000, no replica identity). `test_a_system_that_breaks_the_source_writes_fails_the_run` shows
+   it with a toy that takes the replica identity away from a published table.
 8. The toy reads `test_decoding` through the SQL functions (no Debezium, no publication); it is a model of the
    protocol, not of the engine. Its frames use the C2 layout with every value as text.
 9. "A newcomer exits within 10 s" is measured for the toy as process exit time; round 2 measures the real bootstrap
@@ -352,6 +399,14 @@ started again, nothing left behind.
     machine is theirs.
 
 ## 9. What round 2 needs from S, L, B and V
+
+The plan now carries these needs (docs/design/p3_plan.md 6.2, "From the review of F") and each owner's task takes
+its line. **Bug classes that no planted defect of round 1 stands for**, which round 2 must plant in the real system
+or show found: a wrong cut or hand-off (design 7: `R0 < P0` accepted, a swap before `R1` is passed, catch-up before
+all snapshots are passed, a table without a key read under several snapshots, an unsettled standby); a double apply
+after `CommitUnknown`; a table with a deferrable key applied on the keyed path (rule K — the toy's variant
+`deferrable_by_key` stands for it in round 1 already); a slot that is ahead or recreated and ignored (V); a `FATAL`
+repeated at one position (SPEC 4.3).
 
 - **Facts for "never two writers"** (S, L): one row per committed stream-lane group in `_cdc` (for example
   `_cdc.batches`): the epoch the fence checked, the run id, the previous and new applied position, and the commit
@@ -383,8 +438,8 @@ started again, nothing left behind.
 
 ## 10. Weaknesses met in the harness and the generator
 
-- `NetProxy.stop()` with open connections prints asyncio "Task was destroyed but it is pending" and
-  `CancelledError` tracebacks on standard error (noise only; the proxy stops).
+- Fixed in the fix round: `NetProxy.stop()` with open connections printed asyncio "Task was destroyed" and
+  `CancelledError` noise (it now cancels and awaits its pending tasks; `tests/harness/test_netproxy_stop_quiet.py`).
 - The generator's model assumes every planned transaction committed: a transaction lost to a source fault leaves it
   ahead of the source (with `parent_child` that can create orphans at the source). The fault fuzzer pauses the load
   for the kinds that kill the primary.
@@ -398,18 +453,21 @@ started again, nothing left behind.
 - The oracle works against a local DuckDB file through `Destination(conn=…)`, but a reader holds the file's lock:
   the toy and every observer open the file per statement.
 - `localpg up` restarts every stopped node, also a killed former primary after a promotion (`remove` it first).
-- **System V shared memory.** This machine allows 32 segments (`kern.sysv.shmmni`), and every running Postgres
-  instance holds one. A node that was killed (`localpg kill`) and whose data directory is then deleted (`remove`,
-  `reset`) leaves its segment behind for ever, because only a new start in the same directory removes it. On
-  2026-11-10 twenty such orphans of other work filled the table, and new clusters failed with "could not create shared
-  memory segment: No space left on device". The first suite run therefore failed in `infrastructure`. This package
-  left one orphan (its first primary of `pg-f0`, killed by a promotion drill, identified by creator pid and time) and
-  removed it with `ipcrm`; the others are not this package's to remove. localpg should remove a killed node's
-  segment before it deletes the directory, and the orchestrator should look at the orphans.
-- `procs.Proc.signal_group` catches only `ProcessLookupError`; on macOS, `killpg` of a group whose leader has just
-  exited answers `PermissionError` (EPERM). The leadership fuzzer treats that as "the run is gone".
-- Writing a large failure bundle through `write_evidence` takes minutes: the redaction rules run over every text.
-  It does not slow the run itself, but the campaign waits.
+- Fixed in the fix round: **System V shared memory.** A node that was killed and whose data directory was then
+  deleted left its segment for ever (the kernel allows 32; on 2026-11-10 the orchestrator removed 21 by hand).
+  `localpg` now releases the segment named in the directory's `postmaster.pid` before it deletes a directory and
+  after every `down` (docs/localpg.md, "Shared memory"; `tests/localpg/test_localpg_segments.py` with a negative
+  control), and a start that fails for lack of segments says how many exist and what the limit is.
+- Fixed in the fix round: `procs.Proc.signal_group` treats EPERM from `killpg` as "gone" only when the leader is
+  reaped and the process table shows no living member of the group; otherwise it raises as before
+  (`tests/harness/test_procs_eperm.py`).
+- Fixed in the fix round: `write_evidence` was quadratic on long runs of word characters (three redaction patterns
+  could start at every position of a 20 kB hex value: 190 s for a 228 kB oracle sample). Those patterns now start
+  only where a run of their class starts — the same matches, linear time (0.15 s for that file;
+  `tests/test_evidence_speed.py`: 5 MB in under 10 s; the redaction tests are unchanged and green).
+- Fixed in the fix round: the frame reader allocated a payload of the length field's size before the bytes arrived;
+  it now grows the payload as the bytes arrive (`tests/engine/test_frames_length_alloc.py`; the stream fuzzer's kind
+  `huge_length`).
 
 ## 11. Review
 
