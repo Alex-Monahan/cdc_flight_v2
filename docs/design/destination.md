@@ -785,7 +785,8 @@ the end the counter was 108 with 0 doubles.
 
 The edge lies near one round trip (about 80 ms, section 11) and moves a little from run to run: the run
 before this one had 0 of 4 at 80 ms, 16 in all (the earlier version of `commit_unknown.json` in the
-history of the repository).
+history of the repository). The last run before delivery had 0 of 4 at 80 ms again, 16 in all
+(`final_runs.json`, key `last_md_run_against_the_committed_files`).
 
 A real lost answer (section 9, case `commit_answer_lost`) gives the same: the layer raises `CommitUnknown`, the
 commit had landed, the SUT read again and applied nothing twice.
@@ -1354,8 +1355,8 @@ For packages A, L, S, V, B and the integrator. Each line is backed by the sectio
 ## 16. How to run the suites
 
 **The default run** needs no network: `uv run -q pytest -q`. On 2026-11-10, on this branch with `origin/main`
-merged: 567 passed, 1 skipped, 263 deselected in 61 s. The tests of this package alone
-(`uv run -q pytest -q tests/destination`): 200 passed, 96 deselected in 13 s.
+merged (commit `cc81a76`): 878 passed, 4 skipped, 370 deselected in 73 s. The tests of this package alone
+(`uv run -q pytest -q tests/destination`): 327 passed, 112 deselected in 17 s. Both are in `final_runs.json`.
 
 **The MotherDuck tests** (marker `md`) need the token that `tools/with-env` supplies. They create and drop only
 databases named `cdc_v2_t_d_<random>`. Leave `CDC_V2_MD_PREFIX` unset or set it to `cdc_v2_t_d_`. The command
@@ -1365,13 +1366,24 @@ below leave the second `-q` out.
 
 | Command | Tests | Last run (2026-11-10) |
 |---|---|---|
-| `tools/with-env uv run -q pytest -m md tests/destination/test_md.py` | 31: what MotherDuck answers, deadlines, the registry, the clock, timings | 31 passed in 310 s |
-| `tools/with-env uv run -q pytest -m md tests/destination/test_md_again.py` | 55: the T0 tests of lanes, leader tables, migrations, state and alerts, with a MotherDuck database | 55 passed in 462 s |
-| `tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py` | 10: real processes (sections 8 and 9) | 10 passed in 1079 s, as six runs chosen with `-k` (95 to 308 s each) |
+| `tools/with-env uv run -q pytest -m md tests/destination/test_md.py` | 31: what MotherDuck answers, deadlines, the registry, the clock, timings | 31 passed in 308 s |
+| `tools/with-env uv run -q pytest -m md tests/destination/test_md_again.py` | 71: the T0 tests of lanes, leader tables, migrations, state, alerts and the points from the review of apply, with a MotherDuck database | 71 passed in 597 s, as two runs chosen with `-k` (28 in 199 s and 43 in 399 s) |
+| `tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py` | 10: real processes (sections 8 and 9) | 10 passed in 1071 s, as six runs chosen with `-k` (95 to 308 s each) |
 
-All 96 passed. The whole of `test_md_procs.py` takes about 18 minutes in one run. The six runs were, by `-k`:
+All 112 passed (`final_runs.json`, key `md_runs`). The whole of `test_md_procs.py` takes about 18 minutes in
+one run, and `test_md_again.py` about 10. The six runs of `test_md_procs.py` were, by `-k`:
 `different_epochs or same_epoch`, `middle_of_an_open_transaction`, `commit_outcome_unknown`,
-`run_again_rule or by_fault_sites`, `real_connection_break`, `crash_runner`.
+`run_again_rule or by_fault_sites`, `real_connection_break`, `crash_runner`. The two `-k` expressions for
+`test_md_again.py` were not written down; the counts of the two runs (28 run and 43 left out, 43 run and 28
+left out) are in the evidence.
+
+These runs were made on commit `88e0cf1`. After them the branch took `origin/main` twice (the transform of
+package Y, then documents) and changed one file of its own, `tests/destination/test_static.py`, a test of the
+default run (finding 23). Between `88e0cf1` and `cc81a76` no other file differs among those that the md tests
+use: `src/cdc_v2/md`, `src/cdc_v2/state`, `src/cdc_v2/alerts.py`, `src/cdc_v2/testing`, the shared modules for
+deadlines, crash points and fault sites, `tests/destination`, `tests/conftest.py`, `tools`, `pyproject.toml`
+and `uv.lock` (`git diff --stat 88e0cf1 cc81a76 -- <these paths>`). So the md tests were not run again on
+`cc81a76`.
 
 **After a run** no test database may be left. This reads only the ledger (section 2.7) and prints `[]`:
 
@@ -1386,6 +1398,18 @@ writes `fence_columns.json`.
 **The document of the state machines**: `uv run python -m cdc_v2.state > docs/state_machines.md`.
 
 **The numbers in this document** are the ones in `evidence/p3/destination/`, each file with the date of its
-run. The md tests write these files again at every run. Times and the counts of conflicts move from run to
-run; the tests assert only what the layer promises and record the rest. The last run named in the table above
-passed with counts in the same ranges; its files were not kept, except `commit_unknown.json` (section 8.4).
+run (all on 2026-11-10, before the last run). The md tests write these files again at every run. Times and the
+counts of conflicts move from run to run; the tests assert only what the layer promises and record the rest.
+
+The files that the last run wrote were compared with the committed ones, value by value, and then not kept.
+The comparison is in `final_runs.json` (key `last_md_run_against_the_committed_files`):
+
+- `crash_summary.json` and `fence_columns.json` did not differ. `crash_ledger.jsonl` had 42 lines again.
+- `commit_unknown.json`: 16 instead of 17 commits landed without the client having seen the answer; the
+  difference is one kill at 80 ms (section 8.4).
+- `error_mapping.json`, `from_apply.json`, `run_again_rule.json`, `crash_runner.json`, `connection_break.json`,
+  `clock.json`, `deadlines.json` and `timings.json` differed only in dates and durations. The classes, labels
+  and texts of the error mapping were the same.
+- `two_process.json`, `takeover_open_tx.json`, `registry_takeover.json` and `leader_tables_concurrent.json`
+  differed also in which process won a race and in the counts of conflicts, attempts and interrupts. These are
+  the values that the tests record and do not assert.
