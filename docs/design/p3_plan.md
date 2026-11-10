@@ -148,14 +148,20 @@ Column sets of a `ROWS` frame, each column named by its position `i` in the sche
 `bytea` and arrays a mark that does not travel inside the value). The engine turns it into `u<i>`; after the
 engine, no code compares a value with a placeholder. The H-003 tests are part of package E.
 
-**Attach rule.** The pipeline decides slot continuity only while its own engine holds the slot (design section
-8), so it must know when that is the case and which backend it is. The engine therefore sends `HELLO` only after
-`START_REPLICATION` has succeeded, and its replication connection carries an application name that is unique to
-this engine instance and is repeated in `HELLO`. If Debezium offers no documented point at which "replication
-has started" can be observed, package E says so, `HELLO` is sent when the engine starts, and the pipeline relies
-on the application name and the slot's `active_pid` alone. The engine never attaches a second time by itself:
-Debezium's retries are off (including its own retry when the slot is still active), and any loss of the
-replication connection ends in `FATAL`.
+**Attach rule.** The pipeline decides slot continuity only while its own engine holds the slot (design section 8),
+so it must know when that is the case and which backend it is. Stock Debezium names every replication connection
+`Debezium Streaming`, so the engine cannot carry a unique application name (found by package E). The engine sends
+`HELLO` at its first `handleBatch` call — records exist only after `START_REPLICATION` has succeeded, and on an idle
+source Debezium's heartbeat record makes that call within `heartbeat.interval.ms` — and `HELLO` names the slot's
+holder as one SQL query reads it at that moment: `active_pid` and that backend's `backend_start` (µs, UTC). A holder
+is identified by this pair, never by the process id alone. If the probe fails or the slot has no holder, the engine
+sends `FATAL`. The engine never attaches a second time by itself: `errors.max.retries=0`, `slot.max.retries=0`, and
+any loss of the replication connection ends in `FATAL`.
+
+The engine checks its effective configuration at start and refuses (`FATAL`) a value that would weaken a guarantee:
+among others `skipped.operations`, the offset storage and flush interval, `lsn.flush.mode`, the retry settings, the
+transaction metadata, the snapshot mode, the publication mode, the converter, tombstones and a heartbeat interval
+outside 0 < interval ≤ 10 s. Nothing that reaches the engine as "extra" properties can override them.
 
 `END` and `HEARTBEAT` carry the exact position the engine flushes when that record is marked processed. The
 package document states which records Debezium's event counts include, proven by test for a key change, a
@@ -449,15 +455,22 @@ As delivered by package X; its report defines the interface, and this section is
   sent through a backfill in P3: from the first transaction that carries the new version, its changes are not
   applied to the visible table, and a backfill request (after a gap) is enacted in that group. The schema wave of
   P4 replaces this by a change in place (design 6.5).
-- **Catalog gate.** Debezium's records name a table by schema and name only, and a drop and recreate, or a
-  dropped and added column of the same name and type, can leave the `SCHEMA` frame unchanged (H-007, H-008). So
-  before a group is applied, S calls `tables.confirm(group_end, tables, deadline) -> {table: same | changed}`.
-  Package T builds it on `catalog.observe` (C7): an observation whose lower bracket `b` is ≥ `group_end` must
-  show, for each table of the group, the identity that the destination table was built for (OID; per column
-  `attnum`, name, type). A table that is not `same` leaves the visible path in that group: its rows are not
-  applied. What follows (a drop, a fresh table, a backfill) is enacted by T in the first group whose end is ≥
-  the observation's upper bracket `a`. The cost is one catalog round trip per group. Until T is merged, S's
-  stand-in answers `same`.
+- **Catalog gate.** Debezium's records name a table by schema and name only, and a drop and recreate, or a dropped
+  and added column of the same name and type, can leave the `SCHEMA` frame unchanged (H-007, H-008). So before a
+  group is applied, S calls `tables.confirm(group_end, tables, deadline) -> {table: same | changed}`. Package T
+  builds it on `catalog.observe` (C7): an observation whose lower bracket `b` is ≥ `group_end` must show, for each
+  table of the group, the identity that the destination table was built for (OID; per column `attnum`, name, type;
+  the key columns). A table that is not `same` leaves the visible path in that group: its rows are not applied. What
+  follows is enacted by T in `tables.on_group(tx, group_end)`, which S calls in every group and every idle position
+  step, immediately before `backfill.on_group`: in the first group after the stream has passed the observation (its
+  end is greater than the upper bracket `a`, design 7.2). The cost is one catalog round trip per group. Until T is
+  merged, S's stand-ins answer `same` and do nothing.
+- **The destination follows the source's names** (P3 rule). For each replicated name: absent at the source → the
+  destination table is dropped, or renamed under `on_source_drop: retain`; present with another OID → the old
+  destination table is dropped (or renamed) and a backfill of the new table is requested, in the same group; the
+  same OID with other columns → the schema rule above. A backfill that follows such a finding is entered only past
+  `a`, so that its pending log never holds a row of the earlier table. A rename is therefore a drop of the old name
+  and, if the new name is replicated, a fresh table; the rename in place of SPEC 2.2 is P4.
 - S runs a group again after `Conflict`, a bounded number of times, building its statements again when the
   conflict came from a DDL (a swap changes the catalog).
 - A table that fails to apply `apply.max_table_attempts` times (default 3) leaves the stream: state `quarantined`,

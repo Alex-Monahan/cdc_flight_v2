@@ -30,6 +30,19 @@ and 5.2.
      destination types of C3 and write it down.
 - `docs/wal_hazards.md` H-003 and the hazards on key changes and keyless tables.
 
+## From the engine as built — build on it
+
+Package E is built and reviewed. `docs/design/engine.md` is the full account; where it differs from what this task
+says elsewhere, these points and that document hold.
+
+- `k<i>` is set on the create that follows a key change. A key change arrives as a delete with the old key followed
+  by that create; chains and swaps of keys arrive as such pairs, in order.
+- A delete of a table with a key sets only the key columns of `a<i>`. A table without a key has `a<i>` all NULL on a
+  delete and the old image in `b<i>`.
+- `has_key` and the key flags come from Debezium's record key, which reads the current catalog, not the catalog at
+  the time of the change (H-006). The catalog gate (C10) decides whether a group may be applied; apply does not
+  trust the flags beyond the group it was given.
+
 ## Resources
 
 MotherDuck through `tools/with-env` only; databases `cdc_v2_t_a_*` only. No Postgres, no JVM: your inputs are

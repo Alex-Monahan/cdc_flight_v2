@@ -39,6 +39,17 @@ protocol with cases of its own.
   H-039, H-044, H-046, H-048. Where a hazard says **[test]** and the fact decides a backfill read, the test is
   yours unless a merged package's document already answers it; then cite it.
 
+## From the engine as built — build on it
+
+Package E is built and reviewed. `docs/design/engine.md` is the full account; where it differs from what this task
+says elsewhere, these points and that document hold.
+
+- Rows of a table that is being backfilled arrive in ordinary `ROWS` frames. Package Y's cross-path test is the
+  guarantee that the text of a chunk and the transport forms of the stream give equal destination values; a type
+  that fails it is a finding for Y, not something to convert a second way here.
+- A table that the stream quarantined because the engine cannot read one of its values (package S) is backfilled
+  "after a gap": its `P0` and its hand-off follow the same rules as any other gap.
+
 ## What may be missing when you start
 
 Packages X, E, D, A, P, Y, S and O are merged. Package V (slot continuity) may or may not be: its finding reaches
@@ -100,6 +111,10 @@ F's consumer loop need to know what a consumer may see.
   The plan is written in one transaction, so a table is either planned or not.
 - Memory is bounded whatever a chunk holds: pages say nothing about TOASTed values. Show it with rows that carry
   100 MB values.
+- The plan records the identity the new table is built for: the table's OID, per column `attnum`, name and type
+  with its modifier, and the key columns (C10, the catalog gate). Every chunk's snapshot must show that identity,
+  and the swap stores it as the table's identity, in the swap transaction. Package T compares it with the
+  catalog for every group.
 - A partitioned table is read leaf by leaf in the Postgres-features wave of P4. In P3 the planner refuses it
   with a report, before anything is created.
 - A view for an operator: per table the state, chunks done and total, rows, rate, the positions.
@@ -115,7 +130,8 @@ F's consumer loop need to know what a consumer may see.
   values; every byte sequence the encoding allows; a 100 MB value. Prove with `EXPLAIN` that a chunk is a TID
   range scan and never a scan of the whole table.
 - Every chunk is read in its own short transaction (design 7.1): repeatable read, read only, the cut taken as C9
-  says, `pg_relation_filenode` read under the same snapshot. A snapshot is used only if `R0 ≥ P0`; the wait for
+  says, the plan's identity and `pg_relation_filenode` read under the same snapshot (a chunk never trusts the
+  name alone: the table may have been dropped and created again). A snapshot is used only if `R0 ≥ P0`; the wait for
   it has a deadline and is a declared wait (C11), it does not spin and does not read. A recovery conflict
   (SQLSTATE 40001 and what package P maps to it) reads the chunk again.
 - **A table with a key**: every chunk has its own snapshot and its own cut; nothing is held between chunks.
@@ -189,8 +205,10 @@ Inside `on_group`, in the group's `tx`, for a backfill in `swap_ready`:
   tables and goes on: loaded chunks are not read again; a table without a key whose snapshot is gone starts
   again; a backfill in `swap_ready` waits for the stream.
 - A changed `relfilenode` (`VACUUM FULL`, `CLUSTER`, a rewriting `ALTER TABLE`, `TRUNCATE`) discards the loaded
-  chunks and starts the table's reading again, in one transaction, with an alert that says why. A table whose
-  OID is gone: the backfill is abandoned and the table reported (package T decides what follows).
+  chunks and starts the table's reading again, in one transaction, with an alert that says why. A name that
+  has no table any more, or a table with another identity than the plan's: the backfill is abandoned and the
+  table reported (package T decides what follows; give it one function that abandons a table's live backfill
+  inside a stream-lane transaction).
 - A new request, a new plan for the table in the stream (a schema change during its own backfill: open point 11;
   in P3 the answer is "again, with the new plan"), a second slot finding: the running backfill is abandoned and
   a new one entered at the new `P0`, in one stream-lane transaction.

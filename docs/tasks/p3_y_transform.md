@@ -38,6 +38,26 @@ Findings that the oracle package proved on DuckDB 1.5.6 and that decide your cod
    `1 mon`/`30 days`). That is package A's problem, but your conversion must keep these values apart exactly as
    the source has them (an interval keeps months, days and microseconds as three numbers).
 
+## From the engine as built — build on it
+
+Package E is built and reviewed. `docs/design/engine.md` is the full account; where it differs from what this task
+says elsewhere, these points and that document hold.
+
+- Convert by the transport form that the `SCHEMA` frame names (`docs/design/engine.md` section 3), and by nothing
+  else: `date_pg_days` (int32 days since 2000-01-01; +infinity and -infinity are the int32 maximum and minimum),
+  `timestamp_pg_us` and `timestamptz_pg_us` (int64 µs since 2000-01-01 UTC; the infinities are the int64 maximum and
+  minimum), `time_us` (0 to 86,400,000,000), `interval_text`, `numeric_text` (scale kept; NaN, Infinity, -Infinity),
+  `money_text`, `array_text` (with lower bounds), `bytes`, `text` (`char(n)` keeps its padding). Take the exact
+  names from the document.
+- BC dates and dates outside DuckDB's range arrive as numbers. Never cast a date text through DuckDB (it reads a
+  Postgres BC date text as an AD date).
+- Geometric types arrive in Java's float formatting; they are not lossless yet (P4). Say so in the type table.
+- `u<i>` exists for a superset of the columns that can be sent as unchanged; a column that never is has an all-false
+  `u<i>`.
+- Infinite intervals and intervals above 2^31 hours do not reach you through the stream today: the driver fails on
+  them and the stream quarantines the table (package S). The backfill path does read them; your cross-path test
+  lists them as stream-side gaps instead of skipping them silently.
+
 ## Resources
 
 - Postgres: `tools/localpg --home ~/.cache/cdc_flight_v2/pg-y --port-base 55656` (8 ports from the base). Postgres
