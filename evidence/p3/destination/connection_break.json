@@ -111,8 +111,9 @@
             "signal": null,
             "signal_name": null
           },
-          "ms_of_first_error_after_process_start": 8031,
+          "ms_of_first_error_after_process_start": 8307,
           "proxy_connections_accepted": 2,
+          "proxy_connections_reset": 0,
           "recovered_by_itself": true,
           "rows_of_the_child": 6,
           "seconds_from_lifting_to_exit": 4.8,
@@ -142,11 +143,12 @@
             "signal": null,
             "signal_name": null
           },
-          "ms_of_first_error_after_process_start": 11876,
+          "ms_of_first_error_after_process_start": 11915,
           "proxy_connections_accepted": 4,
+          "proxy_connections_reset": 2,
           "recovered_by_itself": true,
           "rows_of_the_child": 6,
-          "seconds_from_lifting_to_exit": 6.8,
+          "seconds_from_lifting_to_exit": 6.7,
           "transaction_at_the_break_committed": true,
           "what": "the COMMIT reaches MotherDuck, nothing comes back; after the child's error the connections are reset and the proxy passes again"
         },
@@ -173,8 +175,9 @@
             "signal": null,
             "signal_name": null
           },
-          "ms_of_first_error_after_process_start": 12195,
+          "ms_of_first_error_after_process_start": 11925,
           "proxy_connections_accepted": 2,
+          "proxy_connections_reset": 0,
           "recovered_by_itself": true,
           "rows_of_the_child": 6,
           "seconds_from_lifting_to_exit": 4.7,
@@ -204,11 +207,12 @@
             "signal": null,
             "signal_name": null
           },
-          "ms_of_first_error_after_process_start": 11844,
+          "ms_of_first_error_after_process_start": 12290,
           "proxy_connections_accepted": 4,
+          "proxy_connections_reset": 2,
           "recovered_by_itself": true,
           "rows_of_the_child": 6,
-          "seconds_from_lifting_to_exit": 6.8,
+          "seconds_from_lifting_to_exit": 6.9,
           "transaction_at_the_break_committed": false,
           "what": "the COMMIT is held by the proxy; after the child's error the connections are reset, so the COMMIT is never delivered"
         },
@@ -233,6 +237,7 @@
             "signal_name": null
           },
           "proxy_connections_accepted": 3,
+          "proxy_connections_reset": 2,
           "recovered_by_itself": true,
           "rows_of_the_child": 6,
           "seconds_from_lifting_to_exit": 4.5,
@@ -246,7 +251,7 @@
         "stmt_deadline": 4,
         "tx_deadline": 8
       },
-      "date_utc": "2026-11-10 09:12",
+      "date_utc": "2026-11-10 09:24",
       "proxy": {
         "accepted": 15,
         "closed_by_fault": 0,

@@ -651,7 +651,8 @@ def test_a_real_connection_break_in_a_child(scene, evidence):
             error seen or None)`` ends the fault."""
             pos0 = scene.position()
             scene.writer.add("stream", 6)
-            accepted = px.stats()["accepted"]
+            before = px.stats()
+            accepted = before["accepted"]
             child = scene.frozen(name, point, 2, env=env, **BREAK_OPTIONS)
             n_ev = len(events(child))
             fault()
@@ -688,6 +689,7 @@ def test_a_real_connection_break_in_a_child(scene, evidence):
                 "recovered_by_itself": recovered, "exit": st.as_dict() if st is not None else "killed by the test",
                 "seconds_from_lifting_to_exit": round(seconds, 1),
                 "proxy_connections_accepted": px.stats()["accepted"] - accepted,
+                "proxy_connections_reset": px.stats()["reset_by_fault"] - before["reset_by_fault"],
                 "rows_of_the_child": scene.rows_by_tag().get(name, 0), "check": c["lanes"]["stream"],
             }
             if first_error is not None:
@@ -703,9 +705,10 @@ def test_a_real_connection_break_in_a_child(scene, evidence):
             px.set_fault("pass")
 
         # A: every TCP connection is reset while a transaction is open and idle
-        case("reset", "sut.written", reset_now, lambda child, n_ev, t: None,
-             "every TCP connection of the child is reset (RST) while its transaction is open; then the proxy "
-             "passes again and the child goes on")
+        r = case("reset", "sut.written", reset_now, lambda child, n_ev, t: None,
+                 "every TCP connection of the child is reset (RST) while its transaction is open; then the proxy "
+                 "passes again and the child goes on")
+        assert r["proxy_connections_reset"] >= 1, r           # the fault did break a live connection of the child
 
         # B: nothing passes in either direction during a statement; lifted 8 s later
         def lift_b(child, n_ev, t):
