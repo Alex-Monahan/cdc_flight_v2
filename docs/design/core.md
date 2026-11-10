@@ -257,3 +257,78 @@ A TRUNCATE (all relations named in the message, so CASCADE needs nothing extra) 
 into segments. Inside the one destination transaction: apply segment 1, execute the truncate or the DDL, apply
 segment 2, and so on, in commit order. DDL in MotherDuck is transactional, so a rolled-back group leaves no
 half-changed schema.
+
+## 7. Snapshot and stream
+
+One mechanism serves the initial snapshot, a newly discovered table, an operator's re-backfill, an automatic
+re-backfill and a resumed backfill (SPEC 3.3). The stream never stops for it.
+
+### 7.1 Life of one backfill
+
+1. **Enter.** A stream-lane group commits the table's transition to `backfilling` at stream position `P0`. From
+   that commit on, the table's changes are not applied to the visible table; they are appended to the table's
+   **pending log** in the same group transaction that moves the position. Consumers keep the old version.
+2. **Read.** The backfill lane reads chunks from the source into the **new table** (same schema as the target, a
+   reserved name, so that the swap can be a rename). Each chunk is one fenced transaction in lane `backfill` that
+   also records the chunk as done (crash point `backfill.chunk_committed`). Chunks are `ctid` ranges, read by
+   parallel readers; R3: Debezium takes no snapshot.
+3. **Catch up.** The backfill lane applies pending changes to the new table in rounds (statements of section 6),
+   recording `caught_up_lsn` each time, until the rest is small.
+4. **Swap.** A stream-lane group applies the rest of the pending log, drops the old table, renames the new one,
+   and moves the table to `streaming`, in the same transaction as the group's position and fence (R7, SPEC 3.2).
+   From the next group on, the table's changes are applied directly. This is also the moment a table "reaches
+   streaming" for SPEC 1.3.
+
+A crash anywhere leaves either the old version with a resumable backfill, or the new version in `streaming`.
+
+### 7.2 Where a snapshot lies in the stream
+
+Each snapshot has a **cut**: a function that answers, for a source transaction, `inside`, `outside` or `unknown`.
+
+On a standby (replica mode), one multi-statement message in a read-committed transaction reads
+`pg_last_wal_replay_lsn()` (`R0`), then exports the snapshot and reads `pg_last_wal_replay_lsn()` again (`R1`).
+Replay is serial, and a commit becomes visible to snapshots during the replay of its commit record, before the
+replay position moves past that record. Therefore:
+
+- commit record ends at or before `R0` ⇒ `inside`;
+- commit record starts after the first record that follows `R1` ⇒ `outside`;
+- otherwise `unknown` (at most the commits between `R0` and `R1`, plus the one record in flight).
+
+**[test]** P3 proves this with a stress test on a hot table before anything depends on it: thousands of snapshots
+while a writer commits one counted row per transaction; the rows visible in each snapshot must equal the commits
+`inside`, plus some prefix of the `unknown` ones. `pg_current_snapshot()` cannot give the answer on a standby: there
+its in-progress list is empty **[test]**.
+
+On a primary (primary mode), the cut is `pg_current_snapshot()` and the transaction id of each stream transaction;
+it never answers `unknown`.
+
+A snapshot is used only if `R0 ≥ P0`. This matters when backfill reads use a different replica than the slot.
+Parallel readers import the exported snapshot (`SET TRANSACTION SNAPSHOT`, measured on the standby: consistent;
+readers with their own snapshots: mixed states).
+
+### 7.3 Tables with a key
+
+Chunks may be read under different snapshots, which is what makes a resumed backfill possible without reading
+completed chunks again (SPEC 3.7). The pending log is replayed from `replay_from` = `R0` of the table's first
+snapshot; `unknown` counts as `outside`. Replaying a change that a chunk already contains is harmless, because
+every replayed change rewrites or removes the whole row by key, in commit order. A row that moved between `ctid`
+ranges between two snapshots is either read twice or not at all; in both cases the change that moved it is in the
+replayed log and leaves exactly one correct row. Catch-up starts only after all chunks are loaded.
+
+### 7.4 Tables without a key
+
+A change cannot be attributed to a `ctid` range, and replaying a change twice changes a row count. So the whole
+table is read under **one** snapshot whose cut has no `unknown` transaction that touches the table. The backfill
+opens a snapshot, waits until the stream has passed `R1`, and checks; if a touching transaction is `unknown`, it
+opens another snapshot before reading anything. The pending log is replayed from that exact cut.
+
+If the snapshot is lost (crash, hand-over, standby conflict), the chunks already loaded are discarded and the
+table's backfill starts again. Consequence: the row bound of SPEC 3.7 holds for tables with a key; a table without
+a key is consistent after a resume (SPEC 1.6) but is read again. This is reported to the owner as a known limit.
+
+### 7.5 A table that joins the publication
+
+Changes written before the publication change are not published, even if their transaction commits later. After
+adding a table to the publication, the pipeline notes the primary's next transaction id `X`, and the table's first
+snapshot must have `xmin ≥ X`: every transaction that wrote to the table before the change has then finished and
+is `inside`. **[test]** in the discovery work of P4, including a transaction that stays open across the change.
