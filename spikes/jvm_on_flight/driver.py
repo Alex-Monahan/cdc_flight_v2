@@ -112,6 +112,67 @@ def postgres_pids():
     return [int(p) for p in os.listdir("/proc") if p.isdigit() and comm(int(p)) == "postgres"]
 
 
+def thread_cpu(pid):
+    """CPU seconds per JVM thread group (native thread names with trailing numbers folded)."""
+    out = {}
+    try:
+        tids = os.listdir("/proc/%d/task" % pid)
+    except OSError:
+        return out
+    for tid in tids:
+        try:
+            with open("/proc/%d/task/%s/stat" % (pid, tid)) as f:
+                raw = f.read()
+        except OSError:
+            continue
+        name = raw[raw.index("(") + 1:raw.rindex(")")]
+        parts = raw.rsplit(")", 1)[1].split()
+        key = re.sub(r"[#\-]?\d+$", "", name).strip() or name
+        out[key] = out.get(key, 0.0) + (int(parts[11]) + int(parts[12])) / CLK
+    return out
+
+
+def thread_delta(a, b, top=12):
+    d = {k: round(v - a.get(k, 0.0), 2) for k, v in b.items()}
+    return dict(sorted(((k, v) for k, v in d.items() if v > 0.05), key=lambda kv: -kv[1])[:top])
+
+
+def jfr_summary(java_home, path, top=30):
+    """Hot methods from a JFR recording: self samples and inclusive samples."""
+    rc, out, _ = sh([java_home + "/bin/jfr", "print", "--events", "jdk.ExecutionSample", "--stack-depth", "64",
+                     path], timeout=300)
+    if rc != 0:
+        return {"error": out[-500:]}
+    self_c, incl_c, threads, n = {}, {}, {}, 0
+    frames, thread, in_stack = [], None, False
+    for ln in out.splitlines():
+        t = ln.strip()
+        if t.startswith("jdk.ExecutionSample"):
+            frames, thread, in_stack = [], None, False
+        elif t.startswith("sampledThread"):
+            m = re.search(r'"([^"]*)"', t)
+            thread = re.sub(r"[#\-]?\d+$", "", m.group(1)) if m else "?"
+        elif t.startswith("stackTrace = ["):
+            in_stack = True
+        elif in_stack and t == "]":
+            in_stack = False
+        elif in_stack and t and t != "...":
+            frames.append(re.sub(r"\s+line:.*$", "", t))
+        elif t == "}" and frames:
+            n += 1
+            threads[thread] = threads.get(thread, 0) + 1
+            self_c[frames[0]] = self_c.get(frames[0], 0) + 1
+            for f in set(frames):
+                incl_c[f] = incl_c.get(f, 0) + 1
+            frames = []
+    ours = ("io.debezium", "org.apache.kafka", "org.postgresql", "cdc_v2")
+    pct = lambda c: round(100.0 * c / n, 1) if n else None  # noqa: E731
+    return {"samples": n, "threads": {k: pct(v) for k, v in sorted(threads.items(), key=lambda kv: -kv[1])[:8]},
+            "self_pct": [(k[:160], pct(v)) for k, v in sorted(self_c.items(), key=lambda kv: -kv[1])[:top]],
+            "inclusive_pct": [(k[:160], pct(v)) for k, v in sorted(incl_c.items(), key=lambda kv: -kv[1])
+                              if k.startswith(ours)][:top + 10]}
+
+
 def cgroup_mem():
     out = {}
     for k in ("memory.current", "memory.peak", "memory.max"):
@@ -524,9 +585,13 @@ def phase_e2e():
            shutdown=m2.get("SHUTDOWN_DONE", {}).get("detail"), warnings=eng.interesting_log())
 
 
-def tx_test(name, n_rows, props=None, heap="1g", jvm_opts=(), timeout=600):
+def tx_test(name, n_rows, props=None, heap="1g", jvm_opts=(), timeout=600, jfr=False):
     """One transaction of n_rows into a running engine. Returns the measurement record."""
     import pgfixture as pgf
+    jfr_path = "%s/%s.jfr" % (WORK, name)
+    if jfr:
+        jvm_opts = tuple(jvm_opts) + ("-XX:StartFlightRecording=filename=%s,settings=profile,dumponexit=true"
+                                      % jfr_path, "-XX:FlightRecorderOptions=stackdepth=96")
     eng, ok = start_streaming(props, heap=heap, jvm_opts=jvm_opts, label=name)
     rec = {"test": name, "rows": n_rows, "heap": heap, "jvm_opts": list(jvm_opts),
            "settings": {k: v for k, v in (props or {}).items()}, "started": ok}
@@ -558,8 +623,10 @@ def tx_test(name, n_rows, props=None, heap="1g", jvm_opts=(), timeout=600):
     th.start()
     ins_s, commit_at = pgf.insert_rows(1, n_rows)
     cw_stream = CpuWindow(pids)
+    th0 = thread_cpu(eng.jvm_pid)
     done = eng.wait_events(e0 + n_rows, timeout)
     stream_cpu = cw_stream.stop()
+    rec["jvm_threads_cpu_s_commit_to_last"] = thread_delta(th0, thread_cpu(eng.jvm_pid))
     all_cpu = cw_all.stop()
     stop_sampling.set()
     s = eng.stats()
@@ -578,6 +645,8 @@ def tx_test(name, n_rows, props=None, heap="1g", jvm_opts=(), timeout=600):
     rec["stop_s"] = round(stop_s, 3)
     rec["shutdown"] = eng.marks().get("SHUTDOWN_DONE", {}).get("detail")
     rec["warnings"] = eng.interesting_log(8)
+    if jfr and os.path.exists(jfr_path):
+        rec["jfr"] = jfr_summary(STATE["home"], jfr_path)
     result("tx_test", **rec)
     return rec
 
@@ -622,6 +691,25 @@ def phase_memory():
     for heap in ("256m", "512m", "1g", "2g"):
         tx_test("heap_" + heap, n, {}, heap)
     tx_test("heap_256m_batch20k_q80k", n, {"max.batch.size": "20480", "max.queue.size": "81920"}, "256m")
+
+
+def phase_profile():
+    """Where the JVM spends its CPU: per-thread CPU and a JFR execution-sample profile of one 1M-row
+    transaction, for the default settings and for cheaper value conversions."""
+    T("phase_profile")
+    pg_up()
+    prepare()
+    n = int(os.environ.get("CDC_V2_TPUT_ROWS", "1000000"))
+    tx_test("profile_default", n, {}, "1g", (), timeout=300, jfr=True)
+    for name, props, opts in PROFILE_VARIANTS:
+        tx_test(name, n, props, "1g", opts, timeout=300)
+
+
+PROFILE_VARIANTS = [
+    ("decimal_string", {"decimal.handling.mode": "string"}, ()),
+    ("decimal_double", {"decimal.handling.mode": "double"}, ()),
+    ("parallelgc_decimal_double", {"decimal.handling.mode": "double"}, ("-XX:+UseParallelGC",)),
+]
 
 
 def phase_big():
@@ -837,7 +925,7 @@ def main():
            mem_max=open("/sys/fs/cgroup/memory.max").read().strip(), os_cpu_count=os.cpu_count())
     os.makedirs(WORK, exist_ok=True)
     phases = {"jdk": phase_jdk, "e2e": phase_e2e, "tput": phase_tput, "memory": phase_memory, "small": phase_small,
-              "big": phase_big, "supervise": phase_supervise, "orphan": phase_orphan}
+              "big": phase_big, "profile": phase_profile, "supervise": phase_supervise, "orphan": phase_orphan}
     rc = 0
     for m in MODES:
         try:
