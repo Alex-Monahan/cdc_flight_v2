@@ -49,7 +49,7 @@ def test_session_settings_are_pinned_against_role_and_database_settings(cluster,
                                             "'1 year -2 mons 3 days 04:05:06.5'::interval::text, 0.1::float8::text, "
                                             "'\\x00ff'::bytea::text, '2026-01-02'::date::text, "
                                             "current_setting('search_path')", deadline=Deadline.after(5))
-                    assert rows == [("2026-01-02 03:04:05.678901+00", "P10M3DT4H5M6.5S", "0.1", "\\x00ff",
+                    assert rows == [("2026-01-02 03:04:05.678901+00", "10 mons 3 days 04:05:06.5", "0.1", "\\x00ff",
                                      "2026-01-02", "pg_catalog, pg_temp")], (node, replication, rows)
                 finally:
                     conn.close()

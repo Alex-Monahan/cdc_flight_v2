@@ -40,8 +40,10 @@ This is a small package. Keep it small: no new module, no new abstraction.
 
 - `_KEYS_SQL` and `_OBSERVE_SQL` read `pg_index.indimmediate` of the primary key.
 - `SourceTable` says whether the primary key is deferrable and has one property that answers "does this table
-  have a key" by rule K. For a table without a key, `key` and `key_attnums` are empty and `key_source` is
-  `None`. A table that `check` refuses anyway may keep what it reports today.
+  have a key" by rule K. For every table without a key, `key` and `key_attnums` are empty and `key_source` is
+  `None` — also for a table with no primary key and `REPLICA IDENTITY USING INDEX` (today the catalog gives the
+  index's columns as its key; that index is not a key, and `replica_identity_index` still names it). The
+  transform's `plan` reads `key_attnums` and compares it with the `SCHEMA` frame, so this field is the rule.
 - `identity_problem`: a table with a deferrable primary key that is not `REPLICA IDENTITY FULL` is refused, with
   a message of its own ("primary key is deferrable: needs REPLICA IDENTITY FULL (replica identity is …)"). The
   other refusals stay as they are, among them a primary key with an identity index that is another index.
