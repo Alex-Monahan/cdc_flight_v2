@@ -327,27 +327,407 @@ identity; any failure ⇒ stop the engine, alert, take the backfill path. → H-
 
 ---
 
+
 ## 3. Delivery contract of the embedded engine
 
-*Section in progress — to follow in the next commit (batch API, flush timing, exact acknowledgement, restart window,
-offset storage, starting from a supplied position).*
+### 3.1 The batch API
+
+`DebeziumEngine.ChangeConsumer<R>.handleBatch(List<R> records, RecordCommitter<R> committer)` is called on the
+engine's polling thread with each batch returned by the connector task (`AsyncEmbeddedEngine.PollRecords.doCall`;
+SMTs and conversion may run in parallel before it, `record.processing.threads`) **[src]**
+(`dbz:debezium-embedded/src/main/java/io/debezium/embedded/async/AsyncEmbeddedEngine.java`). `RecordCommitter`
+(`dbz:debezium-api/src/main/java/io/debezium/engine/DebeziumEngine.java`) has `markProcessed(record)`,
+`markProcessed(record, Offsets)` and `markBatchFinished()`; its Javadoc says markProcessed "must be called for each
+record" **[src]**. What the implementation does (`AsyncEmbeddedEngine.SourceRecordCommitter`) **[src]**:
+
+- `markProcessed(r)` → `task.commitRecord(r, null)` (stores `r.sourceOffset()` as the task's `lastOffsets`,
+  `BaseSourceTask.commitRecord`) and `offsetWriter.offset(partition, offset)`. Nothing is sent to Postgres.
+- `markBatchFinished()` → if `offset.commit.policy` says so (default `PeriodicCommitOffsetPolicy` with
+  `offset.flush.interval.ms`, default **60 000**), `commitOffsets()`: flush the offset writer into the
+  `OffsetBackingStore`, wait up to `offset.flush.timeout.ms` (5 s), then `task.commit()`.
+- `task.commit()` only sets a flag; on the **next** `poll()` the task runs `performCommit()`, which calls
+  `coordinator.commitOffset(partition, lastOffsets)` → `PostgresStreamingChangeEventSource.commitOffset` → on its
+  `lsn-flush` thread `stream.setFlushedLSN(lsn)`, `setAppliedLSN(lsn)`, `forceUpdateStatus()`, bounded by
+  `lsn.flush.timeout.ms` (30 s, then `lsn.flush.timeout.action`, default `fail`) (`dbz:debezium-connector-common/…/BaseSourceTask.java`,
+  `PostgresStreamingChangeEventSource.java`) **[src]**.
+- The LSN sent is `lsn_commit` of the offset if present, else `lsn_proc` (`commitOffset`) **[src]**. `lsn_commit` is
+  updated only at a COMMIT message (and at a non-transactional logical message), to the LSN the walsender attached to
+  that message, which is the **end** of the commit record (`ctx->write_location = txn->end_lsn`,
+  `pg:src/backend/replication/logical/logical.c`, `commit_cb_wrapper`) **[src]**. The offset of a record in the middle
+  of transaction T therefore carries the commit LSN of the transaction *before* T.
+- On restart the server skips every transaction whose commit record starts before `confirmed_flush_lsn`
+  (`DecodeTXNNeedSkip` → `SnapBuildXactNeedsSkip(builder, buf->origptr)` with `start_decoding_at` = confirmed flush,
+  `pg:src/backend/replication/logical/decode.c`, `snapbuild.c`) **[src]**. Confirming T's commit end LSN skips exactly
+  T and everything before it.
+- `lsnFlushingAllowed` is false until the first message after (re)connect has been received; earlier commit requests
+  are ignored (`commitOffset`) **[src]**.
+
+### 3.2 When does the slot advance relative to our acknowledgement?
+
+Only through `performCommit()` with `lastOffsets` = the offset of the last record passed to `markProcessed`, and only
+after (a) `markBatchFinished` decided to flush, (b) the offset store accepted the flush, (c) the next `poll()` ran. With
+`lsn.flush.mode=connector` nothing else moves the slot **[src]**. Two ways the slot could still move ahead of the
+destination, both excluded by configuration and by our consumer:
+
+- `lsn.flush.mode=connector_and_driver` (Technology Preview) lets the pgjdbc keepalive thread flush the server's
+  keepalive LSN when Debezium has nothing pending **[doc]** (connector docs, `lsn.flush.mode`); it has had monotonicity
+  bugs (debezium/dbz#1489, debezium/dbz#1605) **[doc]**. Not used.
+- debezium/dbz#2460 (open): `performCommit()` acknowledges the newest in-memory `lastOffsets`, which can be ahead of
+  what the offset store persisted **[doc]** (<https://github.com/debezium/dbz/issues/2460>). Harmless for us *because we
+  call `markProcessed` only after the destination commit*: `lastOffsets` is then never ahead of the destination, whatever
+  the offset store holds.
+
+### 3.3 Making "acknowledge only after the destination commit" exact
+
+Consumer protocol (our Java code, architecture B):
+
+1. `handleBatch` streams every record to the applier (§8.3) and keeps, per source transaction, only a reference to
+   its **transaction END record** (`provide.transaction.metadata=true`; the END record's offset has `lsn_commit` = that
+   transaction's commit end LSN). It does **not** block on the destination (blocking would stall the stream for the
+   duration of every MotherDuck commit).
+2. The applier commits each source transaction, or a group of whole transactions — never a part (SPEC 1.3) — in one
+   MotherDuck transaction together with the applied position, then reports "committed up to commit LSN X" on the control
+   channel.
+3. At the start and end of every `handleBatch` call the consumer drains those reports, calls
+   `committer.markProcessed(endRecord)` for the newest END record with commit LSN ≤ X, then `markBatchFinished()`.
+4. `offset.flush.interval.ms=0`, so every `markBatchFinished` flushes; `heartbeat.interval.ms` (e.g. 5 000) guarantees a
+   `handleBatch` call during idle periods so acknowledgements are never delayed indefinitely.
+
+Property: the slot's `confirmed_flush_lsn` ≤ the destination's applied commit LSN at all times (order: destination
+commit → report → markProcessed → flush → next poll → walsender). The acknowledgement lags by at most one batch or
+heartbeat interval, which only costs retained WAL **[src]**, **[test]** (crash points between every step, SPEC 1.7;
+continuous invariant probe "slot never ahead of destination", the same probe debezium/dbz#2460 used).
+
+Calling `markProcessed` only for END records departs from the Javadoc's "must be called for each record" but not from
+the implementation, which keeps only the last offset **[src]**. Honouring the letter would mean keeping every record
+reference of a 10M-row transaction in the JVM until its commit; we should not.
+
+### 3.4 Offset storage and the starting position: run without stored offsets
+
+Offset stores in 3.7: `FileOffsetBackingStore` (default), `MemoryOffsetBackingStore`, Kafka, JDBC
+(`JdbcOffsetBackingStore`; 3.7.1 fixed debezium/dbz#2786), Redis and others in `debezium-storage`, or any class
+implementing Kafka Connect's `OffsetBackingStore`, selected with `offset.storage` **[doc]**
+(<https://debezium.io/documentation/reference/stable/development/engine.html>).
+
+**Recommendation: `offset.storage=org.apache.kafka.connect.storage.MemoryOffsetBackingStore`; the replication slot is the
+restart point; the destination holds the applied position (SPEC 1.1).** Reasons:
+
+- With no stored offset and `snapshot.mode=no_data`, no snapshot runs (`shouldSnapshotData(false, false)` is false) and
+  streaming receives a null offset (`ChangeEventSourceCoordinator.executeChangeEventSources`,
+  `PostgresSnapshotChangeEventSource.getSnapshottingTask`) **[src]**; it logs "No previous LSN found … streaming from the
+  latest xlogpos or flushed LSN" and starts at `min(slot.confirmed_flush_lsn, IDENTIFY_SYSTEM xlogpos)` with an empty
+  `WalPositionLocator` — **no position search and no event skipping** (`PostgresStreamingChangeEventSource.execute`,
+  `PostgresReplicationConnection.initReplicationSlot`) **[src]**. The connector documentation says the same for
+  ephemeral stores: "the connector always defers to the replication slot position on startup" **[doc]** (connector docs,
+  `lsn.flush.mode`).
+- All recent **data-loss and OOM bugs on restart are in the stored-offset path** (`WalPositionLocator`,
+  `lsn_events_processed`): debezium/dbz#2889 (fixed 3.7.1), debezium/dbz#2901 (open: DML lost after restarting from a
+  transactional message following COPY), debezium/dbz#2905 (open: restarting from a mid-transaction offset needs memory
+  proportional to the transaction; OOM on an 8M-row transaction) **[doc]**. Without stored offsets none of them is
+  reachable **[src]**, **[test]** (SIGKILL at random points of a 10M-row COPY with a transactional message inside; expect no
+  loss and bounded JVM memory).
+- SPEC 1.1 puts the applied position in the destination; a second local copy is a second source of truth.
+
+"Starting from a position we supply" then means: before starting the engine, our slot check (SPEC 1.8) compares
+`confirmed_flush_lsn` with the destination's applied commit LSN. `confirmed_flush_lsn ≤ applied` is normal (the server
+re-sends transactions we already have; the applier discards every transaction whose commit LSN ≤ applied).
+`confirmed_flush_lsn > applied` means changes were consumed without being applied ⇒ alert + backfill. To move the slot
+forward ourselves (e.g. after a lag-triggered backfill, SPEC 3.6), use `pg_replication_slot_advance(slot, lsn)` before
+the engine starts (allowed for logical slots on a standby **[test]**) or drop and re-create the slot. A custom
+`OffsetBackingStore` returning `{lsn, lsn_proc, lsn_commit}` = applied commit LSN is possible but re-enters the
+`WalPositionLocator` path and is **not recommended**.
+
+### 3.5 Redelivery window after restart
+
+- Clean stop: `engine.close()` commits the offset of the last marked record and stops the task (`stopSourceTasks`)
+  **[src]**; redelivery = transactions after our last acknowledgement.
+- Crash of our process: redelivery = transactions after the last acknowledgement that reached the walsender (≤ one
+  batch or heartbeat interval plus anything in flight); the engine docs describe the same "up to *n* duplicates" **[doc]**
+  (engine docs, failure handling).
+- Crash of the server holding the slot: the slot may return to the position persisted at the last checkpoint or
+  restartpoint **[doc]** (<https://www.postgresql.org/docs/18/logicaldecoding-explanation.html>); redelivery can span
+  minutes.
+- The server re-sends **whole transactions** in commit order (protocol 1 never sends partial transactions), so
+  discard-by-commit-LSN is exact. The 32-bit xid of the BEGIN message (`Integer.toUnsignedLong` in `handleBeginMessage`)
+  wraps around and must not be used as a key **[src]**.
 
 ## 4. Transactions
 
-*To follow.*
+- **Boundary events** (`provide.transaction.metadata=true`): one BEGIN and one END record per transaction (`id` =
+  `txid:lsn`; END carries `event_count` and per-table `data_collections[].event_count`); every data record gets a
+  `transaction` block with `id`, `total_order`, `data_collection_order` **[doc]**
+  (<https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-transaction-metadata>). The
+  END counts let the applier verify that it received every event before committing — a cheap completeness check for the
+  stream fuzzer's truncation cases (SPEC §4).
+- **Ordering**: one slot, one walsender, one Debezium streaming thread; protocol 1 sends each transaction contiguously at
+  commit time and transactions in commit order, so ordering is total across tables **[doc]**
+  (<https://www.postgresql.org/docs/18/protocol-logical-replication.html>), **[src]**. `record.processing.order=ORDERED`
+  (default) keeps that order through parallel conversion **[doc]** (engine docs).
+- **A 10M-row transaction**: the walsender decodes into its reorder buffer and spills to `pg_replslot/<slot>/` on the
+  **decoding server's disk** beyond `logical_decoding_work_mem` (default 64 MB) **[doc]**
+  (<https://www.postgresql.org/docs/18/runtime-config-resource.html>); nothing is sent before COMMIT. After COMMIT the
+  whole transaction is read back from spill and streamed. In the JVM, memory is bounded by the `ChangeEventQueue`
+  (`max.queue.size` records, default 8 192; `max.queue.size.in.bytes`, default 0 = unbounded; `max.batch.size` 2 048;
+  `poll.interval.ms` 500); the producer blocks when the queue is full **[src]** (`CommonConnectorConfig`,
+  `ChangeEventQueue`). The applier stages the transaction (spill, SPEC 5.4) and commits it once.
+- **Streaming of in-progress transactions**: not used. pgoutput streams only if the client asks for `streaming` with
+  `proto_version ≥ 2` (`pgoutput_startup`: "requested proto_version=%d does not support streaming",
+  `pg:src/backend/replication/pgoutput/pgoutput.c`) **[src]**; Debezium sends protocol 1 and no `streaming` option
+  **[src]**. Consequences: large transactions cost spill disk on the replica (H-049) and add head-of-line latency for
+  everything committed after them (H-001).
+- **Two-phase**: not requested; a prepared transaction is decoded at `COMMIT PREPARED` as an ordinary transaction and
+  `ROLLBACK PREPARED` produces nothing **[doc]** (<https://www.postgresql.org/docs/18/logicaldecoding-two-phase-commits.html>),
+  **[test]**.
 
-## 5. pgoutput message types
+## 5. pgoutput messages and what Debezium does with each
 
-*To follow.*
+From `PgOutputMessageDecoder` and `PostgresStreamingChangeEventSource` (3.7.1) **[src]**; message formats from
+<https://www.postgresql.org/docs/18/protocol-logicalrep-message-formats.html> **[doc]**.
+
+| Message | Debezium 3.7.1 | Record emitted | Lost / not representable |
+|---|---|---|---|
+| Begin `B` | stores xid and commit time; clears origin | transaction BEGIN (metadata on) | BEGIN's `final_lsn` not exposed |
+| Commit `C` | updates `lsn_commit`, resets `lsn_events_processed`, may emit a heartbeat | transaction END | commit flags; `end_lsn` only via the offset |
+| Relation `R` | builds a `Table` from the message **plus out-of-band JDBC queries of the current catalog** (defaults, optionality, type names, primary key); **refuses** tables whose column names differ only in case (`DebeziumException`) | none (schema embedded in later records) | relation OID, replica-identity setting and per-column key flags not exposed; historic metadata replaced by current metadata (H-006, H-032) |
+| Type `Y` | always skipped | none | type names come from Debezium's own JDBC `TypeRegistry` (H-033) |
+| Insert `I` | decoded against the cached relation | `c` | unknown types dropped unless `include.unknown.datatypes=true` (§7) |
+| Update `U` | old tuple `K`/`O` if present, new tuple `N` | `u`; key change ⇒ `d` + tombstone + `c` | unchanged TOAST `u` ⇒ placeholder (§7) |
+| Delete `D` | old key `K` or old row `O` | `d` (+ tombstone if `tombstones.on.delete`) | non-key columns absent under DEFAULT identity |
+| Truncate `T` | **skipped unless `skipped.operations` excludes `t`; the default is `"t"`** (`CommonConnectorConfig.SKIPPED_OPERATIONS`) | one `t` per resolved table, the last one flagged | `CASCADE`/`RESTART IDENTITY` flags parsed and dropped |
+| Origin `O` | kept in the offset context | `origin` fields in source info | — |
+| Message `M` | transactional: inside its transaction; non-transactional: its own commit point; filtered by `message.prefix.include/exclude.list` | `m` with prefix and content bytes | — |
+| Stream Start/Stop/Commit/Abort, Stream Prepare | never requested (protocol 1) | — | an unexpected type would throw `IllegalArgumentException("Unsupported message type")` (`MessageType.forType`) |
+| Begin Prepare, Prepare, Commit Prepared, Rollback Prepared | never requested | — | — |
+| tuple value kind `b` (binary) | not requested; an unknown kind is logged at TRACE and the column is **silently omitted** (`resolveColumnsFromStreamTupleData`) | — | binary mode request open (debezium/dbz#2898) |
+
+Column values are always decoded as UTF-8 (`readColumnValueAsString` → `Charset.forName("UTF-8")`) whatever the server
+encoding **[src]** → H-013.
 
 ## 6. Schema handling
 
-*To follow.*
+- The Postgres connector emits **no DDL events**. It learns of schema changes only from Relation messages, which
+  pgoutput sends before the first change to a relation after its definition changed — also in the middle of a
+  transaction **[doc]** (protocol docs), **[src]** (`handleRelationMessage`). `DROP TABLE`, `ALTER TABLE … RENAME`,
+  `CREATE TABLE` without rows, `ALTER TYPE` produce **no message at all**.
+- `schema.refresh.mode` (`columns_diff` default, or `columns_diff_exclude_unchanged_toast`) decides when Debezium
+  re-reads a table schema over JDBC on a mismatch with an incoming message **[src]**.
+- **Column add/drop/type change**: next Relation message → new record schema. **Rename**: Relation message with a new
+  name in the same position; indistinguishable from drop+add (no attnum in the message) → H-008.
+- **DDL and DML in one transaction**: the Relation message precedes the affected DML in the stream, but Debezium's
+  out-of-band queries return the catalog **as it is now** on the connected server, which can be later than the decoded
+  position (Debezium documents this "from the future" race in a comment in `handleRelationMessage`) **[src]** → H-006.
+- **Drop and recreate with a new OID**: no DROP message; the new table's first change brings a Relation message with a
+  new relation id and the same name; records do not carry the relation OID, so the records alone cannot reveal the
+  recreate → H-007.
+- **New tables**: rows are published from the WAL position of `ALTER PUBLICATION … ADD TABLE`; Debezium needs no
+  restart if its own filters are open; we keep Debezium's filters broad and filter in the applier, and maintain the
+  publication ourselves (§2.3). Signals and incremental snapshots are not used (R3).
+- **Partitioned tables**: with `publish_via_partition_root = false` (our default) every leaf is published under its own
+  name; with `true`, changes appear as the root, `TRUNCATE` on a partition is **not replicated**, and `ATTACH` does not
+  replicate existing rows **[doc]** (<https://www.postgresql.org/docs/18/sql-createpublication.html>) → H-021.
+- **Generated columns**: virtual ones (the default in 18) are never published; stored ones only with
+  `publish_generated_columns = stored` or a column list (18) **[doc]** → H-022. **Identity columns** are ordinary values.
+- **Column lists and row filters**: debezium/dbz#2375 (open) — after any schema refresh the decoder binds tuple values
+  to the wrong columns when the publication has a column list (silent corruption) **[doc]**; row filters turn updates
+  into inserts/deletes **[doc]** → H-023. We use neither.
+- **Enums and types**: debezium/dbz#2521 (open) NPE in `TypeRegistry` kills the task permanently when an enum type is
+  recreated; debezium/dbz#304 (open) schema not updated after `ALTER TYPE … ADD VALUE` **[doc]** → H-033.
 
 ## 7. Values
 
-*To follow.*
+Rules for lossless delivery with stock Debezium 3.7.1 — every item is configuration or our own SPI class:
 
-## 8. Replica identity, liveness, throughput, recommended configuration
+1. `decimal.handling.mode=string`. `precise` throws `ConnectException("Got a special value (NaN/Infinity) for Decimal
+   type …")` on NaN/±Infinity (`SpecialValueDecimal.fromLogical`) and, for unconstrained `numeric`, strips trailing zeros
+   (`stripTrailingZeros()` in `PostgresValueConverter.convertDecimal`), so `1.50` arrives as `1.5` **[src]**. `string`
+   delivers `BigDecimal.toPlainString()` or `NaN`/`Infinity`/`-Infinity` **[src]**.
+2. `time.precision.mode=structured` (documented in 3.7): dates, times, timestamps and intervals as structs of calendar
+   and clock components with a `specialValue` field for ±infinity; "To preserve finite PostgreSQL TIMESTAMP values that
+   exceed the range of an epoch-microsecond integer, use the pgoutput logical decoding plug-in" **[doc]** (connector
+   docs, `time.precision.mode=structured`), **[src]** (`dbz:debezium-connector-common/…/time/StructuredTimestamp.java`).
+   The epoch-based modes map ±infinity to finite sentinels, and `nanoseconds` fails outside 1677–2262 **[doc]**.
+3. `interval.handling.mode=string` (ISO-8601) — `numeric` converts with an average month length (lossy) **[doc]**,
+   **[test]**; `structured` time mode also yields a structured duration **[doc]**.
+4. `binary.handling.mode=bytes` (no base64/hex in the hand-off) **[doc]**.
+5. `include.unknown.datatypes=true`. With the default `false`, values of types Debezium does not know (composites,
+   custom base types, `pg_lsn`, `tsquery`, `txid_snapshot`, multiranges, …) are **dropped** (`asDefault` returns null)
+   **[src]**; with `true` they arrive as the PostgreSQL text representation.
+6. `hstore.handling.mode=json` **[doc]**.
+7. `unavailable.value.placeholder` set to a value that cannot occur in text-like columns, plus our converter for TOAST
+   markers where a placeholder could collide (H-003).
+8. **Our own `CustomConverter` classes** (documented SPI, <https://debezium.io/documentation/reference/stable/development/converters.html>,
+   enabled with `converters=…`) for the types below where Debezium's default mapping is lossy. A custom converter replaces
+   the default converter for that column and receives the *raw* value
+   (`customConverterRegistry.getValueConverter(…).orElse(valueConverterProvider.converter(…))` in
+   `dbz:debezium-connector-common/src/main/java/io/debezium/relational/TableSchemaBuilder.java`) **[src]**: for arrays a
+   pgjdbc `PgArray` built from the text form, for bit strings the text, for an unchanged TOAST column the marker object
+   (`UnchangedToastedReplicationMessageColumn.UNCHANGED_TOAST_VALUE` and its array variants, compared by identity).
 
-*To follow.*
+| PostgreSQL type | Debezium 3.7.1 default | Lossless with stock Debezium? | Configuration / workaround |
+|---|---|---|---|
+| `numeric` (constrained) | `precise`: Decimal | not for NaN/±Inf (connector fails) | `decimal.handling.mode=string` |
+| `numeric` (unconstrained, precision > 38, NaN, ±Inf) | VariableScaleDecimal, trailing zeros stripped | no | `string` |
+| `money` | text parsed by `PostgresMoney.parse`: strips one leading currency symbol and `,` separators → BigDecimal | only if `lc_monetary` gives `.` decimals and a one-character prefix; otherwise `ConnectException` (refusal) | `lc_monetary=C` in the walsender session **[test]**, or a custom converter emitting text |
+| `float4`, `float8` incl. NaN, ±Inf, -0 | Java float/double from text | yes with `extra_float_digits ≥ 1` (shortest-exact output since 12) **[doc]**; pgjdbc sets 3 at connect **[test]** | — |
+| `date`, `timestamp` incl. ±infinity, BC, year > 9999 | epoch-based; infinity → sentinels; BC parse fixed in 3.7.0 (debezium/dbz#1340, #2664) | `structured`: yes **[doc]**; BC encoding to verify **[test]** | `time.precision.mode=structured` |
+| `timestamptz` extremes | OffsetDateTime at UTC | `structured` keeps components and offset **[doc]** | same |
+| `time` (incl. `24:00:00`), `timetz` | micro/nano time | `24:00:00` unverified **[test]** | `structured` |
+| `interval` | `numeric`: micros with average month | no | `string` |
+| `bytea` | bytes | yes | `binary.handling.mode=bytes` |
+| `bit(n)`, `varbit` | `bit(1)`/`varbit(1)` → boolean; others → little-endian bytes padded to the declared length (`convertBits`) | **no** for `varbit`: per-value bit length lost (`B'101'` = `B'0101'`); `varbit(1)` value `B''` → `Integer.valueOf("", 2)` throws **[src]**, **[test]** | custom converter → text |
+| arrays | Connect ARRAY from `PgArray` | **no** for non-default lower bounds (`'[0:2]={…}'`) and multi-dimensional arrays **[test]**; LTREE arrays with NULLs fixed in 3.7.1 (debezium/dbz#2770) | custom converter → `PgArray.toString()` (the text form) **[test]** |
+| `hstore` | `json` or `map` | `json`: yes | `hstore.handling.mode=json` |
+| enums | string | yes (DDL hazards H-033) | — |
+| domains | resolved to the base type | yes | — |
+| composite / row types | unknown → dropped | with `include.unknown.datatypes=true`: text **[test]** | `include.unknown.datatypes=true` |
+| ranges / multiranges | ranges string; multiranges unknown | ranges yes; multiranges as text **[test]** | `include.unknown.datatypes=true` |
+| geometric (`point`, `box`, …) | STRING since 3.7.0 (debezium/dbz#2135) | yes as text **[test]** | — |
+| network (`inet`, `cidr`, `macaddr*`) | string | yes | — |
+| `json`, `jsonb` (huge numbers) | string (`io.debezium.data.Json`) | yes (text passed through) | the applier must not parse numbers into doubles |
+| `xml`, `uuid`, `ltree`, `citext`, `tsvector`, `vector` | string | yes | — |
+| `"char"` | string | yes (non-ASCII bytes are octal-escaped by `charout` since 15) **[test]** | — |
+| `oid` / large objects | INT64; large-object content never decoded | the oid yes, the content no | document as out of scope |
+| PostGIS `geometry`/`geography` | string (hex EWKB) | yes | — |
+| unchanged TOAST | in-band placeholder (string, bytes or one-element array) | ambiguous in principle (H-003) | NUL-containing placeholder + custom converter |
+
+## 8. Replica identity, liveness, throughput, configuration
+
+### 8.1 Replica identity
+
+| Identity | UPDATE | DELETE | Source |
+|---|---|---|---|
+| DEFAULT with PK | new row only; if a key column changed, old key `K` ⇒ Debezium emits `d` (old key) + tombstone + `c` (new row) | old key only | protocol docs; `PostgresChangeRecordEmitter` **[src]** |
+| USING INDEX | as DEFAULT, keyed by the index columns | index columns only | **[doc]** (ALTER TABLE) |
+| FULL | old row `O` (all columns, TOASTed values included) + new row; Debezium fills `u` columns of the new row from the old row (`cachedOldToastedValues`, DBZ-1258) | old row | **[src]** |
+| NOTHING / DEFAULT without PK / index dropped | **the source's own UPDATE/DELETE fails** when the table is in a publication that publishes them: "Attempting such operations will result in an error on the publisher" | same | **[doc]** (<https://www.postgresql.org/docs/18/logical-replication-publication.html>) → H-014 |
+
+Tombstones (`tombstones.on.delete`, default true) are Kafka compaction artefacts; set it to `false`.
+
+### 8.2 Liveness
+
+- **Keepalives**: Debezium runs a keepalive thread per replication stream that calls `stream.forceUpdateStatus()` every
+  `status.update.interval.ms` (default 10 s) independently of the consumer (`startKeepAlive`) **[src]**; pgjdbc also
+  answers server keepalive requests. The walsender terminates a client that has not replied for `wal_sender_timeout`
+  (default 60 s) **[doc]**. A long destination apply blocks the streaming thread on the full queue; TCP back-pressure
+  stops the walsender, but status updates keep flowing, so there is no timeout **[src]**, **[test]** (10-minute apply
+  stall with `wal_sender_timeout=60s`). A JVM frozen longer than `wal_sender_timeout` is disconnected — correct.
+- **Heartbeats**: `heartbeat.interval.ms` emits heartbeat records (no write); `heartbeat.action.query` writes on the
+  connected server (unusable on a standby, §2.6).
+- **Connection loss and retry**: `slot.max.retries` (6) × `slot.retry.delay.ms` (10 s) for stream start; engine-level
+  `errors.max.retries`, `errors.retry.delay.initial.ms`/`max.ms`; a `RetriableException` restarts the task after
+  `retriable.restart.connector.wait.ms` **[src]**. Recommendation: small retry counts in the JVM; our supervisor (SPEC 4.5)
+  restarts the child process after its own slot checks.
+- **Dead connections**: pgjdbc enables `SO_KEEPALIVE` (`tcpKeepAlive=true`, Debezium default) but sets no idle/interval,
+  so detection follows OS defaults (Linux: 2 h) **[doc]** (<https://jdbc.postgresql.org/documentation/use/>), **[test]**.
+  SPEC 4.6's end-to-end marker (heartbeat row seen in the stream within 60 s, else kill and reconnect) is the real
+  detector.
+- **Known hang scenarios**: infinite retry on an invalidated slot (debezium/dbz#2430, open); shutdown stalls while the
+  producer is blocked on a full queue (debezium/dbz#2758, open); Server not exiting after engine failure
+  (debezium/dbz#3010, fixed 3.7.1); slot creation waiting on running transactions (H-040) **[doc]**.
+- **Clean shutdown**: `engine.close()` → commit the last marked offset, stop tasks (bounded by
+  `task.management.timeout.ms`), close the replication connection; the walsender exits and the slot becomes inactive.
+  Expect seconds; bounded by `debezium.embedded.shutdown.pause.before.interrupt.ms` (default 5 min) and the
+  debezium/dbz#2758 stall **[src]**, **[test]**.
+- **Killing safely**: with §3.3 the slot is never ahead of the destination, so `SIGKILL` is always safe; its only cost is
+  redelivery. If the host or network dies instead, the old walsender holds the slot (`active_pid`) until
+  `wal_sender_timeout`; the next leader must `pg_terminate_backend(active_pid)` on the server holding the slot (SPEC 4.2;
+  needs `pg_signal_backend` or the same role), otherwise `START_REPLICATION` fails with "replication slot … is active for
+  PID …" **[src]**, **[test]**.
+
+### 8.3 Throughput
+
+- No official Debezium benchmark exists for the Postgres connector at our row shape. Community figures are in the
+  thousands of events per second per connector behind Kafka (e.g. "7,000 events/s per task" in an Instaclustr 2021
+  talk, <https://www.slideshare.net/slideshow/change-data-capture-cdc-with-kafka-connect-and-the-debezium-postgresql-source-connector/251940030>,
+  weak source) **[doc]**. A 2025 Debezium profile found per-record type-modifier regex parsing as a hotspot (fixed by
+  caching) **[doc]** (<https://debezium.io/blog/2025/07/07/quick-perf-check/>); 3.7.0 reduced per-record allocation in
+  column extraction (debezium/dbz#2202) **[doc]**.
+- Structural bottlenecks: one walsender per slot decodes and text-encodes every column on the **replica** (one core);
+  one Debezium streaming thread parses text into Java objects; Connect `Struct` building; GC pressure (debezium/dbz#531)
+  **[doc]**. On an F16 (2 vCPU) the JVM, the Python applier and DuckDB share two cores: CPU, not I/O, is the expected
+  limit **[test]** (P2 spike, PLAN §2 A 5).
+- **Cheapest hand-off out of the JVM**: `DebeziumEngine.create(Connect.class)` (no JSON/Avro; we get `SourceRecord`s with
+  `Struct` values) writing **Arrow IPC record batches** (columns typed from the Connect schema; one or more batches per
+  source transaction) over a **Unix domain socket or the child's stdout pipe**, plus a small framed control channel
+  (BEGIN/END, commit LSN, END counts, CRC32C per frame) so truncation and corruption are detected (SPEC §4 stream
+  fuzzer). `pyarrow` reads the stream and DuckDB scans Arrow without copying. Arrow Java adds roughly 10 MB of jars and
+  needs `--add-opens=java.base/java.nio=ALL-UNNAMED` **[test]**.
+- Settings that matter for 100K rows/s at 16 columns (tuned in P9): `max.batch.size` 8 192–32 768, `max.queue.size`
+  4–8 × batch, `max.queue.size.in.bytes` (e.g. 256 MB, bounded heap), `poll.interval.ms` 10–50,
+  `record.processing.threads` 1–2, no SMTs, capped `-Xmx` (SPEC 5.4), `logical_decoding_work_mem` on the replica sized so
+  typical transactions do not spill **[test]**.
+
+### 8.4 Recommended configuration (Debezium 3.7.1, embedded engine)
+
+Replica mode (default). Connection values come from the environment and are never committed.
+
+```properties
+# engine
+name=cdc_v2_engine                                       # engine name in logs and metrics
+connector.class=io.debezium.connector.postgresql.PostgresConnector
+offset.storage=org.apache.kafka.connect.storage.MemoryOffsetBackingStore  # slot is the restart point (3.4)
+offset.flush.interval.ms=0                               # flush on every markBatchFinished (3.3)
+offset.flush.timeout.ms=5000                             # memory store, never slow
+record.processing.order=ORDERED                          # keep commit order
+record.processing.threads=1                              # 2 vCPU, no SMTs (tune in P9)
+errors.max.retries=1                                     # fail fast; the supervisor restarts (SPEC 4.5)
+# connection
+database.hostname=${PG_REPLICA_HOST}                     # the replica
+database.port=${PG_REPLICA_PORT}
+database.dbname=${PG_DATABASE}
+database.user=${PG_USER}
+database.password=${PG_PASSWORD}
+database.sslmode=verify-full                             # PLAN 8
+database.tcpKeepAlive=true                               # default; OS-level only (8.2)
+topic.prefix=cdc_v2                                      # required; names record topics
+# decoding
+plugin.name=pgoutput                                     # SPEC 7.1
+slot.name=cdc_v2_slot                                    # created by our code beforehand (2.4)
+publication.name=cdc_v2_pub                              # created by our code on the primary (2.3)
+publication.autocreate.mode=disabled                     # the only safe mode on a standby (2.3)
+slot.drop.on.stop=false                                  # the slot survives restarts
+slot.failover=false                                      # ignored on a standby anyway (2.7)
+slot.max.retries=2                                       # fail fast to the supervisor
+slot.retry.delay.ms=5000
+lsn.flush.mode=connector                                 # slot moves only on our acknowledgement (3.2)
+offset.mismatch.strategy=no_validation                   # we verify the slot ourselves (SPEC 1.8)
+status.update.interval.ms=10000                          # keepalive well under wal_sender_timeout
+snapshot.mode=no_data                                    # backfill is ours (R3)
+provide.transaction.metadata=true                        # BEGIN/END with counts (4)
+skipped.operations=none                                  # the default "t" drops TRUNCATE (5)
+tombstones.on.delete=false                               # no Kafka compaction here
+heartbeat.interval.ms=5000                               # handleBatch calls when idle (3.3)
+message.prefix.include.list=cdc_v2_.*                    # plus the configured SPEC 7.4 prefixes
+schema.refresh.mode=columns_diff                         # safest
+# values (7)
+decimal.handling.mode=string
+time.precision.mode=structured
+interval.handling.mode=string
+binary.handling.mode=bytes
+hstore.handling.mode=json
+include.unknown.datatypes=true
+unavailable.value.placeholder=hex:006364635f76325f746f61737400   # NUL-framed, impossible in text (H-003)
+converters=cdcv2                                         # our CustomConverter: varbit, arrays, TOAST markers, money
+cdcv2.type=<our converter class>
+# queue (tuned in P9)
+max.batch.size=8192
+max.queue.size=32768
+max.queue.size.in.bytes=268435456
+poll.interval.ms=50
+```
+
+Primary mode (non-default) differs only in:
+
+```properties
+database.hostname=${PG_HOST}                             # the primary
+database.port=${PG_PORT}
+slot.failover=true                                       # second line; our code creates the slot WITH failover (2.7)
+```
+
+and our code creates the slot with `failover = true`, checks `failover` and `synced` on the standbys at every
+acquisition (SPEC 4.1), and writes the heartbeat row on the primary on a separate connection.
+
+Deliberately **not** used: `heartbeat.action.query`, `replica.identity.autoset.values` (would `ALTER TABLE` on the
+connected server), `publication.autocreate.mode` other than `disabled`, `lsn.flush.mode=connector_and_driver`,
+`read.only` and `signal.*` (no incremental snapshots), any `snapshot.mode` other than `no_data`,
+`offset.mismatch.strategy=trust_*`.
