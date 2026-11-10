@@ -28,7 +28,7 @@ Last updated: 2026-11-09, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 | 3 MotherDuck semantics | running | `docs/spike/md_semantics.md` |
 | 1 JVM and stock Debezium on a Flight | running | `docs/spike/jvm_on_flight.md` |
 | 2 Run semantics | running | `docs/spike/run_semantics.md` |
-| 5 Local throughput (first indication) | waits for 3 (load method) and 1 (JVM program) | `docs/spike/local_throughput.md` |
+| 5 Local throughput (first indication) | part 1 (read rate from the replica) running; part 2 (stock Debezium streaming rate) waits for the JVM program of spike 1 | `docs/spike/local_throughput.md` |
 | `docs/spike_report.md` and the architecture decision record | after the spikes | — |
 
 ## Decisions
@@ -74,9 +74,10 @@ Each in its own worktree and branch (Opus, high effort); the orchestrator merges
 | Hazard researcher: Debezium facts, replica decoding, hazard catalog | P5 research, started early | 2026-11-09 | `docs/research/debezium.md`, `docs/research/replica_decoding.md`, `docs/wal_hazards.md` |
 | Spike worker: JVM and stock Debezium on a Flight | P2 (§2 A 1) | 2026-11-09 | `flights/spike_jvm/`, `docs/spike/jvm_on_flight.md`, `evidence/p2/jvm_on_flight/` |
 | Spike worker: run semantics | P2 (§2 A 2) | 2026-11-09 | `flights/spike_runs/`, `docs/spike/run_semantics.md`, `evidence/p2/run_semantics/` |
+| Spike worker: local read throughput (private cluster, home `pg-spike-tp`, ports 55500–55509; MotherDuck database `cdc_v2_spike_tp`) | P2 (§2 A 5, part 1) | 2026-11-09 | `spikes/local_throughput/`, `docs/spike/local_throughput.md`, `evidence/p2/local_throughput/` |
 
-Not started yet: the local throughput spike (§2 A 5). It uses the load method that the MotherDuck semantics spike
-finds fastest and the JVM program of the JVM spike, and it should not share this machine's CPU with them.
+Not started yet: part 2 of the local throughput spike (stock Debezium streaming rate for small transactions and for
+one 10M-row transaction). It reuses the JVM program of the JVM spike and the private cluster of part 1.
 
 Finished and merged:
 
