@@ -15,7 +15,8 @@ exception: two load averages of the machine were read by hand and are in no file
 
 - **The standby rule of core 7.2 holds**, with two conditions and one correction that 7.2 does not have yet.
   Tested by a model check over every interleaving of small histories and by stress runs against Postgres 18.6.
-  Seven runs had the complete checker: 1,192,278 cuts over 5,025,620 transactions. Seven earlier runs, the
+  Seven runs recorded the complete checker: 984,387 cuts over 4,854,224 transactions. Two more started after
+  its last step existed but do not record it; they were repeated and carry no claim. Seven earlier runs, the
   main campaign among them (2,982,523 cuts over 9,353,889 transactions), ran before the checker's last step
   existed; section 5.1 says exactly which. No violation of a rule in any of them. Six wrong rules were caught:
   five of them thousands of times, the sixth (a case at a WAL page boundary) 36 times in two runs
@@ -336,38 +337,39 @@ kept as `main_interrupted.txt` and is not used. The campaign was run again in fu
 
 **Which runs had the complete checker.** Step 3 of the checker was added after the main campaign and the first
 runs of the variants had finished. Before it, a cut whose snapshot returned no row for a key was not judged for
-that key by step 2; step 1 still judged it. A lost row is one of the ways the defect of section 7 shows. The
-claims of this document therefore rest on runs with all three steps:
+that key by step 2; step 1 still judged it. A lost row is one of the ways the defect of section 7 shows, and
+readers on their own snapshot can lose rows too (section 5.5, `xb`). The claims of this document therefore rest
+on runs whose result file records all three steps:
 
 | Run | What it is | Cuts | Transactions | Violations | Missing rows |
 |---|---|---|---|---|---|
-| `main_recheck` | the main campaign again, 600 s | 628,741 | 2,451,105 | 0 | 0 |
-| `v5b_restart_crash` | variant 5: 7 restarts and 7 kills of the standby | 89,718 | 722,901 | 0 | 0 |
+| `main_c` | the main campaign again, 600 s | 440,905 | 2,315,571 | 0 | 0 |
+| `v5c_restart_crash` | variant 5: 7 restarts and 7 kills of the standby | 69,663 | 687,039 | 0 | 0 |
 | `v7b_exported_no_subxact` | variant 7: exported way, one-statement transactions | 120,737 | 485,205 | 0 | 0 |
 | `v9_exported_open_no_subxact` | exported way, transactions held open, no subtransactions | 93,600 | 464,260 | 0 | 0 |
 | `qb_quiet_exported` | exported way, quiet snapshots only, subtransactions in the load | 82,928 | 268,363 | 0 | 0 |
 | `v1b_big_drop` | variant 1 | 95,014 | 155,847 | 0 | 0 |
 | `v3b_ddl_walswitch_pause` | variant 3 | 81,540 | 477,939 | 0 | 0 |
-| sum | | 1,192,278 | 5,025,620 | 0 | 0 |
+| sum | | 984,387 | 4,854,224 | 0 | 0 |
 
 The three runs that are expected to fail (`x_exported_subxact`, `xb_exported_subxact`, `xc_exported_subxact`,
 section 5.5) had the complete checker too.
 
 How to tell from the files. The result files written after the review (`v7b`, `v9`, `qb`, `v1b`, `v3b`, `xb`,
-`xc`) name the steps of their checker (`checker_steps`). The files of `main_recheck`, `v5b_restart_crash` and
-`x_exported_subxact` are older than that field and do not record it. For `x_exported_subxact` the file itself
-shows it: it reports a missing row, which only step 3 counts. For the other two it is inferred, not recorded:
-they started after it (`x_exported_subxact` at 07:54 UTC, `main_recheck` at 08:00:59, `v5b_restart_crash` at
-08:11:00) from the same working tree, and step 3 and the three outputs were committed together at 08:15:17
-(`58c2c64`). The two runs were not repeated for this; of the seven runs above, the five that carry the claims
-about the exported way and about lost rows record their checker steps.
+`xc`, `main_c`, `v5c_restart_crash`) name the steps of their checker (`checker_steps`). The files of
+`main_recheck`, `v5b_restart_crash` and `x_exported_subxact` are older than that field and do not record it. For
+`x_exported_subxact` the file itself shows it: it reports a missing row, which only step 3 counts.
+`main_recheck` (628,741 cuts) and `v5b_restart_crash` (89,718 cuts) started after step 3 existed, but their
+files do not record their checker. They carry no claim. They were repeated with the same options as `main_c`
+and `v5c_restart_crash` (at 13:05 and 13:15 UTC; the load average at their start was 11.76 and 17.42, as their
+files record).
 
 **Runs with steps 1 and 2 only:** `main`, `v2_twophase_subxact`, `v4_apply_delay`, `v5_restart_crash`,
 `v6_slot_on_primary`, `v8_idle` and `nc_mid_redo`: 2,982,523 cuts over 9,353,889 transactions, no violation.
 The main campaign was repeated in a shorter form and variant 5 in full; the other five were not repeated. In
 these seven runs a lost row would have gone unseen unless step 1 caught it. All their cuts were taken the own
 way. They are used below for what steps 1 and 2 decide: the answers for single transactions, the wrong rules,
-and the measurements of sections 5.2 to 5.4.
+and the measurements of sections 5.2 to 5.4. `main_recheck` and `v5b_restart_crash` are used the same way.
 
 **Outputs that are not used:** `v1_big_drop`, `v3_ddl_walswitch_pause`, `v7_exported_no_subxact` and
 `q_quiet_exported` are the first runs of four variants that were repeated after the review. Their files are
@@ -442,7 +444,7 @@ A quiet snapshot (`xmin = xmax`) is exact and is the only safe exported snapshot
 | `v4_apply_delay` | as main without aborts, apply delay 300 ms | 54.0% |
 | `v6_slot_on_primary` | as main, slot on the primary | 53.6% |
 | `v3b_ddl_walswitch_pause` | as main, with DDL, WAL switches, replay pauses | 53.0% |
-| `v5b_restart_crash` (`v5_restart_crash`) | as main, standby restarts and crashes | 51.6% (48.7%) |
+| `v5c_restart_crash` (`v5b`, `v5`) | as main, standby restarts and crashes | 48.1% (51.6%, 48.7%) |
 | `qb_quiet_exported` | plain, abort and a writer with 100 subtransactions per transaction | 51.0% |
 | `v9_exported_open_no_subxact` | plain, async, abort and one writer that holds each transaction 0.3 s | 17.8% |
 | `v1b_big_drop` | transactions held 0.3 s, big transactions, drops | 9.4% |
@@ -565,7 +567,8 @@ the run had all three steps (section 5.1).
 | 3 | `v3b_ddl_walswitch_pause` | DDL on the counter table, WAL segment switches, replay pause and resume (13, 12, 12 times) | 120 | 81,540 | 477,939 | 0 | 64.22% | complete |
 | 4 | `v4_apply_delay` | `recovery_min_apply_delay` = 300 ms | 120 | 100,763 | 363,741 | 0 | 76.02% | steps 1, 2 |
 | 5 | `v5_restart_crash` | standby restarted 7 times and killed 7 times | 180 | 76,431 | 703,213 | 0 | 63.86% | steps 1, 2 |
-| 5 | `v5b_restart_crash` | the same again | 180 | 89,718 | 722,901 | 0 | 67.95% | complete |
+| 5 | `v5b_restart_crash` | the same again | 180 | 89,718 | 722,901 | 0 | 67.95% | complete, not recorded |
+| 5 | `v5c_restart_crash` | the same again | 180 | 69,663 | 687,039 | 0 | 56.16% | complete |
 | 6 | `v6_slot_on_primary` | slot on the primary, snapshots on the standby | 120 | 86,409 | 477,973 | 0 | 65.37% | steps 1, 2 |
 | 7 | `v7b_exported_no_subxact` | exported way, no subtransactions, one-statement transactions | 120 | 120,737 | 485,205 | 0 | 99.92% | complete |
 | 8 | `v8_idle` | idle source | 120 | 7,734 | 236 | 0 | 100% | steps 1, 2 |
@@ -573,14 +576,16 @@ the run had all three steps (section 5.1).
 | | `nc_mid_redo` | long redo, 4 takers without a pause | 150 | 715,694 | 188,441 | 0 | 73.89% | steps 1, 2 |
 | | `qb_quiet_exported` | exported way, quiet snapshots only | 120 | 82,928 | 268,363 | 0 | 76.82% | complete |
 
-Sums, with the main campaign and its repeat (section 5.1):
+Sums, with the main campaign and its repeats (section 5.1):
 
-- complete checker, seven runs: 1,192,278 cuts and 5,025,620 transactions, no violation of a sound rule, no
-  missing row;
+- complete checker, recorded, seven runs: 984,387 cuts and 4,854,224 transactions, no violation of a sound
+  rule, no missing row;
+- complete checker, not recorded, two runs (`main_recheck`, `v5b_restart_crash`): 718,459 cuts and 3,174,006
+  transactions, no violation of a sound rule; no claim rests on them;
 - steps 1 and 2 only, seven runs: 2,982,523 cuts and 9,353,889 transactions, no violation of a sound rule.
 
 Variants 1, 3 and 7 and the quiet-only run were run twice. The table has the second run; the first is not
-used (section 5.1). Variant 5 was run twice too, and both runs are in the table.
+used (section 5.1). Variant 5 was run three times, and all three runs are in the table.
 Variant 9 was added after the review, because variant 7 has almost no exported snapshot that is not quiet.
 
 What each variant covers, from the list of the task:
@@ -594,8 +599,8 @@ What each variant covers, from the list of the task:
 - DDL, WAL segment switches, replay pause and resume: variant 3. The DDL adds and drops a column, changes the
   replica identity and rewrites the table with `VACUUM FULL`.
 - `recovery_min_apply_delay`: variant 4.
-- Standby restart between cuts: variant 5. The takers reconnected 255 times in the first run and 194 times
-  in the second.
+- Standby restart between cuts: variant 5. The takers reconnected 255 times in the first run, 194 times in
+  the second and 192 times in the third.
 
 **Variants 5 and 6 and the rule `R0 ≥ P0`.** The checker also counts cuts whose `R0` lies below the last `E`
 the stream had delivered when the cut was taken. Such a cut would fail `R0 ≥ P0` if `P0` were that `E`.
@@ -610,8 +615,9 @@ The second column counts pairs, not cuts: a cut whose snapshot lacks a delivered
 counts three times. Every pair belongs to one of the cuts of the first column. How many of those cuts have at
 least one pair is not recorded.
 
-The repeat of variant 5 (`v5b_restart_crash`) had no such cut. So the case is rare: 6 cuts in one of two runs
-with 14 standby restarts each. This count does not depend on step 3 of the checker.
+The repeats of variant 5 (`v5b_restart_crash`, `v5c_restart_crash`) had no such cut. So the case is rare: 6
+cuts in one of three runs with 14 standby restarts and kills each. This count does not depend on step 3 of the
+checker.
 
 No sound rule is violated in these cuts: the rule `R0 ≥ P0` refuses them, and the answers for single
 transactions stay right. But they show that the condition is not implied by the place of the slot. In variant 5
@@ -942,9 +948,9 @@ passed `R1`.
   and keeps them. With them the cut outlives a restart of the reader's node. Without them it is abandoned at
   the swap, because a reading made after the restart says nothing about the cut. This is what keeps the
   chunks of a keyed table restartable one by one (core 7.4).
-- Variant 5 and its repeat (section 5.6) check the answers across restarts, not the timeline rule (no
+- Variant 5 and its two repeats (section 5.6) check the answers across restarts, not the timeline rule (no
   timeline changes there): cuts taken before a restart are judged after it, when the stream has passed them.
-  166,149 cuts, 28 restarts or kills of the standby, no violation.
+  235,812 cuts, 42 restarts or kills of the standby, no violation.
 - **A new cut needs three things again.** A new connection. The settle floor, read on that connection, because
   a standby that has just started can hide a commit (section 8). The check `R0 ≥ P0`, because the standby
   replays again from its restart point and its replay position can be lower than before the restart (section
@@ -1460,7 +1466,7 @@ from this work: on a primary the repair snapshot needs the rule of section 10.4 
 | 4 | `pg_current_snapshot()` on a standby | In-progress list always empty. Below `xmin` ⇒ inside, at or above `xmax` ⇒ outside; both hold. A quiet snapshot is exact | 3, 5.3, 5.4 |
 | 5 | Both ways of taking the cut are valid; the in-statement position is an upper bound only | Own way: valid. Exported way: valid only for quiet snapshots or on a fixed server; what a table without a key does is decided (section 7.1). In-statement position as `R0`: violated 15,291 times in the main campaign | 5.4, 5.5, 7 |
 | 6 | "Has passed" when the applied position is above `R1`; `R0 ≥ P0` | Both hold. `R0 ≥ P0` is not implied by where the slot is and must always be checked | 3, 5.6, 6 |
-| 7 | The rules survive the listed conditions | Yes, every one of them, no violation. Seven runs had the complete checker, seven others its first two steps only | 5.1, 5.6, 9 |
+| 7 | The rules survive the listed conditions | Yes, every one of them, no violation. Seven runs recorded the complete checker; two more had it but do not record it; seven others had its first two steps only | 5.1, 5.6, 9 |
 | | Timelines | A cut belongs to the timeline and to the server life it was taken in. Shown live for a promotion and for a crash of a primary; the other cases are argued and tested without a server | 9.2, 10.5 |
 | | The primary (open point 12) | Gap shown. Answer by 64-bit id is exact. A rule without the `xmin ≥ X` wait is proposed and tested. "Has passed" by the insert position read with the snapshot holds | 10, 11 |
 
@@ -1501,9 +1507,10 @@ from this work: on a primary the repair snapshot needs the rule of section 10.4 
   two other runs. That run did not record the rule per way, so the kind of these violations is inferred from
   the counts. The single case of section 7 shows the mechanism.
 - **Runs before the missing-row check** (section 5.1). Repeated with the complete checker: the main campaign in
-  a form of 10 minutes, variants 1, 3, 5 and 7 and the quiet-only run. Not repeated: the main campaign at its
-  length of 30 minutes, variants 2, 4, 6 and 8 and the run `nc_mid_redo`. All of these take cuts the own way
-  only. In them a row that a snapshot lost would not have been counted.
+  a form of 10 minutes, variants 1, 3, 5 and 7 and the quiet-only run; the main campaign's and variant 5's
+  repeats a second time, so that the checker is recorded in the file (`main_c`, `v5c_restart_crash`). Not
+  repeated: the main campaign at its length of 30 minutes, variants 2, 4, 6 and 8 and the run `nc_mid_redo`.
+  All of these take cuts the own way only. In them a row that a snapshot lost would not have been counted.
 - **Stream options.** The rule is stated for a stream of whole transactions with `two_phase` off (section 6).
   Streaming of open transactions and `two_phase` on were not examined.
 - **Timelines and server lives** (sections 9.2 and 10.5). The rule is tested live for a promotion and for a
@@ -1640,10 +1647,10 @@ Nothing in this text uses the start of the commit record: the pipeline does not 
 >
 > **[changed]** **[test]** P3 has tested 7.2 (`docs/design/cut.md`, `evidence/p3/cut/`). On a standby: a model
 > check over every interleaving of small histories, and stress runs that compare the rows visible in each
-> snapshot with the commits of the stream; every deliberately wrong rule was caught. Seven runs had the complete
-> checker (the window of `unknown`, the boundary of every key, rows missing from the snapshot): `main_recheck`,
-> `v5b_restart_crash`, `v7b_exported_no_subxact`, `v9_exported_open_no_subxact`, `qb_quiet_exported`,
-> `v1b_big_drop` and `v3b_ddl_walswitch_pause`, together 1,192,278 cuts over 5,025,620 transactions
+> snapshot with the commits of the stream; every deliberately wrong rule was caught. Seven runs recorded the
+> complete checker (the window of `unknown`, the boundary of every key, rows missing from the snapshot):
+> `main_c`, `v5c_restart_crash`, `v7b_exported_no_subxact`, `v9_exported_open_no_subxact`, `qb_quiet_exported`,
+> `v1b_big_drop` and `v3b_ddl_walswitch_pause`, together 984,387 cuts over 4,854,224 transactions
 > (subtransactions, aborts, asynchronous commits, big transactions, dropped tables, DDL, WAL switches, replay
 > pauses, standby restarts and kills, exported and quiet exported snapshots), with no violation and no missing
 > row. Seven earlier runs had the first two steps only, all with a reader's own snapshot: `main`,

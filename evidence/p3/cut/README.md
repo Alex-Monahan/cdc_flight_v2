@@ -17,7 +17,9 @@ and the reading of the numbers. This file says what each file is, how it was mad
   a repeated run gives other counts of the same order.
 - All runs are from 2026-11-10 (UTC). The first campaigns ran between 06:41 and 08:15 UTC. The stress runs
   made after the coordinator's review ran between 10:24 and 10:47 UTC. After a second review two primary
-  campaigns ran at 12:14 and 12:15 UTC. Each `.json` file of a stress run or campaign carries its start time
+  campaigns ran at 12:14 and 12:15 UTC. For the second short fix round two stress runs were repeated with the
+  complete checker at 13:05 and 13:15 UTC (`main_c`, `v5c_restart_crash`). Each `.json` file of a stress run or
+  campaign carries its start time
   (`started_utc`). The single scenarios carry no time. By the time of the file, `export_defect.json`,
   `keyless.json` and `standby_start.json` are from 10:24, `model.txt` from 11:11, and `promotion.json` and
   `primary_crash.json` from 12:14 UTC.
@@ -38,6 +40,10 @@ The load of the others was heaviest during the runs made after the review. `v1b_
 ended at 42.64; read by hand with `uptime` at 10:30 UTC, in the middle of that run, the load average was 85.22
 24.31 13.04. That reading is in no file. `v3b_ddl_walswitch_pause` started at 42.64 and ended at 9.79. Before
 the review the highest value is 41.55, before `v6_slot_on_primary`.
+
+The two repeats of the second short fix round ran one after the other, as their files record: `main_c` started
+at 11.76 8.96 7.96 and ended at 17.42 19.53 16.29; `v5c_restart_crash` started at that value and ended at 13.6
+17.24 15.96. Other workers' test runs were the load; I did not control it.
 
 The main campaign does not print the load. I read it by hand with `uptime`: 5.25 5.67 5.16 before, 6.35 11.22
 11.25 about halfway, 6.24 8.89 10.24 after. **Two things in this file and in the document are in no evidence
@@ -65,18 +71,23 @@ The checker has three steps (`docs/design/cut.md` section 5.1): (1) every transa
 it does not, (3) a row for every key, so that a row a snapshot lost is counted. Step 3 was added after the first
 campaigns had run. Before it, a key whose row was missing from a snapshot was skipped by step 2.
 
-Three groups of runs follow from that. **The claims about the exported way and about lost rows rest on the
+Four groups of runs follow from that. **The claims about the exported way and about lost rows rest on the
 first group only.**
 
-1. **Complete checker, no violation expected** (seven runs): `main_recheck`, `v5b_restart_crash`,
-   `v7b_exported_no_subxact`, `v9_exported_open_no_subxact`, `qb_quiet_exported`, `v1b_big_drop`,
-   `v3b_ddl_walswitch_pause`. Sum: 1,192,278 cuts, 5,025,620 transactions, no violation, no missing row.
-2. **Steps 1 and 2 only** (seven runs, all with cuts taken the own way): `main`, `v2_twophase_subxact`,
+1. **Complete checker, recorded in the file, no violation expected** (seven runs): `main_c`,
+   `v5c_restart_crash`, `v7b_exported_no_subxact`, `v9_exported_open_no_subxact`, `qb_quiet_exported`,
+   `v1b_big_drop`, `v3b_ddl_walswitch_pause`. Sum: 984,387 cuts, 4,854,224 transactions, no violation, no
+   missing row.
+2. **Complete checker inferred, not recorded** (two runs): `main_recheck` and `v5b_restart_crash`. They started
+   after step 3 existed (see below), but their files do not record their checker. No claim rests on them; they
+   were repeated with the same options as `main_c` and `v5c_restart_crash` (group 1). Sum: 718,459 cuts,
+   3,174,006 transactions, no violation, no missing row counted.
+3. **Steps 1 and 2 only** (seven runs, all with cuts taken the own way): `main`, `v2_twophase_subxact`,
    `v4_apply_delay`, `v5_restart_crash`, `v6_slot_on_primary`, `v8_idle`, `nc_mid_redo`. Sum: 2,982,523 cuts,
    9,353,889 transactions, no violation. A row that a snapshot lost would not have been counted in them. They
    are used for what steps 1 and 2 decide: the answers for single transactions, the wrong rules, the
    measurements of the unknown set.
-3. **Not used** (four outputs): `v1_big_drop`, `v3_ddl_walswitch_pause`, `v7_exported_no_subxact`,
+4. **Not used** (four outputs): `v1_big_drop`, `v3_ddl_walswitch_pause`, `v7_exported_no_subxact`,
    `q_quiet_exported`. They ran with steps 1 and 2 only and were repeated after the review (`v1b`, `v3b`, `v7b`,
    `qb`). The files are kept; no claim and no number of the document comes from them.
 
@@ -84,22 +95,29 @@ The three runs that are expected to fail (`x_exported_subxact`, `xb_exported_sub
 had the complete checker.
 
 How to tell from a file. The result files written after the review (`v7b`, `v9`, `qb`, `v1b`, `v3b`, `xb`,
-`xc`) name the steps of their checker: key `checker_steps` in the `.json` file, line `checker steps:` in the
-`.txt` file; their `.txt` file also prints the number of missing rows, 0 included. The files of
-`main_recheck`, `v5b_restart_crash` and `x_exported_subxact` are older than that field, and a counter that
-stays at 0 is not written into them. For `x_exported_subxact` the file shows that step 3 ran: it has the
-counter `rows_missing_from_a_cut` (under `checker`, value 1), which only step 3 fills. For `main_recheck` and
-`v5b_restart_crash` it is **inferred, not recorded**: they started after it (`x_exported_subxact` at 07:54,
-`main_recheck` at 08:00:59, `v5b_restart_crash` at 08:11:00 UTC) from the same working tree, and step 3 and
-the three outputs were committed together at 08:15:17 (`58c2c64`). The two runs were not repeated for this.
-Of the seven runs of group 1, the five that carry the claims about the exported way and about lost rows
-(`v7b`, `v9`, `qb`, `v1b`, `v3b`) record their checker steps. The files of groups 2 and 3 are older than
-step 3.
+`xc`, and `main_c`, `v5c_restart_crash` of the second short fix round) name the steps of their checker: key
+`checker_steps` in the `.json` file, line `checker steps:` in the `.txt` file; their `.txt` file also prints the
+number of missing rows, 0 included. The files of `main_recheck`, `v5b_restart_crash` and `x_exported_subxact`
+are older than that field, and a counter that stays at 0 is not written into them. For `x_exported_subxact`
+the file shows that step 3 ran: it has the counter `rows_missing_from_a_cut` (under `checker`, value 1), which
+only step 3 fills. For `main_recheck` and `v5b_restart_crash` it is **inferred, not recorded**: they started
+after it (`x_exported_subxact` at 07:54, `main_recheck` at 08:00:59, `v5b_restart_crash` at 08:11:00 UTC) from
+the same working tree, and step 3 and the three outputs were committed together at 08:15:17 (`58c2c64`). That
+is why they were repeated (group 1). The files of groups 3 and 4 are older than step 3.
+
+The two repeats ran from the working tree of the branch after its merge `b9c98c9`, while the library was being
+changed for the same round. The test tool (`cutstress.py`, `cutnarrow.py`, `pgoutput.py`) did not change. Of the
+library, the parts the stress run calls (`settle_floor`, `take_standby_cut_own`, `wait_replay_reached`,
+`StandbyCut.observe` and `classify`, `widen_xid`) are the same at `b9c98c9` and at the commit that adds these
+files; the round changed `valid_on` and the functions `take_*_after`, which the stress run does not call. So
+both runs judge the rule as it is in both commits.
 
 Which runs were repeated after the review: variants 7, 1 and 3 and the quiet-only run (`v7b`, `v1b`, `v3b`,
 `qb`), each at its full length. Added: `v9_exported_open_no_subxact`, and two repeats of the expected failure
-(`xb`, `xc`). Not repeated: `main` at its length of 30 minutes (`main_recheck` is a repeat of 10 minutes),
-`v2_twophase_subxact`, `v4_apply_delay`, `v6_slot_on_primary`, `v8_idle`, `nc_mid_redo`.
+(`xb`, `xc`). In the second short fix round: `main_recheck` as `main_c` (10 minutes) and `v5b_restart_crash` as
+`v5c_restart_crash` (180 s, 7 restarts and 7 kills of the standby). Not repeated: `main` at its length of 30
+minutes (`main_recheck` and `main_c` are repeats of 10 minutes), `v2_twophase_subxact`, `v4_apply_delay`,
+`v6_slot_on_primary`, `v8_idle`, `nc_mid_redo`.
 
 ### The runs
 
@@ -119,8 +137,8 @@ Common options not repeated in the table: `tools/cutstress run --label NAME … 
 | `nc_mid_redo` | 07:44 | `--seconds 150 --writers drop,subxact:subs=3000,plain --takers-own 4 --takers-exported 0 --taker-sleep 0` | steps 1, 2 | 715,694 | 188,441 | none | not counted | 3.60 7.67 8.48 |
 | `q_quiet_exported` | 07:47 | `--seconds 120 --writers plain,subxact,abort --takers-own 1 --takers-exported 0 --takers-quiet 2` | steps 1, 2; **not used** | 83,928 | 266,391 | none | not counted | 9.41 8.47 8.65 |
 | `x_exported_subxact` | 07:54 | `--seconds 90 --writers plain,subxact,abort --takers-own 1 --takers-exported 2` | complete | 91,061 | 209,571 | **1,834, expected** | 1 | 1.60 4.92 7.05 |
-| `main_recheck` | 08:00 | `--seconds 600 --writers plain,async,subxact,abort --takers-own 3 --takers-exported 0` | complete | 628,741 | 2,451,105 | none | 0 | 3.49 11.70 11.07 |
-| `v5b_restart_crash` | 08:11 | as `v5_restart_crash` | complete | 89,718 | 722,901 | none | 0 | 5.59 6.61 8.47 |
+| `main_recheck` | 08:00 | `--seconds 600 --writers plain,async,subxact,abort --takers-own 3 --takers-exported 0` | complete, **inferred** | 628,741 | 2,451,105 | none | 0, inferred | 3.49 11.70 11.07 |
+| `v5b_restart_crash` | 08:11 | as `v5_restart_crash` | complete, **inferred** | 89,718 | 722,901 | none | 0, inferred | 5.59 6.61 8.47 |
 | `v7b_exported_no_subxact` | 10:24 | as `v7_exported_no_subxact` | complete | 120,737 | 485,205 | none | 0 | 4.32 5.70 6.50 |
 | `qb_quiet_exported` | 10:26 | as `q_quiet_exported` | complete | 82,928 | 268,363 | none | 0 | 6.00 5.94 6.49 |
 | `v1b_big_drop` | 10:29 | as `v1_big_drop` | complete | 95,014 | 155,847 | none | 0 | 10.42 7.52 7.02 |
@@ -128,6 +146,8 @@ Common options not repeated in the table: `tools/cutstress run --label NAME … 
 | `xb_exported_subxact` | 10:33 | as `x_exported_subxact` | complete | 95,173 | 217,987 | **1,805, expected** | 1 | 9.79 16.39 11.85 |
 | `xc_exported_subxact` | 10:39 | as `x_exported_subxact` | complete | 101,850 | 223,063 | **1,708, expected** | 2 | 3.22 6.92 8.86 |
 | `v9_exported_open_no_subxact` | 10:44 | `--seconds 120 --writers long,plain,async,abort --takers-own 1 --takers-exported 2` | complete | 93,600 | 464,260 | none | 0 | 4.68 5.54 7.72 |
+| `main_c` | 13:05 | as `main_recheck` | complete | 440,905 | 2,315,571 | none | 0 | 11.76 8.96 7.96 |
+| `v5c_restart_crash` | 13:15 | as `v5_restart_crash` | complete | 69,663 | 687,039 | none | 0 | 17.42 19.53 16.29 |
 
 In every run: the stream never went back in `E`, no cut was left unchecked, and the slot was dropped at the
 end.
@@ -135,16 +155,18 @@ end.
 What each run is for:
 
 - `main`: the main campaign. Plain commits, commits with `synchronous_commit = off`, subtransactions, aborts.
-  `main_recheck` is the same for 10 minutes with the complete checker.
+  `main_recheck` and `main_c` are the same for 10 minutes with the complete checker (recorded in `main_c`
+  only).
 - `v1b_big_drop`: big transactions and transactions that drop a table (long commit records, slow replay of a
   commit), a long-running transaction.
 - `v2_twophase_subxact`: two-phase commit, committed or rolled back by another session and out of order;
   transactions with 3,000 subtransactions (more than 64).
 - `v3b_ddl_walswitch_pause`: DDL on the tables, `VACUUM FULL`, WAL segment switches, replay paused and resumed.
 - `v4_apply_delay`: `recovery_min_apply_delay = 300ms` on the standby.
-- `v5_restart_crash`, `v5b_restart_crash`: the standby is restarted or killed every 10 s (7 restarts and 7
-  kills in each run). `v5` has 6 cuts whose `R0` is below a position the stream had already delivered, and 20
-  pairs of such a cut and a key in which the snapshot lacks a delivered transaction; `v5b` has none.
+- `v5_restart_crash`, `v5b_restart_crash`, `v5c_restart_crash`: the standby is restarted or killed every 10 s
+  (7 restarts and 7 kills in each run; the cut takers reconnected 255, 194 and 192 times). `v5` has 6 cuts whose
+  `R0` is below a position the stream had already delivered, and 20 pairs of such a cut and a key in which the
+  snapshot lacks a delivered transaction; `v5b` and `v5c` have none.
 - `v6_slot_on_primary`: the slot is on the primary, the cuts on the standby. 4 cuts with `R0` below the stream,
   6 such pairs.
 - `v7b_exported_no_subxact`: cuts taken the exported way, writers of one statement, no subtransactions. 72,533
