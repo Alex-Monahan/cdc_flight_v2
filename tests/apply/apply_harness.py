@@ -221,7 +221,7 @@ def catch_up_scenario(conn, seed: int, form: str = "local", table: str = "t", n_
     parts = split_by_txn(log, [split] if split else [])
     with StandInTx(conn) as tx:
         cs_all = LocalChangeSet(change_set_table(meta, log), None, meta)
-        removed = reduce_duplicates(tx, target, cs_all)
+        removed = reduce_duplicates(tx, target, cs_all, settings=test_settings())
     counts = apply_sets(conn, target, meta, parts, mode="catch_up", form=form, one_tx=rng.random() < 0.5)
     d1 = dest_canon(conn, target, meta)
     again = apply_sets(conn, target, meta, [log], mode="catch_up", form=form)
