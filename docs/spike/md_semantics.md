@@ -184,7 +184,7 @@ clock showed an age of 2.19 s after a 2 s sleep. The session `TimeZone` is appli
 setting showed in server-rendered text). **Design:** write the heartbeat as `uuid_extract_timestamp(uuidv7())` and
 compute its age in the same SQL expression on the server; never use `now()` for anything compared across runs.
 
-## Q7 Type machinery (SPEC 2.4, 2.5, R9) — `types.py`, evidence `types.txt`
+## Q7 Type machinery (SPEC 2.4, 2.5, R9) — `type_machinery.py`, evidence `types.txt`
 
 Works on MotherDuck, inside one transaction together with INSERT and UPDATE, and rolls back cleanly: INTEGER → BIGINT,
 SMALLINT → INTEGER, FLOAT → DOUBLE, DECIMAL(10,2) → DECIMAL(38,2), DECIMAL(18,4) → DECIMAL(38,10), VARCHAR(5) →

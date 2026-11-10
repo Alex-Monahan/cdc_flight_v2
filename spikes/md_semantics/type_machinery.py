@@ -3,7 +3,7 @@
 Every check is run, recorded as OK (with its result) or ERROR (with the error class and message), and never stops the
 script. Part T times the type changes on a 10M-row table (server side).
 
-Run:  tools/with-env uv run --with pyarrow python spikes/md_semantics/types.py [--rows 10000000]
+Run:  tools/with-env uv run --with pyarrow python spikes/md_semantics/type_machinery.py [--rows 10000000]
 """
 from __future__ import annotations
 
