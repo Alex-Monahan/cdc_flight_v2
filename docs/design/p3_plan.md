@@ -230,7 +230,8 @@ child of its own.
 
 ```python
 plan = transform.plan(source_table, schema_frame=None, *, server_version_num) -> TablePlan
-                                        # per column position: destination name and type; `plan.ambiguous` (below)
+                                        # per column position: destination name and type; `plan.ambiguous` and
+                                        # `plan.ambiguous_key` (below)
 transform.stream(plan, rows: pyarrow.RecordBatch) -> pyarrow.RecordBatch      # engine transport form → destination types
 transform.backfill(plan, rows: pyarrow.RecordBatch) -> pyarrow.RecordBatch    # text as Postgres prints it → destination types
 transform.ambiguous(plan, rows: pyarrow.RecordBatch) -> mask or None          # rows whose zero interval is ambiguous
@@ -251,8 +252,11 @@ sent.
 
 The backfill's text form is what Postgres prints under the session settings that package P fixes for every read
 connection (C7; `docs/design/source.md` section 1). The stream's form of every type is the table in section 3 of
-`docs/design/engine.md`; the engine's walsender session has settings of its own (`IntervalStyle=postgres`,
-`DateStyle=ISO`). These are two transport forms on purpose, and the transform is the only code that knows either.
+`docs/design/engine.md`. These are two transport forms on purpose, and the transform is the only code that knows
+either. Where a value travels as the text that Postgres prints on both paths (an array, a composite, a type
+without a mapping), the two sessions must print it alike: the read sessions and the engine's walsender session
+pin the same text settings, `IntervalStyle=postgres` among them (decided in the fix round of Y; before it, an
+array of intervals had two destination values). A new text-output setting is pinned in both places or in none.
 
 **Ambiguous zero interval.** On a source of Postgres 17 or later, `interval 'infinity'` and `'-infinity'` in a
 scalar `interval` column reach the engine as a zero interval: the Postgres driver parses them into nothing, before
@@ -275,6 +279,10 @@ column of the stream is *ambiguous*: it is a real zero, `infinity` or `-infinity
   has another `xmin` and takes the full way.)
 - Not taken: "apply whatever the row holds now, and count it when a later transaction has changed it". It shows,
   for one group, a row that mixes two source transactions.
+- `TablePlan.ambiguous_key` lists the key positions among them (a scalar `interval` key, or a domain over it;
+  it is part of the plan's hash). A table that has one is not streamed: mode `full_refresh` with an alert. The
+  repair read cannot help there, because it reads by that key. No other key type is delivered non-injectively
+  (the review of Y: arrays and composites keep `infinity`; the wide forms of numeric and timestamp are exact).
 - A table without a key that has a scalar interval column on such a source is not streamed: mode `full_refresh`
   with an alert (SPEC 3.5), until P4 decides more.
 - An infinite value puts the column into its wide form, `UNION(INTERVAL, VARCHAR)` (R9, SPEC 2.4), on both paths.
@@ -558,6 +566,10 @@ As delivered by package X; its report defines the interface, and this section is
   same OID with other columns → the schema rule above. A backfill that follows such a finding is entered only past
   `a`, so that its pending log never holds a row of the earlier table. A rename is therefore a drop of the old name
   and, if the new name is replicated, a fresh table; the rename in place of SPEC 2.2 is P4.
+- **Tables that are not streamed.** S asks the catalog and the transform's plan before it routes a table to
+  `streaming`: a table whose plan has an `ambiguous_key`, and a table without a key whose plan has an
+  `ambiguous` column (C3), get mode `full_refresh` with one alert per table. Their rows in the stream are
+  counted and dropped, as for routing `skip`.
 - S runs a group again after `Conflict`, a bounded number of times, building its statements again when the
   conflict came from a DDL (a swap changes the catalog).
 - A table that fails to apply `apply.max_table_attempts` times (default 3) leaves the stream: state `quarantined`,

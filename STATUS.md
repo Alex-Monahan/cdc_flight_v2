@@ -4,15 +4,15 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 
 ## Where the build stands
 
-- **Stage 1 (local). P1 Environment: gate passed on 2026-11-09** (one item cannot be shown from this session, see
-  the table). **P2 Platform spike: gate passed on 2026-11-10** — every spike is done and merged, the report
+- **Stage 1 (local). P1 Environment: gate passed on 2026-11-09** (one item cannot be shown from this session, see the
+  table). **P2 Platform spike: gate passed on 2026-11-10** — every spike is done and merged, the report
   (`docs/spike_report.md`) is complete and was sent to the owner; nothing found contradicts SPEC, so the build
   continues without waiting. **P3 Core: in progress** (table below): the fault harness, the oracle, the source
-  package and the engine are merged; the apply package is reviewed twice and in its fix round; the question the
-  second review raised — which tables have a key — is measured and decided (rule K, below) and has a small
-  package of its own; the cut and the transform are in their fix rounds; the destination basics are being built;
-  round 1 of the fuzzers (against a toy replicator) is delivered and under review; the task file of every
-  package is written.
+  package, the engine and the transform are merged; the apply package is reviewed twice and in its fix round; the
+  question the second review raised — which tables have a key — is measured and decided (rule K, below) and has a
+  small package of its own, which is running; the cut is in its fix round; the destination basics are being built;
+  round 1 of the fuzzers (against a toy replicator) is reviewed and waits for a writer slot for its fix round; the
+  task file of every package is written.
 - Stage 2 (PlanetScale) cannot start: of its names only `PLANETSCALE_ORG` and `PLANETSCALE_DATABASE` are in the env
   file (checked again at the P1 gate). The service token and the connection values are owed by the owner.
 
@@ -58,7 +58,7 @@ green on T1 (local primary and standby, real MotherDuck, local JVM).
 | A | Apply: the statements over a change set, keyed and keyless | Opus | **delivered**; two reviews done (coordinator; a second reviewer, Fable, on the row-version model); **fix round running** (list below) |
 | P | Source: connections, catalog and its observation, publication, slot, slot facts, timeline, heartbeat | Opus | **merged** (with the repair of `tools/localpg` for Postgres 16; one fix after the review) |
 | L | Leadership: guard, take-over, heartbeat, hand-over, bootstrap, platform interface | Fable | task written; after D |
-| Y | Transform: source types to destination types | Opus | **delivered**, fix round delivered; the coordinator's last check is running, then the merge |
+| Y | Transform: source types to destination types | Opus | **merged** (`362d00b`; one review, one fix round, one last check) |
 | S | Stream: transactions, groups, commit and acknowledge, supervisor, pipeline process | Fable | task written; after E, D, A, P, K |
 | V | Slot continuity | Fable | task written; after S |
 | F | Fuzzers (stream, workload, fault, leadership), the consumer loop of 1.3 and 3.2 | Opus | **round 1 delivered** (branch `p3-f-fuzzers`, against a toy replicator); coordinator: merge after a fix round (below), which starts at the next free writer slot; round 2, against the real system, after S, L, B, V |
@@ -318,7 +318,6 @@ Each in its own worktree and branch; the orchestrator merges. The P3 packages ar
 | Package K, the key rule (Opus, high). Homes `pg-p`, `pg-p2`, `pg-e`. No MotherDuck | P3 | 2026-11-10 | the catalog follows rule K, the engine's list of tables without a key, the measurement of what Debezium calls a key, `evidence/p3/key_rule/` |
 | Package F, fuzzers (Opus, high): **round 1 delivered**, branch `p3-f-fuzzers`, not merged; reviewed. Homes `pg-f<n>`, ports 55700 + 8·n (all stopped) | P3 | 2026-11-10 | the four fuzzers with seeds and replay, the consumer loop of SPEC 1.3 and 3.2, their self-tests with planted defects. Owed: the fix round below |
 | Package X, fix round (Fable; the worker that built the cut). Home `pg-cut`, ports 55600–55607. No MotherDuck | P3 | 2026-11-10 | the items listed below; then the coordinator checks it again and it is merged |
-| Package Y, transform (Opus, high): **fix round delivered** on branch `worktree-agent-a2d7d8aabb7b8b6a5`; last check by the coordinator. Home `pg-y` (stopped). No MotherDuck | P3 | 2026-11-10 | `src/cdc_v2/transform/`, `docs/design/transform.md`, the cross-path test (stream form against backfill form through a local Postgres), the list of ambiguous interval columns and their mask |
 
 **Package A, apply — delivered 2026-11-10; two reviews; the fix round is running.** The coordinator's verdict was
 "merge after a short fix round". The second reviewer (Fable) then tested the model the package is built on —
@@ -394,15 +393,20 @@ segments in use were not touched (the two nodes of the cut's cluster, and one th
 `tools/localpg` (remove a killed node's segment before its directory is deleted, with a self-test) is in F's
 fix round.
 
-**Package Y, transform — delivered 2026-11-10; fix round delivered; the coordinator checks it once more.** Proven
-by the worker: on every baseline type family the stream form and the backfill form give the same destination
-value, on Postgres 18.6 and 16.6 (59 tables, 3,284 streamed records, 6,795 values compared); errors never carry
-a value; the transform connection cannot reach MotherDuck. The fix round: a negative control for the cross-path
-test; the plan names a key column that the stream cannot deliver injectively (a scalar interval key on Postgres
-17 or later); one interval text style on both paths (arrays and composites that hold intervals printed
-differently on the two paths: the read sessions take `IntervalStyle=postgres`, as the engine's session must
-have); fewer property examples in the default run. What goes to other packages and to P4 is in plan 6.2, "From
-the review of Y". Two points for the owner are in the questions below (enums and JSON as `VARCHAR`).
+**Package Y, transform — merged 2026-11-10** (`362d00b`; `src/cdc_v2/transform/`, `tests/transform/`,
+`docs/design/transform.md`, `docs/type_mapping.md`, `evidence/p3/transform/`). Proven by the worker: on every baseline
+type family the stream form and the backfill form give the same destination value, on Postgres 18.6 and 16.6 (59
+tables, 3,284 streamed records, 6,795 values compared); errors never carry a value; the transform connection cannot
+reach MotherDuck. The fix round: a negative control for the cross-path test; the plan names a key column that the
+stream cannot deliver injectively (a scalar interval key on Postgres 17 or later); one interval text style on both
+paths (arrays and composites that hold intervals printed differently on the two paths: the read sessions take
+`IntervalStyle=postgres`, as the engine's session must have); fewer property examples in the default run. The
+coordinator's last check: the negative control can fail (a comparison weakened to `=` or to a coarser time unit misses
+one of its two planted differences), the list of non-injective key types is complete, and it found no text of the new
+interval style that the backfill reads wrongly without an error. What goes to other packages and to P4 is in plan 6.2,
+"From the review of Y"; contracts C3 and C10 name the tables that are not streamed for this reason. The read sessions
+of package P changed with this merge (`IntervalStyle=postgres`; P's connection tests pass on it). Two points for the
+owner are in the questions below (enums and JSON as `VARCHAR`).
 
 **Package E, the engine — merged 2026-11-10** (`11599e6`; JVM program `jvm/src/cdc_v2/engine/`, the Python side
 `src/cdc_v2/stream/{frames,engine,jvm}.py`, `tests/engine/`, `docs/design/engine.md`, `evidence/p3/engine/`).
@@ -658,15 +662,14 @@ the exact-value layer.
 
 ## Next steps
 
-1. P3, as writer slots become free (at most four; now D, K and the fix rounds of X and A): F's fix round at the
-   next free slot; Y is merged after the coordinator's last check. When A's fix round reports, the coordinator checks A
-   again, the second reviewer repeats its campaigns, A is merged and the review's sentences go into design
-   6.1–6.3, plan C0, C3a, C4 and C10, the tasks of D, Y, S and B, the hazard notes (a new entry for a TOASTed key
-   column sent as unchanged) and `docs/spike/md_semantics.md`. Review and merge D, X, Y and F as they report: the
-   coordinator reviews each, D also gets a second reviewer. Then L after D; S after D and A; then V, B, T in the
-   order of the table above. When X merges: design 7.1–7.4 and open points 1 and 12 take its text, plan C9 is
-   completed, and the tasks of B, S, V and T take the rules of the cut (settle floor, `R0 ≥ P0` for every snapshot,
-   the tracker on a primary, timeline).
+1. P3, as writer slots become free (at most four; now D, K and the fix rounds of X and A): F's fix round at the next
+   free slot. When A's fix round reports, the coordinator checks A again, the second reviewer repeats its campaigns, A
+   is merged and the review's sentences go into design 6.1–6.3, plan C0, C3a, C4 and C10, the tasks of D, Y, S and B,
+   the hazard notes (a new entry for a TOASTed key column sent as unchanged) and `docs/spike/md_semantics.md`. Review
+   and merge D, X, K and F as they report: the coordinator reviews each, D also gets a second reviewer. Then L after
+   D; S after D and A; then V, B, T in the order of the table above. When X merges: design 7.1–7.4 and open points 1
+   and 12 take its text, plan C9 is completed, and the tasks of B, S, V and T take the rules of the cut (settle floor,
+   `R0 ≥ P0` for every snapshot, the tracker on a primary, timeline).
 2. Add to the owner's questions when A merges: `REPLICA IDENTITY FULL` for a table whose key column can be
    TOASTed (more WAL; with F-7); whether the DuckDB join-filter defect that apply works around should be
    reported upstream.

@@ -1,7 +1,7 @@
 """A small printer of Postgres text, written for the tests (it shares no code with cdc_v2.transform).
 
 It prints values the way Postgres prints them under the read sessions' settings (DateStyle ISO, IntervalStyle
-iso_8601, TimeZone UTC, extra_float_digits 3, bytea_output hex), and the engine's transport forms of the same values.
+postgres, TimeZone UTC, extra_float_digits 3, bytea_output hex), and the engine's transport forms of the same values.
 """
 from __future__ import annotations
 
