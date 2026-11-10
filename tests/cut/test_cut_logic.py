@@ -266,6 +266,26 @@ def test_exported_cut_is_refused_on_a_server_with_the_export_defect():
     assert C.SQL_VERSION_NUM not in conn.log
 
 
+def test_quiet_only_export_keeps_a_quiet_snapshot_and_drops_any_other():
+    """A snapshot with xmin == xmax has no running transaction to lose, so it is safe on a defect server too."""
+    def conn_with(snapshot):
+        replay = iter(["0/1000", "0/1100", "0/1200"])
+        return FakeConn({C.SQL_VERSION_NUM: (180006,), C.SQL_REPLAY_LSN: lambda: (next(replay),),
+                         C.SQL_R1: lambda: (next(replay), True),
+                         C.SQL_EXPORT: lambda: ("00000003-0000001B-1", next(replay), True, snapshot)})
+    conn = conn_with("705:705:")
+    cut = C.take_standby_cut_exported(conn, quiet_only=True)
+    assert cut.is_quiet and cut.way == "exported" and "ROLLBACK" not in conn.log
+    assert C.SQL_VERSION_NUM not in conn.log                    # the version does not matter for a quiet snapshot
+    assert cut.classify(0x1150, 704) is INSIDE and cut.classify(0x1150, 705) is OUTSIDE   # exact by id alone
+    conn = conn_with("700:705:")
+    with pytest.raises(C.SnapshotNotQuiet):
+        C.take_standby_cut_exported(conn, quiet_only=True)
+    assert conn.log[-1] == "ROLLBACK"                           # the export is gone with its transaction
+    assert not C.StandbyCut(r0=1, r1=2, bounds=SnapshotBounds(700, 705)).is_quiet
+    assert not C.StandbyCut(r0=1, r1=2).is_quiet                # no bounds known: not quiet
+
+
 def test_standby_cut_refused_after_promotion_and_rolled_back():
     conn = FakeConn({C.SQL_REPLAY_LSN: ("0/1000",), C.SQL_OWN_FIRST: ("0/1000", False, "700:705:")})
     with pytest.raises(C.CutError):

@@ -396,8 +396,13 @@ def taker_loop(cl: Cluster, way: str, stream: Stream, out: deque, stop: threadin
                             cut = C.take_standby_cut_own(conn, block_size=block_size)
                             vis = dict(conn.execute(READ_COUNTERS).fetchall())
                         else:
-                            cut = C.take_standby_cut_exported(conn, block_size=block_size,
-                                                              accept_export_defect=True)
+                            try:
+                                cut = C.take_standby_cut_exported(conn, block_size=block_size,
+                                                                  accept_export_defect=(way == "exported"),
+                                                                  quiet_only=(way == "quiet"))
+                            except C.SnapshotNotQuiet:
+                                stats["quiet_snapshots_dropped"] += 1
+                                continue
                             C.import_snapshot(reader, cut.snapshot_id)
                             vis = dict(reader.execute(READ_COUNTERS).fetchall())
                             C.end_transaction(reader)
@@ -441,7 +446,7 @@ class Checker:
     wrong: Counter = field(default_factory=Counter)
     wrong_examples: dict = field(default_factory=dict)
     hist: dict = field(default_factory=lambda: {k: Counter() for k in (
-        "base", "xid", "sharp", "xid+sharp", "base_exported", "base_own", "really_visible")})
+        "base", "xid", "sharp", "xid+sharp", "base_exported", "base_own", "base_quiet", "really_visible")})
     stats: Counter = field(default_factory=Counter)
 
     def ready(self, rec: CutRecord, n: int) -> bool:
@@ -546,7 +551,7 @@ class Checker:
                     self._violation("library", rec, e1, j, "library says inside, the snapshot does not see it")
                 if e <= rec.r1:
                     self._wrong("r1_inside", hits, rec, e1, j)
-                if rec.way == "exported" and e <= rec.r_stmt:
+                if e <= rec.r_stmt:      # own way: the first statement's position is R1, so this equals r1_inside
                     self._wrong("stmt_as_r0", hits, rec, e1, j)
                 if C.widen_xid(xid, rec.xmax) < rec.xmax:
                     self._wrong("xmax_inside", hits, rec, e1, j)
@@ -556,6 +561,8 @@ class Checker:
             self.stats["cuts_with_r0_below_received"] += 1
         if rec.r1 == rec.r0:
             self.stats["cuts_with_r0_eq_r1"] += 1
+        if rec.xmin == rec.xmax:
+            self.stats["quiet_cuts_" + rec.way] += 1      # no transaction running: exact by transaction id
 
 
 def histogram_rows(hist: Counter) -> dict:
@@ -639,6 +646,7 @@ class RunConfig:
     writers: tuple = ("plain", "async", "subxact", "abort")
     takers_own: int = 1
     takers_exported: int = 1
+    takers_quiet: int = 0       # exported way, quiet snapshots only (the library's rule for a defect server)
     taker_sleep: float = 0.001
     slot_node: str = "replica"
     chaos: tuple = ()
@@ -661,7 +669,7 @@ def run(cl: Cluster, cfg: RunConfig, log=lambda text: None) -> dict:
     sessions = sum(2 if s.kind == "twophase" else 1 for s in specs)
     if sessions > 4:
         raise StressError("at most 4 writer sessions (a two-phase writer uses 2)")
-    if cfg.takers_own + cfg.takers_exported > 4:
+    if cfg.takers_own + cfg.takers_exported + cfg.takers_quiet > 4:
         raise StressError("at most 4 cut takers")
     unknown = set(cfg.chaos) - set(CHAOS)
     if unknown:
@@ -684,7 +692,8 @@ def run(cl: Cluster, cfg: RunConfig, log=lambda text: None) -> dict:
                for s, ks in zip(specs, keys_of)]
     takers = [threading.Thread(target=taker_loop, args=(cl, way, stream, cuts, stop_t, stats, cfg.taker_sleep, block),
                                daemon=True)
-              for way in ["own"] * cfg.takers_own + ["exported"] * cfg.takers_exported]
+              for way in ["own"] * cfg.takers_own + ["exported"] * cfg.takers_exported
+              + ["quiet"] * cfg.takers_quiet]
     reader = threading.Thread(target=stream_loop, args=(cl, cfg.slot_node, stream, stop_s), daemon=True)
     chaos = threading.Thread(target=chaos_loop, args=(cl, cfg.chaos, cfg.chaos_period, cfg.seed, stop_c, stats),
                              daemon=True)
@@ -800,6 +809,14 @@ def summary(result: dict) -> str:
                                                       us[name]["max"]))
     for name in ("cuts_with_r0_below_received", "cuts_that_miss_a_received_transaction", "cuts_with_r0_eq_r1"):
         lines.append("  %s: %d" % (name, result["checker"].get(name, 0)))
+    for way in ("own", "exported", "quiet"):
+        n = result["checker"].get("cuts_" + way, 0)
+        if n:
+            q = result["checker"].get("quiet_cuts_" + way, 0)
+            lines.append("  cuts taken the %s way: %d, of them quiet (xmin = xmax): %d (%.1f%%), with a violation: %d"
+                         % (way, n, q, 100.0 * q / n, result["checker"].get("cuts_with_a_violation_" + way, 0)))
+    if result["activity"].get("quiet_snapshots_dropped"):
+        lines.append("  snapshots dropped by the quiet takers: %d" % result["activity"]["quiet_snapshots_dropped"])
     for p in result["problems"]:
         lines.append("  PROBLEM: " + p)
     return "\n".join(lines)
@@ -830,6 +847,7 @@ def main(argv: Optional[list] = None) -> int:
                    "kind:name=value (%s)" % (", ".join(BODY), ", ".join(DEFAULTS)))
     r.add_argument("--takers-own", type=int, default=1)
     r.add_argument("--takers-exported", type=int, default=1)
+    r.add_argument("--takers-quiet", type=int, default=0, help="exported way, quiet snapshots only")
     r.add_argument("--taker-sleep", type=float, default=0.001)
     r.add_argument("--slot-node", choices=("replica", "primary"), default="replica")
     r.add_argument("--chaos", type=_csv, default=(), help="of: " + ", ".join(CHAOS))
@@ -850,13 +868,14 @@ def main(argv: Optional[list] = None) -> int:
     if args.cmd != "run":
         return cutprimary.dispatch(cl, args)
     cfg = RunConfig(label=args.label, seconds=args.seconds, writers=tuple(args.writers),
-                    takers_own=args.takers_own, takers_exported=args.takers_exported, taker_sleep=args.taker_sleep,
+                    takers_own=args.takers_own, takers_exported=args.takers_exported, takers_quiet=args.takers_quiet,
+                    taker_sleep=args.taker_sleep,
                     slot_node=args.slot_node, chaos=tuple(args.chaos), chaos_period=args.chaos_period,
                     apply_delay_ms=args.apply_delay_ms, max_cuts=args.max_cuts, seed=args.seed)
     result = run(cl, cfg, log=lambda text: print(text, flush=True))
     if args.out:
-        Path(args.out).write_text(json.dumps(result, indent=1, sort_keys=True) + "\n")
-    print(summary(result))
+        Path(args.out).write_text(cl.redact(json.dumps(result, indent=1, sort_keys=True)) + "\n")
+    print(cl.redact(summary(result)))
     return 0 if result["ok"] else 1
 
 

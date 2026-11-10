@@ -32,7 +32,7 @@ INSERT_LSN = "SELECT pg_current_wal_insert_lsn()::text"
 FLUSH_LSN = "SELECT pg_current_wal_flush_lsn()::text"
 #: The check the coordinator proposed: is a transaction of the snapshot's in-progress list already committed?
 STATUS_CHECK = ("SELECT coalesce(bool_or(pg_xact_status(x) = 'committed'), false) "
-                "FROM unnest(pg_snapshot_xip(pg_current_snapshot())) AS x")
+                "FROM pg_snapshot_xip(pg_current_snapshot()) AS x")
 
 
 def _lsn(conn, sql: str) -> int:
@@ -78,13 +78,15 @@ EXPORT_CORRECT = {"importer_before_the_commit_sees": 0, "importer_after_the_comm
 
 
 def export_defect(cl: S.Cluster) -> dict:
-    """A transaction is open on the primary.  The standby exports a snapshot.  Then the transaction commits.
-    A session that imports the snapshot must not see it; an ordinary session afterwards must see it."""
+    """A transaction is open on the primary and a younger one has committed, so the open one lies between the
+    snapshot's xmin and xmax.  The standby exports a snapshot.  Then the open transaction commits.  A session
+    that imports the snapshot must not see it; an ordinary session afterwards must see it."""
     keys = list(range(1, 2 + 2 * len(EXPORT_CASES)))
     S.setup(cl, keys, "replica")
     out: dict = {"cases": {}}
     try:
-        with cl.connect("primary") as a, cl.connect("replica") as x, cl.connect("replica") as y:
+        with cl.connect("primary") as a, cl.connect("primary") as b, cl.connect("replica") as x, \
+                cl.connect("replica") as y:
             out["server_version_num"] = _version_num(x)
             out["library_expects_defect"] = C.export_defect(out["server_version_num"])
             out["wal_level"] = a.execute("SHOW wal_level").fetchone()[0]
@@ -94,9 +96,11 @@ def export_defect(cl: S.Cluster) -> dict:
                     a.execute("BEGIN")
                     for sql in statements:
                         a.execute(sql, (key,) if "%s" in sql else None)
+                    b.execute(INC, (1,))         # a younger transaction commits: xmax moves past the open one
                     _flush_and_replay(cl, a)
                     cut = C.take_standby_cut_exported(x, accept_export_defect=True)
                     res["snapshot_" + part] = str(cut.bounds)
+                    res["snapshot_%s_is_quiet" % part] = cut.is_quiet
                     if part == "early":          # import and read while the transaction is still running
                         C.import_snapshot(y, cut.snapshot_id)
                         res["importer_before_the_commit_sees"] = y.execute(GET, (key,)).fetchone()[0]

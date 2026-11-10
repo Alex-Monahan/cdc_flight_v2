@@ -179,6 +179,10 @@ class CutError(Exception):
     """A cut could not be taken, or a rule of use was broken."""
 
 
+class SnapshotNotQuiet(CutError):
+    """A snapshot was dropped because a transaction was running when it was taken.  Take another one."""
+
+
 class CutDeadlineExceeded(CutError):
     """A wait ran into its deadline.  ``detail`` says what was last seen."""
 
@@ -276,6 +280,16 @@ class StandbyCut:
         return True
 
     # -- rules of use -----------------------------------------------------------------------------------------
+
+    @property
+    def is_quiet(self) -> bool:
+        """No transaction was running, as far as the standby knew, when the snapshot was taken (``xmin == xmax``).
+
+        The cut of a quiet snapshot is exact by transaction id alone: an id below ``xmax`` is inside, any other
+        is outside.  A quiet snapshot is also the only kind that is safe to export on a server with the export
+        defect (:func:`export_defect`), because it has no list of running transactions to lose.
+        """
+        return self.bounds is not None and self.bounds.xmin == self.bounds.xmax
 
     def has_passed(self, applied_position: int) -> bool:
         """The stream has passed this snapshot: it has applied a transaction whose commit ends after ``R1``.
@@ -440,7 +454,7 @@ def export_defect(server_version_num: int) -> bool:
 
 
 def take_standby_cut_exported(conn, *, block_size: int = WAL_BLOCK_SIZE_DEFAULT,
-                              accept_export_defect: bool = False) -> StandbyCut:
+                              accept_export_defect: bool = False, quiet_only: bool = False) -> StandbyCut:
     """Take a cut with an exported snapshot on a hot standby.
 
     One READ COMMITTED transaction with three statements: ``R0``; ``pg_export_snapshot()`` (its statement
@@ -448,15 +462,20 @@ def take_standby_cut_exported(conn, *, block_size: int = WAL_BLOCK_SIZE_DEFAULT,
     (:func:`import_snapshot`) only while it lives.  The connection touches no table, so it holds no relation
     lock.
 
-    Refused on a server with the export defect (:func:`export_defect`) unless ``accept_export_defect`` is set.
-    Set it only where no transaction on the primary uses a subtransaction (tests).
+    With ``quiet_only`` the snapshot is kept only if it is quiet (:attr:`StandbyCut.is_quiet`); otherwise the
+    transaction is rolled back and :class:`SnapshotNotQuiet` is raised, and the caller tries again.  A quiet
+    snapshot is safe to export on every server version, and its cut is exact.
+
+    Without ``quiet_only`` the call is refused on a server with the export defect (:func:`export_defect`) unless
+    ``accept_export_defect`` is set.  Set that only where no transaction on the primary uses a subtransaction
+    (tests).
     """
     _require_autocommit(conn)
-    if not accept_export_defect:
+    if not (accept_export_defect or quiet_only):
         version = int(_one(conn, SQL_VERSION_NUM)[0])
         if export_defect(version):
             raise CutError("exported snapshots are not safe on a standby of server version %d: it lacks %s; "
-                           "take the cut with take_standby_cut_own" % (version, EXPORT_FIX))
+                           "take the cut with take_standby_cut_own, or with quiet_only" % (version, EXPORT_FIX))
     conn.execute(SQL_BEGIN_RC)
     try:
         r0 = _replay(_one(conn, SQL_REPLAY_LSN)[0], "R0")
@@ -464,7 +483,11 @@ def take_standby_cut_exported(conn, *, block_size: int = WAL_BLOCK_SIZE_DEFAULT,
         r1_text, in_recovery_b = _one(conn, SQL_R1)
         if not (in_recovery_a and in_recovery_b):
             raise CutError("not a standby: pg_is_in_recovery() is false; use take_primary_cut")
-        return StandbyCut(r0=r0, r1=_replay(r1_text, "R1"), bounds=SnapshotBounds.parse(snap), way="exported",
+        bounds = SnapshotBounds.parse(snap)
+        if quiet_only and bounds.xmin != bounds.xmax:
+            raise SnapshotNotQuiet("a transaction was running when the snapshot %s was taken; take another one"
+                                   % snap)
+        return StandbyCut(r0=r0, r1=_replay(r1_text, "R1"), bounds=bounds, way="exported",
                           snapshot_id=snapshot_id, r_stmt=_replay(r_stmt_text, "in-statement position"),
                           wal_block_size=block_size)
     except BaseException:

@@ -1,0 +1,65 @@
+{
+ "cases": {
+  "no subtransaction": {
+   "snapshot_late": "11509304:11509306:",
+   "snapshot_late_is_quiet": false,
+   "importer_after_the_commit_sees": 0,
+   "snapshot_early": "11509306:11509308:",
+   "snapshot_early_is_quiet": false,
+   "importer_before_the_commit_sees": 0,
+   "same_importer_after_the_commit_sees": 0,
+   "ordinary_session_after_the_commit_sees": 1,
+   "wrong": []
+  },
+  "top level writes first, then one subtransaction": {
+   "snapshot_late": "11509308:11509311:",
+   "snapshot_late_is_quiet": false,
+   "importer_after_the_commit_sees": 0,
+   "snapshot_early": "11509311:11509314:",
+   "snapshot_early_is_quiet": false,
+   "importer_before_the_commit_sees": 0,
+   "same_importer_after_the_commit_sees": 0,
+   "ordinary_session_after_the_commit_sees": 1,
+   "wrong": []
+  },
+  "first write inside a subtransaction": {
+   "snapshot_late": "11509314:11509317:",
+   "snapshot_late_is_quiet": false,
+   "importer_after_the_commit_sees": 1,
+   "snapshot_early": "11509317:11509320:",
+   "snapshot_early_is_quiet": false,
+   "importer_before_the_commit_sees": 0,
+   "same_importer_after_the_commit_sees": 0,
+   "ordinary_session_after_the_commit_sees": 0,
+   "wrong": [
+    "importer_after_the_commit_sees",
+    "ordinary_session_after_the_commit_sees"
+   ]
+  },
+  "65 subtransactions after a top-level write": {
+   "snapshot_late": "11509320:11509387:",
+   "snapshot_late_is_quiet": false,
+   "importer_after_the_commit_sees": 1,
+   "snapshot_early": "11509387:11509454:",
+   "snapshot_early_is_quiet": false,
+   "importer_before_the_commit_sees": 0,
+   "same_importer_after_the_commit_sees": 0,
+   "ordinary_session_after_the_commit_sees": 0,
+   "wrong": [
+    "importer_after_the_commit_sees",
+    "ordinary_session_after_the_commit_sees"
+   ]
+  }
+ },
+ "server_version_num": 180006,
+ "library_expects_defect": true,
+ "wal_level": "logical",
+ "correct_answers": {
+  "importer_before_the_commit_sees": 0,
+  "importer_after_the_commit_sees": 0,
+  "same_importer_after_the_commit_sees": 0,
+  "ordinary_session_after_the_commit_sees": 1
+ },
+ "defect_shown": true,
+ "slot_dropped": true
+}
