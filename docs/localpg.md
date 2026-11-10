@@ -57,12 +57,30 @@ Every subprocess has a timeout (10 s for quick tools, 60 s for SQL, 90 s for `pg
 `pg_basebackup`). Mutating commands take an exclusive lock on the home, so a second concurrent invocation waits for
 up to 300 s.
 
+## Postgres versions
+
+localpg runs the binaries of `--pg-bin` / `$CDC_V2_PG_BIN`. The local tiers use Postgres 18 (the default); Postgres
+16 is installed as well (`--pg-bin /opt/homebrew/opt/postgresql@16/bin`), on a home of its own. What depends on the
+version:
+
+- The major version of a home is the one of its data directories (`PG_VERSION`); `state.json` records it as
+  `pg_major` when the home is built. `up` (and every start) refuses binaries of another major version with exit 2
+  and a message; use the matching binaries, another home, or `reset`.
+- Settings that a version does not have are not written: `sync_replication_slots` only from 17 on. `set` refuses
+  `sync_replication_slots` and `synchronized_standby_slots` (17+) and `idle_replication_slot_timeout` (18+) on an
+  older node with exit 2 and "needs Postgres N or later", instead of an SQL error.
+- `status` reads every column of `pg_replication_slots` that the server has; `failover`, `synced`,
+  `invalidation_reason` (17+) are `null` on 16 (shown as `-`). `status --json` also reports `pg_major` (per node
+  and for the home), `bin_major` (the binaries) and `server_version_num`.
+- Failover slots (`failover = true`) and their synchronisation exist from 17 on. On 16 the self-tests that need
+  them are skipped; logical decoding on a standby and `pg_log_standby_snapshot()` exist from 16 on.
+
 ## Topology and settings
 
 - **Primary**: `wal_level = logical`. **Standbys**: they are created with `pg_basebackup` and stream through a
   physical slot (`primary_slot_name = cdc_v2_phys_<node>`) with `hot_standby_feedback = on`, so logical decoding on
-  the replica works. They also have `sync_replication_slots = on`, and their `primary_conninfo` names a database, so
-  failover slots (`failover = true`) that are created on the primary are synchronised to them (PG17+).
+  the replica works. On 17 and later they also have `sync_replication_slots = on`, and their `primary_conninfo` names a
+  database, so failover slots (`failover = true`) that are created on the primary are synchronised to them.
 - Each instance gets `shared_buffers = 128MB`, `max_connections = 50`, `max_wal_senders = 20`,
   `max_replication_slots = 20`, `max_worker_processes = 16` and `wal_retrieve_retry_interval = 1s` (the default is
   5 s; with 1 s, standbys reconnect quickly after a primary restart or crash). It listens on `localhost` (127.0.0.1 and ::1) only.
@@ -128,4 +146,9 @@ sslrootcert=<home>/tls/ca.crt passfile=<home>/secrets/pgpass
 
 ```sh
 tools/with-env uv run pytest -m localpg tests/localpg   # opt-in: the default run deselects the marker localpg
+CDC_V2_PG_BIN=/opt/homebrew/opt/postgresql@16/bin tools/with-env uv run pytest -m localpg tests/localpg
 ```
+
+Run them one at a time: they share one home (`pg-selftest`, ports 55460–55467). A run with binaries of another
+major version than the home's rebuilds the home (`reset`). On 16 the two failover-slot tests are skipped (measured
+2026-11-10: 18.6: 24 passed; 16.6: 22 passed, 2 skipped).
