@@ -35,8 +35,10 @@ transaction when the client dies, so all of that was measured.
    measured 32 s). The takeover must call `md_interrupt_server_connection(<old leader's client_connection_id>)`:
    that ends the old transaction at once and the takeover then succeeds within about 0.2-2 s (SPEC 4.2). The leader
    record therefore stores the leader's `client_connection_id`.
-4. **A dead client's COMMIT can land after the client is gone** (up to 0.56 s after SIGKILL in these trials), and is
-   then fully applied — never partially (SPEC 1.1, 1.7). A restarting run must read its position from MotherDuck, never
+4. **A dead client's COMMIT can land after the client is gone** (up to 1.95 s after SIGKILL in these trials), and is
+   then fully applied — never partially (SPEC 1.1, 1.7). **A dead client's open transaction keeps its rows locked for
+   about 30 s** (SIGKILL: 29.4-29.9 s, 10/10 trials), so a run restarting after a crash conflicts on the leader or
+   state row for up to 30 s unless it interrupts the dead connection (finding 3). A restarting run must read its position from MotherDuck, never
    assume the last unacknowledged batch failed. (Exactly-once by position, SPEC 1.1, already requires this.)
 5. **One shared state row updated by parallel apply transactions makes them conflict** (SPEC 1.3, 5.3, 3.3). Parallel
    appliers need separate state rows (one per stream or per table group), or must be serialised.
@@ -78,13 +80,15 @@ statement 16,820 times, and a third checked it with six separate statements insi
 **zero violations**. **Visibility:** a commit is visible to another process as soon as COMMIT returns: in 9,198 polls
 no poll that started after COMMIT returned saw the older position (zero stale reads); first-seen minus
 COMMIT-returned p50 0.002 s, p99 0.094 s, max 0.146 s (bounded by the 80 ms poll interval). **Crash:** a client was
-SIGKILLed inside a 600,000-row transaction (two tables + state row). Killed mid-transaction: nothing applied (10/10).
+SIGKILLed inside a 600,000-row transaction (two tables + state row). Killed mid-transaction: nothing applied (10/10; rerun 10/10).
 Killed after sending COMMIT (random delay 0-1.5 s): every outcome was all-or-nothing and the invariant always held;
-in 9 of 30 trials the commit landed 0.17-0.56 s **after** the kill, i.e. the client could not know whether it
-committed. One trial in that run showed a second effect: the next client's UPDATE of the state row conflicted with
-the dead client's transaction for more than 20 s. The rerun (`atomic_multi_c.txt`) kills clients that hold an open
-transaction after all their writes and measures how long the dead client's rows stay locked: see that file and
-"Unfinished" below. **Design:** the position-in-the-same-transaction protocol (1.1) is sound on MotherDuck; on
+in 9 of 30 (first run) and 3 of 10 (rerun) trials the commit landed **after** the kill (0.17-1.95 s later), i.e. the
+client could not know whether it committed. **Killed while holding an open transaction** after all its writes
+(rerun, `atomic_multi_c.txt`): nothing was applied, but the dead client's server-side transaction kept the state row
+locked for **29.4-29.9 s** (10 of 10 trials; another client's UPDATE of that row got "Conflict on update!" until
+then) — the same ~30 s lease as for a frozen client in Q5. (In the first run one trial's client could not even
+start: its state-row UPDATE conflicted with the transaction of the client killed 20 s earlier; that trial is the one
+"during_commit applied=False".) **Design:** the position-in-the-same-transaction protocol (1.1) is sound on MotherDuck; on
 restart, read the position from MotherDuck; expect the fencing UPDATE of a restarted run to conflict until the dead
 run's server transaction has ended, and end it with `md_interrupt_server_connection` (Q5).
 
@@ -94,19 +98,24 @@ One transaction inserting 10M lineitem-width rows (server-side generator), then 
 10M, committed in 21.4 s (insert 20.8 s — dominated by the generator's per-row string work —, update 0.24 s,
 delete 0.28 s, commit 0.08 s); no limit, error or timeout; client peak RSS 88 MB (the client holds nothing: the
 transaction lives on the server). The same with 10M rows that survive: insert 20.1 s, update 0.14 s, **commit
-8.9 s**. **Apply shapes** from a staged table already on the server, target 10M rows, one transaction each:
+8.9 s**. **50M rows** (`txn_size_1.txt`): insert+update+delete in one transaction 102.7 s (insert 101 s, update
+0.8 s, delete 0.7 s, commit 0.1 s); 50M surviving rows: insert 101 s, update 0.2 s, **commit 38.4 s**; no limit or
+timeout, client RSS 89 MB. (Updates and deletes in Part 1 hit rows inserted by the same transaction; updates and
+deletes of committed rows are measured in Part 2.) **Apply shapes** from a staged table already on the server, target 10M rows, one transaction each:
 
 | shape | 10K rows | 1M rows | 10M rows |
 |---|---|---|---|
 | INSERT … SELECT | 46K/s | 1.5M/s | 7.5M/s |
 | DELETE … USING | 39K/s | 2.2M/s | 5.0M/s |
 | UPDATE … FROM | 57K/s | 1.4M/s | 10.2M/s |
-| MERGE (half update, half insert) | 42K/s | 170K/s (outlier, see below) | 4.7M/s |
+| MERGE (half update, half insert) | 42K/s | 170K/s; repeat 190K/s | 4.7M/s |
 | DELETE … USING + INSERT (upsert) | 36K/s | 1.1M/s | 3.3M/s |
 | INSERT OR REPLACE (needs a PK) | 33K/s | 0.6M/s | 1.2M/s |
 
 At 10K rows every shape costs about 0.2-0.3 s, i.e. round trips; from 1M rows up the server work dominates and all
-shapes except INSERT OR REPLACE are far above 100K rows/s. **Small transactions** sent from the client (one
+shapes except INSERT OR REPLACE are far above 100K rows/s. MERGE at 1M rows was slow twice (5.9 s and 5.3 s,
+`txn_size_2.txt` is the repeat) although it took 2.1 s at 10M rows: MERGE performance is erratic, `DELETE … USING` +
+`INSERT` is consistently fast. **Small transactions** sent from the client (one
 INSERT … VALUES, one state UPDATE, COMMIT): 3.8 commits/s with 1-row batches and 3.1/s with 100-row batches on one
 connection (p50 0.26 s / 0.32 s ≈ 3-4 round trips), 15.1/s and 11.9/s on four connections. **Design:** apply with
 set-based statements from a staged table (`DELETE … USING` + `INSERT`, or `MERGE`); avoid PK-dependent shapes
@@ -212,11 +221,21 @@ directory). Synthetic lineitem-shaped data (16 B/row as zstd Parquet — it comp
 | server: INSERT … SELECT from another table | 1.9M/s | 7.2M/s |
 
 The appender path (`DuckDBPyConnection.append` of a pandas frame) failed on DECIMAL columns (pandas holds them as
-Python objects and the inferred type was DECIMAL(3,2)); the script now sends them as float64. Real TPC-H data:
-`bulk_load_tpch.txt`. **Design:** a 1M-row batch takes ~1.5-3 s to upload even from a laptop, so the staged-load path
+Python objects and the inferred type was DECIMAL(3,2)); the script now sends them as float64. Real TPC-H lineitem
+(`dbgen` sf 1, 6.0M rows, 25 B/row as zstd Parquet, `bulk_load_tpch.txt`): COPY from Parquet 497K rows/s, Arrow
+stream 548K rows/s, pandas `append` 255K rows/s, 4 processes 710K rows/s (17.7 MB/s of Parquet). **Design:** a 1M-row batch takes ~1.5-3 s to upload even from a laptop, so the staged-load path
 (Arrow stream or Parquet into a staging table, then server-side INSERT … SELECT / swap) has headroom above 100K rows/s;
 the server-side copy rate (7M rows/s) is not the bottleneck.
 
-## Unfinished
+## Unfinished or limited
 
-- (filled in below when the remaining runs finish)
+- Long scans across swaps lasted about 1.1 s each (40M rows processed per scan), not tens of seconds; longer scans were
+  not tried.
+- The SIGKILL "during COMMIT" trials could not separate "COMMIT not yet received by the server" from "received":
+  outcomes are reported per trial; none was partial.
+- Server-side fixed cost of a commit could not be separated from the laptop's round trips; Part 3 of Q3 must be
+  repeated on a Flight (same script) to bound SPEC 5.2/5.3 properly.
+- Bulk-load numbers are laptop-uplink numbers; `bulk_load.py` is ready to run unchanged in a Flight
+  (`CDC_V2_SPIKE_TMP`, `CDC_V2_SPIKE_EVIDENCE`, `CDC_V2_BULK_*` from the environment).
+- The idle-transaction lease (~30 s) was measured, not documented by MotherDuck; whether it is configurable was not
+  found in the public documentation.

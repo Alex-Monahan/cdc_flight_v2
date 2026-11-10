@@ -1,0 +1,27 @@
+{
+  "spike": "txn_size_1",
+  "duckdb_client": "1.5.6",
+  "started_utc": "2026-11-10T02:56:28Z",
+  "note": "measured from a laptop over the public internet; performance numbers are indications only",
+  "part1_50000000": {
+    "rows": 50000000,
+    "insert_s": 101.11168622970581,
+    "inserted": 50000000,
+    "update_s": 0.8059539794921875,
+    "updated": 50000000,
+    "delete_s": 0.6852219104766846,
+    "deleted": 50000000,
+    "commit_s": 0.11369872093200684,
+    "status": "committed",
+    "total_s": 102.71674275398254,
+    "rows_after": 1000,
+    "client_peak_rss_mb": 89
+  },
+  "part1_50000000_surviving": {
+    "insert_s": 100.87630295753479,
+    "update_s": 0.1830132007598877,
+    "commit_s": 38.41974401473999,
+    "total_s": 139.47961902618408
+  },
+  "finished_utc": "2026-11-10T03:00:34Z"
+}
