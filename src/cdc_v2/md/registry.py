@@ -44,21 +44,30 @@ def register(conn, lane, epoch, deadline=None):
     """Write the connection's server-side id into `_cdc.connections`, in one autocommit statement that inserts only
     if `_cdc.leader` still holds ``epoch``. No row inserted: `FenceLost`.
 
-    A lane calls this itself before its first transaction and after every replacement of its connection. Other
-    connections that write for an epoch (the heartbeat connection) call it once, with the lane name they stand
-    for. A lost connection here is `ConnectionLost`: a row may or may not have been written, and one row too many
-    does no harm."""
+    A lane calls this itself before its first transaction and after every replacement of its connection. Another
+    connection that writes for an epoch (the heartbeat connection) calls it with the lane name it stands for:
+    before its first write, and again whenever ``conn.generation`` has changed since (its client connection was
+    replaced, so the server knows it under a new id).
+
+    The row holds the id of the client connection that wrote it: the statement runs on the connection whose id
+    was read, and a connection that is replaced meanwhile is `ConnectionLost`. A lost connection here is
+    `ConnectionLost` too: a row may or may not have been written, and one row too many does no harm. Returns
+    the id."""
     if lane not in LANES:
         raise ValueError("unknown lane %r" % (lane,))
+    if conn._in_block:
+        raise LaneMisuse("this connection is inside a lane transaction")
     d = as_deadline(deadline, conn.settings.statement_deadline_s)
     sess = conn.ensure(d)
     sid = sess.server_id
     try:
-        n = conn._run(SITE_EXECUTE, REGISTER_SQL, [lane, sid, _epoch(epoch)], "count", d, writes=True)
+        n = conn._run_on(sess, SITE_EXECUTE, REGISTER_SQL, [lane, sid, _epoch(epoch)], "count", d, writes=True)
     except CommitUnknown as e:
         raise ConnectionLost("lane %s: connection lost while it registered" % lane) from e
     if n != 1:
         raise FenceLost("lane %s: epoch %d no longer leads (the leader row has another epoch)" % (lane, epoch))
+    if conn._session is not sess or sess.state != "open":
+        raise ConnectionLost("lane %s: the connection was replaced while it registered" % lane)
     return sid
 
 
@@ -88,7 +97,7 @@ def interrupt_earlier(conn, epoch, deadline=None):
         for sid in ids:
             if d.expired:
                 raise DeadlineExceeded("interrupting the connections of earlier epochs")
-            if _interrupt_local(sid):
+            if _interrupt_local(sid, d):
                 done += 1
     if listed:
         log.info("interrupted connections of earlier epochs",

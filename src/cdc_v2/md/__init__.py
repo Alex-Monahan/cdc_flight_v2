@@ -14,9 +14,9 @@ No other module issues BEGIN, COMMIT, ROLLBACK or the fence statement.
 """
 from . import errors, registry, schema
 from .connection import (CLOCK_US_SQL, Connection, background_threads, clock_sql, configure, connect,
-                         default_settings, open_connections, wait_idle)
+                         default_settings, open_connections, statement_kind, wait_idle)
 from .errors import (CommitUnknown, Conflict, ConnectionLost, DeadlineExceeded, DestinationError, FenceLost,
-                     LaneMisuse)
+                     LaneMisuse, StatementError)
 from .lane import FENCE_SQL, Lane, Transaction, crash_points
 from .registry import interrupt_earlier
 from .schema import SchemaError, Step, ensure_leader_tables, migrate, register_migrations
@@ -25,7 +25,8 @@ from .settings import LANES, Settings
 __all__ = [
     "Settings", "configure", "default_settings", "connect", "Connection", "Lane", "Transaction", "LANES",
     "clock_sql", "CLOCK_US_SQL", "FENCE_SQL", "crash_points",
-    "DestinationError", "FenceLost", "CommitUnknown", "Conflict", "ConnectionLost", "DeadlineExceeded", "LaneMisuse",
+    "DestinationError", "FenceLost", "CommitUnknown", "Conflict", "ConnectionLost", "StatementError",
+    "DeadlineExceeded", "LaneMisuse",
     "SchemaError", "Step", "register_migrations", "migrate", "ensure_leader_tables", "interrupt_earlier",
-    "errors", "registry", "schema", "open_connections", "background_threads", "wait_idle",
+    "errors", "registry", "schema", "open_connections", "background_threads", "wait_idle", "statement_kind",
 ]

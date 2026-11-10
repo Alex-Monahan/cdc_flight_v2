@@ -13,7 +13,8 @@ table has the columns they need (`dedup_key`, `first_at`, `last_at`, `count`, `s
 a flat mapping from a lower-case name to an integer, a finite float, or a string of at most `MAX_STRING` printable
 characters. Anything else is refused with `AlertError` before the database is touched.
 
-The table exists after the migrations ran (`md.migrate`); before that an emit fails with the client's catalog error.
+The table exists after the migrations ran (`md.migrate`); before that an emit fails with `md.StatementError`
+(``error_class`` is ``CatalogException``).
 """
 from __future__ import annotations
 
@@ -126,9 +127,11 @@ def _insert(tx, kind, severity, fields, dkey):
         "count": 1, "delivery_state": DELIVERY_PENDING, "delivery_attempts": 0,
         "fields": json.dumps(fields, sort_keys=True), "epoch": tx.epoch, "lane": tx.lane,
     })
+    # Written inside the caller's open transaction, so that the alert is seen even when that transaction fails.
+    # `_cdc.alerts` is the record of what was committed; the field `committed` says what the line cannot know.
     log.warning("alert", extra={"cdc": {"alert_id": alert_id, "kind": kind, "severity": severity,
                                         "dedup_key": dkey, "fields": fields, "epoch": tx.epoch,
-                                        "lane": tx.lane}})
+                                        "lane": tx.lane, "committed": False}})
     return alert_id
 
 

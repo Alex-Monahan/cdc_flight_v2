@@ -247,14 +247,16 @@ def test_a_failing_step_leaves_nothing_half_done(led, lists):
     md.register_migrations("zz_f", log_steps("zz_f", 3, fail_at=2))
     look = led.connect("look")
     lane = led.lane("control", led.epoch)
-    with pytest.raises(duckdb.CatalogException):
+    with pytest.raises(md.StatementError) as info:
         md.migrate(lane)
+    assert (info.value.error_class, info.value.statement) == ("CatalogException", "SELECT")
     # step 1 stays; of step 2 neither its row nor its table nor the version change is there
     assert schema.versions(look)["zz_f"] == (1, "s1")
     assert logged(look, "zz_f") == ["s1"]
     assert "zz_f_half" not in tables(look, "main")
-    with pytest.raises(duckdb.CatalogException):        # again: the same result, nothing piles up
+    with pytest.raises(md.StatementError) as info:      # again: the same result, nothing piles up
         md.migrate(lane)
+    assert info.value.error_class == "CatalogException"
     assert schema.versions(look)["zz_f"] == (1, "s1") and logged(look, "zz_f") == ["s1"]
 
     lists["zz_f"] = log_steps("zz_f", 3)                # the corrected release

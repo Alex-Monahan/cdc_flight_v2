@@ -212,6 +212,42 @@ def test_two_transactions_cannot_both_make_one_transition(ex):
     assert [r[3] for r in log_rows(ex.look, "example_door")] == ["installed", "first"]
 
 
+def test_two_creators_of_one_key_meet_only_through_the_fence_row_of_their_lane(ex):
+    """Found by the review. `create` looks for a row of the key with what its transaction sees, and it writes
+    nothing that a second creator reads. Two transactions that overlap and create one key therefore meet only
+    in the fence row: on one lane name the second one cannot commit, on two lanes both commit and the key has
+    two rows. The layer does not prevent that (no table of this package has a unique constraint); it is a rule
+    for the callers: the rows of one machine are created from one lane. What the layer does guarantee is that
+    the damage is seen: every later `read`, `transition` and `create` of the key fails."""
+    control = ex.lane("control", ex.epoch)
+    with ex.stream.transaction() as tx1:
+        state.create(tx1, ex.door, "d1", "closed", "first")
+        with control.transaction() as tx2:
+            assert state.read(tx2, ex.door, "d1") is None               # it does not see the first one
+            state.create(tx2, ex.door, "d1", "closed", "second")
+    assert ex.look.fetchone("SELECT count(*) FROM _cdc_example.door WHERE door_id = 'd1'")[0] == 2
+    assert sorted(r[3] for r in log_rows(ex.look, "example_door")) == ["first", "second"]
+    with pytest.raises(state.StateError, match="2 rows"):
+        state.read(ex.look, ex.door, "d1")
+    with pytest.raises(state.StateError, match="not unique"):
+        with ex.stream.transaction() as tx:
+            state.transition(tx, ex.door, "d1", "closed", "open", "someone came")
+    with pytest.raises(state.StateError, match="2 rows"):
+        with ex.stream.transaction() as tx:
+            state.create(tx, ex.door, "d1", "closed", "third")          # nor is a third row added
+    assert ex.look.fetchone("SELECT count(*) FROM _cdc_example.door WHERE door_id = 'd1'")[0] == 2
+    # one lane name: the transactions share the fence row, so the one that commits second is refused
+    twin = ex.lane("stream", ex.epoch)
+    with pytest.raises(md.Conflict):
+        with ex.stream.transaction() as tx1:
+            state.create(tx1, ex.door, "d2", "closed", "first")
+            with twin.transaction() as tx2:
+                state.create(tx2, ex.door, "d2", "closed", "second")
+    assert ex.look.fetchone("SELECT count(*) FROM _cdc_example.door WHERE door_id = 'd2'")[0] == 1
+    assert state.read(ex.look, ex.door, "d2") == "closed"
+    assert sorted(r[3] for r in log_rows(ex.look, "example_door") if r[0] == '["d2"]') == ["second"]
+
+
 # ------------------------------------------------------------------------------------------------- enumeration
 def test_every_pair_of_the_example_machines(ex):
     with ex.stream.transaction() as tx:

@@ -228,10 +228,10 @@ def test_nothing_is_written_when_an_alert_is_refused(al):
 
 
 def test_an_alert_before_the_migrations_ran_fails_and_writes_nothing(dest):
-    import duckdb
     epoch = dest.lead(migrate=False)
-    with pytest.raises(duckdb.CatalogException):
+    with pytest.raises(md.StatementError) as info:
         alerts.emit_now(dest.lane("control", epoch), "takeover", "info", {"epoch": epoch})
+    assert info.value.error_class == "CatalogException"       # the table does not exist
     look = dest.connect("look")
     assert look.fetchone("SELECT count(*) FROM information_schema.tables WHERE table_schema = '_cdc' AND "
                          "table_name = 'alerts'")[0] == 0

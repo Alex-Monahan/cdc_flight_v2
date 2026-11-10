@@ -295,7 +295,9 @@ class Run:
             return EXIT_OK
         try:
             self.known = {r[0]: int(r[1]) for r in init.fetchall(READ_POSITIONS_SQL)}
-        except duckdb.CatalogException:
+        except md.StatementError as e:
+            if e.error_class != "CatalogException":       # the table does not exist yet; anything else is real
+                raise
             self.known = {}
         self.say(ev="read", known={k: self.known[k] for k in a.lanes if k in self.known})
         crashpoints.crash_point(P_READ)

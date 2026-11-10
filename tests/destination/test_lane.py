@@ -212,11 +212,12 @@ def test_an_exception_rolls_back_and_is_passed_on(led):
             tx.execute(BUMP)
             raise KeyError("boom")
     assert value(c) == 0 and fence(c) == (1, 0)
-    with pytest.raises(Exception) as info:                      # an error of the statement itself: unchanged type
+    with pytest.raises(md.StatementError) as info:              # an error of the statement itself: its class
         with lane.transaction() as tx:
             tx.execute(BUMP)
             tx.execute("SELECT * FROM no_such_table")
-    assert type(info.value).__name__ == "CatalogException"
+    assert (info.value.error_class, info.value.statement) == ("CatalogException", "SELECT")
+    assert "no_such_table" not in str(info.value)               # nothing of the client's text
     assert value(c) == 0
     with lane.transaction() as tx:
         tx.execute(BUMP)
@@ -256,10 +257,10 @@ def test_arrow_data_and_row_counts(led):
         assert tx.fetch_arrow("SELECT k FROM t WHERE k >= 10 ORDER BY k").column("k").to_pylist() == [10, 11, 12]
         assert tx.clock_us() > 1_600_000_000_000_000
     assert c.fetchone("SELECT count(*), sum(v) FROM t") == (4, 6)
-    with pytest.raises(Exception) as info:                      # the view is gone after the block
+    with pytest.raises(md.StatementError) as info:              # the view is gone after the block
         with lane.transaction() as tx:
             tx.fetchall("SELECT * FROM incoming")
-    assert type(info.value).__name__ == "CatalogException"
+    assert info.value.error_class == "CatalogException"
 
 
 # --------------------------------------------------------------------------------------------- misuse
@@ -397,7 +398,7 @@ def test_a_replaced_connection_is_interrupted_by_id_before_the_new_one_is_used(l
     c = counter(led)
     calls = []
     real = mdc._interrupt_local
-    monkeypatch.setattr(mdc, "_interrupt_local", lambda sid: calls.append(str(sid)) or real(sid))
+    monkeypatch.setattr(mdc, "_interrupt_local", lambda sid, d=None: calls.append(str(sid)) or real(sid, d))
     lane = led.lane("stream", led.epoch)
     with lane.transaction() as tx:
         tx.execute(BUMP)
@@ -583,12 +584,18 @@ def test_an_unclassified_error_after_commit_was_sent_is_commit_unknown(led, faul
     with pytest.raises(md.CommitUnknown):
         with lane.transaction() as tx:
             tx.execute(BUMP)
-    faults.raise_at("md.execute", skip=1, hits=1)               # the same error in a statement is passed on unchanged
-    with pytest.raises(Exception) as info:
-        with lane.transaction() as tx:
-            tx.execute(BUMP)
-    assert type(info.value).__name__ == "FaultInjected"
-    assert value(c) == 0
+    # the same error before COMMIT was sent: rolled back, and its class and the kind of statement are named.
+    # First in BEGIN (the new connection registers with one statement, then BEGIN), then in the statement
+    for kind in ("BEGIN", "UPDATE"):
+        faults.raise_at("md.execute", skip=1, hits=1)
+        with pytest.raises(md.StatementError) as info:
+            with lane.transaction() as tx:
+                tx.execute(BUMP)
+        assert (info.value.error_class, info.value.statement) == ("FaultInjected", kind)
+        assert value(c) == 0 and lane.conn.usable               # the connection is kept
+    with lane.transaction() as tx:
+        tx.execute(BUMP)
+    assert value(c) == 1 and lane.conn.generation == 2
 
 
 def test_abort_from_another_thread_ends_the_call_at_once(led, faults):
@@ -667,9 +674,10 @@ def test_times_are_read_as_integer_microseconds(led):
     try:
         import pytz  # noqa: F401
     except ImportError:
-        with pytest.raises(Exception) as info:
+        with pytest.raises(md.StatementError) as info:
             c.fetchone("SELECT seen_at FROM seen")
-        assert type(info.value).__name__ == "InvalidInputException" and "pytz" in str(info.value)
+        # the client's text names `pytz`; the layer keeps the class and the kind of statement only
+        assert (info.value.error_class, info.value.statement) == ("InvalidInputException", "SELECT")
         assert c.generation == 1                                  # not taken for a lost connection
         assert c.fetchone("SELECT count(*) FROM seen")[0] == 1    # and the connection goes on
 

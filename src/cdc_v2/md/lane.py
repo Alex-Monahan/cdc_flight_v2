@@ -12,8 +12,13 @@ What the block guarantees, whatever happens inside it:
 * after any failed statement nothing is committed. The transaction is rolled back at once and the object is dead:
   a COMMIT that follows a failed statement is answered "OK" by MotherDuck and commits nothing
   (`evidence/p3/destination/error_mapping.json`), so the lane never sends one;
-* every step has a deadline; a step that does not come back retires the connection (see `connection`);
-* the errors are the five of contract C4; anything else is passed on unchanged after the roll-back.
+* every step has a deadline; a step that does not come back retires the connection (see `connection`). The
+  clean-up after a step that failed (roll-back, reading the fence row, removing the registered data) has one
+  ``rollback_deadline_s`` per call for all of it;
+* an exception that breaks a step off in the caller's thread (``KeyboardInterrupt``, ...) gives the connection
+  up and fails the transaction: nothing is committed after it, also when the caller swallows it;
+* the errors are the five of contract C4 and `StatementError` for a statement that the destination refused.
+  Nothing of the client's error text travels on: it can name a value of a row (`errors`).
 """
 from __future__ import annotations
 
@@ -25,8 +30,10 @@ from cdc_v2 import crashpoints
 from cdc_v2.deadline import Deadline, DeadlineExceeded
 
 from . import errors, registry
-from .connection import (CLOCK_US_SQL, SITE_EXECUTE, SITE_FENCE, Connection, _NO_TX, as_deadline, check_sql)
-from .errors import CommitUnknown, Conflict, ConnectionLost, DestinationError, FenceLost, LaneMisuse
+from .connection import (CLOCK_US_SQL, COUNTED, SITE_EXECUTE, SITE_FENCE, Connection, _NO_TX, as_deadline,
+                         check_sql, statement_kind)
+from .errors import (CommitUnknown, Conflict, ConnectionLost, DestinationError, FenceLost, LaneMisuse,
+                     StatementError)
 from .settings import LANES
 
 log = logging.getLogger("cdc_v2.md")
@@ -44,6 +51,26 @@ FENCE_SQL = "UPDATE _cdc.fence SET n = n + 1, epoch = ? WHERE lane = ? AND epoch
 FENCE_EPOCH_SQL = "SELECT epoch FROM _cdc.fence WHERE lane = ?"
 
 _VIEW_NAME = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
+
+
+def _arrow_table(data):
+    """What `register` hands to the client: one ``pyarrow.Table``. Anything that is not a table, a record batch
+    or a list of record batches is refused; no message repeats a piece of the data."""
+    import pyarrow as pa
+    if isinstance(data, pa.Table):
+        return data
+    if isinstance(data, pa.RecordBatch):
+        data = [data]
+    if isinstance(data, pa.RecordBatchReader):
+        raise LaneMisuse("a record batch reader is not registered: read it into a pyarrow.Table first")
+    if not isinstance(data, (list, tuple)) or not all(isinstance(b, pa.RecordBatch) for b in data):
+        raise LaneMisuse("register takes a pyarrow.Table, a record batch or a list of record batches")
+    if not data:
+        raise LaneMisuse("nothing to register: the list of record batches is empty")
+    schema = data[0].schema
+    if any(not b.schema.equals(schema) for b in data[1:]):
+        raise LaneMisuse("the record batches of one registered name have one schema")
+    return pa.Table.from_batches(list(data))
 
 
 def _declare_points():
@@ -111,6 +138,7 @@ class Transaction:
         self._thread = None
         self._sess = None
         self._views = []
+        self._cleanup = None                   # the deadline for the clean-up of the call that is running
 
     # ------------------------------------------------------------------ what a caller may read
     @property
@@ -145,10 +173,10 @@ class Transaction:
                 if conn._session is not sess or sess.state != "open":
                     raise ConnectionLost("lane %s: the connection was replaced while it registered" % lane.name)
                 lane._registered_id = sess.server_id
-            out = sess.call(sess.statement(SITE_EXECUTE, "BEGIN", None, None, tx=True), d)
+            self._sess = sess
+            out = self._on(sess.statement(SITE_EXECUTE, "BEGIN", None, None, tx=True), d)
             if not (out.ok and not out.late):
-                self._sess = sess
-                raise self._failure(out, "BEGIN", rollback=out.ok)
+                raise self._failure(out, "BEGIN", "BEGIN", rollback=out.ok)
         except BaseException:
             self._state = "ended"
             lane._guard.release()
@@ -162,6 +190,7 @@ class Transaction:
     def __exit__(self, exc_type, exc, tb):
         lane, conn = self._lane, self._conn
         state, self._state = self._state, "ended"
+        self._cleanup = None
         try:
             if state == "failed":
                 if exc is None:
@@ -181,9 +210,11 @@ class Transaction:
 
     # ------------------------------------------------------------------ statements
     def execute(self, sql, params=None, deadline=None):
-        """Run one statement. Returns the number of changed rows (INSERT, UPDATE, DELETE, CREATE TABLE AS) or
-        None for a statement that reports none."""
-        return self._call(sql, params, "count", deadline)
+        """Run one statement. Returns the number of rows an INSERT, UPDATE or DELETE changed, else None (also
+        for CREATE TABLE AS and MERGE, and for a statement with RETURNING: its rows are read with
+        `fetchall`)."""
+        n = self._call(sql, params, "count", deadline)
+        return n if statement_kind(sql) in COUNTED else None
 
     def execute_one(self, sql, params=None, deadline=None):
         """Run a statement that must change exactly one row (the run-again rule of C4). Any other count rolls the
@@ -204,7 +235,9 @@ class Transaction:
         return self._call(sql, params, "one", deadline)
 
     def fetch_arrow(self, sql, params=None, deadline=None):
-        """The result of a query as a ``pyarrow.Table``."""
+        """The result of a query as a ``pyarrow.Table``, read completely before the call returns. (The
+        client's lazy reader is never handed out: registering a reader on the connection that produced it and
+        querying it does not come back.)"""
         return self._call(sql, params, "arrow", deadline)
 
     def clock_us(self, deadline=None):
@@ -212,16 +245,21 @@ class Transaction:
         return int(self._call(CLOCK_US_SQL, None, "one", deadline)[0])
 
     def register(self, name, data, deadline=None):
-        """Make local Arrow data (a ``pyarrow.Table`` or record batch reader) visible to this connection's
-        statements under ``name`` until the block ends."""
+        """Make local Arrow data readable by this connection's statements under ``name`` until the block ends:
+        a ``pyarrow.Table``, a ``pyarrow.RecordBatch`` or a list of record batches. A name that is registered
+        already gets the new data. When the block ends the name is removed, also when it ends by an error or
+        a deadline.
+
+        ``name`` matches ``^[a-z_][a-z0-9_]{0,62}$``. A record batch reader is refused: it can be read once,
+        and a reader that this connection produced cannot be read by a statement of this connection (the
+        client waits for itself)."""
         self._check()
-        if not isinstance(name, str) or not _VIEW_NAME.match(name):
-            raise LaneMisuse("a registered name is a lower-case identifier")
-        if data is None:
-            raise LaneMisuse("nothing to register")
-        out = self._sess.call(self._sess.view(name, data), self._stmt_deadline(deadline))
+        if not isinstance(name, str) or not _VIEW_NAME.fullmatch(name):     # `$` alone lets a last newline pass
+            raise LaneMisuse("a registered name is a lower-case identifier of at most 63 characters")
+        data = _arrow_table(data)
+        out = self._on(self._sess.view(name, data), self._stmt_deadline(deadline))
         if not (out.ok and not out.late):
-            raise self._fail(self._failure(out, "registering local data"))
+            raise self._fail(self._failure(out, "registering local data", "REGISTER"))
         if name not in self._views:
             self._views.append(name)
 
@@ -243,6 +281,7 @@ class Transaction:
             raise LaneMisuse("a transaction object is used inside its block only")
         if threading.get_ident() != self._thread:
             raise LaneMisuse("a transaction is used by the thread that opened it")
+        self._cleanup = None                   # a new call: its clean-up has its own time
 
     def _stmt_deadline(self, deadline):
         d = as_deadline(deadline, self._conn.settings.statement_deadline_s)
@@ -250,21 +289,49 @@ class Transaction:
 
     def _call(self, sql, params, fetch, deadline, site=SITE_EXECUTE):
         self._check()
-        check_sql(sql)
-        sess = self._sess
-        out = sess.call(sess.statement(site, sql, params, fetch), self._stmt_deadline(deadline))
+        try:
+            check_sql(sql, "lane %s" % self._lane.name)
+        except StatementError as e:                 # the client cannot parse it; nothing was sent. A failed
+            self._rollback()                        # statement like any other: nothing is committed after it
+            raise self._fail(e)
+        out = self._on(self._sess.statement(site, sql, params, fetch), self._stmt_deadline(deadline))
         if out.ok and not out.late:
             return out.result
-        raise self._fail(self._failure(out, "a statement"))
+        raise self._fail(self._failure(out, "a statement", statement_kind(sql)))
+
+    def _on(self, fn, deadline):
+        """Run one step of the block on its connection and wait for it (`Session.call`).
+
+        The call itself raises only when something breaks the wait off in this thread (``KeyboardInterrupt``,
+        ...). What the step did is not known then. The connection is given up, so that nothing can be committed
+        on it, the transaction is failed, and the exception is passed on."""
+        sess = self._sess
+        try:
+            return sess.call(fn, deadline)
+        except BaseException as e:
+            self._conn._drop_session(sess)
+            if self._state == "open":
+                self._fail(e)
+            raise
+
+    def _budget(self):
+        """The deadline for the clean-up of the call that is running. The roll-back, the read of the fence row
+        and the removal of the registered data share one ``rollback_deadline_s``, counted from the first of
+        them: a call returns at the latest ``rollback_deadline_s`` plus the grace period after the step that
+        failed."""
+        if self._cleanup is None:
+            self._cleanup = Deadline.after(self._conn.settings.rollback_deadline_s)
+        return self._cleanup
 
     def _fail(self, error):
         self._state = "failed"
         self._error = error
         return error
 
-    def _failure(self, out, what, rollback=True):
+    def _failure(self, out, what, statement, rollback=True):
         """The error for a step before COMMIT that did not succeed. Afterwards the transaction is gone: rolled
-        back on a connection that still works, or left to the reaper of a retired one."""
+        back on a connection that still works, or left to the reaper of a retired one. ``statement`` is the
+        kind of the step, for the `StatementError` of a step that the destination refused."""
         name, conn, sess = self._lane.name, self._conn, self._sess
         if not out.sent:
             if rollback:
@@ -280,26 +347,25 @@ class Transaction:
         kind = errors.kind_of(err)
         if kind == "transport":
             conn._drop_session(sess)
-            e = ConnectionLost("lane %s: connection lost during %s: %s" % (name, what, errors.safe_text(err)))
-            e.__cause__ = err
-            return e
+            # the client's error is not attached, and of its text only a phrase from the list travels on
+            return ConnectionLost("lane %s: connection lost during %s: %s" % (name, what, errors.label(err)))
         if rollback:
             self._rollback()
         if kind == "conflict":
             return Conflict("lane %s: write-write conflict in %s" % (name, what))
-        return err
+        # the client's text can name a value of a row (SPEC 8.3): its class and the kind of statement travel on
+        return errors.refused(err, "lane %s" % name, statement)
 
     def _rollback(self):
-        """ROLLBACK with a deadline. A connection that cannot roll back in time is retired; its reaper interrupts
-        the server connection, which rolls the transaction back there."""
+        """ROLLBACK within the clean-up time of the call (`_budget`). A connection that cannot roll back in time
+        is retired; its reaper interrupts the server connection, which rolls the transaction back there."""
         conn, sess = self._conn, self._sess
         if sess is None:
             return
         if sess.state != "open":
             conn._drop_session(sess)
             return
-        d = Deadline.after(conn.settings.rollback_deadline_s)
-        out = sess.call(sess.statement(SITE_EXECUTE, "ROLLBACK", None, None, tx=False), d)
+        out = self._on(sess.statement(SITE_EXECUTE, "ROLLBACK", None, None, tx=False), self._budget())
         if out.ok and not out.late:
             return
         if out.sent and out.returned and not out.late and out.error is not None and _NO_TX.search(str(out.error)):
@@ -307,7 +373,7 @@ class Transaction:
             return
         log.warning("roll-back failed; connection retired",
                     extra={"cdc": {"lane": self._lane.name, "late": bool(out.late),
-                                   "error": errors.safe_text(out.error) if out.error is not None else None}})
+                                   "error": errors.label(out.error) if out.error is not None else None}})
         conn._drop_session(sess)
 
     def _drop_views(self):
@@ -315,8 +381,9 @@ class Transaction:
         views, self._views = self._views, []
         if sess is None or sess.state != "open":
             return
+        d = self._budget()
         for name in views:
-            out = sess.call(sess.view(name, None), Deadline.after(self._conn.settings.rollback_deadline_s))
+            out = self._on(sess.view(name, None), d)
             if not (out.ok and not out.late):
                 self._conn._drop_session(sess)
                 return
@@ -324,10 +391,11 @@ class Transaction:
     def _fence_conflict(self):
         """The fence row is being written, or was written, by someone else. After the roll-back, read the row to
         tell a finished take-over (`FenceLost`) from one in progress or a lane used twice (`Conflict`)."""
-        lane, conn = self._lane, self._conn
+        lane, conn, d = self._lane, self._conn, self._budget()
         try:
-            row = conn._run(SITE_EXECUTE, FENCE_EPOCH_SQL, [lane.name], "one",
-                            Deadline.after(conn.settings.rollback_deadline_s), writes=False)
+            # no time left: not read. `Conflict` then; the next try of the caller meets the fence statement
+            row = () if d.expired else conn._run(SITE_EXECUTE, FENCE_EPOCH_SQL, [lane.name], "one", d,
+                                                 writes=False)
         except (DestinationError, DeadlineExceeded):
             row = ()
         if row is None or (row and int(row[0]) != lane.epoch):
@@ -340,9 +408,9 @@ class Transaction:
         lane, conn, sess, d = self._lane, self._conn, self._sess, self._deadline
         name, epoch = lane.name, lane.epoch
         fenced, commit_sent, committed = _POINTS[name]
-        out = sess.call(sess.statement(SITE_FENCE, FENCE_SQL, [epoch, name, epoch], "count"), d)
+        out = self._on(sess.statement(SITE_FENCE, FENCE_SQL, [epoch, name, epoch], "count"), d)
         if not (out.ok and not out.late):
-            err = self._failure(out, "the fence statement")
+            err = self._failure(out, "the fence statement", "FENCE")
             if isinstance(err, Conflict):
                 err = self._fence_conflict()
             raise err
@@ -362,7 +430,11 @@ class Transaction:
         if job is None:                             # retired from outside (abort) before anything was sent
             conn._drop_session(sess)
             raise ConnectionLost("lane %s: connection closed before COMMIT" % name)
-        out = sess.wait(job, d)
+        try:
+            out = sess.wait(job, d)
+        except BaseException:                       # the wait was broken off: the outcome of COMMIT is unknown
+            conn._drop_session(sess)
+            raise
         if out.ok:
             if out.late:                            # it did commit; only the connection is replaced
                 conn._drop_session(sess)
@@ -372,8 +444,8 @@ class Transaction:
                 self._rollback()
                 raise Conflict("lane %s: write-write conflict at COMMIT" % name)
             conn._drop_session(sess)
-            why = errors.safe_text(err) if err is not None else "no answer within the deadline and the grace period"
-            e = CommitUnknown("lane %s: the outcome of COMMIT is unknown (%s)" % (name, why))
-            e.__cause__ = err
-            raise e
+            # a constraint that COMMIT reports names a key: only the class of the client's error travels on, and
+            # the error is not attached (SPEC 8.3)
+            why = errors.label(err) if err is not None else "no answer within the deadline and the grace period"
+            raise CommitUnknown("lane %s: the outcome of COMMIT is unknown (%s)" % (name, why))
         crashpoints.crash_point(committed)

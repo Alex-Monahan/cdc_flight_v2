@@ -205,9 +205,11 @@ _LOG_SQL = ("INSERT INTO _cdc.transitions (machine, key, from_state, to_state, c
 def _record(tx, m, key, from_state, to_state, cause):
     key_text = json.dumps(list(key), default=str)
     tx.execute(_LOG_SQL, [m.name, key_text, from_state, to_state, cause, getattr(tx, "epoch", None)])
+    # The line is written inside the caller's open transaction: the change holds only if that transaction
+    # commits. `_cdc.transitions` is the record; the field `committed` says what the line cannot know.
     log.info("state transition", extra={"cdc": {"machine": m.name, "key": key_text, "from": from_state,
                                                 "to": to_state, "cause": cause,
-                                                "epoch": getattr(tx, "epoch", None)}})
+                                                "epoch": getattr(tx, "epoch", None), "committed": False}})
 
 
 def _stored(reader, m, key):
@@ -249,7 +251,12 @@ def transition(tx, machine, key, from_state, to_state, cause):
 def create(tx, machine, key, state, cause, values=None):
     """Add the row of a new key in ``state``. Fails with `IllegalTransition` when the key has a row already
     (``stored`` says in which state) or when ``state`` is not one a new row may have. ``values`` gives the other
-    columns of the new row (column name -> value; the value `NOW` stands for MotherDuck's clock)."""
+    columns of the new row (column name -> value; the value `NOW` stands for MotherDuck's clock).
+
+    The check for an existing row sees what this transaction sees. Two transactions that create one key at the
+    same time meet only through the fence row of their lane: on one lane the second one gets `Conflict`, on
+    two lanes both commit and the key has two rows (`read` and `transition` then raise `StateError`). So the
+    rows of one machine are created from one lane only (`docs/design/destination.md`, contract notes)."""
     m = _resolve(machine)
     key = _key(m, key)
     cause = _cause(cause)
