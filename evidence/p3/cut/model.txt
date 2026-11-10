@@ -1,13 +1,13 @@
 standby model, 1 transaction(s), up to 3 records: 804 worlds, 47060 reader interleavings, 0.1 s
   sound rules violated: none
   wrong rules refuted:  r1_inside=201, r1_outside=201, naive_sharp=48
-standby model, 2 transaction(s), up to 3 records: 11280 worlds, 1178688 reader interleavings, 3.6 s
+standby model, 2 transaction(s), up to 3 records: 11280 worlds, 1178688 reader interleavings, 4.0 s
   sound rules violated: none
   wrong rules refuted:  r1_inside=6580, r1_outside=6580, naive_sharp=1600, xmax_inside=2256, xmin_outside=1880
-standby model, 2 transaction(s), up to 4 records: 65280 worlds, 9638328 reader interleavings, 29.4 s
+standby model, 2 transaction(s), up to 4 records: 65280 worlds, 9638328 reader interleavings, 33.1 s
   sound rules violated: none
   wrong rules refuted:  r1_inside=38080, r1_outside=38080, naive_sharp=8480, xmax_inside=13056, xmin_outside=10880
-a server that moves the position before the commit becomes visible (1 transaction, up to 3 records): violated ['inside', 'library', 'usable']
+a server that moves the position before the commit becomes visible (1 transaction, up to 3 records): violated ['inside', 'library', 'sharp', 'usable']
 primary model, 1 transaction(s), 1 marker(s): 7 histories; sound rules violated: none; wrong rules refuted: ['later_snapshot', 'probe_after_snapshot', 'xmax_ge_x']
 primary model, 2 transaction(s), 1 marker(s): 145 histories; sound rules violated: none; wrong rules refuted: ['later_snapshot', 'probe_after_snapshot', 'xmax_ge_x']
 primary model, 3 transaction(s), 1 marker(s): 6265 histories; sound rules violated: none; wrong rules refuted: ['later_snapshot', 'probe_after_snapshot', 'xmax_ge_x']

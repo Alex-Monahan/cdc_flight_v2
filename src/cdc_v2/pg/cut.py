@@ -32,13 +32,17 @@ Rules of use that this module enforces:
   function that takes a standby cut demands it.
 * **Export defect.**  On the server versions that :func:`export_defect` names, an exported snapshot of a standby
   is given out only if it is quiet.
-* **Timeline.**  A cut records the timeline it was taken on and is valid only there (``valid_on``).
+* **Timeline.**  A cut records the timeline it was taken on and is valid only there (``valid_on``).  On a
+  standby SQL shows a lower bound of that timeline only; ``valid_on`` says what the caller has to pass so that
+  the answer is exact.
 
 This module has two halves: pure logic (transaction-id arithmetic, the cut classes) and the few SQL statements
 that take a cut.  The SQL half needs a psycopg connection in autocommit mode; nothing here opens a connection or
-names a host or a port.  Positions are integers (``cdc_v2.lsn``).  Every loop that waits takes a
+names a host or a port.  With the source package's connections that is ``cdc_v2.pg.PgConnection.raw``, and the
+caller wraps the call in ``PgConnection.guard(deadline, what)``, which is that package's rule for every direct
+use of ``raw``.  Positions are integers (``cdc_v2.lsn``).  Every loop that waits takes a
 ``cdc_v2.deadline.Deadline`` and ends with ``DeadlineExceeded``; single statements are bounded by the
-``statement_timeout`` of the connection (:func:`set_statement_timeout`).
+``statement_timeout`` of the connection (:func:`set_statement_timeout`) or by the caller's guard.
 """
 
 from __future__ import annotations
@@ -305,10 +309,20 @@ class StandbyCut:
     def valid_on(self, timeline: Optional[int]) -> bool:
         """The cut belongs to the timeline it was taken on: true only if ``timeline`` is that one.
 
-        ``timeline`` is the timeline the stream is on now, as the slot check knows it.  After a promotion or a
+        ``timeline`` is the timeline the stream is on, read exactly (``IDENTIFY_SYSTEM`` over a replication
+        connection: ``cdc_v2.pg.slot.timeline_history``) **after this cut was taken**.  After a promotion or a
         slot finding it differs (or the caller passes ``None``): the cut is abandoned, with every answer it gave
         and everything read under its snapshot, and the table's backfill starts again.  A cut that recorded no
         timeline is valid nowhere.
+
+        Why "after".  A standby cut records the timeline of the control file's checkpoint (:func:`timeline`),
+        which is at or below the timeline replay was on when the cut was taken; and a node's timeline never
+        goes back.  So: recorded <= timeline of the cut <= timeline read later on the same node.  If the outer
+        two are equal, the cut was taken on that timeline.  A value read before the cut proves nothing.
+
+        When the cut was taken on another node than the one that holds the slot, the caller reads that node's
+        timeline in the same way and after the cut, and uses the cut only if this method is true for it and
+        the stream's timeline is the same number.
         """
         return _same_timeline(self.timeline, timeline)
 
@@ -563,10 +577,11 @@ def timeline(conn) -> int:
     On a primary it is exact: the timeline of the WAL insert position.  On a standby SQL does not show the
     timeline that replay is on; the value is the timeline of the checkpoint named in the control file, which is
     the replay timeline or, between a timeline switch and the standby's next restart point, the one before it.
-    It never runs ahead.  A standby cut records this value, read before its snapshot is taken, so the lag can
-    only make :meth:`StandbyCut.valid_on` say no to a cut that was still good (the backfill then starts again
-    once more); it cannot make it say yes after a switch, provided the caller compares with the exact timeline
-    of the stream (the slot check reads that over the replication connection).
+    It never runs ahead.  A standby cut records this value, read before its snapshot is taken.  Compared with
+    an exact timeline of the same node read after the cut (:meth:`StandbyCut.valid_on`), the lag can only make
+    the answer no for a cut that was good (the backfill then starts again once more).  Compared with a value
+    read before the cut, or with the timeline of another node only, it could say yes to a cut taken after a
+    switch; ``valid_on`` therefore says which value to pass.
     """
     _require_autocommit(conn)
     control, walfile = _one(conn, SQL_TIMELINE)
@@ -796,8 +811,9 @@ def probe_snapshot(conn) -> PrimaryCut:
 def next_xid_marker(conn) -> int:
     """Assign one transaction id on the primary and return it as a 64-bit id (``X`` of the primary rule).
 
-    Every transaction id assigned earlier is smaller.  Call it after the table's switch to ``backfilling`` is
-    committed.  It costs one transaction id.
+    Every transaction id assigned earlier is smaller.  Two callers: the stream lane after an engine start, for
+    ``GapTracker(unknown_below=...)``; and a backfill that uses the simple rule ``xmin >= X``, after the table's
+    switch to ``backfilling`` is committed.  It costs one transaction id.
     """
     _require_autocommit(conn)
     text, in_recovery = _one(conn, SQL_NEXT_XID)
