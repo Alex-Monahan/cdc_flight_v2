@@ -74,8 +74,9 @@ Rules:
 - The commit deadline scales with the size of the group: `apply.commit_timeout_base` plus
   `apply.commit_timeout_per_million_rows` × rows. A commit has no progress signal, so the supervisor uses this
   deadline instead of the 120 s silence rule while a commit is in flight.
-- Staging rows of a committed group are deleted in the next group's transaction or by a truncate of the staging
-  table between groups, never in a way that can lose rows of an uncommitted group.
+- Staging rows of a large transaction (section 6.4) are deleted after its commit, by the next group's transaction
+  or by a truncate of the staging table between groups, never in a way that can lose rows of a transaction that
+  is not committed.
 
 ## 4. Leader, fence, heartbeat
 
@@ -200,15 +201,26 @@ The engine sends change records as Arrow record batches, one stream per table. E
 | before columns | old image, only for tables without a key (`REPLICA IDENTITY FULL`) |
 | `_unchanged` | list of columns whose value is an unchanged TOAST placeholder |
 
-The pipeline appends the batches to staging tables in MotherDuck, in a schema that is private to the leader epoch
-(`_cdc_stage_<epoch>`; schemas of older epochs are dropped during start-up). Staging appends are committed on
-their own and are not fenced: they are invisible to consumers, and a stale leader can only write into its own
-epoch's schema. The buffer in front of the append has a byte limit; when it is full the pipeline stops reading
-the engine's pipe, which stops the engine's queue and then the slot read (back-pressure, SPEC 5.4).
+A group is held in memory as Arrow tables and applied **directly**: the statements of 6.2–6.3 read the local Arrow
+data through the client (a registered relation, or a TEMP table, which also lives in the client). Measured on an
+F16 Flight (`docs/spike/md_semantics.md`, "On an F16 Flight", run 4): 0.066 s for a group of 1–100 rows, 212K
+rows/s at 100K rows, 342–355K rows/s at 1M rows. A staging table in MotherDuck was slower at every size and more
+sensitive to load on the server, so it is used only for a transaction larger than a group (6.4).
 
-Whether small groups skip the staging tables and apply straight from the local Arrow data is decided by the
-measurement on a Flight (`docs/spike/md_semantics.md`, apply-transaction part). The statements of 6.2–6.3 are the
-same in both cases; only the name of their input relation differs.
+Rules that follow from the measurements:
+
+- Arrow data is handed to DuckDB in bounded record batches, never as one reader over an unbounded stream (a
+  reader over 12M rows grew to 2 GB of client memory).
+- `net` (6.2) and `delta` (6.3) are computed once per table and group on the client; the statements that follow
+  read that result, so the rows are uploaded once per statement that needs them.
+- The memory a group may hold is `apply.max_group_bytes`. The buffer in front of it has a byte limit; when it is
+  full the pipeline stops reading the engine's pipe, which stops the engine's queue and then the slot read
+  (back-pressure, SPEC 5.4).
+
+Staging tables for 6.4 live in a schema that is private to the leader epoch (`_cdc_stage_<epoch>`; schemas of
+older epochs are dropped during start-up). Appends to them are committed on their own and are not fenced: they
+are invisible to consumers, and a stale leader can only write into its own epoch's schema. The statements of
+6.2–6.3 are the same for both inputs; only the name of the input relation differs.
 
 ### 6.2 Tables with a key
 
@@ -246,9 +258,10 @@ type fuzzer checks this for every type, because a keyless delete can only find a
 
 ### 6.4 A transaction larger than a group
 
-Its records are appended to the staging tables in committed chunks while they arrive, so memory and local disk stay
-bounded. At its END record one destination transaction runs the statements of 6.2–6.3 over all of its staged rows,
-writes the position, fences and commits. The applied position does not move, and no later source transaction
+Its records are appended to staging tables in MotherDuck (6.1) in committed chunks while they arrive, so memory and
+local disk stay bounded, and the upload is finished before the END record arrives. At its END record one
+destination transaction runs the statements of 6.2–6.3 over all of its staged rows, writes the position, fences
+and commits. The applied position does not move, and no later source transaction
 becomes visible, until that commit. Nothing is ever applied from an unfinished source transaction.
 
 ### 6.5 Segments
@@ -400,7 +413,7 @@ src/cdc_v2/oracle/          source/destination comparison used by every test tie
 | 1 | Cut on a standby (7.2) is exact as described | P3 stress test |
 | 2 | `rowid` is usable to delete exactly k identical rows (6.3) | P3 test on MotherDuck |
 | 3 | Canonical comparison form for UNION and NaN (6.3) | P3, with the oracle |
-| 4 | Staging tables versus direct apply for small groups (6.1) | Flight measurement in P2 |
+| 4 | Staging tables versus direct apply (6.1) | decided by the Flight measurement in P2: direct for groups, staging tables only for 6.4 |
 | 5 | Appends by the stream lane and reads by the backfill lane on one pending log do not conflict (7.1) | P3 test on MotherDuck |
 | 6 | Identity of a recreated slot; reading the timeline history (8) | P3, stage 2 for PlanetScale |
 | 7 | Publication join rule (7.5) | P4 discovery work |

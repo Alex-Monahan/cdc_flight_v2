@@ -25,7 +25,7 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 | Spike (PLAN §2 A) | State | Report |
 |---|---|---|
 | 4 Flight SQL functions, platform facts | done | `docs/spike/flight_platform.md` |
-| 3 MotherDuck semantics | laptop part done and merged; the network-bound measurements are being repeated inside an F16 Flight | `docs/spike/md_semantics.md` |
+| 3 MotherDuck semantics | done (laptop part and the repeat inside an F16 Flight) | `docs/spike/md_semantics.md` |
 | 1 JVM and stock Debezium on a Flight | done | `docs/spike/jvm_on_flight.md` |
 | 2 Run semantics | done | `docs/spike/run_semantics.md` |
 | 5 Local throughput (first indication) | part 1 (read rate from the replica) running; part 2 (stock Debezium streaming rate) starts when part 1 has finished, on the same private cluster | `docs/spike/local_throughput.md` |
@@ -51,6 +51,13 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
   this file.
 - **MotherDuck account**: Flights and `cdc_v2_*` databases are created under the owner's own account (PLAN §9), not
   under the service account. Say so if the service account should be used instead.
+- **One MotherDuck account, one server instance.** Measured on a Flight: a heavy query from any other session of
+  the same MotherDuck user made the Flight's server-side work 4–5 times slower. Two consequences. (1) Because the
+  build runs under the owner's own account, its test and fuzz campaigns share the server instance with everything
+  else the owner runs under that account, in both directions. (2) Performance numbers (SPEC 3.1, 5.1–5.3) are only
+  valid when the account is otherwise idle; the build makes its own workers idle for such runs but cannot see the
+  owner's other sessions. A dedicated service account for the pipeline removes both; SPEC already expects one in
+  production.
 - `SLACK_WEBHOOK_URL` and the alert channel: not provided; alerts are tested against a local stub until then.
 - MotherDuck plan and region: measured in P2 — Business plan, us-east-1, maximum run time 8 h
   (`docs/spike/flight_platform.md`). No longer open.
@@ -107,9 +114,9 @@ Each in its own worktree and branch (Opus, high effort); the orchestrator merges
 
 | Job | Phase | Started | Delivers |
 |---|---|---|---|
-| Spike worker: MotherDuck semantics, second part — the same measurements inside an F16 Flight (`cdc_v2_spike_md*`) | P2 (§2 A 3) | 2026-11-09 | `flights/spike_md/`, additions to `docs/spike/md_semantics.md`, `evidence/p2/md_semantics/flight_*` |
 | Spike worker: local read throughput (private cluster, home `pg-spike-tp`, ports 55500–55509; MotherDuck database `cdc_v2_spike_tp`) | P2 (§2 A 5, part 1) | 2026-11-09 | `spikes/local_throughput/`, `docs/spike/local_throughput.md`, `evidence/p2/local_throughput/` |
 | P3 worker, started early in a free slot: oracle, tier-T1 harness (isolated source and destination per test, evidence writer with redaction), seeded workload generator. MotherDuck databases `cdc_v2_t_*`; private clusters from port 55520 | P3 | 2026-11-10 | `src/cdc_v2/oracle/`, `src/cdc_v2/testing/`, `tools/oracle`, `docs/oracle.md`, `evidence/p3/oracle/` |
+| P3 worker, started early in a free slot: crash-point and fault-injection harness (named crash points, crash runner with a ledger, process control for competing runs, TCP fault proxy on ports 55440–55459, byte-stream fault relay, run-time fault sites, toy systems that prove the harness catches a wrong commit protocol). No MotherDuck use | P3 | 2026-11-10 | `src/cdc_v2/crashpoints.py`, `src/cdc_v2/faultsites.py`, `src/cdc_v2/testing/{procs,crash,netproxy,pipefaults,faults}.py`, `tools/netproxy`, `tests/harness/`, `docs/testing/harness.md`, `evidence/p3/harness/` |
 
 Not started yet: part 2 of the local throughput spike (stock Debezium streaming rate for small transactions and for
 one 10M-row transaction). It reuses the JVM program of the JVM spike (merged) and the private cluster of part 1,
@@ -121,6 +128,18 @@ continuity, state machines, modules, open points). P3 workers build against it.
 
 Finished and merged:
 
+- 2026-11-10 — MotherDuck semantics repeated inside an F16 Flight (§2 A 3, second part): `flights/spike_md/`,
+  `spikes/md_semantics/{apply_txn,flight_extract}.py`, the "On an F16 Flight" part of `docs/spike/md_semantics.md`,
+  `evidence/p2/md_semantics/flight_r4_*` (run 4 is the uncontended run; runs 2–3 are kept and labelled as
+  contended). The spike Flight is deleted; no Flight, secret or spike database is left. What it settles: a round
+  trip from a Flight is 8 ms (80 ms from the laptop) and the Flight's clock agrees with the server within 4 ms (the
+  single-clock rule stays); a complete apply transaction of 1–100 rows takes 0.066 s; apply reaches 212K rows/s at
+  100K-row groups and 342–355K rows/s at 1M-row groups on one connection; bulk load of real `lineitem` rows by
+  `COPY` from Parquet reaches 1.58M rows/s; more than two loader processes never help (2 CPUs). The applier is
+  limited by round trips for small groups and by client upload and CPU for large ones, not by MotherDuck. Design
+  consequences, written into `docs/design/core.md` 6.1: groups are applied directly from local Arrow data, staging
+  tables in MotherDuck are used only for a transaction larger than a group; Arrow is handed over in bounded
+  batches. **All sessions of one MotherDuck user share one server instance** (see the questions for the owner).
 - 2026-11-10 — JVM and stock Debezium on a Flight (§2 A 1): `jvm/` (lock files, `EngineMain.java`),
   `src/cdc_v2/artifacts.py`, `flights/spike_jvm/`, `spikes/jvm_on_flight/`, `docs/spike/jvm_on_flight.md`,
   `evidence/p2/jvm_on_flight/` (8 Flight runs). The spike Flight is deleted. What it settles: candidate B works on
