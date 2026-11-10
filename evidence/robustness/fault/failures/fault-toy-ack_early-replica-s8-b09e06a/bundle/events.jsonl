@@ -1,0 +1,20 @@
+{"epoch": 1, "kind": "took_over", "pid": 21841, "previous_age_ms": 847634967412, "previous_state": "released", "run": "i1-21841", "t": 1794319767.4146, "tag": "i1"}
+{"epoch": 1, "kind": "started", "pid": 21841, "run": "i1-21841", "t": 1794319767.417185, "tag": "i1", "variant": "ack_early"}
+{"kind": "resync_start", "pid": 21841, "run": "i1-21841", "t": 1794319767.44509, "tag": "i1", "why": "pending"}
+{"kind": "resync_done", "pid": 21841, "position": "0/228352E8", "rows": 24, "run": "i1-21841", "t": 1794319767.63156, "tag": "i1"}
+{"epoch": 2, "kind": "took_over", "pid": 21936, "previous_age_ms": 2019, "previous_state": "leading", "run": "i3-21936", "t": 1794319771.930506, "tag": "i3"}
+{"epoch": 2, "kind": "started", "pid": 21936, "run": "i3-21936", "t": 1794319771.935725, "tag": "i3", "variant": "ack_early"}
+{"epoch": 3, "kind": "took_over", "pid": 21963, "previous_age_ms": 2030, "previous_state": "leading", "run": "i4-21963", "t": 1794319774.63295, "tag": "i4"}
+{"epoch": 3, "kind": "started", "pid": 21963, "run": "i4-21963", "t": 1794319774.637706, "tag": "i4", "variant": "ack_early"}
+{"detail": "keyless public.w_nkt found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 21963, "run": "i4-21963", "t": 1794319774.983246, "tag": "i4"}
+{"detail": "keyless public.w_nkt found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 21963, "run": "i4-21963", "t": 1794319775.267261, "tag": "i4"}
+{"detail": "keyless public.w_nkt found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 21963, "run": "i4-21963", "t": 1794319775.634431, "tag": "i4"}
+{"kind": "quarantined", "pid": 21963, "run": "i4-21963", "t": 1794319775.653999, "table": "public.w_nkt", "tag": "i4"}
+{"detail": "keyless public.w_nk found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 21963, "run": "i4-21963", "t": 1794319776.12928, "tag": "i4"}
+{"detail": "keyless public.w_nk found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 21963, "run": "i4-21963", "t": 1794319776.789174, "tag": "i4"}
+{"detail": "keyless public.w_nk found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 21963, "run": "i4-21963", "t": 1794319777.854859, "tag": "i4"}
+{"kind": "quarantined", "pid": 21963, "run": "i4-21963", "t": 1794319777.873963, "table": "public.w_nk", "tag": "i4"}
+{"detail": "keyless public.w_dk found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 21963, "run": "i4-21963", "t": 1794319779.181722, "tag": "i4"}
+{"detail": "keyless public.w_dk found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 21963, "run": "i4-21963", "t": 1794319780.528016, "tag": "i4"}
+{"detail": "keyless public.w_dk found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 21963, "run": "i4-21963", "t": 1794319781.814658, "tag": "i4"}
+{"kind": "quarantined", "pid": 21963, "run": "i4-21963", "t": 1794319781.839661, "table": "public.w_dk", "tag": "i4"}

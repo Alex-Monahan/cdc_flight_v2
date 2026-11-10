@@ -210,6 +210,15 @@ class LeadershipRun:
                             actions=self.actions[-40:])
         return self.rec
 
+    def _leader(self, alive):
+        """The alive run that took over last (by the system's own events), or None."""
+        last = {}
+        for e in getattr(self.system, "events", lambda: [])():
+            if e.get("kind") == "took_over":
+                last[e["tag"]] = e.get("t", 0)
+        cands = [r for r in alive if r.tag in last]
+        return max(cands, key=lambda r: last[r.tag]) if cands else None
+
     def _slow_newcomers(self, platform):
         """Runs that never took over and lived longer than newcomer_exit_s (alive or ended), unless this fuzzer
         paused, killed or cancelled them (their life is then ours, not theirs)."""
@@ -246,6 +255,9 @@ class LeadershipRun:
                 act["runs"] = [platform.start_run(env, max_runtime_s=round(rng.uniform(1.0, 3.0), 2)).tag]
             elif kind in ("pause", "kill", "cancel") and alive:
                 run = rng.choice(alive)
+                leader = self._leader(alive)
+                if kind == "pause" and leader is not None and rng.random() < 0.7:
+                    run = leader                   # a paused leader that resumes after a take-over: the fence's case
                 act["run"] = run.tag
                 if kind == "kill":
                     run.proc.kill_tree()

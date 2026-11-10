@@ -1,0 +1,10 @@
+{"epoch": 1, "kind": "took_over", "pid": 36857, "previous_age_ms": 847635762908, "previous_state": "released", "run": "i1-36857", "t": 1794320562.911107, "tag": "i1"}
+{"epoch": 1, "kind": "started", "pid": 36857, "run": "i1-36857", "t": 1794320562.91359, "tag": "i1", "variant": "keyless_toast_null"}
+{"kind": "resync_start", "pid": 36857, "run": "i1-36857", "t": 1794320562.938165, "tag": "i1", "why": "pending"}
+{"kind": "resync_done", "pid": 36857, "position": "0/35551388", "rows": 24, "run": "i1-36857", "t": 1794320563.085231, "tag": "i1"}
+{"detail": "keyless public.w_nkt found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 36857, "run": "i1-36857", "t": 1794320563.797597, "tag": "i1"}
+{"detail": "keyless public.w_nkt found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 36857, "run": "i1-36857", "t": 1794320563.92413, "tag": "i1"}
+{"detail": "keyless public.w_nkt found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 36857, "run": "i1-36857", "t": 1794320564.106218, "tag": "i1"}
+{"kind": "quarantined", "pid": 36857, "run": "i1-36857", "t": 1794320564.122341, "table": "public.w_nkt", "tag": "i1"}
+{"detail": "write-write conflict on public.w_child", "error": "ToyConflict", "kind": "retry", "pid": 36857, "run": "i1-36857", "t": 1794320572.144538, "tag": "i1"}
+{"detail": "write-write conflict on public.w_parent", "error": "ToyConflict", "kind": "retry", "pid": 36857, "run": "i1-36857", "t": 1794320572.380348, "tag": "i1"}

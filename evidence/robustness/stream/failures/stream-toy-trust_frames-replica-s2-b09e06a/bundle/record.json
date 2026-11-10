@@ -1,0 +1,164 @@
+{
+ "campaign": "20261110T142155-8161",
+ "checkpoints": [],
+ "clean": true,
+ "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+ "config": {
+  "budget_s": 40.0,
+  "catch_up_s": 90.0,
+  "episode_s": 10.0,
+  "fuzzer": "stream",
+  "ignore_self_report": false,
+  "keep_workdir": false,
+  "observer_interval_s": 0.005,
+  "pace_s": 0.25,
+  "schedule": null,
+  "start_timeout_s": 120.0
+ },
+ "counts": {
+  "checkpoints": 0,
+  "final_rows": null,
+  "observations": 640,
+  "rolled_back": 16,
+  "rounds": 11,
+  "transactions": 220
+ },
+ "duration_s": 4.777,
+ "failure_id": "stream-toy-trust_frames-replica-s2-b09e06a",
+ "faults": {
+  "stream_bytes": 3
+ },
+ "faults_without_effect": [],
+ "first_failure_s": 4.041,
+ "fuzzer": "stream",
+ "instances": {
+  "exits": {},
+  "started": 1
+ },
+ "no_effect": {},
+ "observers": [
+  {
+   "check": "transfers",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "expected": 24000,
+    "sum": 24000
+   },
+   "longest_gap_s": 0.475,
+   "observations": 160,
+   "seconds": 3.557,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "parent_child",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "orphan_parent_ids": 0,
+    "parents": 6,
+    "parents_with_wrong_count": 0,
+    "sample_orphans": [],
+    "sample_parent_id_count_children": []
+   },
+   "longest_gap_s": 0.475,
+   "observations": 160,
+   "seconds": 3.559,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "debit_credit",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "credit_rows": 17,
+    "credits": 46020,
+    "debit_rows": 13,
+    "debits": 46020
+   },
+   "longest_gap_s": 0.475,
+   "observations": 160,
+   "seconds": 3.559,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "large_marked",
+   "errors": [],
+   "first_violations": [
+    {
+     "batches": 1,
+     "batches_partial_or_unmarked": 1,
+     "observation": 148,
+     "sample_batch_rows_marked": [
+      [
+       213,
+       299,
+       300
+      ]
+     ],
+     "t": 2.928
+    },
+    {
+     "batches": 1,
+     "batches_partial_or_unmarked": 1,
+     "observation": 149,
+     "sample_batch_rows_marked": [
+      [
+       213,
+       299,
+       300
+      ]
+     ],
+     "t": 2.941
+    },
+    {
+     "batches": 1,
+     "batches_partial_or_unmarked": 1,
+     "observation": 150,
+     "sample_batch_rows_marked": [
+      [
+       213,
+       299,
+       300
+      ]
+     ],
+     "t": 2.959
+    }
+   ],
+   "last": {
+    "batches": 1,
+    "batches_partial_or_unmarked": 1,
+    "sample_batch_rows_marked": [
+     [
+      213,
+      299,
+      300
+     ]
+    ]
+   },
+   "longest_gap_s": 0.475,
+   "observations": 160,
+   "seconds": 3.559,
+   "unavailable": 0,
+   "violations": 13
+  }
+ ],
+ "options": {
+  "toy": {
+   "stream_fault_rate": 0.35
+  }
+ },
+ "outcome": "violation",
+ "reason": "consumer loop: large_marked 11 of 158 ([{\"batches_partial_or_unmarked\": 1, \"batches\": 1, \"sample_batch_rows_marked\": [[213, 299, 300]], \"observation\": 148, \"t\": 2.928}])",
+ "seed": 2,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T14:21:55Z",
+ "stream_detected": 0,
+ "system": "toy-trust_frames",
+ "system_spec": "toy:trust_frames",
+ "tier": "local"
+}

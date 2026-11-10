@@ -1,0 +1,224 @@
+{
+ "campaign": "20261110T140926-8545",
+ "checkpoints": [],
+ "clean": true,
+ "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+ "config": {
+  "budget_s": 60.0,
+  "catch_up_s": 90.0,
+  "episode_s": 10.0,
+  "fuzzer": "fault",
+  "ignore_self_report": true,
+  "keep_workdir": false,
+  "observer_interval_s": 0.005,
+  "pace_s": 0.25,
+  "schedule": {
+   "not_attacked": [
+    "dest_delay",
+    "dest_error",
+    "dest_hang",
+    "freeze",
+    "hang_point",
+    "net_blackhole",
+    "net_drop",
+    "net_latency",
+    "net_reset",
+    "replica_promote",
+    "replica_restart",
+    "slot_drop",
+    "slot_invalidate",
+    "spill_full",
+    "src_cancel",
+    "src_lock",
+    "src_long_txn",
+    "src_restart_primary",
+    "src_terminate",
+    "src_wal_switch"
+   ],
+   "per_episode": [
+    1,
+    3
+   ],
+   "weights": {
+    "kill_group": 6,
+    "kill_point": 10,
+    "kill_point_later": 4
+   }
+  },
+  "start_timeout_s": 120.0
+ },
+ "counts": {
+  "checkpoints": 0,
+  "final_rows": null,
+  "observations": 3031,
+  "rolled_back": 33,
+  "rounds": 32,
+  "transactions": 640
+ },
+ "duration_s": 17.923,
+ "failure_id": "fault-toy-ack_early-replica-s8-b09e06a",
+ "faults": {
+  "kill_point_later": 1
+ },
+ "faults_without_effect": [
+  {
+   "error": null,
+   "kind": "kill_point",
+   "params": {
+    "hang_s": 1.6917382341461134,
+    "hit": "seed:216734028946555:3",
+    "point": "toyrep.position_written"
+   },
+   "proof": {
+    "exit": {
+     "code": null,
+     "signal": 9,
+     "signal_name": "SIGKILL"
+    },
+    "fired": null,
+    "hit": null,
+    "instance": "i2"
+   }
+  }
+ ],
+ "first_failure_s": 17.404,
+ "fuzzer": "fault",
+ "instances": {
+  "exits": {
+   "SIGKILL": 3
+  },
+  "started": 4
+ },
+ "no_effect": {
+  "kill_point": 1
+ },
+ "observers": [
+  {
+   "check": "transfers",
+   "errors": [],
+   "first_violations": [
+    {
+     "expected": 24000,
+     "observation": 747,
+     "sum": 23718,
+     "t": 16.121
+    },
+    {
+     "expected": 24000,
+     "observation": 748,
+     "sum": 23718,
+     "t": 16.137
+    },
+    {
+     "expected": 24000,
+     "observation": 749,
+     "sum": 23718,
+     "t": 16.155
+    }
+   ],
+   "last": {
+    "expected": 24000,
+    "sum": 23718
+   },
+   "longest_gap_s": 0.738,
+   "observations": 759,
+   "seconds": 16.302,
+   "unavailable": 0,
+   "violations": 13
+  },
+  {
+   "check": "parent_child",
+   "errors": [],
+   "first_violations": [
+    {
+     "observation": 743,
+     "orphan_parent_ids": 1,
+     "parents": 6,
+     "parents_with_wrong_count": 0,
+     "sample_orphans": [
+      75
+     ],
+     "sample_parent_id_count_children": [],
+     "t": 16.124
+    },
+    {
+     "observation": 744,
+     "orphan_parent_ids": 1,
+     "parents": 6,
+     "parents_with_wrong_count": 0,
+     "sample_orphans": [
+      75
+     ],
+     "sample_parent_id_count_children": [],
+     "t": 16.138
+    },
+    {
+     "observation": 745,
+     "orphan_parent_ids": 1,
+     "parents": 6,
+     "parents_with_wrong_count": 0,
+     "sample_orphans": [
+      75
+     ],
+     "sample_parent_id_count_children": [],
+     "t": 16.155
+    }
+   ],
+   "last": {
+    "orphan_parent_ids": 1,
+    "parents": 6,
+    "parents_with_wrong_count": 0,
+    "sample_orphans": [
+     75
+    ],
+    "sample_parent_id_count_children": []
+   },
+   "longest_gap_s": 0.735,
+   "observations": 755,
+   "seconds": 16.302,
+   "unavailable": 0,
+   "violations": 13
+  },
+  {
+   "check": "debit_credit",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "credit_rows": 13,
+    "credits": 58288,
+    "debit_rows": 8,
+    "debits": 58288
+   },
+   "longest_gap_s": 0.735,
+   "observations": 760,
+   "seconds": 16.302,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "large_marked",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "batches": 2,
+    "batches_partial_or_unmarked": 0,
+    "sample_batch_rows_marked": []
+   },
+   "longest_gap_s": 0.738,
+   "observations": 757,
+   "seconds": 16.302,
+   "unavailable": 0,
+   "violations": 0
+  }
+ ],
+ "options": {},
+ "outcome": "violation",
+ "reason": "consumer loop: transfers 9 of 755 ([{\"sum\": 23718, \"expected\": 24000, \"observation\": 747, \"t\": 16.121}]); parent_child 9 of 751 ([{\"parents_with_wrong_count\": 0, \"orphan_parent_ids\": 1, \"sample_parent_id_count_children\": [], \"sample_orphans\": [75], \"parents\": 6, \"observation\": 743, \"t\": 16.124}])",
+ "seed": 8,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T14:09:26Z",
+ "system": "toy-ack_early",
+ "system_spec": "toy:ack_early",
+ "tier": "local"
+}

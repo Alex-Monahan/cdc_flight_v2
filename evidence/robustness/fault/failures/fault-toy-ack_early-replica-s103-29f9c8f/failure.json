@@ -12,13 +12,13 @@
   "outcome": "diverged",
   "reason": "the system reports that the destination diverged from the source (3 times ApplyInvariantError, last: keyless public.w_nkt found 0 rows to remove), stopped short of 0/3FCBF50",
   "reduced": {
-    "entries": 1,
-    "faults": 0,
+    "entries": 74,
+    "faults": 1,
     "from_entries": 2177,
     "from_faults": 5,
-    "replays": 23,
+    "replays": 125,
     "reproduced": true,
-    "seconds": 466.5
+    "seconds": 2500.3
   },
   "regression_test": "tests/fuzz/regressions/test_fault_toy_ack_early_replica_s103_29f9c8f.py",
   "seed": 103,

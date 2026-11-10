@@ -286,8 +286,9 @@ class Load:
 class RunConfig:
     def __init__(self, fuzzer="workload", budget_s=60.0, episode_s=10.0, catch_up_s=90.0, pace_s=0.25,
                  observer_interval_s=0.005, schedule=None, keep_workdir=False, start_timeout_s=120.0, abort=None,
-                 ignore_self_report=False):
+                 ignore_self_report=False, observers=True):
         self.ignore_self_report = ignore_self_report  # do not end a run on the system's own divergence report
+        self.observers = observers                    # False: no consumer loops, the oracle alone decides
         self.abort = abort                     # threading.Event: stop at the next episode, record nothing
         self.fuzzer, self.budget_s, self.episode_s = fuzzer, budget_s, episode_s
         self.catch_up_s, self.pace_s, self.observer_interval_s = catch_up_s, pace_s, observer_interval_s
@@ -384,7 +385,7 @@ class Run:
             wl = system.wl
             checks = obs.checks_for(wl.cfg.features, wl.cfg.schema, wl.transfer_table_names, wl.transfer_sum)
             observers_ = obs.Observers(checks, system.observer_connect, cfg.observer_interval_s).start() \
-                if checks else None
+                if checks and cfg.observers else None
             load = Load(wl, cfg.pace_s)
             rng = random.Random("%d/run" % self.seed)
             end = time.monotonic() + cfg.budget_s

@@ -1,0 +1,40 @@
+{"epoch": 1, "kind": "took_over", "pid": 30144, "previous_age_ms": 847635444057, "previous_state": "released", "run": "run1-e3f562", "t": 1794320244.059986, "tag": "r1"}
+{"epoch": 1, "kind": "started", "pid": 30144, "run": "run1-e3f562", "t": 1794320244.063135, "tag": "r1", "variant": "no_fence"}
+{"kind": "resync_start", "pid": 30144, "run": "run1-e3f562", "t": 1794320244.089406, "tag": "r1", "why": "pending"}
+{"kind": "resync_done", "pid": 30144, "position": "0/2CEACCB0", "rows": 24, "run": "run1-e3f562", "t": 1794320244.25294, "tag": "r1"}
+{"kind": "source_lost", "pid": 30144, "run": "run1-e3f562", "t": 1794320244.459576, "tag": "r1", "why": "connection"}
+{"error": "OperationalError", "kind": "source_error", "pid": 30144, "run": "run1-e3f562", "t": 1794320244.459818, "tag": "r1"}
+{"error": "OperationalError", "kind": "source_error", "pid": 30144, "run": "run1-e3f562", "t": 1794320244.531247, "tag": "r1"}
+{"error": "OperationalError", "kind": "source_error", "pid": 30144, "run": "run1-e3f562", "t": 1794320244.663687, "tag": "r1"}
+{"error": "OperationalError", "kind": "source_error", "pid": 30144, "run": "run1-e3f562", "t": 1794320244.879026, "tag": "r1"}
+{"age_ms": 459, "epoch": 1, "kind": "healthy_leader_found", "pid": 30176, "run": "run2-93d729", "t": 1794320245.102515, "tag": "r2"}
+{"error": "OperationalError", "kind": "source_error", "pid": 30144, "run": "run1-e3f562", "t": 1794320245.332172, "tag": "r1"}
+{"age_ms": 839, "epoch": 1, "kind": "healthy_leader_found", "pid": 30205, "run": "run3-09cb0e", "t": 1794320246.137918, "tag": "r3"}
+{"error": "OperationalError", "kind": "source_error", "pid": 30144, "run": "run1-e3f562", "t": 1794320246.164269, "tag": "r1"}
+{"age_ms": 674, "epoch": 1, "kind": "healthy_leader_found", "pid": 30216, "run": "run4-7e3894", "t": 1794320246.826033, "tag": "r4"}
+{"age_ms": 714, "epoch": 1, "kind": "healthy_leader_found", "pid": 30222, "run": "run5-5052b0", "t": 1794320246.865638, "tag": "r5"}
+{"age_ms": 747, "epoch": 1, "kind": "healthy_leader_found", "pid": 30225, "run": "run6-a9037f", "t": 1794320246.899405, "tag": "r6"}
+{"age_ms": 1014, "epoch": 1, "kind": "healthy_leader_found", "pid": 30229, "run": "run7-776a80", "t": 1794320247.166811, "tag": "r7"}
+{"error": "OperationalError", "kind": "source_error", "pid": 30144, "run": "run1-e3f562", "t": 1794320247.205181, "tag": "r1"}
+{"age_ms": 22, "epoch": 1, "kind": "healthy_leader_found", "pid": 30251, "run": "run8-af2d9b", "t": 1794320248.243781, "tag": "r8"}
+{"kind": "source_reconnected", "pid": 30144, "run": "run1-e3f562", "t": 1794320248.276923, "tag": "r1"}
+{"age_ms": 1670, "epoch": 1, "kind": "healthy_leader_found", "pid": 30262, "run": "run9-5912cb", "t": 1794320249.891734, "tag": "r9"}
+{"age_ms": 37, "epoch": 1, "kind": "healthy_leader_found", "pid": 30299, "run": "run10-4e9dc7", "t": 1794320250.526057, "tag": "r10"}
+{"age_ms": 55, "epoch": 1, "kind": "healthy_leader_found", "pid": 30322, "run": "run11-276d77", "t": 1794320251.783658, "tag": "r11"}
+{"age_ms": 57, "epoch": 1, "kind": "healthy_leader_found", "pid": 30375, "run": "run12-e86354", "t": 1794320252.817631, "tag": "r12"}
+{"age_ms": 70, "epoch": 1, "kind": "healthy_leader_found", "pid": 30387, "run": "run13-e17bba", "t": 1794320253.526871, "tag": "r13"}
+{"age_ms": 56, "epoch": 1, "kind": "healthy_leader_found", "pid": 30392, "run": "run14-02b160", "t": 1794320254.523272, "tag": "r14"}
+{"detail": "write-write conflict on public.w_toast", "error": "ToyConflict", "kind": "retry", "pid": 30144, "run": "run1-e3f562", "t": 1794320255.206698, "tag": "r1"}
+{"age_ms": 50, "epoch": 1, "kind": "healthy_leader_found", "pid": 30398, "run": "run15-e4f662", "t": 1794320255.760054, "tag": "r15"}
+{"age_ms": 1003, "epoch": 1, "kind": "healthy_leader_found", "pid": 30413, "run": "run16-5dd827", "t": 1794320257.257727, "tag": "r16"}
+{"age_ms": 665, "epoch": 1, "kind": "healthy_leader_found", "pid": 30438, "run": "run17-fbcf0a", "t": 1794320257.92858, "tag": "r17"}
+{"age_ms": 700, "epoch": 1, "kind": "healthy_leader_found", "pid": 30441, "run": "run18-2ccb16", "t": 1794320257.963079, "tag": "r18"}
+{"age_ms": 1405, "epoch": 1, "kind": "healthy_leader_found", "pid": 30460, "run": "run19-af328c", "t": 1794320258.667871, "tag": "r19"}
+{"epoch": 2, "kind": "took_over", "pid": 30474, "previous_age_ms": 2391, "previous_state": "leading", "run": "run20-aec310", "t": 1794320259.656356, "tag": "r20"}
+{"epoch": 2, "kind": "started", "pid": 30474, "run": "run20-aec310", "t": 1794320259.661786, "tag": "r20", "variant": "no_fence"}
+{"error": "OperationalError", "kind": "source_error", "pid": 30474, "run": "run20-aec310", "t": 1794320259.676689, "tag": "r20"}
+{"age_ms": 41, "epoch": 2, "kind": "healthy_leader_found", "pid": 30476, "run": "run21-a13a16", "t": 1794320259.695052, "tag": "r21"}
+{"age_ms": 70, "epoch": 2, "kind": "healthy_leader_found", "pid": 30477, "run": "run22-506f7d", "t": 1794320259.724352, "tag": "r22"}
+{"error": "OperationalError", "kind": "source_error", "pid": 30474, "run": "run20-aec310", "t": 1794320259.747495, "tag": "r20"}
+{"error": "OperationalError", "kind": "source_error", "pid": 30474, "run": "run20-aec310", "t": 1794320259.865895, "tag": "r20"}
+{"error": "OperationalError", "kind": "source_error", "pid": 30474, "run": "run20-aec310", "t": 1794320260.082313, "tag": "r20"}

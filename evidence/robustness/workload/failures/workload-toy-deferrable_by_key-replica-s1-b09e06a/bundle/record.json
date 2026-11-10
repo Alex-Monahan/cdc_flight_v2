@@ -1,0 +1,135 @@
+{
+ "campaign": "20261110T142253-8e5e",
+ "checkpoints": [
+  {
+   "catch_up_s": 0.007,
+   "compare_s": 0.031,
+   "equal": false,
+   "final": false,
+   "q": "0/36172E80",
+   "t": 11.134
+  }
+ ],
+ "clean": true,
+ "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+ "config": {
+  "budget_s": 40.0,
+  "catch_up_s": 90.0,
+  "episode_s": 10.0,
+  "fuzzer": "workload",
+  "ignore_self_report": false,
+  "keep_workdir": false,
+  "observer_interval_s": 0.005,
+  "pace_s": 0.25,
+  "schedule": null,
+  "start_timeout_s": 120.0
+ },
+ "counts": {
+  "checkpoints": 1,
+  "final_rows": null,
+  "observations": 1552,
+  "rolled_back": 34,
+  "rounds": 36,
+  "transactions": 720
+ },
+ "duration_s": 11.598,
+ "failure_id": "workload-toy-deferrable_by_key-replica-s1-b09e06a",
+ "faults": {},
+ "faults_without_effect": [],
+ "first_failure_s": 11.304,
+ "fuzzer": "workload",
+ "instances": {
+  "exits": {},
+  "started": 1
+ },
+ "no_effect": {},
+ "observers": [
+  {
+   "check": "transfers",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "expected": 24000,
+    "sum": 24000
+   },
+   "longest_gap_s": 0.545,
+   "observations": 388,
+   "seconds": 10.315,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "parent_child",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "orphan_parent_ids": 0,
+    "parents": 2,
+    "parents_with_wrong_count": 0,
+    "sample_orphans": [],
+    "sample_parent_id_count_children": []
+   },
+   "longest_gap_s": 0.545,
+   "observations": 388,
+   "seconds": 10.316,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "debit_credit",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "credit_rows": 42,
+    "credits": 119030,
+    "debit_rows": 26,
+    "debits": 119030
+   },
+   "longest_gap_s": 0.545,
+   "observations": 388,
+   "seconds": 10.316,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "large_marked",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "batches": 1,
+    "batches_partial_or_unmarked": 0,
+    "sample_batch_rows_marked": []
+   },
+   "longest_gap_s": 0.544,
+   "observations": 388,
+   "seconds": 10.316,
+   "unavailable": 0,
+   "violations": 0
+  }
+ ],
+ "options": {},
+ "oracle": {
+  "equal": false,
+  "tables": [
+   {
+    "destination_rows": 12,
+    "different_rows": 0,
+    "equal": false,
+    "extra_rows": 0,
+    "missing_on_destination": false,
+    "missing_rows": 12,
+    "source": "public.w_dk",
+    "source_rows": 24
+   }
+  ]
+ },
+ "outcome": "diverged",
+ "reason": "oracle: public.w_dk missing 12 extra 0 different 0",
+ "seed": 1,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T14:22:53Z",
+ "system": "toy-deferrable_by_key",
+ "system_spec": "toy:deferrable_by_key",
+ "tier": "local"
+}

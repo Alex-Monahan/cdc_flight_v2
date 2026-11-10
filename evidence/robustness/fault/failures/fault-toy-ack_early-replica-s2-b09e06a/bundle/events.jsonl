@@ -1,0 +1,13 @@
+{"epoch": 1, "kind": "took_over", "pid": 20127, "previous_age_ms": 847634881508, "previous_state": "released", "run": "i1-20127", "t": 1794319681.511144, "tag": "i1"}
+{"epoch": 1, "kind": "started", "pid": 20127, "run": "i1-20127", "t": 1794319681.513647, "tag": "i1", "variant": "ack_early"}
+{"kind": "resync_start", "pid": 20127, "run": "i1-20127", "t": 1794319681.539558, "tag": "i1", "why": "pending"}
+{"kind": "resync_done", "pid": 20127, "position": "0/208288C0", "rows": 24, "run": "i1-20127", "t": 1794319681.69478, "tag": "i1"}
+{"epoch": 2, "kind": "took_over", "pid": 20168, "previous_age_ms": 2301, "previous_state": "leading", "run": "i3-20168", "t": 1794319684.345852, "tag": "i3"}
+{"epoch": 2, "kind": "started", "pid": 20168, "run": "i3-20168", "t": 1794319684.350132, "tag": "i3", "variant": "ack_early"}
+{"epoch": 3, "kind": "took_over", "pid": 20366, "previous_age_ms": 2354, "previous_state": "leading", "run": "i5-20366", "t": 1794319687.536938, "tag": "i5"}
+{"epoch": 3, "kind": "started", "pid": 20366, "run": "i5-20366", "t": 1794319687.540515, "tag": "i5", "variant": "ack_early"}
+{"detail": "write-write conflict on public.w_nkt", "error": "ToyConflict", "kind": "retry", "pid": 20366, "run": "i5-20366", "t": 1794319688.020892, "tag": "i5"}
+{"epoch": 4, "kind": "took_over", "pid": 20474, "previous_age_ms": 2036, "previous_state": "leading", "run": "i6-20474", "t": 1794319690.119305, "tag": "i6"}
+{"epoch": 4, "kind": "started", "pid": 20474, "run": "i6-20474", "t": 1794319690.123591, "tag": "i6", "variant": "ack_early"}
+{"detail": "write-write conflict on public.w_xfer_2", "error": "ToyConflict", "kind": "retry", "pid": 20474, "run": "i6-20474", "t": 1794319690.335759, "tag": "i6"}
+{"detail": "keyless public.w_dk found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 20474, "run": "i6-20474", "t": 1794319691.196797, "tag": "i6"}

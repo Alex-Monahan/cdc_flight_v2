@@ -15,8 +15,8 @@
         "writers": 2
       },
       "both_replays_fail": true,
-      "clean": false,
-      "commit": "29f9c8f736417f5187a786dd4dd03e8f08913393",
+      "clean": true,
+      "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
       "fuzzer": "workload",
       "id": "workload-toy-split-replica-s101-a6bc667",
       "outcome": "violation",

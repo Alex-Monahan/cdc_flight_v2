@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+  "first_failure_s": 11.304,
+  "fixed_commit": null,
+  "fuzzer": "workload",
+  "id": "workload-toy-deferrable_by_key-replica-s1-b09e06a",
+  "local_bundle": {
+    "campaign": "20261110T142253-8e5e",
+    "dir": "bundle-workload-toy-deferrable_by_key-replica-s1-b09e06a"
+  },
+  "outcome": "diverged",
+  "reason": "oracle: public.w_dk missing 12 extra 0 different 0",
+  "regression_test": null,
+  "seed": 1,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-deferrable_by_key",
+  "system_spec": "toy:deferrable_by_key"
+}

@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+  "first_failure_s": 17.404,
+  "fixed_commit": null,
+  "fuzzer": "fault",
+  "id": "fault-toy-ack_early-replica-s8-b09e06a",
+  "local_bundle": {
+    "campaign": "20261110T140926-8545",
+    "dir": "bundle-fault-toy-ack_early-replica-s8-b09e06a"
+  },
+  "outcome": "violation",
+  "reason": "consumer loop: transfers 9 of 755 ([{\"sum\": 23718, \"expected\": 24000, \"observation\": 747, \"t\": 16.121}]); parent_child 9 of 751 ([{\"parents_with_wrong_count\": 0, \"orphan_parent_ids\": 1, \"sample_parent_id_count_children\": [], \"sample_orphans\": [75], \"parents\": 6, \"observation\": 743, \"t\": 16.124}])",
+  "regression_test": null,
+  "seed": 8,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-ack_early",
+  "system_spec": "toy:ack_early"
+}

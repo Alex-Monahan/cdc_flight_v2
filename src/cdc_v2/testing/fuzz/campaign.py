@@ -47,7 +47,9 @@ class Campaign:
                  hours: Optional[float] = None, workers: int = 1, budget_s: Optional[float] = None,
                  rounds: int = 10, options: Optional[dict] = None, reduce_failures: bool = False,
                  ledger_root: Path = LEDGER_ROOT, keep_workdir: bool = False, kinds: Optional[list] = None,
-                 stop_on_failure: bool = False, log=print, ignore_self_report: bool = False):
+                 stop_on_failure: bool = False, log=print, ignore_self_report: bool = False,
+                 observers: bool = True):
+        self.observers = observers
         self.stop_on_failure = stop_on_failure
         self.ignore_self_report = ignore_self_report
         if fuzzer not in ("workload", "fault", "stream", "leadership"):
@@ -111,7 +113,8 @@ class Campaign:
             run_like = lr
         else:
             cfg = RunConfig(fuzzer=self.fuzzer, budget_s=self.budget_s, keep_workdir=self.keep_workdir,
-                            abort=self.abort, ignore_self_report=self.ignore_self_report)
+                            abort=self.abort, ignore_self_report=self.ignore_self_report,
+                            observers=self.observers)
             if self.fuzzer == "fault":
                 cfg.schedule = Schedule(system, only=self.kinds)
             holder = {}

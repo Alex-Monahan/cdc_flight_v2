@@ -1,176 +1,425 @@
 {
-  "about": "Wrong variants of the toy replicator (tests/fuzz/toy/toy.py), the fuzzer that must find each, and the correct toy on the same seeds (docs/testing/fuzzers.md section 2).",
-  "all_found": true,
+  "about": "Wrong variants of the toy replicator (tests/fuzz/toy/toy.py), the fuzzer and the signal that found each, and the correct toy on the same seeds (docs/testing/fuzzers.md section 2).",
+  "all_found": false,
   "correct_toy_passed": true,
   "source_node": "replica",
   "variants": [
     {
       "bound_seeds": 6,
-      "correct_toy_passed": true,
-      "correct_toy_same_seeds": {
-        "1": "pass"
-      },
-      "expected_finder": "fault fuzzer (process kills): a lost change",
-      "failure_id": "fault-toy-ack_early-replica-s1-ffdd6f4",
-      "first_failure_s_in_run": 18.922,
-      "found": true,
-      "fuzzer": "fault",
-      "outcome": "diverged",
-      "reason": "the system reports that the destination diverged from the source (3 times ApplyInvariantError, last: unchanged value of public.w_toast has no earlier row), stopped short of 0/3868D90",
-      "seconds_until_found": 19.4,
-      "seeds_run": [
-        1
-      ],
-      "seeds_until_found": 1,
-      "variant": "ack_early",
-      "wall_s": 24.6
-    },
-    {
-      "bound_seeds": 6,
-      "correct_toy_passed": true,
-      "correct_toy_same_seeds": {
-        "1": "pass"
-      },
-      "expected_finder": "fault fuzzer (process kills): a change applied twice",
-      "failure_id": "fault-toy-position_apart-replica-s1-ffdd6f4",
-      "first_failure_s_in_run": 44.455,
-      "found": true,
-      "fuzzer": "fault",
-      "outcome": "diverged",
-      "reason": "the system reports that the destination diverged from the source (4 times ApplyInvariantError, last: unchanged value of public.w_toast has no earlier row), stopped short of 0/58557C0",
-      "seconds_until_found": 45.1,
-      "seeds_run": [
-        1
-      ],
-      "seeds_until_found": 1,
-      "variant": "position_apart",
-      "wall_s": 45.2
-    },
-    {
-      "bound_seeds": 4,
-      "correct_toy_passed": true,
-      "correct_toy_same_seeds": {
-        "1": "pass"
-      },
-      "expected_finder": "the consumer loops (the end-state oracle cannot see it)",
-      "failure_id": "workload-toy-split-replica-s1-ffdd6f4",
-      "first_failure_s_in_run": 0.964,
-      "found": true,
-      "fuzzer": "workload",
-      "outcome": "violation",
-      "reason": "consumer loop: debit_credit 3 of 12 ([{\"debits\": 8256, \"credits\": 0, \"debit_rows\": 1, \"credit_rows\": 0, \"observation\": 4, \"t\": 0.061}])",
-      "seconds_until_found": 1.3,
-      "seeds_run": [
-        1
-      ],
-      "seeds_until_found": 1,
-      "variant": "split",
-      "wall_s": 1.4
-    },
-    {
-      "bound_seeds": 4,
-      "correct_toy_passed": true,
-      "correct_toy_same_seeds": {
-        "1": "pass"
-      },
-      "expected_finder": "workload fuzzer",
-      "failure_id": "workload-toy-reorder-replica-s1-ffdd6f4",
-      "first_failure_s_in_run": 1.639,
-      "found": true,
-      "fuzzer": "workload",
-      "outcome": "violation",
-      "reason": "consumer loop: parent_child 6 of 46 ([{\"parents_with_wrong_count\": 1, \"orphan_parent_ids\": 0, \"sample_parent_id_count_children\": [[14, 1, 4]], \"sample_orphans\": [], \"parents\": 3, \"observation\": 41, \"t\": 0.741}])",
-      "seconds_until_found": 1.9,
-      "seeds_run": [
-        1
-      ],
-      "seeds_until_found": 1,
-      "variant": "reorder",
-      "wall_s": 2.0
-    },
-    {
-      "bound_seeds": 3,
+      "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
       "correct_toy_passed": true,
       "correct_toy_same_seeds": {
         "2": "pass"
       },
-      "expected_finder": "leadership fuzzer: two writers",
-      "failure_id": "leadership-toy-no_fence-replica-s2-4dffb64",
-      "first_failure_s_in_run": 22.552,
+      "expected_finder": "fault fuzzer (process kills): a lost change",
+      "failure_id": "fault-toy-ack_early-replica-s2-b09e06a",
+      "first_failure_s_in_run": 10.238,
       "found": true,
-      "fuzzer": "leadership",
+      "fuzzer": "fault",
+      "kinds": [
+        "kill_point",
+        "kill_point_later",
+        "kill_group"
+      ],
+      "options": null,
+      "other_findings": [],
       "outcome": "violation",
-      "reason": "round 1: writer log: [{'two_writers': True, 'order': 817, 'epoch': 3, 'after_epoch': 4, 'run': 'run17-839cfe'}, {'two_writers': True, 'order': 818, 'epoch': 3, 'after_epoch': 4, 'run': 'run17-839cfe'}, {'two_writers': True, 'order': 819, 'epoch': 3, 'after_epoch': 4, 'run': 'run17-839cfe'}]",
-      "seconds_until_found": 24.1,
+      "reason": "consumer loop: transfers 1 of 360 ([{\"sum\": 24026, \"expected\": 24000, \"observation\": 360, \"t\": 9.265}])",
+      "required_signal": null,
+      "row": "ack_early",
+      "seconds_until_found": 10.8,
       "seeds_run": [
         2
       ],
       "seeds_until_found": 1,
-      "variant": "no_fence",
-      "wall_s": 24.2
+      "self_report_ignored": false,
+      "signal": "consumer loop (transfers)",
+      "variant": "ack_early",
+      "wall_s": 85.8
     },
     {
       "bound_seeds": 6,
+      "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
       "correct_toy_passed": true,
       "correct_toy_same_seeds": {
-        "1": "pass"
+        "8": "pass"
       },
-      "expected_finder": "fault fuzzer (network and source backends)",
-      "failure_id": "fault-toy-skip_on_reconnect-replica-s1-ffdd6f4",
-      "first_failure_s_in_run": 12.143,
+      "expected_finder": "the same, with the toy's self-report ignored: the oracle",
+      "failure_id": null,
+      "first_failure_s_in_run": null,
+      "found": false,
+      "fuzzer": "fault",
+      "kinds": [
+        "kill_point",
+        "kill_point_later",
+        "kill_group"
+      ],
+      "options": null,
+      "other_findings": [
+        {
+          "seed": 8,
+          "signal": "consumer loop (transfers)"
+        }
+      ],
+      "outcome": null,
+      "reason": null,
+      "required_signal": "oracle",
+      "row": "ack_early_oracle",
+      "seconds_until_found": null,
+      "seeds_run": [
+        8
+      ],
+      "seeds_until_found": null,
+      "self_report_ignored": true,
+      "signal": null,
+      "variant": "ack_early",
+      "wall_s": 92.2
+    },
+    {
+      "bound_seeds": 6,
+      "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+      "correct_toy_passed": true,
+      "correct_toy_same_seeds": {
+        "2": "pass"
+      },
+      "expected_finder": "fault fuzzer (process kills): a change applied twice",
+      "failure_id": "fault-toy-position_apart-replica-s2-b09e06a",
+      "first_failure_s_in_run": 15.458,
       "found": true,
       "fuzzer": "fault",
+      "kinds": [
+        "kill_point",
+        "kill_point_later",
+        "kill_group"
+      ],
+      "options": null,
+      "other_findings": [],
       "outcome": "diverged",
-      "reason": "oracle: public.w_bulk missing 600 extra 300 different 0; public.w_bulk_mark missing 2 extra 1 different 0; public.w_child missing 11 extra 10 different 0; public.w_credit missing 37 extra 7 different 4; public.w_debit missing 24 extra 5 different 4; public.w_k0 missing 633 extra 27 different 18",
-      "seconds_until_found": 12.4,
+      "reason": "the system reports that the destination diverged from the source (3 times ApplyInvariantError, last: keyless public.w_dk found 0 rows to remove), stopped short of 0/24C580F8",
+      "required_signal": null,
+      "row": "position_apart",
+      "seconds_until_found": 16.1,
       "seeds_run": [
-        1
+        2
       ],
       "seeds_until_found": 1,
-      "variant": "skip_on_reconnect",
-      "wall_s": 198.1
+      "self_report_ignored": false,
+      "signal": "system self-report",
+      "variant": "position_apart",
+      "wall_s": 17.4
+    },
+    {
+      "bound_seeds": 6,
+      "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+      "correct_toy_passed": true,
+      "correct_toy_same_seeds": {
+        "8": "pass",
+        "9": "pass"
+      },
+      "expected_finder": "the same, with the toy's self-report ignored: the oracle",
+      "failure_id": "fault-toy-position_apart-replica-s9-b09e06a",
+      "first_failure_s_in_run": 67.824,
+      "found": true,
+      "fuzzer": "fault",
+      "kinds": [
+        "kill_point",
+        "kill_point_later",
+        "kill_group"
+      ],
+      "options": null,
+      "other_findings": [],
+      "outcome": "diverged",
+      "reason": "oracle: public.w_dk missing 6 extra 0 different 35; public.w_nkt missing 38 extra 23 different 0",
+      "required_signal": "oracle",
+      "row": "position_apart_oracle",
+      "seconds_until_found": 144.5,
+      "seeds_run": [
+        8,
+        9
+      ],
+      "seeds_until_found": 2,
+      "self_report_ignored": true,
+      "signal": "oracle",
+      "variant": "position_apart",
+      "wall_s": 211.5
     },
     {
       "bound_seeds": 4,
+      "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
       "correct_toy_passed": true,
       "correct_toy_same_seeds": {
-        "1": "pass"
+        "2": "pass"
       },
-      "expected_finder": "workload fuzzer",
-      "failure_id": "workload-toy-swallow-replica-s1-ffdd6f4",
-      "first_failure_s_in_run": 9.53,
+      "expected_finder": "the consumer loops (the end-state oracle cannot see it)",
+      "failure_id": "workload-toy-split-replica-s2-b09e06a",
+      "first_failure_s_in_run": 1.196,
       "found": true,
       "fuzzer": "workload",
+      "kinds": null,
+      "options": null,
+      "other_findings": [],
       "outcome": "violation",
-      "reason": "consumer loop: debit_credit 9 of 352 ([{\"debits\": 123937, \"credits\": 131376, \"debit_rows\": 21, \"credit_rows\": 33, \"observation\": 344, \"t\": 8.501}])",
-      "seconds_until_found": 10.2,
+      "reason": "consumer loop: debit_credit 2 of 11 ([{\"debits\": 629, \"credits\": 0, \"debit_rows\": 1, \"credit_rows\": 0, \"observation\": 10, \"t\": 0.164}])",
+      "required_signal": "consumer loop",
+      "row": "split",
+      "seconds_until_found": 1.7,
       "seeds_run": [
-        1
+        2
       ],
       "seeds_until_found": 1,
-      "variant": "swallow",
-      "wall_s": 10.2
+      "self_report_ignored": false,
+      "signal": "consumer loop (debit_credit)",
+      "variant": "split",
+      "wall_s": 43.8
     },
     {
       "bound_seeds": 4,
+      "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+      "correct_toy_passed": true,
+      "correct_toy_same_seeds": {
+        "2": "pass"
+      },
+      "expected_finder": "workload fuzzer",
+      "failure_id": "workload-toy-reorder-replica-s2-b09e06a",
+      "first_failure_s_in_run": 15.496,
+      "found": true,
+      "fuzzer": "workload",
+      "kinds": null,
+      "options": null,
+      "other_findings": [],
+      "outcome": "diverged",
+      "reason": "oracle: public.w_credit missing 0 extra 2 different 1; public.w_debit missing 0 extra 1 different 1; public.w_dk missing 16 extra 0 different 7; public.w_nkt missing 20 extra 10 different 0",
+      "required_signal": null,
+      "row": "reorder",
+      "seconds_until_found": 15.8,
+      "seeds_run": [
+        2
+      ],
+      "seeds_until_found": 1,
+      "self_report_ignored": false,
+      "signal": "oracle",
+      "variant": "reorder",
+      "wall_s": 17.3
+    },
+    {
+      "bound_seeds": 3,
+      "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+      "correct_toy_passed": true,
+      "correct_toy_same_seeds": {
+        "3": "pass",
+        "4": "pass",
+        "5": "pass"
+      },
+      "expected_finder": "leadership fuzzer: two writers",
+      "failure_id": null,
+      "first_failure_s_in_run": null,
+      "found": false,
+      "fuzzer": "leadership",
+      "kinds": null,
+      "options": null,
+      "other_findings": [],
+      "outcome": null,
+      "reason": null,
+      "required_signal": "writer log",
+      "row": "no_fence",
+      "seconds_until_found": null,
+      "seeds_run": [
+        3,
+        4,
+        5
+      ],
+      "seeds_until_found": null,
+      "self_report_ignored": false,
+      "signal": null,
+      "variant": "no_fence",
+      "wall_s": 254.9
+    },
+    {
+      "bound_seeds": 6,
+      "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+      "correct_toy_passed": true,
+      "correct_toy_same_seeds": {
+        "2": "pass"
+      },
+      "expected_finder": "fault fuzzer (network and source backends)",
+      "failure_id": "fault-toy-skip_on_reconnect-replica-s2-b09e06a",
+      "first_failure_s_in_run": 15.223,
+      "found": true,
+      "fuzzer": "fault",
+      "kinds": [
+        "net_reset",
+        "net_drop",
+        "net_blackhole",
+        "src_terminate"
+      ],
+      "options": null,
+      "other_findings": [],
+      "outcome": "violation",
+      "reason": "consumer loop: transfers 32 of 950 ([{\"sum\": 23931, \"expected\": 24000, \"observation\": 919, \"t\": 13.793}]); parent_child 32 of 947 ([{\"parents_with_wrong_count\": 2, \"orphan_parent_ids\": 0, \"sample_parent_id_count_children\": [[19, 5, 3], [128, 7, 5]], \"sample_orphans\": [], \"parents\": 9, \"observation\": 916, \"t\": 13.796}]); debit_credit 32 of 950 ([{\"debits\": 71546, \"credits\": 68718, \"debit_rows\": 19,",
+      "required_signal": null,
+      "row": "skip_on_reconnect",
+      "seconds_until_found": 15.5,
+      "seeds_run": [
+        2
+      ],
+      "seeds_until_found": 1,
+      "self_report_ignored": false,
+      "signal": "consumer loop (transfers)",
+      "variant": "skip_on_reconnect",
+      "wall_s": 16.6
+    },
+    {
+      "bound_seeds": 4,
+      "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+      "correct_toy_passed": true,
+      "correct_toy_same_seeds": {
+        "2": "pass"
+      },
+      "expected_finder": "workload fuzzer (through the toy's simulated destination conflicts)",
+      "failure_id": "workload-toy-swallow-replica-s2-b09e06a",
+      "first_failure_s_in_run": 14.451,
+      "found": true,
+      "fuzzer": "workload",
+      "kinds": null,
+      "options": null,
+      "other_findings": [],
+      "outcome": "violation",
+      "reason": "consumer loop: parent_child 4 of 497 ([{\"parents_with_wrong_count\": 1, \"orphan_parent_ids\": 0, \"sample_parent_id_count_children\": [[3441, 2, 1]], \"sample_orphans\": [], \"parents\": 18, \"observation\": 494, \"t\": 13.595}])",
+      "required_signal": null,
+      "row": "swallow",
+      "seconds_until_found": 15.0,
+      "seeds_run": [
+        2
+      ],
+      "seeds_until_found": 1,
+      "self_report_ignored": false,
+      "signal": "consumer loop (parent_child)",
+      "variant": "swallow",
+      "wall_s": 16.1
+    },
+    {
+      "bound_seeds": 6,
+      "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+      "correct_toy_passed": true,
+      "correct_toy_same_seeds": {
+        "1": "pass",
+        "2": "pass"
+      },
+      "expected_finder": "fault fuzzer, destination errors only, no simulated conflicts",
+      "failure_id": "fault-toy-swallow-replica-s2-b09e06a",
+      "first_failure_s_in_run": 11.816,
+      "found": true,
+      "fuzzer": "fault",
+      "kinds": [
+        "dest_error"
+      ],
+      "options": {
+        "toy": {
+          "conflict_rate": 0.0
+        }
+      },
+      "other_findings": [],
+      "outcome": "violation",
+      "reason": "consumer loop: debit_credit 10 of 403 ([{\"debits\": 133478, \"credits\": 133255, \"debit_rows\": 26, \"credit_rows\": 38, \"observation\": 394, \"t\": 10.889}])",
+      "required_signal": null,
+      "row": "swallow_dest_errors",
+      "seconds_until_found": 77.8,
+      "seeds_run": [
+        1,
+        2
+      ],
+      "seeds_until_found": 2,
+      "self_report_ignored": false,
+      "signal": "consumer loop (debit_credit)",
+      "variant": "swallow",
+      "wall_s": 78.9
+    },
+    {
+      "bound_seeds": 4,
+      "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+      "correct_toy_passed": true,
+      "correct_toy_same_seeds": {
+        "2": "pass"
+      },
+      "expected_finder": "stream fuzzer",
+      "failure_id": "stream-toy-trust_frames-replica-s2-b09e06a",
+      "first_failure_s_in_run": 4.041,
+      "found": true,
+      "fuzzer": "stream",
+      "kinds": null,
+      "options": null,
+      "other_findings": [],
+      "outcome": "violation",
+      "reason": "consumer loop: large_marked 11 of 158 ([{\"batches_partial_or_unmarked\": 1, \"batches\": 1, \"sample_batch_rows_marked\": [[213, 299, 300]], \"observation\": 148, \"t\": 2.928}])",
+      "required_signal": null,
+      "row": "trust_frames",
+      "seconds_until_found": 4.8,
+      "seeds_run": [
+        2
+      ],
+      "seeds_until_found": 1,
+      "self_report_ignored": false,
+      "signal": "consumer loop (large_marked)",
+      "variant": "trust_frames",
+      "wall_s": 47.0
+    },
+    {
+      "bound_seeds": 4,
+      "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
       "correct_toy_passed": true,
       "correct_toy_same_seeds": {
         "1": "pass"
       },
-      "expected_finder": "stream fuzzer",
-      "failure_id": "stream-toy-trust_frames-replica-s1-ffdd6f4",
-      "first_failure_s_in_run": 14.394,
+      "expected_finder": "workload fuzzer: a keyless table with an unchanged TOASTed column",
+      "failure_id": "workload-toy-keyless_toast_null-replica-s1-b09e06a",
+      "first_failure_s_in_run": 11.348,
       "found": true,
-      "fuzzer": "stream",
+      "fuzzer": "workload",
+      "kinds": null,
+      "options": null,
+      "other_findings": [],
       "outcome": "diverged",
-      "reason": "oracle: public.w_bulk missing 1 extra 0 different 0; public.w_k0 missing 0 extra 0 different 77",
-      "seconds_until_found": 14.8,
+      "reason": "oracle: public.w_nkt missing 23 extra 2 different 0",
+      "required_signal": null,
+      "row": "keyless_toast_null",
+      "seconds_until_found": 11.6,
       "seeds_run": [
         1
       ],
       "seeds_until_found": 1,
-      "variant": "trust_frames",
-      "wall_s": 14.8
+      "self_report_ignored": false,
+      "signal": "oracle",
+      "variant": "keyless_toast_null",
+      "wall_s": 11.8
+    },
+    {
+      "bound_seeds": 4,
+      "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+      "correct_toy_passed": true,
+      "correct_toy_same_seeds": {
+        "1": "pass"
+      },
+      "expected_finder": "workload fuzzer: a deferrable key with FULL applied by its key (rule K)",
+      "failure_id": "workload-toy-deferrable_by_key-replica-s1-b09e06a",
+      "first_failure_s_in_run": 11.304,
+      "found": true,
+      "fuzzer": "workload",
+      "kinds": null,
+      "options": null,
+      "other_findings": [],
+      "outcome": "diverged",
+      "reason": "oracle: public.w_dk missing 12 extra 0 different 0",
+      "required_signal": null,
+      "row": "deferrable_by_key",
+      "seconds_until_found": 11.6,
+      "seeds_run": [
+        1
+      ],
+      "seeds_until_found": 1,
+      "self_report_ignored": false,
+      "signal": "oracle",
+      "variant": "deferrable_by_key",
+      "wall_s": 12.7
     }
   ]
 }

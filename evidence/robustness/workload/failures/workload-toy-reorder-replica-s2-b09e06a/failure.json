@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+  "first_failure_s": 15.496,
+  "fixed_commit": null,
+  "fuzzer": "workload",
+  "id": "workload-toy-reorder-replica-s2-b09e06a",
+  "local_bundle": {
+    "campaign": "20261110T141531-53ae",
+    "dir": "bundle-workload-toy-reorder-replica-s2-b09e06a"
+  },
+  "outcome": "diverged",
+  "reason": "oracle: public.w_credit missing 0 extra 2 different 1; public.w_debit missing 0 extra 1 different 1; public.w_dk missing 16 extra 0 different 7; public.w_nkt missing 20 extra 10 different 0",
+  "regression_test": null,
+  "seed": 2,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-reorder",
+  "system_spec": "toy:reorder"
+}

@@ -18,6 +18,7 @@ import fcntl
 import json
 import os
 import subprocess
+import threading
 import time
 from pathlib import Path
 from typing import Optional
@@ -59,15 +60,17 @@ class HomeLease:
         self.record = {"home": "pg-f%d" % n, "base": self.base, "holder": os.getpid(), "databases": [], "md": [],
                        "procs": [], "dirty": False}
         self._cluster = None
+        self._save_lock = threading.Lock()
 
     @property
     def proxy_range(self) -> tuple:
         return (self.base + PROXY_OFFSETS[0], self.base + PROXY_OFFSETS[1])
 
     def save(self) -> None:
-        tmp = self.record_path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(self.record, indent=1, sort_keys=True))
-        os.replace(tmp, self.record_path)
+        with self._save_lock:                          # several threads of one scenario note processes
+            tmp = self.record_path.with_suffix(".%d.%d.tmp" % (os.getpid(), threading.get_ident()))
+            tmp.write_text(json.dumps(self.record, indent=1, sort_keys=True))
+            os.replace(tmp, self.record_path)
 
     def note(self, kind: str, value) -> None:
         if value not in self.record[kind]:

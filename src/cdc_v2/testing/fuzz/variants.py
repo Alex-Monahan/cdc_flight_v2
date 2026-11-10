@@ -23,11 +23,14 @@ TABLE = {
     "ack_early": dict(variant="ack_early", fuzzer="fault", kinds=PROCESS,
                       expect="fault fuzzer (process kills): a lost change"),
     "ack_early_oracle": dict(variant="ack_early", fuzzer="fault", kinds=PROCESS, ignore_self_report=True,
-                             signal="oracle", expect="the same, with the toy's self-report ignored: the oracle"),
+                             oracle_only=True, signal="oracle",
+                             expect="the same, with the toy's self-report ignored and no consumer loop: the oracle"),
     "position_apart": dict(variant="position_apart", fuzzer="fault", kinds=PROCESS,
                            expect="fault fuzzer (process kills): a change applied twice"),
     "position_apart_oracle": dict(variant="position_apart", fuzzer="fault", kinds=PROCESS, ignore_self_report=True,
-                                  signal="oracle", expect="the same, with the toy's self-report ignored: the oracle"),
+                                  oracle_only=True, signal="oracle",
+                                  expect="the same, with the toy's self-report ignored and no consumer loop: the "
+                                         "oracle"),
     "split": dict(variant="split", fuzzer="workload", signal="consumer loop",
                   expect="the consumer loops (the end-state oracle cannot see it)"),
     "reorder": dict(variant="reorder", fuzzer="workload", expect="workload fuzzer"),
@@ -71,7 +74,8 @@ def signal_of(rec: dict) -> str:
 def _campaign(row, system, seeds, source_node, budget, log, extra, stop_on_failure):
     c = Campaign(row["fuzzer"], system, source_node, seeds=None, workers=1, budget_s=budget,
                  rounds=row.get("rounds", 10), stop_on_failure=stop_on_failure, log=log, kinds=row.get("kinds"),
-                 options=row.get("options"), ignore_self_report=row.get("ignore_self_report", False), **extra)
+                 options=row.get("options"), ignore_self_report=row.get("ignore_self_report", False),
+                 observers=not row.get("oracle_only", False), **extra)
     c.seeds = seeds if seeds is not None else _next_free(c, BOUND_SEEDS[row["fuzzer"]])
     return c
 
@@ -94,6 +98,7 @@ def run_row(name, source_node="replica", log=print, budget=None, correct=True, l
     upto = res[:res.index(first) + 1] if first else res
     out = {"row": name, "variant": row["variant"], "fuzzer": row["fuzzer"], "kinds": row.get("kinds"),
            "options": row.get("options"), "self_report_ignored": bool(row.get("ignore_self_report")),
+           "consumer_loops": not row.get("oracle_only", False),
            "expected_finder": row["expect"], "required_signal": want, "bound_seeds": BOUND_SEEDS[row["fuzzer"]],
            "seeds_run": [r["seed"] for r in res], "found": bool(first),
            "signal": signal_of(first) if first else None,
