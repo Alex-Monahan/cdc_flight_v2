@@ -1,0 +1,40 @@
+{
+ "attempts": [
+  {
+   "row_before": 0,
+   "the_cut_reads": 2,
+   "cut": {
+    "timeline": 1,
+    "insert_position": "2/DC04E710",
+    "flush_position_read_under_the_cut": "2/DC04E600",
+    "wal_not_flushed_when_the_cut_was_taken": true
+   },
+   "after_the_restart_the_row_reads": 0,
+   "the_commit_was_lost": true,
+   "after_the_restart": {
+    "timeline": 1,
+    "transactions_committed": 1,
+    "readings_at_the_swap": {
+     "stream": {
+      "timeline": 1,
+      "position": "2/DC056488"
+     },
+     "reader": {
+      "timeline": 1,
+      "position": "2/DC056488"
+     }
+    },
+    "same_timeline": true,
+    "positions_of_the_cut_reached_again": true,
+    "server_start_differs": true,
+    "has_passed": true,
+    "valid_at_the_swap": false,
+    "valid_if_the_server_start_were_not_compared": true
+   },
+   "the_standby_reads": 0
+  }
+ ],
+ "server_version_num": 180006,
+ "shown": true,
+ "ok": true
+}

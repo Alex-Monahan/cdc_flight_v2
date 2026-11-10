@@ -162,24 +162,55 @@ def test_standby_that_has_just_started_is_refused_until_it_settles(cluster):
 
 
 def test_a_cut_is_valid_only_on_the_timeline_it_was_taken_on(cluster):
-    """A second standby is added, a cut is taken on it and left open, the standby is promoted.  The open cut
-    still reads its old snapshot, so nothing in the data shows that it is void: the timeline does.  The cut is
-    valid on the timeline of its source and on no other; the library refuses a new standby cut and a new settle
-    floor on the promoted node; a primary cut there belongs to the new timeline."""
+    """A second standby is added, a cut is taken on it and left open.  The stream passes it, the readings of
+    the swap are made (``IDENTIFY_SYSTEM`` on the stream's node and on the reader's node, then the reader's
+    start time), and the cut is valid.  Then the standby is promoted.  The open cut still reads its old
+    snapshot, so nothing in the data shows that it is void: the readings do, whether the stream stays on the
+    source or moves to the promoted node.  The library refuses a new standby cut and a new settle floor on the
+    promoted node; a primary cut there is valid with the readings of its own node and of no other."""
     r = CP.promotion(cluster)
     assert r["ok"], r
     cut, after = r["open_cut"], r["after_promotion"]
     assert cut["timeline"] == cut["timeline_of_the_source"]
-    assert cut["valid_on_the_timeline_of_the_source"] and not cut["valid_without_a_timeline"]
+    assert cut["server_start_is_the_one_of_its_node"]
+    assert cut["has_passed"] and cut["valid_at_the_swap"] and not cut["valid_without_a_reading"]
     assert after["timeline"] > cut["timeline"]
-    assert not after["the_open_cut_is_valid_on_the_new_timeline"]
+    assert after["server_start_unchanged"]            # a promotion is not a restart: the timeline shows it
+    assert after["readings_with_the_stream_on_the_source"]["stream"]["timeline"] == cut["timeline"]
+    assert after["readings_with_the_stream_on_the_source"]["reader"]["timeline"] == after["timeline"]
+    assert not after["the_open_cut_is_valid_with_the_stream_on_the_source"]
+    assert not after["the_open_cut_is_valid_with_the_stream_on_the_promoted_node"]
     assert after["the_open_cut_still_reads"] == 1 and after["a_new_snapshot_reads"] == 2
     for key in ("library_on_a_new_cut", "library_on_a_new_exported_cut", "library_on_a_new_settle_floor"):
         assert r[key].startswith("refused"), r[key]
     promoted = r["primary_cut_on_the_promoted_node"]
-    assert promoted["timeline"] == after["timeline"] and promoted["valid_on_the_new_timeline"]
-    assert not promoted["valid_on_the_timeline_of_the_source"]
+    assert promoted["timeline"] == after["timeline"]
+    assert promoted["has_passed"] and not promoted["has_passed_before_the_next_commit"]
+    assert promoted["valid_at_the_swap"] and not promoted["valid_with_the_readings_of_the_source"]
     assert CP.PROMO_NODE not in " ".join(r["replication_slots_left_on_the_primary"])
+
+
+def test_a_primary_cut_does_not_outlive_a_crash_of_its_server(cluster):
+    """A snapshot on a primary sees a transaction that was committed with ``synchronous_commit = off`` and whose
+    commit record was not flushed; the primary is killed.  After the restart the transaction does not exist,
+    the timeline is the same, and other records stand at the positions the cut recorded: by positions and
+    timeline alone the stream has passed the cut.  The start time of the server says that it has not."""
+    r = CP.primary_crash(cluster, attempts=3)
+    assert r["ok"], r
+    for case in r["attempts"]:                        # whether or not the commit was lost
+        assert case["after_the_restart"]["server_start_differs"], case
+        assert not case["after_the_restart"]["valid_at_the_swap"], case
+        assert case["the_standby_reads"] == case["after_the_restart_the_row_reads"], case
+    if not r["shown"]:
+        # something flushed the WAL before the kill in every attempt: say so instead of passing silently
+        pytest.xfail("server %s flushed the commit before the kill in %d attempts: no lost commit was shown"
+                     % (r["server_version_num"], len(r["attempts"])))
+    case = r["attempts"][-1]
+    after = case["after_the_restart"]
+    assert case["cut"]["wal_not_flushed_when_the_cut_was_taken"], case
+    assert case["after_the_restart_the_row_reads"] < case["the_cut_reads"], case
+    assert after["same_timeline"] and after["positions_of_the_cut_reached_again"] and after["has_passed"], case
+    assert after["valid_if_the_server_start_were_not_compared"], case      # the negative control
 
 
 def test_primary_rules_under_a_held_back_synchronous_standby(cluster):
@@ -190,6 +221,7 @@ def test_primary_rules_under_a_held_back_synchronous_standby(cluster):
     assert r["ok"], r["violations"]
     assert r["violations"] == {}
     assert r["cuts_checked"] >= 2000
+    assert r["checker"]["passed_rule_checked"] > 0    # PrimaryCut.has_passed, with the library's own position
     wrong = r["wrong_rules"]
     assert wrong["later_snapshot"] > 0
     assert wrong["status_check"] > 0

@@ -15,6 +15,7 @@ from cdc_v2.testing import pgoutput as P
 
 lsns = st.integers(min_value=0, max_value=L.MAX)
 WALFILE_TL1 = "000000010000000000000003"
+START = 1_794_300_000_123_456      # a server's start time, microseconds since 1970
 
 
 @pytest.fixture
@@ -128,6 +129,13 @@ def test_has_passed_and_usable_after():
     cut = StandbyCut(r0=1000, r1=1100)
     assert not cut.has_passed(1100) and cut.has_passed(1101)
     assert cut.usable_after(1000) and cut.usable_after(999) and not cut.usable_after(1001)
+    # a primary: the stream has applied a transaction that ends at or after the insert position read after
+    # the snapshot (every transaction the snapshot sees ends at or before that position)
+    pc = PrimaryCut(SnapshotBounds(100, 100), insert_lsn=1100)
+    assert not pc.has_passed(1099) and pc.has_passed(1100) and pc.has_passed(1101)
+    assert not PrimaryCut(SnapshotBounds(100, 100)).has_passed(L.MAX)      # no insert position: never passed
+    with pytest.raises(C.CutError):
+        PrimaryCut(SnapshotBounds(100, 100), insert_lsn=-1)
 
 
 def test_xid_narrowing_never_overrides_positions_and_handles_the_epoch():
@@ -198,17 +206,85 @@ def test_classify_all_feeds_the_stream_in_order():
 
 # -- the timeline ------------------------------------------------------------------------------------------------
 
+def at(timeline, position):
+    """What IDENTIFY_SYSTEM said on a node."""
+    return C.TimelineReading(timeline, position)
+
+
 def test_a_cut_is_valid_only_on_the_timeline_it_was_taken_on():
-    cut = StandbyCut(r0=1000, r1=1100, timeline=3)
-    assert cut.valid_on(3)
-    assert not cut.valid_on(4)                     # after a promotion: the cut is abandoned
-    assert not cut.valid_on(2)
-    assert not cut.valid_on(None)                  # the caller does not know the stream's timeline: abandoned
-    assert not StandbyCut(r0=1000, r1=1100).valid_on(3)     # a cut that recorded no timeline is valid nowhere
-    pc = PrimaryCut(SnapshotBounds(100, 100), timeline=3)
-    assert pc.valid_on(3) and not pc.valid_on(4) and not pc.valid_on(None)
-    assert not PrimaryCut(SnapshotBounds(100, 100)).valid_on(3)
-    assert pc == PrimaryCut(SnapshotBounds(100, 100), timeline=3) != PrimaryCut(SnapshotBounds(100, 100), timeline=4)
+    """The question is asked at the swap, with three readings: the stream's node (read then), the reader's
+    node, and the start time of the reader's node (both read after the cut, in its server life)."""
+    cut = StandbyCut(r0=1000, r1=1100, timeline=3, server_start=START)
+    here = at(3, 1200)
+    assert cut.valid_on(here, here, START)                  # one node: the same reading twice
+    assert cut.valid_on(at(3, 1101), at(3, 1100), START)    # two nodes
+    assert not cut.valid_on(at(4, 1200), at(4, 1200), START)    # after a promotion: the cut is abandoned
+    assert not cut.valid_on(at(4, 1200), here, START)       # the stream's node alone has left the timeline
+    assert not cut.valid_on(here, at(4, 1200), START)       # the reader's node alone has
+    assert not cut.valid_on(at(2, 1200), at(2, 1200), START)
+    assert not cut.valid_on(at(3, 1100), here, START)       # the stream's node has no WAL beyond R1
+    assert not cut.valid_on(here, at(3, 1099), START)       # not the node the cut was taken on: it is behind R1
+    assert not cut.valid_on(here, here, START + 1)          # read in a later server life of the reader's node
+    for missing in ((None, here, START), (here, None, START), (here, here, None), (here, here, True),
+                    (3, here, START), (here, at(None, 1200), START), (here, at(3, None), START)):
+        assert not cut.valid_on(*missing), missing          # a reading that could not be made: abandoned
+    # a cut that recorded no timeline, or no start time, is valid nowhere
+    assert not StandbyCut(r0=1000, r1=1100, server_start=START).valid_on(here, here, START)
+    assert not StandbyCut(r0=1000, r1=1100, timeline=3).valid_on(here, here, START)
+    params = inspect.signature(StandbyCut.valid_on).parameters
+    assert list(params) == ["self", "stream", "reader", "reader_start"]
+    assert all(p.default is inspect.Parameter.empty for p in params.values())      # none can be left out
+
+
+def test_a_reading_made_while_the_cut_is_open_proves_nothing():
+    """Reader B is ahead of the fork point on timeline 1; the stream's node A is behind it and then follows
+    timeline 2.  Read while the cut was open, both nodes said timeline 1.  At the swap the stream's node says
+    2, and the cut, which holds a dead branch of timeline 1, is abandoned."""
+    fork, r1 = 5000, 6000
+    cut = StandbyCut(r0=5900, r1=r1, timeline=1, server_start=START)
+    while_open = (at(1, fork - 100), at(1, r1 + 10), START)
+    assert while_open[0].timeline == while_open[1].timeline == cut.timeline    # all that an early check sees
+    assert not cut.has_passed(fork - 100)                   # the swap is not asked for before this ...
+    assert not cut.valid_on(*while_open)                    # ... and the stream's node is not beyond R1
+    assert cut.has_passed(r1 + 500)                         # the stream passes R1, on timeline 2
+    assert not cut.valid_on(at(2, r1 + 500), at(1, r1 + 10), START)
+
+
+def test_the_readers_readings_are_about_the_cut_and_can_be_kept():
+    """Made once the read under the cut is complete, the reader's two readings say which timeline the cut was
+    taken on.  They stay good when the reader's node restarts afterwards; readings of the new server life are
+    not."""
+    cut = StandbyCut(r0=1000, r1=1100, timeline=3, server_start=START)
+    kept = (at(3, 1150), START)                             # after the read, before the restart
+    assert not cut.valid_on(at(3, 1090), *kept)             # the stream has not passed R1 yet
+    assert cut.valid_on(at(3, 1300), *kept)                 # at the swap: the stream's reading is new
+    after_restart = (at(3, 1300), START + 5_000_000)
+    assert not cut.valid_on(at(3, 1300), *after_restart)    # a caller that kept nothing abandons the cut
+    assert not cut.valid_on(at(4, 1300), *kept)             # kept readings do not help on another timeline
+    # a primary: the reader's reading is the flush position, and it must have reached the insert position
+    pc = PrimaryCut(SnapshotBounds(100, 100), timeline=3, insert_lsn=1100, server_start=START)
+    assert not pc.valid_on(at(3, 1090), at(3, 1090), START)     # not flushed yet: read again later
+    flushed = (at(3, 1100), START)
+    assert pc.valid_on(at(3, 4000), *flushed)               # flushed before a restart: the cut survives it
+    assert not pc.valid_on(at(3, 4000), at(3, 4000), START + 5_000_000)     # never seen flushed: abandoned
+
+
+def test_a_primary_cut_is_valid_only_in_its_server_life_and_on_its_timeline():
+    pc = PrimaryCut(SnapshotBounds(100, 100), timeline=3, insert_lsn=1100, server_start=START)
+    here = at(3, 1100)
+    assert pc.valid_on(here, here, START) and pc.valid_on(at(3, 5000), at(3, 5000), START)
+    assert not pc.valid_on(at(4, 5000), at(4, 5000), START)     # a promoted node, or a restore: another timeline
+    assert not pc.valid_on(at(3, 1099), at(3, 1099), START)     # the insert position is not on disk yet
+    # a crash and a restart: the same timeline, and the same positions with other records
+    assert not pc.valid_on(at(3, 5000), at(3, 5000), START + 7_000_000)
+    assert not pc.valid_on(None, here, START) and not pc.valid_on(here, here, None)
+    for incomplete in (PrimaryCut(SnapshotBounds(100, 100), timeline=3, insert_lsn=1100),
+                       PrimaryCut(SnapshotBounds(100, 100), timeline=3, server_start=START),
+                       PrimaryCut(SnapshotBounds(100, 100), insert_lsn=1100, server_start=START)):
+        assert not incomplete.valid_on(here, here, START)
+    assert pc == PrimaryCut(SnapshotBounds(100, 100), timeline=3, insert_lsn=1100, server_start=START)
+    assert pc != PrimaryCut(SnapshotBounds(100, 100), timeline=4, insert_lsn=1100, server_start=START)
+    assert list(inspect.signature(PrimaryCut.valid_on).parameters) == ["self", "stream", "reader", "reader_start"]
 
 
 # -- the primary cut ---------------------------------------------------------------------------------------------
@@ -270,7 +346,7 @@ def standby(answers, floor="0:3"):
 
 def export_answers(snapshot, version=180007, timeline=1):
     replay = iter(["0/1000", "0/1100", "0/1200"] * 50)
-    answers = {C.SQL_R0: lambda: (next(replay), timeline), C.SQL_R1: lambda: (next(replay), True),
+    answers = {C.SQL_R0: lambda: (next(replay), timeline, START), C.SQL_R1: lambda: (next(replay), True),
                C.SQL_EXPORT: lambda: ("00000003-0000001B-1", next(replay), True,
                                       snapshot() if callable(snapshot) else snapshot)}
     if version is not None:
@@ -280,13 +356,17 @@ def export_answers(snapshot, version=180007, timeline=1):
 
 def test_take_standby_cut_own_statement_order():
     replay = iter(["0/1000", "0/1100"])
-    conn, floor = standby({C.SQL_R0: lambda: (next(replay), 7),
+    conn, floor = standby({C.SQL_R0: lambda: (next(replay), 7, START),
                            C.SQL_OWN_FIRST: lambda: (next(replay), True, "700:705:")})
     cut = C.take_standby_cut_own(conn, floor)
     assert conn.log == [C.SQL_R0, C.SQL_BEGIN_RR, C.SQL_OWN_FIRST]   # R0 first, in autocommit
     assert (cut.r0, cut.r1, cut.r_stmt, cut.way) == (0x1000, 0x1100, 0x1100, "own")
     assert cut.bounds == SnapshotBounds(700, 705)
-    assert cut.timeline == 7 and cut.valid_on(7) and not cut.valid_on(8)   # read with R0, before the snapshot
+    assert (cut.timeline, cut.server_start) == (7, START)            # read with R0, before the snapshot
+    assert "pg_control_checkpoint()" in C.SQL_R0 and "pg_postmaster_start_time()" in C.SQL_R0
+    assert cut.valid_on(at(7, 0x1200), at(7, 0x1200), START)
+    assert not cut.valid_on(at(8, 0x1200), at(8, 0x1200), START)
+    assert C.server_start(FakeConn({C.SQL_SERVER_START: (START,)})) == START
 
 
 def test_take_standby_cut_exported_statement_order():
@@ -294,7 +374,8 @@ def test_take_standby_cut_exported_statement_order():
     cut = C.take_standby_cut_exported(conn, floor)
     assert conn.log == [C.SQL_VERSION_NUM, C.SQL_BEGIN_RC, C.SQL_R0, C.SQL_EXPORT, C.SQL_R1]
     assert (cut.r0, cut.r_stmt, cut.r1) == (0x1000, 0x1100, 0x1200)
-    assert cut.snapshot_id == "00000003-0000001B-1" and cut.way == "exported" and cut.timeline == 2
+    assert cut.snapshot_id == "00000003-0000001B-1" and cut.way == "exported"
+    assert (cut.timeline, cut.server_start) == (2, START)
 
 
 def test_export_defect_is_the_one_place_that_knows_the_versions():
@@ -332,11 +413,11 @@ def test_quiet_only_export_keeps_a_quiet_snapshot_and_drops_any_other():
 
 
 def test_standby_cut_refused_after_promotion_and_rolled_back():
-    conn, floor = standby({C.SQL_R0: ("0/1000", 1), C.SQL_OWN_FIRST: ("0/1000", False, "700:705:")})
+    conn, floor = standby({C.SQL_R0: ("0/1000", 1, START), C.SQL_OWN_FIRST: ("0/1000", False, "700:705:")})
     with pytest.raises(C.CutError, match="not a standby"):
         C.take_standby_cut_own(conn, floor)
     assert conn.log[-1] == "ROLLBACK"
-    conn, floor = standby({C.SQL_R0: (None, 1)})
+    conn, floor = standby({C.SQL_R0: (None, 1, START)})
     with pytest.raises(C.CutError):
         C.take_standby_cut_own(conn, floor)
 
@@ -344,7 +425,7 @@ def test_standby_cut_refused_after_promotion_and_rolled_back():
 def test_autocommit_is_required():
     conn = FakeConn({}, autocommit=False)
     with pytest.raises(C.CutError, match="autocommit"):
-        C.take_standby_cut_own(conn, C.SettleFloor(conn, 3))
+        C.take_standby_cut_own(conn, N.made_up_settle_floor(conn, 3))
     with pytest.raises(C.CutError, match="autocommit"):
         C.settle_floor(conn)
     with pytest.raises(C.CutError, match="autocommit"):
@@ -371,28 +452,33 @@ def test_wait_replay_reached_has_a_deadline(clock):
 
 
 def test_take_primary_cut_after_reports_blockers_at_the_deadline(clock):
-    conn = FakeConn({C.SQL_PRIMARY_FIRST: ("100:110:100,104", False, WALFILE_TL1)})
+    conn = FakeConn({C.SQL_PRIMARY_FIRST: ("100:110:100,104", False, "0/3000028", WALFILE_TL1, START)})
     with pytest.raises(DeadlineExceeded) as err:
         C.take_primary_cut_after(conn, 105, Deadline.after(0.5), poll_s=0.25)
     assert "100, 104" in err.value.what and clock["now"] == pytest.approx(0.5)
     assert conn.log.count(C.SQL_BEGIN_RR) == conn.log.count("ROLLBACK")      # no transaction left open
     cut = C.take_primary_cut_after(conn, 100, Deadline.after(0.5))
     assert cut.bounds.xmin == 100 and cut.timeline == 1
+    assert (cut.insert_lsn, cut.server_start) == (0x3000028, START)        # read after the snapshot was taken
+    assert not cut.has_passed(0x3000027) and cut.has_passed(0x3000028)
+    here = at(1, 0x3000100)
+    assert cut.valid_on(here, here, START) and not cut.valid_on(here, here, START + 1)
 
 
 def test_primary_cut_refused_on_a_standby():
-    conn = FakeConn({C.SQL_PRIMARY_FIRST: ("100:100:", True, None)})
+    conn = FakeConn({C.SQL_PRIMARY_FIRST: ("100:100:", True, None, None, START)})
     with pytest.raises(C.CutError):
         C.take_primary_cut(conn)
     assert conn.log[-1] == "ROLLBACK"
 
 
 def test_probe_snapshot_is_one_statement_and_leaves_nothing_open():
-    conn = FakeConn({C.SQL_PRIMARY_FIRST: ("100:110:100,104", False, "0000000500000000000000A1")})
+    conn = FakeConn({C.SQL_PRIMARY_FIRST: ("100:110:100,104", False, "0/A1000028",
+                                           "0000000500000000000000A1", START)})
     cut = C.probe_snapshot(conn)
     assert conn.log == [C.SQL_PRIMARY_FIRST]                    # no BEGIN: nothing to end
     assert cut.bounds == SnapshotBounds(100, 110, (100, 104)) and cut.timeline == 5
-    conn = FakeConn({C.SQL_PRIMARY_FIRST: ("100:100:", True, None)})
+    conn = FakeConn({C.SQL_PRIMARY_FIRST: ("100:100:", True, None, None, START)})
     with pytest.raises(C.CutError, match="not a primary"):
         C.probe_snapshot(conn)
     assert conn.log == [C.SQL_PRIMARY_FIRST]
@@ -580,9 +666,30 @@ def test_settle_floor_reads_the_control_file_and_refuses_a_primary():
         C.settle_floor(FakeConn({C.SQL_SETTLE_FLOOR: ("1:9", False)}))
     for bad in (None, True, -1, "9", 1.5):
         with pytest.raises(C.CutError):
-            C.SettleFloor(conn, bad)
+            N.made_up_settle_floor(conn, bad)
     with pytest.raises(C.CutError):
-        C.SettleFloor(None, 9)
+        N.made_up_settle_floor(None, 9)
+
+
+def test_a_settle_floor_is_read_not_made():
+    """Only settle_floor(conn) makes one; a test that needs a made-up floor names it so."""
+    conn = FakeConn({C.SQL_SETTLE_FLOOR: ("0:900", True)})
+    for attempt in (lambda: C.SettleFloor(conn, 0), lambda: C.SettleFloor(conn, 900),
+                    lambda: C.SettleFloor(conn, 900, None), lambda: C.SettleFloor(conn, 900, object()),
+                    lambda: C.SettleFloor(conn, 900, True)):
+        with pytest.raises(C.CutError, match="read, not made"):
+            attempt()
+    floor = C.settle_floor(conn)
+    for change in (lambda: setattr(floor, "_value", 0), lambda: setattr(floor, "_conn", object()),
+                   lambda: setattr(floor, "value", 0), lambda: delattr(floor, "_value"),
+                   lambda: setattr(floor, "other", 1)):
+        with pytest.raises(C.CutError, match="cannot be changed"):
+            change()
+    assert floor.value == 900 and floor.for_connection(conn) == 900
+    made_up = N.made_up_settle_floor(conn, 5)
+    assert isinstance(made_up, C.SettleFloor) and made_up.value == 5
+    assert "testing" in N.made_up_settle_floor.__module__
+    assert not [name for name in vars(C) if "made_up" in name or "for_test" in name]
 
 
 TAKERS = (C.take_standby_cut_own, C.take_standby_cut_exported, C.take_standby_cut_after,
@@ -612,7 +719,7 @@ def test_no_function_takes_a_standby_cut_without_a_settle_floor():
 
 def test_a_settle_floor_read_on_one_standby_is_refused_on_another():
     conn_a, floor_a = standby({}, floor="0:900")
-    conn_b, floor_b = standby({C.SQL_R0: ("0/1000", 1), C.SQL_OWN_FIRST: ("0/1100", True, "700:705:")},
+    conn_b, floor_b = standby({C.SQL_R0: ("0/1000", 1, START), C.SQL_OWN_FIRST: ("0/1100", True, "700:705:")},
                               floor="0:100")
     for fn in (lambda: C.take_standby_cut_own(conn_b, floor_a),
                lambda: C.take_standby_cut_exported(conn_b, floor_a, accept_export_defect=True),
@@ -622,27 +729,29 @@ def test_a_settle_floor_read_on_one_standby_is_refused_on_another():
             fn()
     assert conn_b.log == []
     assert C.take_standby_cut_own(conn_b, floor_b).bounds.xmax == 705     # its own floor is accepted
-    with pytest.raises(AttributeError):
+    with pytest.raises(C.CutError, match="cannot be changed"):
         floor_a.value = 1                                                  # and cannot be changed afterwards
+    with pytest.raises(C.CutError, match="read, not made"):
+        C.SettleFloor(conn_b, floor_a.value)                               # nor copied to another connection
 
 
 def test_cut_below_the_settle_floor_is_dropped():
     """The measured case (evidence/p3/cut/standby_start.json): after the restart the snapshot is
-    26838532:26838532: and the control file says next id 26838533; the hidden transaction is 26838532."""
+    44654445:44654445: and the control file says next id 44654446; the hidden transaction is 44654445."""
     def conn_with(snapshot):
         replay = iter(["0/1000", "0/1100"])
-        return standby({C.SQL_R0: lambda: (next(replay), 1),
-                        C.SQL_OWN_FIRST: lambda: (next(replay), True, snapshot)}, floor="0:26838533")
-    conn, floor = conn_with("26838532:26838532:")
-    assert floor.value == 26838533
+        return standby({C.SQL_R0: lambda: (next(replay), 1, START),
+                        C.SQL_OWN_FIRST: lambda: (next(replay), True, snapshot)}, floor="0:44654446")
+    conn, floor = conn_with("44654445:44654445:")
+    assert floor.value == 44654446
     with pytest.raises(C.StandbyNotSettled) as info:
         C.take_standby_cut_own(conn, floor)
-    assert conn.log[-1] == "ROLLBACK" and (info.value.floor, info.value.xmax) == (floor.value, 26838532)
-    conn, floor = conn_with("26838534:26838534:")
+    assert conn.log[-1] == "ROLLBACK" and (info.value.floor, info.value.xmax) == (floor.value, 44654445)
+    conn, floor = conn_with("44654447:44654447:")
     assert C.take_standby_cut_own(conn, floor).is_settled(floor.value)
-    conn, floor = conn_with("26838532:26838532:")
+    conn, floor = conn_with("44654445:44654445:")
     cut = C.take_standby_cut_own(conn, floor, accept_unsettled=True)       # the test switch: the cut is given out
-    assert not cut.is_settled(floor.value) and cut.is_settled(26838532) and "ROLLBACK" not in conn.log
+    assert not cut.is_settled(floor.value) and cut.is_settled(44654445) and "ROLLBACK" not in conn.log
     assert not C.StandbyCut(r0=1, r1=2).is_settled(3)                      # no bounds: never settled
     # the exported way tests the floor before it tests for a quiet snapshot
     conn, floor = standby(export_answers("700:705:", version=180006), floor="0:706")
@@ -655,7 +764,7 @@ def test_cut_below_the_settle_floor_is_dropped():
 
 
 def own_answers(snapshots, replay="0/2000", timeline=1):
-    return {C.SQL_REPLAY_LSN: (replay,), C.SQL_R0: (replay, timeline),
+    return {C.SQL_REPLAY_LSN: (replay,), C.SQL_R0: (replay, timeline, START),
             C.SQL_OWN_FIRST: lambda: (replay, True, next(snapshots))}
 
 
@@ -684,7 +793,7 @@ def test_take_standby_cut_after_waits_for_replay_and_for_the_floor(clock):
 def keyless_answers(snapshots, version, replay="0/2000"):
     """A standby whose replay position stands at ``replay`` and whose snapshots come from the list, in order."""
     snapshots = iter(snapshots)
-    return {C.SQL_VERSION_NUM: (version,), C.SQL_REPLAY_LSN: (replay,), C.SQL_R0: (replay, 1),
+    return {C.SQL_VERSION_NUM: (version,), C.SQL_REPLAY_LSN: (replay,), C.SQL_R0: (replay, 1, START),
             C.SQL_R1: (replay, True),
             C.SQL_EXPORT: lambda: ("00000003-0000001B-1", replay, True, next(snapshots)),
             C.SQL_OWN_FIRST: lambda: (replay, True, next(snapshots))}
@@ -697,7 +806,7 @@ def test_a_wait_for_a_quiet_snapshot_ends_with_a_result_not_with_an_error(clock)
     assert isinstance(got, C.NoQuietSnapshot) and not isinstance(got, (StandbyCut, Exception))
     assert not got                                                         # false in a condition
     assert (got.attempts, got.oldest_running) == (4, 700)
-    assert "no quiet snapshot within the deadline" in str(got) and "700" in str(got)
+    assert "no quiet snapshot within the wait" in str(got) and "700" in str(got) and not got.not_settled
     assert clock["now"] == pytest.approx(1.0)
     assert conn.log[-1] == "ROLLBACK" and conn.log.count(C.SQL_BEGIN_RC) == conn.log.count("ROLLBACK") == 4
     assert C.SQL_VERSION_NUM not in conn.log
@@ -706,6 +815,14 @@ def test_a_wait_for_a_quiet_snapshot_ends_with_a_result_not_with_an_error(clock)
     got = C.take_standby_cut_after(conn, 0x1800, Deadline.after(1.0), floor, exported=True, quiet_only=True,
                                    poll_s=0.25)
     assert got and isinstance(got, StandbyCut) and got.is_quiet and got.way == "exported"
+    # during the wait the caller is told which transaction is waited for
+    seen = []
+    conn, floor = standby(keyless_answers(["700:705:", "702:705:", "705:705:"], version=180006))
+    got = C.take_standby_cut_after(conn, 0x1800, Deadline.after(1.0), floor, exported=True, quiet_only=True,
+                                   poll_s=0.25, report=seen.append)
+    assert isinstance(got, StandbyCut)
+    assert [(s.attempts, s.oldest_running) for s in seen] == [(1, 700), (2, 702)]
+    assert all(isinstance(s, C.NoQuietSnapshot) for s in seen)
     # a standby that does not settle is an error also here: no kind of cut may be taken from it
     conn, floor = standby(keyless_answers(["700:700:"] * 100, version=180006), floor="0:701")
     with pytest.raises(DeadlineExceeded):
@@ -736,6 +853,21 @@ def test_keyless_cut_falls_back_to_one_reader_when_no_quiet_snapshot_comes(clock
     assert isinstance(waited, C.NoQuietSnapshot) and waited.oldest_running == 700 and waited.attempts == 240
     assert clock["now"] == pytest.approx(60.0)                             # the declared wait, and no more
     assert conn.log[-3:] == [C.SQL_R0, C.SQL_BEGIN_RR, C.SQL_OWN_FIRST]     # the reader's transaction is open
+    assert not waited.not_settled and "a transaction was running at each of 240 attempts" in str(waited)
+    # the report is passed on to the quiet wait
+    clock["now"] = 0.0
+    seen = []
+    conn, floor = standby(keyless_answers(["700:705:"] * 1000, version=180006))
+    C.take_keyless_standby_cut(conn, 0x1800, Deadline.after(300), floor, quiet_wait_s=1.0, poll_s=0.25,
+                               report=seen.append)
+    assert [s.attempts for s in seen] == [1, 2, 3, 4] and {s.oldest_running for s in seen} == {700}
+    # a standby that settles only after the quiet wait: the result says so, and does not speak of attempts
+    clock["now"] = 0.0
+    conn, floor = standby(keyless_answers(["700:700:"] * 4 + ["702:705:"], version=180006), floor="0:701")
+    cut = C.take_keyless_standby_cut(conn, 0x1800, Deadline.after(300), floor, quiet_wait_s=1.0, poll_s=0.25)
+    waited = cut.extra["quiet_wait"]
+    assert cut.way == "own" and waited.not_settled and not waited
+    assert "had not settled" in str(waited) and "attempts" not in str(waited)
     # the quiet wait never extends the caller's deadline
     clock["now"] = 0.0
     conn, floor = standby(keyless_answers(["700:705:"] * 1000, version=180006))

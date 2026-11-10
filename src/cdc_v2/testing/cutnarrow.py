@@ -1,20 +1,27 @@
-"""Test only: narrowing a standby cut's ``unknown`` by the start of the commit record (``S``).
+"""Test only: two things the cut library does not offer to the pipeline.
 
-Raw pgoutput gives ``S`` (BEGIN ``final_lsn``).  Stock Debezium does not: no field of a Debezium event equals it
+**Narrowing a standby cut's ``unknown`` by the start of the commit record (``S``).**  Raw pgoutput gives ``S``
+(BEGIN ``final_lsn``).  Stock Debezium does not: no field of a Debezium event equals it
 (docs/spike/local_streaming.md section 4; docs/design/engine.md section 5).  So the pipeline cannot use this
 rule and ``cdc_v2.pg.cut`` does not contain it.  It lives here for two purposes only: the measurement in
 docs/design/cut.md section 5 (how much the rule would narrow, if a stream ever delivered ``S``), and the model
 check, which shows that the rule is sound.
 
-Nothing under ``cdc_v2.testing`` is imported by the pipeline, and the names here say what they need
-(``..._with_start``), so production code cannot reach this rule by passing one more argument to the library.
+**A settle floor that was not read.**  ``cdc_v2.pg.cut.SettleFloor`` can be made by ``settle_floor(conn)``
+only.  Tests that show what a wrong floor does (a value of another standby, a value above what the standby
+has reached) make one with :func:`made_up_settle_floor`.
+
+Nothing under ``cdc_v2.testing`` is imported by the pipeline, and the names here say what they are
+(``..._with_start``, ``made_up_...``), so production code cannot reach either by passing one more argument to
+the library.
 """
 
 from __future__ import annotations
 
 from typing import Optional
 
-from cdc_v2.pg.cut import OUTSIDE, UNKNOWN, StandbyCut, Verdict
+from cdc_v2.pg import cut as _cut
+from cdc_v2.pg.cut import OUTSIDE, UNKNOWN, SettleFloor, StandbyCut, Verdict
 
 #: Size of a WAL page header at the start of a segment (``SizeOfXLogLongPHD``).  A record that follows a page
 #: boundary starts this many bytes (or 24, on other pages) after the boundary.
@@ -23,6 +30,11 @@ WAL_SHORT_PAGE_HEADER = 24
 WAL_BLOCK_SIZE_DEFAULT = 8192
 
 SQL_WAL_BLOCK_SIZE = "SELECT current_setting('wal_block_size')::int"
+
+
+def made_up_settle_floor(conn, value: int) -> SettleFloor:
+    """A settle floor with a value the test chose, bound to ``conn``.  Never read from a server."""
+    return SettleFloor(conn, value, _cut._READ_ON_THE_STANDBY)
 
 
 def wal_block_size(conn) -> int:

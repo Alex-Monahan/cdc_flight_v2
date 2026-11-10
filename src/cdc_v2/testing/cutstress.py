@@ -603,6 +603,8 @@ class Checker:
                 if C.widen_xid(xid, rec.xmax) < rec.xmax:
                     self._wrong("xmax_inside", hits, rec, e1, j)
                 if e <= rec.head:
+                    # Counts pairs of a cut and a key, not cuts (the name is kept: evidence files carry it).
+                    # Every such cut has R0 below the stream, and is counted once as that further down.
                     self.stats["cuts_that_miss_a_received_transaction"] += 1
         # 3. Every counter row exists before the stream starts and is never deleted.  A snapshot that returns
         #    no row for a key has lost the row (wrong hint bits do that), and step 2 would skip the key.
