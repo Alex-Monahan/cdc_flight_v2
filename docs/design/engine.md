@@ -81,7 +81,7 @@ value: kind 0 none, 1 i64, 2 `str`, 3 `flag`), keys sorted (Java `TreeMap<String
 A column **buffer** is u32 byte length, zero bytes up to a multiple of 8 counted from the payload start, the bytes,
 zero bytes up to the next multiple of 8. So every buffer starts 8-aligned inside the payload; Python reads each
 payload into its own `bytearray` (malloc-aligned) and wraps the buffers with `pyarrow.Array.from_buffers` without
-copying (test: `test_rows_buffers_are_zero_copy_slices_of_the_payload`). Arrow layout per physical type:
+copying (test: `test_rows_buffers_are_zero_copy_slices_of_the_payload`). That `bytearray` grows as the payload's bytes arrive, never ahead by the length field, so a damaged length cannot reserve memory (`tests/engine/test_frames_length_alloc.py`). Arrow layout per physical type:
 
 | Code | Physical | Arrow | Data buffer |
 |---|---|---|---|

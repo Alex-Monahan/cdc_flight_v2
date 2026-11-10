@@ -32,6 +32,7 @@ import hashlib
 import json
 import os
 import random
+import struct
 import threading
 import time
 from collections import Counter
@@ -45,9 +46,9 @@ from cdc_v2.testing import pipefaults
 
 CORPUS_DIR = Path(__file__).resolve().parents[4] / "tests" / "fuzz" / "corpus"
 # faults after which a clean end at a frame boundary is the true outcome (the stream really is shorter)
-SHORTENING = ("pipefault", "cut_at_boundary", "raw_drop_frame", "drop_end", "flip_header_length")
+SHORTENING = ("pipefault", "cut_at_boundary", "raw_drop_frame", "drop_end", "flip_header_length", "huge_length")
 UNDETECTABLE = ("clean_end_at_boundary", "new_life_replay", "content_replaced_same_shape")
-BYTE_KINDS = ("pipefault", "flip_header_length", "flip_header_seq", "flip_header_type", "flip_payload",
+BYTE_KINDS = ("pipefault", "huge_length", "flip_header_length", "flip_header_seq", "flip_header_type", "flip_payload",
               "raw_swap", "raw_dup_run", "raw_drop_frame", "cut_at_boundary")
 SEMANTIC_KINDS = ("end_count", "foreign_rows", "drop_end", "drop_begin", "swap_records", "ack_regress",
                   "dup_txn_same_life", "heartbeat_ahead", "content_replaced_same_shape", "new_life_replay")
@@ -265,6 +266,13 @@ def mutate(kind: str, frames: list, data: bytes, r: random.Random) -> tuple:
         plan = pipefaults.make_plan(r.getrandbits(32), len(data), kinds=("flip", "dup", "cut", "truncate"))
         out, log = pipefaults.apply_bytes(data, plan)
         return out, {"plan": [e for e in log if e.get("fired")]}
+    if kind == "huge_length":
+        # a length field that claims up to the decoder's maximum, then the stream ends: the reader must not
+        # reserve that memory and must end with a typed error (read with the default maximum, below)
+        s, e = spans[r.randrange(len(spans))]
+        b = bytearray(data[:e])
+        struct.pack_into("<I", b, s + 16, r.randint(1 << 24, F.DEFAULT_MAX_FRAME_BYTES))
+        return bytes(b), {"frame_start": s}
     if kind.startswith("flip_"):
         s, e = spans[r.randrange(len(spans))]
         if kind == "flip_header_length":
@@ -426,12 +434,13 @@ def read_life(data: bytes, r: random.Random, assembler_cls=Assembler, decoder="s
     return out
 
 
-def apply_lives(lives: list, r: random.Random, assembler_cls=Assembler, decoder="strict") -> dict:
+def apply_lives(lives: list, r: random.Random, assembler_cls=Assembler, decoder="strict",
+                max_frame_bytes: int = 1 << 20) -> dict:
     """Each life gets a new reader (an engine restart); a transaction at or below the applied position is
     discarded as a whole."""
     applied, position, ends = [], None, []
     for data in lives:
-        res = read_life(data, r, assembler_cls, decoder)
+        res = read_life(data, r, assembler_cls, decoder, max_frame_bytes)
         ends.append(res["end"])
         for t in res["txns"]:
             if position is None or t["ack"] > position:
@@ -484,7 +493,8 @@ def run_case(seed: int, corpus: list, kinds=None, assembler_cls=Assembler, decod
     kind = r.choice(list(kinds or (BYTE_KINDS + SEMANTIC_KINDS)))
     mutated, details = mutate(kind, frames, data, r)
     lives = mutated if isinstance(mutated, list) else [mutated]
-    res = apply_lives(lives, r, assembler_cls, decoder)
+    res = apply_lives(lives, r, assembler_cls, decoder,
+                      max_frame_bytes=F.DEFAULT_MAX_FRAME_BYTES if kind == "huge_length" else 1 << 20)
     c = check_case(true, res, kind, details)
     c.update(seed=seed, stream=name)
     return c

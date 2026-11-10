@@ -401,16 +401,13 @@ class FrameParser:
                 if length > self.max_frame_bytes:
                     self._fail("frame length %d above the limit %d" % (length, self.max_frame_bytes))
                 self._ftype, self._len = ftype, length
-                try:
-                    self._payload = bytearray(length)
-                except MemoryError:
-                    self._fail("cannot allocate a frame of %d bytes" % length)
+                self._payload = bytearray()          # grows as the bytes arrive, never ahead by the length field
                 self._filled = 0
                 self._crc_buf = bytearray()
                 continue
             if self._filled < self._len:
                 take = min(self._len - self._filled, n - i)
-                self._payload[self._filled:self._filled + take] = mv[i:i + take]
+                self._payload += mv[i:i + take]
                 self._filled += take
                 i += take
                 self.bytes_in += take
