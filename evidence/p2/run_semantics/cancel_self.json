@@ -1,0 +1,125 @@
+{
+  "db_events": [
+    {
+      "client_unix": 1794278447.1472526,
+      "detail": {
+        "call_client_unix": 1794278446.5821786,
+        "call_server_unix": 1794278446.581,
+        "flight_id": "37e6d532-6adb-4d90-9ace-95790c23588b",
+        "ok": true,
+        "result": [
+          [
+            "1"
+          ]
+        ],
+        "returned_client_unix": 1794278447.1471398,
+        "run_number": 5,
+        "took_s": 0.565
+      },
+      "kind": "cancel_call",
+      "pid": 34,
+      "role": "main",
+      "run_number": 5,
+      "server": "2026-11-10T02:40:47.154000+00:00",
+      "server_unix": 1794278447.154
+    },
+    {
+      "client_unix": 1794278447.353746,
+      "detail": {
+        "targets": 1
+      },
+      "kind": "end",
+      "pid": 34,
+      "role": "main",
+      "run_number": 5,
+      "server": "2026-11-10T02:40:47.355000+00:00",
+      "server_unix": 1794278447.355
+    }
+  ],
+  "events": [
+    {
+      "kind": "start",
+      "mode": "canceller",
+      "own_flight_id": "37e6d532-6adb-4d90-9ace-95790c23588b",
+      "pid": 34,
+      "role": "main",
+      "run": 5,
+      "t": 1794278446.581,
+      "target": "self",
+      "v": "v1"
+    },
+    {
+      "call_client_unix": 1794278446.5821786,
+      "call_server_unix": 1794278446.581,
+      "flight_id": "37e6d532-6adb-4d90-9ace-95790c23588b",
+      "kind": "cancel_result",
+      "ok": true,
+      "pid": 34,
+      "result": [
+        [
+          "1"
+        ]
+      ],
+      "returned_client_unix": 1794278447.1471398,
+      "role": "main",
+      "run": 5,
+      "run_number": 5,
+      "t": 1794278447.147,
+      "took_s": 0.565,
+      "v": "v1"
+    },
+    {
+      "cancelled_at": "2026-11-10 02:40:47.014+00",
+      "ended_at": null,
+      "exit_code": null,
+      "kind": "target_state",
+      "pid": 34,
+      "role": "main",
+      "run": 5,
+      "run_number": 5,
+      "status": "CANCELLED",
+      "t": 1794278447.354,
+      "v": "v1"
+    },
+    {
+      "kind": "end",
+      "pid": 34,
+      "role": "main",
+      "run": 5,
+      "t": 1794278447.376,
+      "v": "v1"
+    }
+  ],
+  "final": {
+    "cancelled_at": "2026-11-10T02:40:47.014+00:00",
+    "created_at": "2026-11-10T02:40:40.556+00:00",
+    "ended_at": null,
+    "exit_code": null,
+    "flight_version": 2,
+    "is_scheduled": false,
+    "run_number": 5,
+    "scheduled_at": "2026-11-10T02:40:40.544+00:00",
+    "started_at": "2026-11-10T02:40:41.04+00:00",
+    "state": "CANCELLED"
+  },
+  "log_tail": [
+    "Downloading duckdb (20.6MiB)",
+    " Downloaded duckdb",
+    "Prepared 1 package in 1.35s",
+    "Installed 1 package in 32ms",
+    " + duckdb==1.5.6",
+    "FIRST 1794278444.186",
+    "EV {\"kind\": \"start\", \"role\": \"main\", \"pid\": 34, \"run\": 5, \"t\": 1794278446.581, \"v\": \"v1\", \"mode\": \"canceller\", \"target\": \"self\", \"own_flight_id\": \"37e6d532-6adb-4d90-9ace-95790c23588b\"}",
+    "EV {\"kind\": \"cancel_result\", \"role\": \"main\", \"pid\": 34, \"run\": 5, \"t\": 1794278447.147, \"v\": \"v1\", \"ok\": true, \"result\": [[\"1\"]], \"flight_id\": \"37e6d532-6adb-4d90-9ace-95790c23588b\", \"run_number\": 5, \"call_client_unix\": 1794278446.5821786, \"call_server_unix\": 1794278446.581, \"returned_client_unix\": 1794278447.1471398, \"took_s\": 0.565}",
+    "EV {\"kind\": \"target_state\", \"role\": \"main\", \"pid\": 34, \"run\": 5, \"t\": 1794278447.354, \"v\": \"v1\", \"run_number\": 5, \"status\": \"CANCELLED\", \"cancelled_at\": \"2026-11-10 02:40:47.014+00\", \"ended_at\": null, \"exit_code\": null}",
+    "EV {\"kind\": \"end\", \"role\": \"main\", \"pid\": 34, \"run\": 5, \"t\": 1794278447.376, \"v\": \"v1\"}"
+  ],
+  "run": 5,
+  "timing": {
+    "created_minus_scheduled_s": 0.012,
+    "scheduled_to_first_line_s": 3.642,
+    "scheduled_to_started_s": 0.496,
+    "started_to_cancelled_s": 5.974,
+    "started_to_first_line_s": 3.146
+  }
+}

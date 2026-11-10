@@ -1,0 +1,129 @@
+{
+  "flight": "cdc_v2_spike_runs_maxrt",
+  "gap_s": 17,
+  "max_runtime_sec": 60,
+  "runs": [
+    {
+      "final": {
+        "cancelled_at": "2026-11-10T02:43:57.573+00:00",
+        "created_at": "2026-11-10T02:41:42.792+00:00",
+        "ended_at": null,
+        "exit_code": null,
+        "flight_version": 20,
+        "is_scheduled": false,
+        "run_number": 3,
+        "scheduled_at": "2026-11-10T02:41:42.783+00:00",
+        "started_at": "2026-11-10T02:41:44.323+00:00",
+        "state": "CANCELLED"
+      },
+      "last_row_minus_terminal_s": -0.001,
+      "limit_at": "2026-11-10T02:42:44.323000+00:00",
+      "run": 3,
+      "terminal_minus_limit_s": 73.25,
+      "terminal_seconds_into_minute": 57.573
+    },
+    {
+      "final": {
+        "cancelled_at": "2026-11-10T02:44:59.175+00:00",
+        "created_at": "2026-11-10T02:42:00.459+00:00",
+        "ended_at": null,
+        "exit_code": null,
+        "flight_version": 20,
+        "is_scheduled": false,
+        "run_number": 4,
+        "scheduled_at": "2026-11-10T02:42:00.387+00:00",
+        "started_at": "2026-11-10T02:42:01.675+00:00",
+        "state": "CANCELLED"
+      },
+      "last_row_minus_terminal_s": 1.211,
+      "limit_at": "2026-11-10T02:43:01.675000+00:00",
+      "run": 4,
+      "terminal_minus_limit_s": 117.5,
+      "terminal_seconds_into_minute": 59.175
+    },
+    {
+      "final": {
+        "cancelled_at": "2026-11-10T02:44:59.359+00:00",
+        "created_at": "2026-11-10T02:42:18.152+00:00",
+        "ended_at": null,
+        "exit_code": null,
+        "flight_version": 20,
+        "is_scheduled": false,
+        "run_number": 5,
+        "scheduled_at": "2026-11-10T02:42:18.143+00:00",
+        "started_at": "2026-11-10T02:42:18.877+00:00",
+        "state": "CANCELLED"
+      },
+      "last_row_minus_terminal_s": 1.609,
+      "limit_at": "2026-11-10T02:43:18.877000+00:00",
+      "run": 5,
+      "terminal_minus_limit_s": 100.482,
+      "terminal_seconds_into_minute": 59.359
+    },
+    {
+      "final": {
+        "cancelled_at": "2026-11-10T02:44:59.574+00:00",
+        "created_at": "2026-11-10T02:42:35.971+00:00",
+        "ended_at": null,
+        "exit_code": null,
+        "flight_version": 20,
+        "is_scheduled": false,
+        "run_number": 6,
+        "scheduled_at": "2026-11-10T02:42:35.903+00:00",
+        "started_at": "2026-11-10T02:42:37.11+00:00",
+        "state": "CANCELLED"
+      },
+      "last_row_minus_terminal_s": 1.813,
+      "limit_at": "2026-11-10T02:43:37.110000+00:00",
+      "run": 6,
+      "terminal_minus_limit_s": 82.464,
+      "terminal_seconds_into_minute": 59.574
+    },
+    {
+      "final": {
+        "cancelled_at": "2026-11-10T02:44:59.814+00:00",
+        "created_at": "2026-11-10T02:42:53.842+00:00",
+        "ended_at": null,
+        "exit_code": null,
+        "flight_version": 20,
+        "is_scheduled": false,
+        "run_number": 7,
+        "scheduled_at": "2026-11-10T02:42:53.824+00:00",
+        "started_at": "2026-11-10T02:42:54.232+00:00",
+        "state": "CANCELLED"
+      },
+      "last_row_minus_terminal_s": 1.215,
+      "limit_at": "2026-11-10T02:43:54.232000+00:00",
+      "run": 7,
+      "terminal_minus_limit_s": 65.582,
+      "terminal_seconds_into_minute": 59.814
+    },
+    {
+      "final": {
+        "cancelled_at": "2026-11-10T02:45:43.891+00:00",
+        "created_at": "2026-11-10T02:43:11.519+00:00",
+        "ended_at": null,
+        "exit_code": null,
+        "flight_version": 20,
+        "is_scheduled": false,
+        "run_number": 8,
+        "scheduled_at": "2026-11-10T02:43:11.506+00:00",
+        "started_at": "2026-11-10T02:43:13.416+00:00",
+        "state": "CANCELLED"
+      },
+      "last_row_minus_terminal_s": 0.68,
+      "limit_at": "2026-11-10T02:44:13.416000+00:00",
+      "run": 8,
+      "terminal_minus_limit_s": 90.475,
+      "terminal_seconds_into_minute": 43.891
+    }
+  ],
+  "terminal_minus_limit_s": {
+    "max": 117.5,
+    "mean": 88.292,
+    "median": 86.469,
+    "min": 65.582,
+    "n": 6,
+    "p95": 117.5
+  }
+}

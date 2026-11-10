@@ -85,6 +85,34 @@ def step_exceed(seconds):
                                                                        if r["run_number"] not in runs]})
 
 
+def step_stagger(seconds, count=6, gap=17):
+    """How exact is the timeout? `count` runs started `gap` s apart with max_runtime_sec = `seconds`: if the
+    timeout were enforced per run, each would end at started_at + seconds; clustered cancel times mean a sweep."""
+    cfg = dict(c.DEFAULT_CONFIG, CDC_V2_RUNS_FLIGHT=NAME)
+    cfg.update(VICTIM, CDC_V2_RUNS_CHILDREN="0", CDC_V2_RUNS_TICK_VIA="duckdb", CDC_V2_RUNS_TICK_S="1")
+    c.ctl.update(NAME, max_runtime_sec=seconds, config=cfg)
+    runs = []
+    for i in range(count):
+        runs.append(c.run(NAME)["run_number"])
+        if i < count - 1:
+            time.sleep(gap)
+    rows = []
+    for n in runs:
+        f = c.ctl.wait(NAME, n, timeout=seconds + 900, poll=2)
+        sta, can = c.unix(f.get("started_at")), c.unix(f.get("cancelled_at")) or c.unix(f.get("ended_at"))
+        ticks = c.tick_summary(NAME, n)
+        rows.append({"run": n, "final": c.slim_run(f), "limit_at": c.iso(sta + seconds),
+                     "terminal_minus_limit_s": round(can - sta - seconds, 3) if sta and can else None,
+                     "terminal_seconds_into_minute": round(can % 60, 3) if can else None,
+                     "last_row_minus_terminal_s": round(ticks[-1]["last_server_unix"] - can, 3) if ticks and can
+                     else None})
+        print(rows[-1]["run"], rows[-1]["terminal_minus_limit_s"], flush=True)
+    c.save("max_runtime_stagger_%ds" % seconds, {"flight": NAME, "max_runtime_sec": seconds, "gap_s": gap,
+                                                 "runs": rows,
+                                                 "terminal_minus_limit_s": c.dist(r["terminal_minus_limit_s"]
+                                                                                  for r in rows)})
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("steps", nargs="*", default=["probe", "exceed"])
@@ -104,6 +132,8 @@ def main():
             ok = sorted(r["max_runtime_sec"] for r in res if r["accepted"] and r["max_runtime_sec"] >= 60)
             seconds = ok[0] if ok else 60
         step_exceed(seconds)
+    if "stagger" in a.steps:
+        step_stagger(seconds or 60)
 
 
 if __name__ == "__main__":

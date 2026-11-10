@@ -1,0 +1,188 @@
+{
+  "flight": "cdc_v2_spike_runs_wd_maxrt",
+  "result": {
+    "db_events": [
+      {
+        "client_unix": 1794278204.552996,
+        "detail": {
+          "freeze": "all",
+          "pgid": 37
+        },
+        "kind": "freezing",
+        "pid": 37,
+        "role": "pipeline",
+        "run_number": 1,
+        "server": "2026-11-10T02:36:44.554000+00:00",
+        "server_unix": 1794278204.554
+      }
+    ],
+    "events": [
+      {
+        "freeze": "all",
+        "kind": "start",
+        "mode": "watchdog",
+        "pid": 36,
+        "role": "main",
+        "run": 1,
+        "t": 1794278171.821,
+        "v": "v1",
+        "variant": "killpg1"
+      },
+      {
+        "child_pid": 37,
+        "child_role": "pipeline",
+        "kind": "spawned",
+        "new_session": true,
+        "pid": 36,
+        "role": "main",
+        "run": 1,
+        "t": 1794278171.822,
+        "v": "v1"
+      },
+      {
+        "child_pid": 38,
+        "child_role": "helper",
+        "kind": "spawned",
+        "new_session": true,
+        "pid": 36,
+        "role": "main",
+        "run": 1,
+        "t": 1794278171.822,
+        "v": "v1"
+      },
+      {
+        "child_pid": 278,
+        "child_role": "pgrand",
+        "kind": "spawned",
+        "new_session": false,
+        "pid": 37,
+        "role": "pipeline",
+        "run": 1,
+        "t": 1794278174.528,
+        "v": "v1"
+      },
+      {
+        "kind": "tick",
+        "pid": 278,
+        "role": "pgrand",
+        "run": 1,
+        "seq": 0,
+        "t": 1794278175.307,
+        "tag": "pgrand",
+        "v": "v1"
+      },
+      {
+        "kind": "tick",
+        "pid": 278,
+        "role": "pgrand",
+        "run": 1,
+        "seq": 10,
+        "t": 1794278185.308,
+        "tag": "pgrand",
+        "v": "v1"
+      },
+      {
+        "kind": "tick",
+        "pid": 278,
+        "role": "pgrand",
+        "run": 1,
+        "seq": 21,
+        "t": 1794278196.307,
+        "tag": "pgrand",
+        "v": "v1"
+      },
+      {
+        "freeze": "all",
+        "kind": "freezing",
+        "pid": 37,
+        "role": "pipeline",
+        "run": 1,
+        "t": 1794278204.584,
+        "v": "v1"
+      }
+    ],
+    "final": {
+      "cancelled_at": "2026-11-10T02:39:11.733+00:00",
+      "created_at": "2026-11-10T02:36:07.12+00:00",
+      "ended_at": null,
+      "exit_code": null,
+      "flight_version": 1,
+      "is_scheduled": false,
+      "run_number": 1,
+      "scheduled_at": "2026-11-10T02:36:07.101+00:00",
+      "started_at": "2026-11-10T02:36:08.403+00:00",
+      "state": "CANCELLED"
+    },
+    "freeze_at": "2026-11-10T02:36:44.584000+00:00",
+    "freeze_to_hard_exit_s": null,
+    "freeze_to_run_terminal_s": 147.149,
+    "hard_exit_logged_at": null,
+    "hard_exit_to_run_terminal_s": null,
+    "heartbeat_stale_logged_at": null,
+    "log_tail": [
+      "FIRST 1794278171.612",
+      "EV {\"kind\": \"start\", \"role\": \"main\", \"pid\": 36, \"run\": 1, \"t\": 1794278171.821, \"v\": \"v1\", \"mode\": \"watchdog\", \"freeze\": \"all\", \"variant\": \"killpg1\"}",
+      "EV {\"kind\": \"spawned\", \"role\": \"main\", \"pid\": 36, \"run\": 1, \"t\": 1794278171.822, \"v\": \"v1\", \"child_role\": \"pipeline\", \"child_pid\": 37, \"new_session\": true}",
+      "EV {\"kind\": \"spawned\", \"role\": \"main\", \"pid\": 36, \"run\": 1, \"t\": 1794278171.822, \"v\": \"v1\", \"child_role\": \"helper\", \"child_pid\": 38, \"new_session\": true}",
+      "FIRST 1794278171.854FIRST 1794278171.854",
+      "",
+      "EV {\"kind\": \"spawned\", \"role\": \"pipeline\", \"pid\": 37, \"run\": 1, \"t\": 1794278174.528, \"v\": \"v1\", \"child_role\": \"pgrand\", \"child_pid\": 278, \"new_session\": false}",
+      "FIRST 1794278174.555",
+      "EV {\"kind\": \"tick\", \"role\": \"pgrand\", \"pid\": 278, \"run\": 1, \"t\": 1794278175.307, \"v\": \"v1\", \"seq\": 0, \"tag\": \"pgrand\"}",
+      "EV {\"kind\": \"tick\", \"role\": \"pgrand\", \"pid\": 278, \"run\": 1, \"t\": 1794278185.308, \"v\": \"v1\", \"seq\": 10, \"tag\": \"pgrand\"}",
+      "EV {\"kind\": \"tick\", \"role\": \"pgrand\", \"pid\": 278, \"run\": 1, \"t\": 1794278196.307, \"v\": \"v1\", \"seq\": 21, \"tag\": \"pgrand\"}",
+      "EV {\"kind\": \"freezing\", \"role\": \"pipeline\", \"pid\": 37, \"run\": 1, \"t\": 1794278204.584, \"v\": \"v1\", \"freeze\": \"all\"}"
+    ],
+    "max_runtime_sec": 180,
+    "rows_written_more_than_1s_after_run_end": {
+      "helper": {
+        "last": "2026-11-10T02:39:13.540000+00:00",
+        "rows": 1
+      }
+    },
+    "run": 1,
+    "terminal_minus_started_plus_max_runtime_s": 3.33,
+    "ticks_per_role": [
+      {
+        "first_server": "2026-11-10T02:36:14.521000+00:00",
+        "first_server_unix": 1794278174.521,
+        "last_client_unix": 1794278353.5386236,
+        "last_row_minus_run_end_s": 1.807,
+        "last_server": "2026-11-10T02:39:13.540000+00:00",
+        "last_server_unix": 1794278353.54,
+        "pid": 38,
+        "role": "helper",
+        "rows": 175
+      },
+      {
+        "first_server": "2026-11-10T02:36:14.533000+00:00",
+        "first_server_unix": 1794278174.533,
+        "last_client_unix": 1794278204.528338,
+        "last_row_minus_run_end_s": -147.203,
+        "last_server": "2026-11-10T02:36:44.530000+00:00",
+        "last_server_unix": 1794278204.53,
+        "pid": 37,
+        "role": "pipeline",
+        "rows": 4
+      },
+      {
+        "first_server": "2026-11-10T02:36:15.274000+00:00",
+        "first_server_unix": 1794278175.274,
+        "last_client_unix": 1794278204.2686167,
+        "last_row_minus_run_end_s": -147.463,
+        "last_server": "2026-11-10T02:36:44.270000+00:00",
+        "last_server_unix": 1794278204.27,
+        "pid": 278,
+        "role": "pgrand",
+        "rows": 30
+      }
+    ],
+    "timing": {
+      "created_minus_scheduled_s": 0.019,
+      "scheduled_to_first_line_s": 4.511,
+      "scheduled_to_started_s": 1.302,
+      "started_to_cancelled_s": 183.33,
+      "started_to_first_line_s": 3.209
+    }
+  }
+}

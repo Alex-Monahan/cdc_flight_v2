@@ -1,0 +1,284 @@
+{
+  "flight": "cdc_v2_spike_runs_def",
+  "initial_version": 1,
+  "step1": {
+    "run_A": 1,
+    "run_A_record": {
+      "cancelled_at": null,
+      "created_at": "2026-11-10T02:38:24.054+00:00",
+      "ended_at": null,
+      "exit_code": null,
+      "flight_version": 1,
+      "is_scheduled": false,
+      "run_number": 1,
+      "scheduled_at": "2026-11-10T02:38:23.984+00:00",
+      "started_at": "2026-11-10T02:38:24.582+00:00",
+      "state": "RUNNING"
+    },
+    "run_A_rows_after_update": {
+      "last": "2026-11-10T02:39:51.390000+00:00",
+      "rows": 71,
+      "tags": [
+        "main:v1"
+      ]
+    },
+    "run_A_start_event": {
+      "caught_signals": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64
+      ],
+      "first_line_unix": 1794278308.1273386,
+      "mode": "ticker",
+      "pgid": 33,
+      "version": "v1"
+    },
+    "run_S_record": {
+      "cancelled_at": null,
+      "created_at": "2026-11-10T02:38:47.66+00:00",
+      "ended_at": null,
+      "exit_code": null,
+      "flight_version": 2,
+      "is_scheduled": true,
+      "run_number": 2,
+      "scheduled_at": "2026-11-10T02:39:00+00:00",
+      "started_at": "2026-11-10T02:39:00.904+00:00",
+      "state": "RUNNING"
+    },
+    "run_S_start_event": {
+      "caught_signals": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64
+      ],
+      "first_line_unix": 1794278344.0714967,
+      "mode": "ticker",
+      "pgid": 32,
+      "version": "v2"
+    },
+    "run_S_tags": {
+      "last": "2026-11-10T02:39:51.333000+00:00",
+      "rows": 46,
+      "tags": [
+        "main:v2"
+      ]
+    },
+    "scheduled_run_S": 2
+  },
+  "step2_unschedule": {
+    "at": "2026-11-10T02:39:20.214790+00:00",
+    "run_A_rows_after": {
+      "last": "2026-11-10T02:39:51.390000+00:00",
+      "rows": 31,
+      "tags": [
+        "main:v1"
+      ]
+    },
+    "run_S_rows_after": {
+      "last": "2026-11-10T02:39:52.333000+00:00",
+      "rows": 32,
+      "tags": [
+        "main:v2"
+      ]
+    },
+    "runs": [
+      {
+        "cancelled_at": null,
+        "created_at": "2026-11-10T02:38:47.66+00:00",
+        "ended_at": null,
+        "exit_code": null,
+        "flight_version": 2,
+        "is_scheduled": true,
+        "run_number": 2,
+        "scheduled_at": "2026-11-10T02:39:00+00:00",
+        "started_at": "2026-11-10T02:39:00.904+00:00",
+        "state": "RUNNING"
+      },
+      {
+        "cancelled_at": null,
+        "created_at": "2026-11-10T02:38:24.054+00:00",
+        "ended_at": null,
+        "exit_code": null,
+        "flight_version": 1,
+        "is_scheduled": false,
+        "run_number": 1,
+        "scheduled_at": "2026-11-10T02:38:23.984+00:00",
+        "started_at": "2026-11-10T02:38:24.582+00:00",
+        "state": "RUNNING"
+      }
+    ]
+  },
+  "step3_delete": {
+    "active_runs_at_delete": [
+      2,
+      1
+    ],
+    "at": "2026-11-10T02:39:52.868876+00:00",
+    "last_rows": {
+      "1": [
+        {
+          "first_server": "2026-11-10T02:38:30.390000+00:00",
+          "first_server_unix": 1794278310.39,
+          "last_client_unix": 1794278438.3885732,
+          "last_server": "2026-11-10T02:40:38.390000+00:00",
+          "last_server_unix": 1794278438.39,
+          "pid": 36,
+          "role": "main",
+          "rows": 129
+        }
+      ],
+      "2": [
+        {
+          "first_server": "2026-11-10T02:39:06.333000+00:00",
+          "first_server_unix": 1794278346.333,
+          "last_client_unix": 1794278438.331475,
+          "last_server": "2026-11-10T02:40:38.333000+00:00",
+          "last_server_unix": 1794278438.333,
+          "pid": 35,
+          "role": "main",
+          "rows": 93
+        }
+      ]
+    },
+    "result": {
+      "deleted": true,
+      "flight_id": "c194b19a-2ce9-422e-b4c5-982b55239673",
+      "flight_name": "cdc_v2_spike_runs_def"
+    },
+    "rows_after_delete": {
+      "1": {
+        "last": "2026-11-10T02:40:38.390000+00:00",
+        "rows": 44,
+        "tags": [
+          "main:v1"
+        ]
+      },
+      "2": {
+        "last": "2026-11-10T02:40:38.333000+00:00",
+        "rows": 44,
+        "tags": [
+          "main:v2"
+        ]
+      }
+    },
+    "runs_listed_after_delete_error": "Catalog Error: Flight \"c194b19a-2ce9-422e-b4c5-982b55239673\" not found"
+  },
+  "update": {
+    "at": "2026-11-10T02:38:40.439643+00:00",
+    "new_version": 2
+  }
+}

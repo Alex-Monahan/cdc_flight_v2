@@ -1,0 +1,73 @@
+{
+  "flight": "cdc_v2_spike_runs_fail",
+  "runs": [
+    {
+      "cancelled_at": null,
+      "created_at": "2026-11-10T02:40:38.799+00:00",
+      "created_minus_scheduled_s": -21.201,
+      "ended_at": "2026-11-10T02:41:04.094+00:00",
+      "exit_code": 3,
+      "flight_version": 2,
+      "is_scheduled": true,
+      "run_number": 5,
+      "scheduled_at": "2026-11-10T02:41:00+00:00",
+      "scheduled_to_started_s": 0.28,
+      "started_at": "2026-11-10T02:41:00.28+00:00",
+      "started_to_ended_s": 3.814,
+      "state": "FAILED"
+    },
+    {
+      "cancelled_at": null,
+      "created_at": "2026-11-10T02:41:38.402+00:00",
+      "created_minus_scheduled_s": -21.598,
+      "ended_at": "2026-11-10T02:42:03.827+00:00",
+      "exit_code": 3,
+      "flight_version": 2,
+      "is_scheduled": true,
+      "run_number": 6,
+      "scheduled_at": "2026-11-10T02:42:00+00:00",
+      "scheduled_to_started_s": 0.241,
+      "started_at": "2026-11-10T02:42:00.241+00:00",
+      "started_to_ended_s": 3.586,
+      "state": "FAILED"
+    },
+    {
+      "cancelled_at": null,
+      "created_at": "2026-11-10T02:42:38.789+00:00",
+      "created_minus_scheduled_s": -21.211,
+      "ended_at": "2026-11-10T02:43:04.599+00:00",
+      "exit_code": 3,
+      "flight_version": 2,
+      "is_scheduled": true,
+      "run_number": 7,
+      "scheduled_at": "2026-11-10T02:43:00+00:00",
+      "scheduled_to_started_s": 1.248,
+      "started_at": "2026-11-10T02:43:01.248+00:00",
+      "started_to_ended_s": 3.351,
+      "state": "FAILED"
+    },
+    {
+      "cancelled_at": null,
+      "created_at": "2026-11-10T02:43:38.564+00:00",
+      "created_minus_scheduled_s": -21.436,
+      "ended_at": "2026-11-10T02:44:04.504+00:00",
+      "exit_code": 3,
+      "flight_version": 2,
+      "is_scheduled": true,
+      "run_number": 8,
+      "scheduled_at": "2026-11-10T02:44:00+00:00",
+      "scheduled_to_started_s": 1.142,
+      "started_at": "2026-11-10T02:44:01.142+00:00",
+      "started_to_ended_s": 3.362,
+      "state": "FAILED"
+    }
+  ],
+  "runs_per_scheduled_minute": {
+    "2026-11-10T02:41": 1,
+    "2026-11-10T02:42": 1,
+    "2026-11-10T02:43": 1,
+    "2026-11-10T02:44": 1
+  },
+  "schedule_cleared_at": "2026-11-10T02:44:27.701393+00:00",
+  "schedule_set_at": "2026-11-10T02:40:26.840006+00:00"
+}
