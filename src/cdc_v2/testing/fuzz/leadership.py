@@ -251,11 +251,12 @@ class LeadershipRun:
                 else:
                     dur = rng.uniform(0.3, 1.5) if rng.random() < 0.4 else rng.uniform(2.5, 5.0)
                     act["seconds"] = round(dur, 2)
-                    run.proc.stop_group()
+                    if not _signal(run.proc.stop_group):
+                        act["skipped"] = "the run's group was gone"
 
                     def cont(p=run.proc, d=dur):
                         time.sleep(d)
-                        p.cont_group()
+                        _signal(p.cont_group)
                     th = threading.Thread(target=cont, daemon=True)
                     th.start()
                     threads.append(th)
@@ -276,6 +277,15 @@ class LeadershipRun:
             time.sleep(left)
         for th in threads:
             th.join(60)
+
+
+def _signal(fn) -> bool:
+    """A signal to a run's process group. macOS answers EPERM (not ESRCH) for a group whose leader has just exited
+    and whose members are zombies; that run is gone, which is not an error of the fuzzer."""
+    try:
+        return bool(fn())
+    except PermissionError:
+        return False
 
 
 class _Fail(Exception):

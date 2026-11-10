@@ -57,6 +57,7 @@ def main(argv=None) -> int:
     s.add_argument("--out", default=None)
     v = sub.add_parser("variants", help="the wrong variants of the toy and the fuzzer that must find each")
     v.add_argument("--only", help="comma separated variants")
+    v.add_argument("--merge", action="store_true", help="replace only these rows of the existing table")
     v.add_argument("--source-node", default="replica", choices=("replica", "primary"))
     v.add_argument("--out", default=str(REPO / "evidence" / "p3" / "fuzzers" / "variants.json"))
     o = sub.add_parser("stream-offline", help="the stream fuzzer against the engine's reader, offline")
@@ -102,7 +103,7 @@ def main(argv=None) -> int:
         return 0 if res["all_passed"] else 1
     if a.cmd == "variants":
         from .variants import run_variants
-        res = run_variants(a.only.split(",") if a.only else None, a.source_node, a.out)
+        res = run_variants(a.only.split(",") if a.only else None, a.source_node, a.out, merge=a.merge)
         print(json.dumps({"all_found": res["all_found"], "correct_toy_passed": res["correct_toy_passed"]}))
         return 0 if res["all_found"] and res["correct_toy_passed"] else 1
     if a.cmd == "stream-offline":

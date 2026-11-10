@@ -32,7 +32,7 @@ BOUND_SEEDS = {"fault": 6, "workload": 4, "stream": 4, "leadership": 3}
 
 
 def run_variants(names=None, source_node="replica", out=None, log=print, budget=None, correct=True,
-                 ledger_root=None) -> dict:
+                 ledger_root=None, merge=False) -> dict:
     extra = {"ledger_root": ledger_root} if ledger_root else {}
     rows = []
     for v in names or list(TABLE):
@@ -76,6 +76,13 @@ def run_variants(names=None, source_node="replica", out=None, log=print, budget=
            "source_node": source_node, "variants": rows,
            "all_found": all(r["found"] for r in rows),
            "correct_toy_passed": all(r.get("correct_toy_passed", True) for r in rows)}
+    if out and merge and Path(out).exists():
+        import json
+        old = json.loads(Path(out).read_text())
+        new = {r["variant"]: r for r in rows}
+        doc["variants"] = [new.pop(r["variant"], r) for r in old["variants"]] + list(new.values())
+        doc["all_found"] = all(r["found"] for r in doc["variants"])
+        doc["correct_toy_passed"] = all(r.get("correct_toy_passed", True) for r in doc["variants"])
     if out:
         write_evidence(Path(out), doc)
     return doc
