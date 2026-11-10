@@ -18,6 +18,20 @@ TEST_HOME = os.path.expanduser(os.environ.get("CDC_V2_LOCALPG_TEST_HOME", "~/.ca
 TEST_BASE = int(os.environ.get("CDC_V2_LOCALPG_TEST_PORT_BASE", "55460"))
 PG_BIN = os.environ.get("CDC_V2_PG_BIN", "/opt/homebrew/opt/postgresql@18/bin")
 
+
+def _bin_major(pg_bin):
+    try:
+        out = subprocess.run([os.path.join(pg_bin, "postgres"), "--version"], capture_output=True, text=True,
+                             timeout=10).stdout
+        return int(out.split("(PostgreSQL)")[1].split()[0].split(".")[0])
+    except (OSError, IndexError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+PG_MAJOR = _bin_major(PG_BIN)       # the self-tests run on 16 and 18; what needs 17+ is skipped on 16
+needs_17 = pytest.mark.skipif(PG_MAJOR is not None and PG_MAJOR < 17,
+                              reason="failover slots and slot synchronisation need Postgres 17+")
+
 assert 55460 <= TEST_BASE and TEST_BASE + 7 <= 55479, "self-tests must use ports in 55460-55479"
 
 
@@ -145,7 +159,7 @@ def stop_clusters_at_end():
 def cluster():
     """A running primary + replica on the self-test home (reset if the topology was changed by an earlier test)."""
     st = json.loads(lp("status", "--json", check=False).stdout) if os.path.isdir(TEST_HOME) else {"nodes": []}
-    if st.get("initialized") and canonical_topology(st):
+    if st.get("initialized") and canonical_topology(st) and st.get("pg_major") == PG_MAJOR:
         lp("up")
     else:
         lp("reset")
