@@ -11,7 +11,7 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
   package, the engine and the transform are merged; the apply package is reviewed twice and its fix round is checked
   (verdict: merge; it waits for the second reviewer's repeat campaigns and two small fixes); the question the second
   review raised — which tables have a key — is measured and decided (rule K, below) and has a small package of its
-  own, which is running; the cut's fix round is checked (verdict: merge after one text fix) and it is in a second,
+  own, which is delivered and waits for its review; the cut's fix round is checked (verdict: merge after one text fix) and it is in a second,
   short round; the destination basics are delivered and under their two reviews; round 1 of the fuzzers (against a toy replicator) is reviewed
   and in its fix round; the task file of every package is written.
 - Stage 2 (PlanetScale) cannot start: of its names only `PLANETSCALE_ORG` and `PLANETSCALE_DATABASE` are in the env
@@ -65,7 +65,7 @@ green on T1 (local primary and standby, real MotherDuck, local JVM).
 | F | Fuzzers (stream, workload, fault, leadership), the consumer loop of 1.3 and 3.2 | Opus | **round 1 delivered** (branch `p3-f-fuzzers`, against a toy replicator); coordinator: merge after a fix round (below), **running**; round 2, against the real system, after S, L, B, V |
 | B | Backfill and hand-off | Fable | task written; after X, S, A, P, Y |
 | T | The catalog gate, truncate, drop and recreate, the document and the test over all state machines | Opus | task written; after S, B |
-| K | The key rule: the catalog reads whether a primary key is deferrable, the engine is told which tables are without a key, what Debezium calls a key is measured (added 2026-11-10) | Opus | **running** (task `docs/tasks/p3_k_key_rule.md`); S waits for it |
+| K | The key rule: the catalog reads whether a primary key is deferrable, the engine is told which tables are without a key, what Debezium calls a key is measured (added 2026-11-10) | Opus | **delivered** (`f182e1e`; task `docs/tasks/p3_k_key_rule.md`); waits for the coordinator's review; S waits for it |
 
 At most four workers write at once (PLAN §3). The coordinator (Opus, xhigh) writes no code: it reviewed the plan
 and reviews every package branch before its merge; D, L, S, V, B and the acknowledgement path of E get a second
@@ -316,7 +316,7 @@ Each in its own worktree and branch; the orchestrator merges. The P3 packages ar
 |---|---|---|---|
 | Package D, destination basics: **delivered** on branch `worktree-agent-a5e245130333b3efe` (`9e389cc`). Two reviews are running: the coordinator (Opus, reading only) and a second reviewer (Fable, xhigh, reading only; MotherDuck databases `cdc_v2_t_d_rv_*`) that attacks the fence, the unknown commit outcome, deadlines, the error mapping and the transition function with cases of its own and runs the package's MotherDuck tests once more on the last commit | P3 | 2026-11-10 | the two verdicts; then a fix round if needed (known already: `_cdc.transitions` has no place yet for the facts of a group that the fuzzers of round 2 need), the merge, and D's notes in the tasks of L and S |
 | Package A, apply: **fix round delivered** on branch `worktree-agent-adbee9c1aec8e2051` (`68df804`); the coordinator's re-check says merge; the campaigns of the second reviewer (Fable, local DuckDB only, reading only) are running | P3 | 2026-11-10 | the reviewer's result; then two small fixes by the worker (`reduce_duplicates` without spill limits, one stale docstring), the merge, and the sentences for design 6.1–6.5 and plan C0, C3a, C4, C10 |
-| Package K, the key rule (Opus, high). Homes `pg-p`, `pg-p2`, `pg-e`. No MotherDuck | P3 | 2026-11-10 | the catalog follows rule K, the engine's list of tables without a key, the measurement of what Debezium calls a key, `evidence/p3/key_rule/` |
+| Package K, the key rule: **delivered** on branch `worktree-agent-a7bff9175aa501995` (`f182e1e`); the coordinator reviews it after package D. Found on the way: stock Debezium cannot stream a table whose name starts with a double quote or has one after a space (the engine stops at every start), and drops a table whose name is entirely in double quotes without a sign | P3 | 2026-11-10 | the verdict; then the merge, the field names in the task of S, and a prevention for the names Debezium cannot stream |
 | Package F, fuzzers (Opus, high): **fix round running** on branch `p3-f-fuzzers` (15 items: ledger rules, suite 1.7 again, reductions, two table shapes, the shared-memory repair of `tools/localpg`, the frame reader's allocation). Homes `pg-f<n>`, ports 55700 + 8·n; localpg self-test ports | P3 | 2026-11-10 | the four fuzzers with seeds and replay, the consumer loop of SPEC 1.3 and 3.2, their self-tests with planted defects. Owed: the fix round below |
 | Package X, second fix round (Fable; the worker that built the cut). Home `pg-cut`, ports 55600–55607. No MotherDuck | P3 | 2026-11-10 | four items: the claim about the complete checker rests on recorded runs only (or the two runs are repeated); the takers read the reader node's identity themselves; the oracle's reader no longer imports a snapshot that may not be quiet on a standby with the export defect; section 13 and C9 adjusted. Then the merge |
 
