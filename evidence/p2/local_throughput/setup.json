@@ -1,0 +1,23 @@
+{
+ "started_utc": "2026-11-10T02:37:02Z",
+ "sf": 2.0,
+ "load_avg_start": [
+  6.75,
+  6.03,
+  6.21
+ ],
+ "generate_s": 5.3,
+ "load_s": 39.6,
+ "vacuum_analyze_s": 8.7,
+ "replay_wait_s": 6.1,
+ "replica": {
+  "rows": 11997996,
+  "relpages": 242904,
+  "heap_bytes": 1989804032,
+  "total_bytes": 2368561152,
+  "table_size_pretty": "1898 MB",
+  "server_version": "18.6 (Homebrew)"
+ },
+ "avg_row_bytes_heap": 165.8,
+ "finished_utc": "2026-11-10T02:38:03Z"
+}
