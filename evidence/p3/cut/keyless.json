@@ -1,0 +1,30 @@
+{
+ "quiet_wait_s": 1.0,
+ "server_version_num": 180006,
+ "server_has_the_export_defect": true,
+ "while_a_transaction_is_open": {
+  "quiet_only_wait_returned": "NoQuietSnapshot",
+  "is_false_in_a_condition": true,
+  "seconds": 1.01,
+  "attempts": 18,
+  "oldest_running_is_the_open_transaction": true,
+  "text": "no quiet snapshot within the deadline: a transaction was running at each of 18 attempts (oldest running id at the last one: 44654627)"
+ },
+ "keyless_cut_while_open": {
+  "way": "own",
+  "usable_after_p0": true,
+  "snapshot": "44654627:44654629:",
+  "quiet_wait_result_kept": "NoQuietSnapshot",
+  "the_one_reader_sees_the_open_transaction": false,
+  "the_one_reader_sees_the_committed_one": true
+ },
+ "keyless_cut_after_the_commit": {
+  "way": "exported",
+  "is_quiet": true,
+  "usable_after_p0": true,
+  "snapshot": "44654629:44654629:",
+  "a_reader_that_imports_it_sees_both": true
+ },
+ "ok": true,
+ "slot_dropped": true
+}

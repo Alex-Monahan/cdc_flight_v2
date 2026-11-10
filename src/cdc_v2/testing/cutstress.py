@@ -475,6 +475,9 @@ class Checker:
     violations: Counter = field(default_factory=Counter)
     violation_examples: list = field(default_factory=list)
     violations_by_way: Counter = field(default_factory=Counter)
+    #: "way/rule" -> count, and up to three examples each: the first 40 examples alone can all be of one way.
+    violations_by_way_and_rule: Counter = field(default_factory=Counter)
+    examples_by_way_and_rule: dict = field(default_factory=dict)
     last_bad_cut: Optional[CutRecord] = None
     wrong: Counter = field(default_factory=Counter)
     wrong_examples: dict = field(default_factory=dict)
@@ -488,11 +491,17 @@ class Checker:
     def _violation(self, rule: str, rec: CutRecord, e1: int, j: Optional[int], note: str) -> None:
         self.violations[rule] += 1
         self.violations_by_way[rec.way] += 1
+        self.violations_by_way_and_rule[rec.way + "/" + rule] += 1
         if self.last_bad_cut is not rec:
             self.last_bad_cut = rec
             self.stats["cuts_with_a_violation_" + rec.way] += 1
+            if rec.xmin == rec.xmax:
+                self.stats["quiet_cuts_with_a_violation_" + rec.way] += 1
         if len(self.violation_examples) < 40:
             self.violation_examples.append(self._describe(rule, rec, e1, j, note))
+        examples = self.examples_by_way_and_rule.setdefault(rec.way + "/" + rule, [])
+        if len(examples) < 3:
+            examples.append(self._describe(rule, rec, e1, j, note))
 
     def _wrong(self, rule: str, hits: set, rec: CutRecord, e1: int, j: int) -> None:
         if rule not in hits:
@@ -821,7 +830,9 @@ def run(cl: Cluster, cfg: RunConfig, log=lambda text: None) -> dict:
         transactions_delivered=stream.count,
         violations=dict(checker.violations),
         violations_by_way=dict(checker.violations_by_way),
+        violations_by_way_and_rule=dict(sorted(checker.violations_by_way_and_rule.items())),
         violation_examples=checker.violation_examples,
+        violation_examples_by_way_and_rule=checker.examples_by_way_and_rule,
         e_order_violations=stream.stats.get("e_order_violations", 0),
         wrong_rules={r: checker.wrong.get(r, 0) for r in WRONG_RULES},
         wrong_rule_examples=checker.wrong_examples,
@@ -862,6 +873,12 @@ def summary(result: dict) -> str:
             q = result["checker"].get("quiet_cuts_" + way, 0)
             lines.append("  cuts taken the %s way: %d, of them quiet (xmin = xmax): %d (%.1f%%), with a violation: %d"
                          % (way, n, q, 100.0 * q / n, result["checker"].get("cuts_with_a_violation_" + way, 0)))
+            if result["checker"].get("cuts_with_a_violation_" + way, 0):
+                lines.append("    of the cuts with a violation, quiet: %d" % result["checker"].get(
+                    "quiet_cuts_with_a_violation_" + way, 0))
+    if result.get("violations_by_way_and_rule"):
+        lines.append("  violations by way and rule: %s" % ", ".join(
+            "%s=%d" % kv for kv in result["violations_by_way_and_rule"].items()))
     if result["activity"].get("quiet_snapshots_dropped"):
         lines.append("  snapshots dropped by the quiet takers: %d" % result["activity"]["quiet_snapshots_dropped"])
     lines.append("  snapshots dropped because the standby had not settled: %d"

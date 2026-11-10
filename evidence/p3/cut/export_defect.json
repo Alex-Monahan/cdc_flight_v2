@@ -1,10 +1,10 @@
 {
  "cases": {
   "no subtransaction": {
-   "snapshot_late": "11509304:11509306:",
+   "snapshot_late": "44654462:44654464:",
    "snapshot_late_is_quiet": false,
    "importer_after_the_commit_sees": 0,
-   "snapshot_early": "11509306:11509308:",
+   "snapshot_early": "44654464:44654466:",
    "snapshot_early_is_quiet": false,
    "importer_before_the_commit_sees": 0,
    "same_importer_after_the_commit_sees": 0,
@@ -12,10 +12,10 @@
    "wrong": []
   },
   "top level writes first, then one subtransaction": {
-   "snapshot_late": "11509308:11509311:",
+   "snapshot_late": "44654466:44654469:",
    "snapshot_late_is_quiet": false,
    "importer_after_the_commit_sees": 0,
-   "snapshot_early": "11509311:11509314:",
+   "snapshot_early": "44654469:44654472:",
    "snapshot_early_is_quiet": false,
    "importer_before_the_commit_sees": 0,
    "same_importer_after_the_commit_sees": 0,
@@ -23,10 +23,10 @@
    "wrong": []
   },
   "first write inside a subtransaction": {
-   "snapshot_late": "11509314:11509317:",
+   "snapshot_late": "44654472:44654475:",
    "snapshot_late_is_quiet": false,
    "importer_after_the_commit_sees": 1,
-   "snapshot_early": "11509317:11509320:",
+   "snapshot_early": "44654475:44654478:",
    "snapshot_early_is_quiet": false,
    "importer_before_the_commit_sees": 0,
    "same_importer_after_the_commit_sees": 0,
@@ -37,10 +37,10 @@
    ]
   },
   "65 subtransactions after a top-level write": {
-   "snapshot_late": "11509320:11509387:",
+   "snapshot_late": "44654478:44654545:",
    "snapshot_late_is_quiet": false,
    "importer_after_the_commit_sees": 1,
-   "snapshot_early": "11509387:11509454:",
+   "snapshot_early": "44654545:44654612:",
    "snapshot_early_is_quiet": false,
    "importer_before_the_commit_sees": 0,
    "same_importer_after_the_commit_sees": 0,

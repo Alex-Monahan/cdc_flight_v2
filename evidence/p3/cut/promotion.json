@@ -1,19 +1,33 @@
 {
+ "server_version_num": 180006,
  "open_cut": {
-  "r0": "1/E3001758",
-  "r1": "1/E3001758",
+  "r0": "2/21000578",
+  "r1": "2/21000578",
+  "timeline": 1,
+  "timeline_of_the_source": 1,
+  "valid_on_the_timeline_of_the_source": true,
+  "valid_without_a_timeline": false,
   "reads_before_promotion": 1
  },
  "after_promotion": {
   "in_recovery": false,
-  "replay_position_before_a_local_commit": "1/E3001758",
-  "replay_position_after_a_local_commit": "1/E3001758",
+  "timeline": 2,
+  "timeline_in_the_control_file_right_after": 1,
+  "the_open_cut_is_valid_on_the_new_timeline": false,
+  "replay_position_before_a_local_commit": "2/21000578",
+  "replay_position_after_a_local_commit": "2/21000578",
   "local_commit_record_ends_after_that_position": true,
   "a_new_snapshot_reads": 2,
   "the_open_cut_still_reads": 1
  },
  "library_on_a_new_cut": "refused: not a standby: pg_is_in_recovery() is false; use take_primary_cut",
  "library_on_a_new_exported_cut": "refused: not a standby: pg_is_in_recovery() is false; use take_primary_cut",
+ "library_on_a_new_settle_floor": "refused: not a standby: pg_is_in_recovery() is false",
+ "primary_cut_on_the_promoted_node": {
+  "timeline": 2,
+  "valid_on_the_new_timeline": true,
+  "valid_on_the_timeline_of_the_source": false
+ },
  "ok": true,
  "replication_slots_left_on_the_primary": [
   "cdc_v2_phys_replica"

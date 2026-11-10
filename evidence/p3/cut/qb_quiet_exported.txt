@@ -1,0 +1,26 @@
+$ tools/cutstress run --label qb_quiet_exported --seconds 120 --writers plain,subxact,abort --takers-own 1 --takers-exported 0 --takers-quiet 2 --out evidence/p3/cut/qb_quiet_exported.json
+load average before: 6.00 5.94 6.49
+   30s cuts=23502 transactions=70396 violations=0 waiting=75
+   60s cuts=43821 transactions=136434 violations=0 waiting=141
+   90s cuts=63224 transactions=201958 violations=0 waiting=105
+qb_quiet_exported: OK
+  Postgres 18.6 (Homebrew), 120 s, writers plain,subxact,abort, disturbances none, slot on replica
+  cuts checked 82928 (not checked 0), transactions delivered 268363
+  violations of the sound rules: none
+  stream out of E order: 0
+  wrong rules caught (cuts): stmt_as_r0=4434, r1_inside=5265, r1_outside=2, naive_sharp=0, xmax_inside=18613, xmin_outside=22776
+  unknown set (transactions per cut)   empty     mean   max
+    base                                 0.00%    1.746   557
+    xid                                 76.82%    0.462    41
+    sharp                               72.11%    0.748   556
+    xid+sharp                           81.85%    0.408    41
+    really_visible                      74.39%    0.587   556
+  cuts_with_r0_below_received: 0
+  cuts_that_miss_a_received_transaction: 0
+  cuts_with_r0_eq_r1: 59545
+  cuts taken the own way: 46515, of them quiet (xmin = xmax): 23730 (51.0%), with a violation: 0
+  cuts taken the quiet way: 36413, of them quiet (xmin = xmax): 36413 (100.0%), with a violation: 0
+  snapshots dropped by the quiet takers: 106106
+  snapshots dropped because the standby had not settled: 0
+  checker steps: unknown_window, per_key_boundary, missing_rows; rows missing from a cut: 0
+  load average at start [6.0, 5.94, 6.49], at end [10.42, 7.52, 7.02]

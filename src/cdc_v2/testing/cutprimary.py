@@ -843,6 +843,7 @@ def promotion(cl: S.Cluster) -> dict:
         cl.localpg("add-standby", "--name", PROMO_NODE)
         cl.info(refresh=True)
         with cl.connect("primary") as a:
+            out["server_version_num"] = _version_num(a)
             a.execute(INC, (1,))
             target = _lsn(a, INSERT_LSN)
             source_timeline = C.timeline(a)           # exact: the source is a primary
