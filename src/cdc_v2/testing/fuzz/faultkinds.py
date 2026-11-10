@@ -607,6 +607,9 @@ class Episode:
         if delay > 0:
             time.sleep(delay)
         quiet = fault.kind in QUIET_SOURCE
+        window = getattr(self.load, "window", None)
+        if window is not None:
+            window.enter()
         try:
             if quiet:
                 self._quiet.acquire()
@@ -625,6 +628,8 @@ class Episode:
             fault.effect = False                           # a failed injection is never counted
         finally:
             fault.t_heal = ctx.t()
+            if window is not None:
+                window.leave()
             if quiet:
                 self.load.resume()
                 self._quiet.release()

@@ -54,7 +54,60 @@ def utc_now() -> str:
 
 
 class Infrastructure(Exception):
-    """The scenario could not run (setup, or the source failed under the workload); carries the proof."""
+    """The scenario could not run (setup, or the source failed under the workload for an allowed cause); carries
+    the proof."""
+
+
+# A failure of the workload at the source is `infrastructure` only for a cause on this short list (plan 6.2, "The
+# ledger of SPEC section 4"): a lost connection while an injected fault was active (or had just healed). The paused
+# load of a primary kill has no writer running, so it cannot fail. Every other source error is a failure of the run:
+# the pipeline itself can break the application's writes (H-014: SQLSTATE 55000, no replica identity).
+CONNECTION_LOST_SQLSTATES = ("57P01", "57P02", "57P03")
+FAULT_GRACE_S = 3.0
+
+
+class FaultWindow:
+    """Whether an injected fault is active now (or ended within FAULT_GRACE_S): faults enter and leave it."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self.active = 0
+        self.last_end = None
+
+    def enter(self):
+        with self._lock:
+            self.active += 1
+
+    def leave(self):
+        with self._lock:
+            self.active = max(0, self.active - 1)
+            self.last_end = time.monotonic()
+
+    def now(self) -> bool:
+        with self._lock:
+            return self.active > 0 or (self.last_end is not None
+                                       and time.monotonic() - self.last_end < FAULT_GRACE_S)
+
+
+def source_error(e: BaseException, window: Optional[FaultWindow]) -> dict:
+    sqlstate = getattr(e, "sqlstate", None)
+    lost = type(e).__name__ in ("OperationalError", "ConnectionTimeout") and (
+        sqlstate is None or sqlstate.startswith("08") or sqlstate in CONNECTION_LOST_SQLSTATES)
+    during = bool(window is not None and window.now())
+    return {"type": type(e).__name__, "sqlstate": sqlstate, "message": str(e)[:200], "connection_lost": lost,
+            "during_fault": during, "allowed": lost and during}
+
+
+def judge_source_errors(errors: list) -> None:
+    """Raise Infrastructure when every error is on the allow-list, _Outcome('error') otherwise."""
+    bad = [e for e in errors if not e.get("allowed")]
+    if bad:
+        e = bad[0]
+        raise _Outcome("error", "the workload failed at the source outside the allow-list (%s, SQLSTATE %s): %s"
+                       % (e["type"], e["sqlstate"], e["message"]))
+    if errors:
+        raise Infrastructure("the workload lost its source connection during an injected fault: %s"
+                             % errors[0]["message"])
 
 
 # ------------------------------------------------------------------------------------------------- supervisor
@@ -182,6 +235,7 @@ class Load:
         self.wl, self.pace_s = workload, pace_s
         self.rounds = 0
         self.errors = []
+        self.window = FaultWindow()
         self._run = threading.Event()
         self._idle = threading.Event()
         self._idle.set()
@@ -206,7 +260,7 @@ class Load:
                 self.wl.run_round()
                 self.rounds += 1
             except Exception as e:                         # noqa: BLE001 - the run records it
-                self.errors.append("%s: %s" % (type(e).__name__, str(e)[:200]))
+                self.errors.append(source_error(e, self.window))
                 self._run.clear()
                 continue
             if self.pace_s:
@@ -303,8 +357,7 @@ class Run:
         self.final_rows = sum((tr.source_rows or 0) for tr in r.tables)
         if observers_ is not None and observers_.violations():
             raise _Outcome("violation", "consumer loop: %s" % _violation_summary(observers_))
-        if load.errors:
-            raise Infrastructure("the workload failed on the source: %s" % load.errors[0])
+        judge_source_errors(load.errors)
         if not final:
             load.resume()
 

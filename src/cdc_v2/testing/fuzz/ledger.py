@@ -27,14 +27,24 @@ _PIPELINE = ["src/cdc_v2/stream", "src/cdc_v2/apply", "src/cdc_v2/md", "src/cdc_
              "src/cdc_v2/backfill", "src/cdc_v2/state", "src/cdc_v2/leader", "src/cdc_v2/supervisor.py",
              "src/cdc_v2/pipeline.py", "src/cdc_v2/config.py", "src/cdc_v2/lsn.py", "src/cdc_v2/deadline.py",
              "src/cdc_v2/artifacts.py", "jvm/src", "flights/cdc_v2"]
+# A change of a pinned dependency is a change to correctness code (plan 6.2, "The ledger of SPEC section 4").
+PINS = ["jvm/debezium.lock.json", "jvm/jdk.lock.json", "uv.lock", "pyproject.toml"]
+# The measuring instrument: the fuzz package, the oracle, the workload generator, the fault harness. A change to it
+# restarts the counters of every bar it measures; only an exemption (with its reason) avoids that.
+INSTRUMENT = ["src/cdc_v2/testing", "src/cdc_v2/oracle", "src/cdc_v2/crashpoints.py", "src/cdc_v2/faultsites.py",
+              "src/cdc_v2/evidence.py", "tools/fuzz"]
 AFFECTS = {
-    "workload": _PIPELINE,
-    "fault": _PIPELINE + ["src/cdc_v2/crashpoints.py", "src/cdc_v2/faultsites.py"],
-    "stream": ["src/cdc_v2/stream", "src/cdc_v2/transform", "jvm/src"],
+    "workload": _PIPELINE + PINS + INSTRUMENT,
+    "fault": _PIPELINE + PINS + INSTRUMENT,
+    "stream": ["src/cdc_v2/stream", "src/cdc_v2/transform", "jvm/src"] + PINS + INSTRUMENT,
     "leadership": ["src/cdc_v2/leader", "src/cdc_v2/md", "src/cdc_v2/state", "src/cdc_v2/supervisor.py",
-                   "src/cdc_v2/pipeline.py", "src/cdc_v2/stream", "flights/cdc_v2", "src/cdc_v2/crashpoints.py"],
-    "value": ["src/cdc_v2/transform", "src/cdc_v2/apply", "src/cdc_v2/stream", "jvm/src"],
+                   "src/cdc_v2/pipeline.py", "src/cdc_v2/stream", "flights/cdc_v2"] + PINS + INSTRUMENT,
+    "value": ["src/cdc_v2/transform", "src/cdc_v2/apply", "src/cdc_v2/stream", "jvm/src"] + PINS + INSTRUMENT,
 }
+# Until the owner rules: a bar "on local Postgres and on PlanetScale, in replica mode and in primary mode" is met
+# when its totals are met and each of the four combinations holds at least this fraction of each quantity.
+COMBO_FRACTION = 0.25
+COMBO_QUANTITIES = ("seeds", "hours", "faults", "rounds")
 
 # SPEC §4 robustness bar. Workload and fault: on local Postgres and on PlanetScale, in replica and primary mode.
 MINIMUMS = {
@@ -212,10 +222,18 @@ def build(root: Path, repo: Path) -> dict:
         if combos:
             have = {(g["tier"], g["source_mode"]) for g in entry["groups"] if not g["self_test"]
                     and g["counted"]["runs"]}
-            entry["combos"] = {"required": ["%s/%s" % c for c in combos],
-                               "missing": ["%s/%s" % c for c in combos if c not in have]}
+            per = {}
+            for c in combos:
+                rs = [r for r in totals if (r.get("tier", "local"), r.get("source_mode")) == c]
+                sm = summarize(rs)
+                need = {q: MINIMUMS[fz][q] * COMBO_FRACTION for q in COMBO_QUANTITIES if q in MINIMUMS[fz]}
+                per["%s/%s" % c] = {q: {"value": sm[q], "minimum": need[q], "met": sm[q] >= need[q]} for q in need}
+            entry["combos"] = {"required": ["%s/%s" % c for c in combos], "fraction": COMBO_FRACTION,
+                               "missing": ["%s/%s" % c for c in combos if c not in have],
+                               "per_combination": per,
+                               "all_met": all(v["met"] for d in per.values() for v in d.values())}
         met = all(v.get("met") for v in entry["against_minimum_total"].values()) if MINIMUMS.get(fz) else None
-        if combos and entry["combos"]["missing"]:
+        if combos and (entry["combos"]["missing"] or not entry["combos"]["all_met"]):
             met = False
         entry["bar_met"] = met
         for f in failures(root, fz):
@@ -257,7 +275,12 @@ def status_text(data: dict) -> str:
                 g["system"], g["tier"], g["source_mode"], a["runs"], a["seeds"], a["hours"], a["faults"],
                 a["rounds"], a["outcomes"], " (self-test)" if g["self_test"] else " counted: %d seeds, %.3f h"
                 % (c["seeds"], c["hours"])))
-    if data.get("exempt_commits"):
-        lines.append("exempt commits (review): %s" % ", ".join("%s (%s)" % (x["commit"][:10], x.get("reason"))
-                                                              for x in data["exempt_commits"]))
+        for combo, qs in ((e.get("combos") or {}).get("per_combination") or {}).items():
+            lines.append("    %-20s %s" % (combo, "  ".join("%s %s/%s%s" % (q, round(v["value"], 3), v["minimum"],
+                                                                         "" if v["met"] else " (not met)")
+                                                        for q, v in qs.items())))
+    ex = data.get("exempt_commits") or []
+    lines.append("exemptions (%d), every entry in full, for the orchestrator's review at each gate:" % len(ex))
+    for x in ex:
+        lines.append("  " + json.dumps(x, sort_keys=True))
     return "\n".join(lines)

@@ -228,6 +228,58 @@ def test_self_test_runs_never_count_and_minimums_are_judged(scratch):
     assert d["fuzzers"]["value"]["note"]
 
 
+@pytest.mark.parametrize("path", ["uv.lock", "jvm/debezium.lock.json", "pyproject.toml",
+                                  "src/cdc_v2/testing/fuzz/run.py", "src/cdc_v2/oracle/comparison.py",
+                                  "src/cdc_v2/testing/workload.py", "src/cdc_v2/crashpoints.py"])
+def test_pins_and_the_instrument_restart_the_counters(scratch, path):
+    repo, root, (c0, c1, c2) = scratch
+    _write_runs(root, [_run("fault", 1, c2)])
+    c3 = _commit(repo, path, "changed", "a pin or the instrument")
+    d = ledger.build(root, repo)["fuzzers"]["fault"]
+    assert d["restart"]["commit"] == c3 and d["counted_total"]["seeds"] == 0
+    (root / "exempt.json").write_text(json.dumps({"exempt": [{"commit": c3, "reason": "the reason, read at gates"}]}))
+    d2 = ledger.build(root, repo)
+    assert d2["fuzzers"]["fault"]["counted_total"]["seeds"] == 1
+    text = ledger.status_text(d2)
+    assert c3 in text and "the reason, read at gates" in text              # every entry in full
+
+
+def test_each_of_the_four_combinations_needs_a_quarter(scratch):
+    repo, root, (c0, c1, c2) = scratch
+    runs = [_run("workload", s, c2, hours=0.2) for s in range(700)]              # local replica: 700 seeds, 140 h
+    runs += [_run("workload", 1000 + s, c2, mode="primary", hours=0.2) for s in range(300)]
+    _write_runs(root, runs)
+    w = ledger.build(root, repo)["fuzzers"]["workload"]
+    assert w["against_minimum_total"]["seeds"]["met"] and w["against_minimum_total"]["hours"]["met"]
+    per = w["combos"]["per_combination"]
+    assert per["local/replica"]["seeds"]["met"] and per["local/primary"]["seeds"]["met"]
+    assert per["planetscale/replica"]["seeds"]["value"] == 0 and not per["planetscale/replica"]["seeds"]["met"]
+    assert w["combos"]["fraction"] == ledger.COMBO_FRACTION == 0.25 and w["bar_met"] is False
+    assert "local/primary" in ledger.status_text(ledger.build(root, repo))
+
+
+def test_infrastructure_is_an_allow_list():
+    import psycopg
+    from cdc_v2.testing.fuzz import run as fr
+    w = fr.FaultWindow()
+    ri = psycopg.errors.ObjectNotInPrerequisiteState("cannot update table because it does not have a replica identity")
+    lost = psycopg.OperationalError("server closed the connection unexpectedly")
+    quiet = [fr.source_error(ri, w), fr.source_error(lost, w)]
+    assert not any(e["allowed"] for e in quiet) and quiet[0]["sqlstate"] == "55000"
+    with pytest.raises(fr._Outcome) as o:
+        fr.judge_source_errors(quiet)
+    assert o.value.outcome == "error" and "55000" in o.value.reason
+    w.enter()
+    during = [fr.source_error(lost, w), fr.source_error(ri, w)]
+    w.leave()
+    assert during[0]["allowed"] and not during[1]["allowed"]        # only a lost connection, only during a fault
+    with pytest.raises(fr._Outcome):
+        fr.judge_source_errors(during)
+    with pytest.raises(fr.Infrastructure):
+        fr.judge_source_errors(during[:1])
+    fr.judge_source_errors([])
+
+
 def test_held_seeds_skip_infrastructure(tmp_path):
     root = tmp_path / "ev"
     (root / "workload").mkdir(parents=True)

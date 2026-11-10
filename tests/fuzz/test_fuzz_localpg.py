@@ -51,6 +51,16 @@ def test_toy_end_to_end_under_each_fuzzer(tmp_path, fuzzer, budget):
         assert lines[0]["faults"]["stream_bytes"] >= 1 and lines[0]["stream_detected"] >= 1
 
 
+def test_a_system_that_breaks_the_source_writes_fails_the_run(tmp_path):
+    """H-014: the system takes the replica identity away from a published table; the workload's UPDATE and DELETE
+    fail at the source with SQLSTATE 55000. That is a failure of the run, never `infrastructure`."""
+    c = Campaign("workload", "toy", seeds=[1], budget_s=15, ledger_root=tmp_path, log=lambda *_: None,
+                 options={"toy": {"sabotage_replica_identity": True}})
+    res = c.run()
+    assert res[0]["outcome"] == "error", res[0]
+    assert "55000" in res[0]["reason"] and "allow-list" in res[0]["reason"]
+
+
 @pytest.mark.parametrize("variant", sorted(TABLE))
 def test_variant_is_found_and_the_correct_toy_passes(tmp_path, variant):
     doc = run_variants([variant], ledger_root=tmp_path, log=lambda *_: None)

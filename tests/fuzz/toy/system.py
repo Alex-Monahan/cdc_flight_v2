@@ -235,6 +235,12 @@ class ToySystem(PgSystem):
         self.write_config()
 
     def start(self, tag, env, extra_args=()):
+        if self.settings.get("sabotage_replica_identity") and not getattr(self, "_sabotaged", False):
+            # a system that takes the replica identity away from a published table (H-014): the application's
+            # UPDATE and DELETE then fail at the source with SQLSTATE 55000; the run must fail, not be infrastructure
+            self.db.sql("CREATE PUBLICATION cdc_v2_toy_pub FOR TABLE public.w_nk")
+            self.db.sql("ALTER TABLE public.w_nk REPLICA IDENTITY DEFAULT")
+            self._sabotaged = True
         env = dict(env or {})
         env["PYTHONPATH"] = str(REPO / "src") + os.pathsep + os.environ.get("PYTHONPATH", "")
         p = procs.start([sys.executable, str(TOY), "--config", str(self.cfg_path), "--tag", tag, *extra_args],

@@ -29,7 +29,8 @@ from cdc_v2.testing.harness_evidence import scrub
 
 from . import faultkinds as fk
 from . import observers as obs
-from .run import FAILURES, Infrastructure, Load, git_state, utc_now
+from .run import FAILURES, Infrastructure, Load, git_state, judge_source_errors, utc_now
+from .run import _Outcome as _RunOutcome
 
 PLATFORM_FAULTS = ["net_drop", "net_reset", "net_blackhole", "net_latency", "src_terminate", "dest_error",
                    "dest_delay", "spill_full"]
@@ -161,8 +162,10 @@ class LeadershipRun:
                                 % (r, slow[:3]))
                 if observers_ is not None and observers_.violations():
                     raise _Fail("violation", "round %d: consumer loop" % r)
-                if load.errors:
-                    raise Infrastructure("the workload failed on the source: %s" % load.errors[0])
+                try:
+                    judge_source_errors(load.errors)
+                except _RunOutcome as o:
+                    raise _Fail(o.outcome, o.reason) from None
                 done_rounds += 1
             self.rec["outcome"] = "pass"
         except _Fail as f:
