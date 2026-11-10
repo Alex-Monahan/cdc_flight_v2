@@ -80,7 +80,7 @@ Equality is defined per Postgres type family by a canonical text that the oracle
 Postgres, SQL for DuckDB (given the destination column's actual type), and a Python reference that both SQL
 builders are tested against: the DuckDB side hermetically in a local DuckDB, including property-based tests (300
 random doubles, 300 random float32 values, 200 decimals, 200 texts, 200 timestamps); the Postgres side in T1
-(`canonical_postgres.json`, 42 values).
+(`canonical_postgres.json`, 43 values).
 
 | Family | Postgres types | Canonical form | Destination types accepted |
 |---|---|---|---|
@@ -141,7 +141,7 @@ heartbeat of SPEC 4.4 provides one when nothing else is written.
 every supported type family and its edge values (all-NULL row, boundaries, empty strings, `-0`, NaN, infinities,
 `24:00:00`, intervals with months, numerics too wide for `DECIMAL(38,10)`, arrays with NULL elements, unicode), a
 keyless table with identical rows and a 3,000-row lineitem-shaped table spread over 6 buckets was copied to
-MotherDuck by the test loader and reported equal (`equal.json`), also when read from the replica. Then 63
+MotherDuck by the test loader and reported equal (`equal.json`), also when read from the replica. Then 60
 mutations were applied to the destination one at a time (`mutations.json`, `all_detected: true`): a missing row, an
 extra row, a duplicated key, a wrong number of identical rows in the keyless table (one less, one more, also for
 identical rows with NULLs), the empty string turned into NULL, a missing and a changed row in the multi-bucket
@@ -157,25 +157,39 @@ changed column). Two non-differences were not reported: trailing spaces in `char
 numeric (`1.50` versus `1.5000`). Tables in `_cdc` and `_cdc_stage_*` are ignored. The command line returns 0 and 1
 for the same two states (`cli.txt`).
 
-### 1.5 Finding for the apply design (core.md 6.2)
+### 1.5 Findings for the apply design (core.md 6.2, 6.3) and the type mapping
 
-DuckDB skips an `UPDATE` whose new value compares equal to the stored value, and then keeps the **old**
-representation: `-0` stays `-0` after `SET x = 0`, `1 mon` stays `1 mon` after `SET x = INTERVAL 30 DAY`, also
-through `UPDATE ... FROM` (`duckdb_equal_update.json`: locally and on MotherDuck, DuckDB 1.5.6). In one table that
-had been loaded in bulk on MotherDuck the `-0` update was applied, so the behaviour depends on the storage state.
-`DELETE` + `INSERT` always writes the new representation. Core.md 6.2 step 3 applies partial images with
-`UPDATE ... FROM`; for float, double and interval columns (and any type whose distinct values compare equal) such an
-update can leave the destination different from the source, and the oracle will report it. Proposed: apply rows of
-those types by delete and insert, or make the P4 type wave test it. The oracle's mutation tests replace rows for
-this reason.
+1. **An UPDATE to an equal-comparing value is skipped.** DuckDB skips an `UPDATE` whose new value compares equal to
+   the stored value, and then keeps the **old** representation: `-0` stays `-0` after `SET x = 0`, `1 mon` stays
+   `1 mon` after `SET x = INTERVAL 30 DAY`, also through `UPDATE ... FROM` (`duckdb_equal_update.json`: locally and
+   on MotherDuck, DuckDB 1.5.6). In one table that had been loaded in bulk on MotherDuck the `-0` update was
+   applied, so the behaviour depends on the storage state. `DELETE` + `INSERT` always writes the new representation.
+   Core.md 6.2 step 3 applies partial images with `UPDATE ... FROM`; for real, double and interval columns such an
+   update can leave the destination different from the source, and the oracle will report it. Proposed: apply rows
+   with such columns by delete and insert, or make the P4 type wave test it. The oracle's mutation tests replace
+   rows for this reason.
+2. **GROUP BY and PARTITION BY treat distinct values as one.** In DuckDB `-0` and `0` form one group, `NaN` and
+   `-NaN` one group, and `1 mon`, `30 days` and `720 hours` one group (checked on DuckDB 1.5.6). Core.md 6.3
+   computes the keyless delta with `GROUP BY` all columns and picks the rows to delete with `row_number() OVER
+   (PARTITION BY <all columns>)`: a source delete of the row with `0` can then delete the destination row with
+   `-0`. The note in 6.3 has the problem backwards: NaN does compare equal to NaN in DuckDB; the risk is distinct
+   values that compare equal, and UNION values of different members that compare unequal. The keyless apply needs
+   a grouping key that keeps such values apart (for example the canonical text of those columns).
+3. **A NULL in a UNION column must be a real NULL.** `union_value(s := NULL)` is a non-NULL union whose member is
+   NULL (`IS NULL` is false). The test loader first produced such values; the oracle reports them as different.
+4. **DuckDB reads Postgres BC dates wrongly.** `CAST('0044-03-15 BC' AS DATE)` returns 0044-03-15 AD, silently. The
+   pipeline must not pass Postgres date text with ` BC` through a DuckDB cast.
 
 ### 1.6 Rate (claim)
 
-**Claim: the oracle compares a 5M-row lineitem-width table in RATE_EQUAL_S s (RATE_EQUAL rows/s, checksum pass
-only), and finds one changed value in RATE_DIFF_S s, with RATE_RSS MB peak client memory.** Measured on this laptop
-(10 cores, 16 GB), source the local primary, destination MotherDuck over the public internet, default settings
-(100,000 rows per bucket, 4 source workers); `rate.json`. Scaled linearly, a 60M-row table takes about RATE_60M
-for the checksum pass; the row pass adds one more scan per side for up to four differing buckets.
+**Claim: the oracle compares a 5M-row lineitem-width table in 23.5 s (213,000 rows/s, checksum pass only), and
+finds and reports one changed value in 76 s, with 173 MB peak client memory.** Measured on this laptop (10 cores,
+16 GB), source the local primary (1.07 GB table), destination MotherDuck over the public internet, default settings
+(100,000 rows per bucket, 50 buckets, 4 source workers); `rate.json`. Scaled linearly, the checksum pass over a
+60M-row table takes about 5 minutes. The row pass costs, per batch of up to four differing buckets, one more source
+scan and two more destination scans (hashes first, then the values of the extra rows), which run one after another.
+A first version that fetched all rows of the differing bucket from both sides was faster (48 s for the same case)
+but peaked at 399 MB; memory now depends on the bucket size and the number of differing rows, not on the table size.
 
 ## 2. T1 harness
 

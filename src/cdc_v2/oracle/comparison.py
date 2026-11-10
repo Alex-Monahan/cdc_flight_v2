@@ -304,17 +304,20 @@ class _SourceSnapshot:
                 self._free.append(c)
 
     def stream(self, sql: str, consume: Callable[[list], None], batch: int = 5000) -> None:
-        """Run sql on a snapshot connection through a server-side cursor; consume() gets the rows in batches."""
+        """Run sql on a snapshot connection and hand the rows to consume() in batches, without holding the whole
+        result. Uses libpq's single-row mode (`Cursor.stream`), not a server-side cursor: Postgres never runs a
+        DECLARE CURSOR query in parallel, which made the row pass about twice as slow."""
         with self._lock:
             c = self._free.pop()
         try:
-            with c.cursor(name="cdc_v2_oracle_rows") as cur:
-                cur.execute(sql)
-                while True:
-                    rows = cur.fetchmany(batch)
-                    if not rows:
-                        break
-                    consume(rows)
+            buf: list = []
+            for row in c.cursor().stream(sql):
+                buf.append(row)
+                if len(buf) >= batch:
+                    consume(buf)
+                    buf = []
+            if buf:
+                consume(buf)
         finally:
             with self._lock:
                 self._free.append(c)
