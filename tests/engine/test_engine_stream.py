@@ -74,6 +74,11 @@ def test_operations_transactions_and_event_counts(pair, scenario, artifacts):
         ("several tables in one transaction", ["begin", "insert into {s}.t values (200, 'p')",
                                                "insert into {s}.k values (9, 'q')",
                                                "insert into {s}.t values (201, 'r')", "commit"]),
+        ("message with an excluded prefix in a mixed transaction", ["begin", "insert into {s}.t values (40, 'p')",
+                                   "select pg_logical_emit_message(true, 'other_prefix', 'filtered')", "commit"]),
+        ("message with an excluded prefix alone", ["select pg_logical_emit_message(true, 'other_prefix', 'alone')"]),
+        ("truncate of an excluded table with an included insert", ["begin", "truncate {s}.x",
+                                                                    "insert into {s}.t values (41, 'q')", "commit"]),
         ("marker", ["insert into {s}.t values (999, 'end')"]),
     ]
     with Engine(sc.settings(table_include=include, message_prefixes=("cdc_v2_.*",)), None, artifacts) as eng:
@@ -122,6 +127,12 @@ def test_operations_transactions_and_event_counts(pair, scenario, artifacts):
     ex = next(t for t in txns if any(r.get("a0") == 30 for _tb, r in t.rows))
     assert ex.end.event_count == 1 and records_of(ex) == 1
     ex_only = [t for t in txns if records_of(t) == 0]
+    # a transactional message with an excluded prefix: neither delivered nor counted
+    fp = next(t for t in txns if any(r.get("a0") == 40 for _tb, r in t.rows))
+    assert fp.end.event_count == 1 and not fp.messages
+    # TRUNCATE of an excluded table in a mixed transaction: neither delivered nor counted
+    tx = next(t for t in txns if any(r.get("a0") == 41 for _tb, r in t.rows))
+    assert tx.end.event_count == 1 and not tx.truncates
     # savepoint
     sp = next(t for t in txns if any(r.get("a0") == 100 for _tb, r in t.rows))
     assert [r["a0"] for _tb, r in sp.rows] == [100, 102]

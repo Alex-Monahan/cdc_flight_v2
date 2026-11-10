@@ -20,6 +20,9 @@
     "unpublished table only",
     "savepoint rolled back",
     "several tables in one transaction",
+    "message with an excluded prefix in a mixed transaction",
+    "message with an excluded prefix alone",
+    "truncate of an excluded table with an included insert",
     "marker"
   ],
   "loose_messages": [
@@ -30,7 +33,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_e005b867.t",
+          "cdc_v2_e_318b0fd8.t",
           3
         ]
       ],
@@ -68,7 +71,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_e005b867.t",
+          "cdc_v2_e_318b0fd8.t",
           1
         ]
       ],
@@ -88,7 +91,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_e005b867.t",
+          "cdc_v2_e_318b0fd8.t",
           1
         ]
       ],
@@ -108,7 +111,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_e005b867.t",
+          "cdc_v2_e_318b0fd8.t",
           4
         ]
       ],
@@ -155,7 +158,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_e005b867.t2",
+          "cdc_v2_e_318b0fd8.t2",
           2
         ]
       ],
@@ -184,7 +187,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_e005b867.t2",
+          "cdc_v2_e_318b0fd8.t2",
           4
         ]
       ],
@@ -231,7 +234,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_e005b867.k",
+          "cdc_v2_e_318b0fd8.k",
           3
         ]
       ],
@@ -269,7 +272,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_e005b867.k",
+          "cdc_v2_e_318b0fd8.k",
           1
         ]
       ],
@@ -289,7 +292,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_e005b867.k",
+          "cdc_v2_e_318b0fd8.k",
           1
         ]
       ],
@@ -309,7 +312,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_e005b867.k",
+          "cdc_v2_e_318b0fd8.k",
           1
         ]
       ],
@@ -325,11 +328,11 @@
     {
       "collections": [
         [
-          "cdc_v2_e_e005b867.k",
+          "cdc_v2_e_318b0fd8.k",
           1
         ],
         [
-          "cdc_v2_e_e005b867.t",
+          "cdc_v2_e_318b0fd8.t",
           1
         ]
       ],
@@ -350,7 +353,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_e005b867.parent",
+          "cdc_v2_e_318b0fd8.parent",
           1
         ]
       ],
@@ -370,7 +373,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_e005b867.child",
+          "cdc_v2_e_318b0fd8.child",
           1
         ]
       ],
@@ -390,11 +393,11 @@
     {
       "collections": [
         [
-          "cdc_v2_e_e005b867.parent",
+          "cdc_v2_e_318b0fd8.child",
           1
         ],
         [
-          "cdc_v2_e_e005b867.child",
+          "cdc_v2_e_318b0fd8.parent",
           1
         ]
       ],
@@ -415,7 +418,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_e005b867.seqt",
+          "cdc_v2_e_318b0fd8.seqt",
           1
         ]
       ],
@@ -435,7 +438,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_e005b867.seqt",
+          "cdc_v2_e_318b0fd8.seqt",
           1
         ]
       ],
@@ -451,11 +454,11 @@
     {
       "collections": [
         [
-          "io.debezium.connector.postgresql.LogicalDecodingMessageMonitor$LogicalDecodingMessageId@61bb40d",
+          "cdc_v2_e_318b0fd8.t",
           1
         ],
         [
-          "cdc_v2_e_e005b867.t",
+          "io.debezium.connector.postgresql.LogicalDecodingMessageMonitor$LogicalDecodingMessageId@74757472",
           1
         ]
       ],
@@ -480,7 +483,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_e005b867.t",
+          "cdc_v2_e_318b0fd8.t",
           1
         ]
       ],
@@ -505,7 +508,7 @@
     {
       "collections": [
         [
-          "cdc_v2_e_e005b867.t",
+          "cdc_v2_e_318b0fd8.t",
           2
         ]
       ],
@@ -534,11 +537,11 @@
     {
       "collections": [
         [
-          "cdc_v2_e_e005b867.k",
+          "cdc_v2_e_318b0fd8.k",
           1
         ],
         [
-          "cdc_v2_e_e005b867.t",
+          "cdc_v2_e_318b0fd8.t",
           2
         ]
       ],
@@ -576,7 +579,52 @@
     {
       "collections": [
         [
-          "cdc_v2_e_e005b867.t",
+          "cdc_v2_e_318b0fd8.t",
+          1
+        ]
+      ],
+      "event_count": 1,
+      "records": [
+        [
+          "row",
+          "t",
+          [
+            "c",
+            40,
+            null
+          ]
+        ]
+      ]
+    },
+    {
+      "collections": [],
+      "event_count": 0,
+      "records": []
+    },
+    {
+      "collections": [
+        [
+          "cdc_v2_e_318b0fd8.t",
+          1
+        ]
+      ],
+      "event_count": 1,
+      "records": [
+        [
+          "row",
+          "t",
+          [
+            "c",
+            41,
+            null
+          ]
+        ]
+      ]
+    },
+    {
+      "collections": [
+        [
+          "cdc_v2_e_318b0fd8.t",
           1
         ]
       ],
@@ -594,6 +642,6 @@
       ]
     }
   ],
-  "transactions_delivered": 22,
-  "transactions_without_records": 1
+  "transactions_delivered": 25,
+  "transactions_without_records": 2
 }

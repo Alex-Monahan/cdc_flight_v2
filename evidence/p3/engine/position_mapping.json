@@ -3,39 +3,39 @@
   "test": "tests/engine/test_engine_attach.py::test_positions_map_to_pgoutput_begin_and_commit",
   "transactions": [
     {
-      "begin.lsn": "0/4D797D58",
-      "end.ack_position": "0/4D797E88",
-      "pgoutput.B.final_lsn": "0/4D797E58",
-      "pgoutput.C.commit_lsn": "0/4D797E58",
-      "pgoutput.C.end_lsn": "0/4D797E88"
+      "begin.lsn": "0/6FD97EE8",
+      "end.ack_position": "0/6FD98030",
+      "pgoutput.B.final_lsn": "0/6FD97FE8",
+      "pgoutput.C.commit_lsn": "0/6FD97FE8",
+      "pgoutput.C.end_lsn": "0/6FD98030"
     },
     {
-      "begin.lsn": "0/4D797E88",
-      "end.ack_position": "0/4D797FF8",
-      "pgoutput.B.final_lsn": "0/4D797FC8",
-      "pgoutput.C.commit_lsn": "0/4D797FC8",
-      "pgoutput.C.end_lsn": "0/4D797FF8"
+      "begin.lsn": "0/6FD98030",
+      "end.ack_position": "0/6FD981A0",
+      "pgoutput.B.final_lsn": "0/6FD98170",
+      "pgoutput.C.commit_lsn": "0/6FD98170",
+      "pgoutput.C.end_lsn": "0/6FD981A0"
     },
     {
-      "begin.lsn": "0/4D797FF8",
-      "end.ack_position": "0/4D798220",
-      "pgoutput.B.final_lsn": "0/4D7981F0",
-      "pgoutput.C.commit_lsn": "0/4D7981F0",
-      "pgoutput.C.end_lsn": "0/4D798220"
+      "begin.lsn": "0/6FD981A0",
+      "end.ack_position": "0/6FD983B0",
+      "pgoutput.B.final_lsn": "0/6FD98380",
+      "pgoutput.C.commit_lsn": "0/6FD98380",
+      "pgoutput.C.end_lsn": "0/6FD983B0"
     },
     {
-      "begin.lsn": "0/4D798220",
-      "end.ack_position": "0/4D7984D0",
-      "pgoutput.B.final_lsn": "0/4D7984A0",
-      "pgoutput.C.commit_lsn": "0/4D7984A0",
-      "pgoutput.C.end_lsn": "0/4D7984D0"
+      "begin.lsn": "0/6FD983B0",
+      "end.ack_position": "0/6FD98660",
+      "pgoutput.B.final_lsn": "0/6FD98630",
+      "pgoutput.C.commit_lsn": "0/6FD98630",
+      "pgoutput.C.end_lsn": "0/6FD98660"
     },
     {
-      "begin.lsn": "0/4D7984D0",
-      "end.ack_position": "0/4D798820",
-      "pgoutput.B.final_lsn": "0/4D7987F0",
-      "pgoutput.C.commit_lsn": "0/4D7987F0",
-      "pgoutput.C.end_lsn": "0/4D798820"
+      "begin.lsn": "0/6FD98660",
+      "end.ack_position": "0/6FD989B0",
+      "pgoutput.B.final_lsn": "0/6FD98980",
+      "pgoutput.C.commit_lsn": "0/6FD98980",
+      "pgoutput.C.end_lsn": "0/6FD989B0"
     }
   ]
 }

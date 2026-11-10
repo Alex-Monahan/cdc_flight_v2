@@ -106,13 +106,12 @@ def test_slot_held_by_another_engine(pair, scenario, artifacts):
 
 
 @pytest.mark.parametrize("fault", ["reset", "close", "blackhole"])
-def test_broken_source_connection_through_the_proxy(pair, scenario, artifacts, fault, monkeypatch):
-    monkeypatch.setattr(netproxy, "PORT_FIRST", 55624)       # proxies of package E: the upper half of its range
-    monkeypatch.setattr(netproxy, "PORT_LAST", 55627)
+def test_broken_source_connection_through_the_proxy(pair, scenario, artifacts, fault):
     sc = scenario("create table {s}.a (id int primary key)")
     bound = 150
-    with netproxy.NetProxy("localhost", pair.replica_port) as px:
-        s = sc.settings()
+    # proxies of package E: the upper half of its own port range
+    with netproxy.NetProxy("localhost", pair.replica_port, port_range=(55624, 55627)) as px:
+        s = sc.settings(heartbeat_interval_ms=1000)
         s = type(s)(**{**s.__dict__, "port": px.port})
         eng = Engine(s, None, artifacts)
         try:
@@ -120,19 +119,24 @@ def test_broken_source_connection_through_the_proxy(pair, scenario, artifacts, f
             pid = pair.slot(sc.slot)[2]
             t0 = time.monotonic()
             px.set_fault(fault)
-            err, secs = ended(eng, bound)
+            hb_times, ws_end = [], None
+            err = None
+            end = Deadline.after(bound)
+            while not end.expired:
+                try:
+                    for f in eng.frames(end.within(1.0)):
+                        if isinstance(f, F.Heartbeat):
+                            hb_times.append(round(time.monotonic() - t0, 1))
+                except (EngineFatal, EngineExited, F.EngineBroken) as e:
+                    err = e
+                    break
+                if ws_end is None and not pair.r("select 1 from pg_stat_activity where pid = %s", (pid,),
+                                                 role="bootstrap"):
+                    ws_end = round(time.monotonic() - t0, 1)
+            secs = time.monotonic() - t0
             stats = px.stats()
-            if err is None:
-                outcome = "no end within %d s" % bound
-            else:
-                outcome = type(err).__name__
-            ws_gone = None
+            outcome = type(err).__name__ if err is not None else "no end within %d s" % bound
             px.set_fault("pass")
-            try:
-                ws_gone = wait_for(lambda: not pair.r("select 1 from pg_stat_activity where pid = %s", (pid,),
-                                                      role="bootstrap"), timeout=90, what="old walsender gone")
-            except AssertionError:
-                ws_gone = False
             alive_after = eng.alive
         finally:
             eng.kill()
@@ -141,7 +145,10 @@ def test_broken_source_connection_through_the_proxy(pair, scenario, artifacts, f
     evidence("proxy_%s.json" % fault, {
         "test": "tests/engine/test_engine_attach.py::test_broken_source_connection_through_the_proxy[%s]" % fault,
         "fault": fault, "outcome": outcome, "message": str(err)[:300] if err else "",
-        "seconds": round(secs, 2), "engine_alive_at_bound": alive_after, "old_walsender_gone": bool(ws_gone),
+        "seconds": round(secs, 2), "engine_alive_at_bound": alive_after,
+        "heartbeat_interval_ms": 1000, "heartbeat_frames_during_fault": len(hb_times),
+        "last_heartbeat_frame_at_s": hb_times[-1] if hb_times else None,
+        "server_walsender_ended_at_s": ws_end, "wal_sender_timeout": "60s (default)",
         "slot_active_after_kill": slot[1], "proxy_stats": {k: stats[k] for k in ("accepted", "closed_by_fault",
                                                                                    "reset_by_fault")}})
     if fault in ("reset", "close"):

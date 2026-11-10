@@ -174,7 +174,7 @@ def test_end_only_acknowledgement_under_a_heartbeat_storm(pair, scenario, artifa
     rng = random.Random(6061)
     try:
         for _ in range(4 if LONG else 3):
-            pipe.life(kill_after=rng.uniform(2.0, 8.0))
+            pipe.life(kill_after=rng.uniform(0.8, 2.5))    # the backlog drains in a few seconds
         pipe.life(done=lambda p: sum(p.rows.values()) >= n and sum(p.msgs.values()) >= len(msgs), timeout=900)
     finally:
         probe.stop()

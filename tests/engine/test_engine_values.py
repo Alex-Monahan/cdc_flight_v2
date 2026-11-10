@@ -58,10 +58,15 @@ def test_unparsable_interval_ends_in_fatal_without_the_value(pair, scenario, art
                      "fatal_class": err.frame.error_class, "fatal_message": err.frame.message,
                      "fatal_causes": [list(c) for c in err.frame.causes],
                      "fatal_positions": err.frame.positions, "fatal_table": err.frame.schema + "." + err.frame.table})
-    # every attempt ends at the same place: after the BEGIN of the transaction with the value
-    assert all(r["frames_before_fatal"] == runs[0]["frames_before_fatal"] for r in runs)
-    assert runs[0]["frames_before_fatal"][-1] == ("Begin", "")
-    assert all(r["fatal_positions"] == runs[0]["fatal_positions"] for r in runs)
+    # every attempt ends at the same transaction: nothing of it beyond its BEGIN is framed (how much of the
+    # transactions before it is framed depends on how far the engine's queue was drained), and the cause names
+    # the offset of the failing event, the same in every attempt
+    for r in runs:
+        assert ("Rows", "bad") not in r["frames_before_fatal"]
+        assert r["frames_before_fatal"].count(("End", "")) <= 1      # at most the transaction before it
+    failing = [next(m for _c, m in r["fatal_causes"] if m.startswith("Error while processing event at offset"))
+               for r in runs]
+    assert len({f.split("ts_usec")[0] for f in failing}) == 1
     # with the table left out of table.include.list the transaction passes (END with count 0) and the stream goes on
     with Engine(sc.settings(table_include=s + ".ok"), None, artifacts) as eng:
         col = Collector(eng).run(lambda c: len(c.txns) >= 3, timeout=60)

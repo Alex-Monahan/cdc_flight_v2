@@ -1,0 +1,48 @@
+{
+  "doubled": 0,
+  "heartbeat_frames": 1052,
+  "heartbeat_interval_ms": 1,
+  "heartbeats_carrying_the_position_of_the_next_end": 96,
+  "lag_transactions": 3,
+  "lives": [
+    {
+      "cf_at_start": "0/64A500D8",
+      "crash": null,
+      "first_txn_ack": "0/64A501E8",
+      "how": "killed",
+      "kill_after": 6.141449359534059,
+      "rows_applied": 39997
+    },
+    {
+      "cf_at_start": "0/65159DA8",
+      "crash": null,
+      "first_txn_ack": "0/65159E58",
+      "how": "killed",
+      "kill_after": 4.05784480875528,
+      "rows_applied": 39997
+    },
+    {
+      "cf_at_start": "0/65159DA8",
+      "crash": null,
+      "first_txn_ack": "0/65159E58",
+      "how": "killed",
+      "kill_after": 3.260403340425114,
+      "rows_applied": 39997
+    },
+    {
+      "cf_at_start": "0/65159DA8",
+      "crash": null,
+      "first_txn_ack": "0/65159E58",
+      "how": "stopped",
+      "kill_after": null,
+      "rows_applied": 40000
+    }
+  ],
+  "message_only_transactions": 2000,
+  "missing": 0,
+  "probe_samples": 493,
+  "seed": 6061,
+  "single_row_transactions": 40000,
+  "test": "tests/engine/test_engine_ack.py::test_end_only_acknowledgement_under_a_heartbeat_storm",
+  "violations": 0
+}
