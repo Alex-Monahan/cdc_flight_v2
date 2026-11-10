@@ -363,6 +363,7 @@ def test_the_two_settings_belong_to_the_connections_of_the_layer_only(led, measu
             later = led.connect("later").fetchone(read)         # a connection of the layer that opens after it
         finally:
             raw.execute("RESET GLOBAL TimeZone")
+            raw.execute("RESET GLOBAL arrow_lossless_conversion")
     finally:
         raw.close()
     measured("settings_scope", {"other_connection_has_lossless": other, "lane_after_a_global_change": list(mine),
