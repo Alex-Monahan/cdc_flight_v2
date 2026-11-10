@@ -30,6 +30,7 @@ def test_password_is_never_shown():
     for text in (repr(p), str(p), repr(n), str(n), json.dumps(n.conninfo())):
         assert "pw-secret-1234" not in text
     assert p.reveal() == "pw-secret-1234"
+    assert "db.invalid" not in repr(n) and "db.invalid" not in repr(SourceSettings(nodes={"primary": n}))
     with pytest.raises(TypeError):
         import pickle
         pickle.dumps(p)

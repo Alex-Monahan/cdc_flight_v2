@@ -107,7 +107,7 @@ SELECT up.n, pg_current_xact_id()::text, pg_current_wal_insert_lsn()::text FROM 
 """
 
 
-def beat(primary: PgConnection, slot: str, *, deadline: Deadline, schema: str = SCHEMA,
+def beat(primary: PgConnection, deadline: Deadline, *, slot: str = "cdc_v2_slot", schema: str = SCHEMA,
          table: str = TABLE) -> HeartbeatWrite:
     """One heartbeat write on the primary (its own connection, autocommit). Returns what the stream needs to
     recognise the write when it arrives: the marker, the transaction id and a bracket around its commit record:

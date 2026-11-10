@@ -236,8 +236,8 @@ def test_heartbeat_write_is_published_and_recognisable(cluster, scratch):
         rt_standby = scratch.connect("replica")
         assert heartbeat.check(rt_standby, publication=scratch.pub, schema=hs, deadline=D()) == []
         slot.create(rt_standby, scratch.slot, D(60), primary=rt_primary)
-        beats = [heartbeat.beat(rt_primary, scratch.slot, schema=hs, deadline=D()) for _ in range(3)]
-        other = heartbeat.beat(cluster.connect("primary"), scratch.slot, schema=hs, deadline=D())  # a second run
+        beats = [heartbeat.beat(rt_primary, slot=scratch.slot, schema=hs, deadline=D()) for _ in range(3)]
+        other = heartbeat.beat(cluster.connect("primary"), slot=scratch.slot, schema=hs, deadline=D())  # a second run
         assert len({b.marker for b in beats + [other]}) == 4 and [b.n for b in beats] == [1, 2, 3]
         for b in beats:
             assert b.lower < b.upper
@@ -289,7 +289,7 @@ def test_heartbeat_advances_an_idle_slot_behind_unpublished_traffic(cluster, scr
         rt_standby = scratch.connect("replica")
         slot.create(rt_standby, scratch.slot, D(60), primary=rt_primary)
         scratch.admin(f"insert into {q(scratch.schema)}.busy (v) select repeat('x', 100) from generate_series(1, 20000)")
-        b = heartbeat.beat(rt_primary, scratch.slot, schema=hs, deadline=D())
+        b = heartbeat.beat(rt_primary, slot=scratch.slot, schema=hs, deadline=D())
         cluster.replay_to_primary()
         msgs = pgoutput_changes(cluster, "replica", scratch.slot, scratch.pub)
         assert [m for m in msgs if m["kind"] == "I" or m["kind"] == "U"]           # only the heartbeat row
@@ -309,13 +309,13 @@ def test_heartbeat_cost(cluster, scratch):
         setup = scratch.connect("primary", role="admin")
         publication.ensure(setup, [(hs, heartbeat.TABLE)], publication=scratch.pub, deadline=D())
         prim = scratch.connect("primary")
-        heartbeat.beat(prim, scratch.slot, schema=hs, deadline=D())
+        heartbeat.beat(prim, slot=scratch.slot, schema=hs, deadline=D())
         n = 200
-        start = heartbeat.beat(prim, scratch.slot, schema=hs, deadline=D()).upper
+        start = heartbeat.beat(prim, slot=scratch.slot, schema=hs, deadline=D()).upper
         for _ in range(n):
-            last = heartbeat.beat(prim, scratch.slot, schema=hs, deadline=D())
+            last = heartbeat.beat(prim, slot=scratch.slot, schema=hs, deadline=D())
         per_write = (last.upper - start) / n
-        heartbeat.beat(prim, scratch.slot + "_other", schema=hs, deadline=D())      # a second slot: a second row
+        heartbeat.beat(prim, slot=scratch.slot + "_other", schema=hs, deadline=D())      # a second slot: a second row
         rows = scratch.admin(f"select count(*), pg_relation_size('{q(hs)}.heartbeat') from {q(hs)}.heartbeat")[0]
         time.sleep(0.7)                                                       # statistics are flushed lazily
         hot = scratch.admin("select n_tup_upd, n_tup_hot_upd from pg_stat_user_tables "
