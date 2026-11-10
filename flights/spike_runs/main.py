@@ -211,6 +211,7 @@ def sql_str(v):
 
 
 def connect():
+    """Timestamps are fetched as text: the duckdb package needs pytz for TIMESTAMPTZ values (not installed)."""
     import duckdb
     con = duckdb.connect("md:%s?attach_mode=single" % DB)
     con.execute("SET TimeZone = 'UTC'")
@@ -407,7 +408,7 @@ def mode_canceller():
         targets = [(FLIGHT_ID, RUN)]
     elif target.startswith("others"):
         fid = target.split(":", 1)[1] if target.startswith("others_of:") else FLIGHT_ID
-        rows = db.query("SELECT run_number, status, is_scheduled, scheduled_at, started_at FROM "
+        rows = db.query("SELECT run_number, status, is_scheduled, scheduled_at::VARCHAR, started_at::VARCHAR FROM "
                         "MD_LIST_FLIGHT_RUNS(flight_id := %s, \"limit\" := 50)" % uuid_lit(fid))
         listed = [{"run_number": r[0], "status": r[1], "is_scheduled": r[2], "scheduled_at": r[3],
                    "started_at": r[4]} for r in rows]
@@ -438,7 +439,7 @@ def mode_canceller():
         deadline = time.time() + 60
         states = []
         while time.time() < deadline:
-            r = db.query("SELECT status, cancelled_at, ended_at, exit_code FROM "
+            r = db.query("SELECT status, cancelled_at::VARCHAR, ended_at::VARCHAR, exit_code FROM "
                          "MD_GET_FLIGHT_RUN(flight_id := %s, run_number := %d)" % (uuid_lit(fid), int(n)))
             st = str(r[0][0]) if r else None
             if not states or states[-1][0] != st:
