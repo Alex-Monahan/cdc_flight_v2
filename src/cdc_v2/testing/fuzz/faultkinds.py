@@ -189,8 +189,17 @@ class Net(Fault):
         super().__init__(**params)
         self.kind = kind
 
+    _busy = {}
+    _lock = threading.Lock()
+
     def inject(self, ctx):
         self.px = ctx.system.links()["source"]
+        with Net._lock:
+            if Net._busy.get(id(self.px)):
+                self.skipped = True                        # overlapping faults on one link would undo each other
+                return
+            Net._busy[id(self.px)] = True
+        self.skipped = False
         self.s0 = self.px.stats()
         mode = self.MODES[self.kind]
         if mode == "delay":
@@ -199,8 +208,14 @@ class Net(Fault):
             self.px.set_fault(mode)
 
     def heal(self, ctx):
+        if getattr(self, "skipped", True):
+            self.effect = False
+            self.proof = {"skipped": "another network fault held the link"}
+            return
         s1 = self.px.stats()
         self.px.set_fault("pass")
+        with Net._lock:
+            Net._busy.pop(id(self.px), None)
         d = {k: s1.get(k, 0) - self.s0.get(k, 0) for k in ("closed_by_fault", "reset_by_fault", "accept_closed",
                                                           "accept_reset", "accepted", "bytes_up", "bytes_down")}
         self.proof = dict(d, active_at_inject=self.s0.get("active"), held_up=s1.get("held_up"),
@@ -224,12 +239,13 @@ class SrcSignal(Fault):
 
     def inject(self, ctx):
         fn = "pg_terminate_backend" if self.kind == "src_terminate" else "pg_cancel_backend"
+        active = "" if self.kind == "src_terminate" else " AND state = 'active'"     # a cancel needs a statement
         n = 0
         nodes = sorted({ctx.system.slot_node, ctx.system.primary_node})
         for node in nodes:
             with ctx.admin(node) as c:
                 rows = c.execute("SELECT %s(pid) FROM pg_stat_activity WHERE application_name LIKE %%s "
-                                 "AND pid <> pg_backend_pid() AND datname = current_database()" % fn,
+                                 "AND pid <> pg_backend_pid() AND datname = current_database()%s" % (fn, active),
                                  (ctx.system.app_prefix + "%",)).fetchall()
             n += sum(1 for (ok,) in rows if ok)
         self.effect = n > 0
@@ -435,6 +451,8 @@ class SlotInvalidate(Fault):
         if p is not None and p.alive():
             p.stop_group()
         self.proof = {"node": node}
+        was_dirty = sysm.lease.record.get("dirty")
+        sysm.lease.mark_dirty("slot_invalidate changed max_slot_wal_keep_size")
         try:
             sysm.lease.localpg("set", node, "max_slot_wal_keep_size=2MB")
             if node != sysm.primary_node:
@@ -468,9 +486,13 @@ class SlotInvalidate(Fault):
             self.effect = lost
             self.proof["invalidated"] = lost
         finally:
-            sysm.lease.localpg("unset", node, "max_slot_wal_keep_size", check=False)
+            ok = sysm.lease.localpg("unset", node, "max_slot_wal_keep_size", check=False).returncode == 0
             if node != sysm.primary_node:
-                sysm.lease.localpg("unset", sysm.primary_node, "max_slot_wal_keep_size", check=False)
+                ok = sysm.lease.localpg("unset", sysm.primary_node, "max_slot_wal_keep_size",
+                                        check=False).returncode == 0 and ok
+            if ok and not was_dirty:
+                sysm.lease.record["dirty"] = False
+                sysm.lease.save()
             if p is not None and p.alive():
                 p.cont_group()
             ctx.sup.resume()
@@ -539,7 +561,9 @@ def make_fault(kind: str, rng: random.Random, system) -> tuple:
 class Schedule:
     """Which kinds, with which weights, how many faults per episode."""
 
-    def __init__(self, system, weights: Optional[dict] = None, only: Optional[list] = None, per_episode=(1, 3)):
+    def __init__(self, system, weights: Optional[dict] = None, only: Optional[list] = None, per_episode=(1, 3),
+                 cover_all: bool = False):
+        self.cover_all = cover_all
         w = dict(weights or DEFAULT_WEIGHTS)
         if only:
             w = {k: w.get(k, 1) for k in only}
@@ -559,8 +583,12 @@ class Schedule:
     def plan(self, rng: random.Random, episode_s: float) -> list:
         kinds, weights = zip(*sorted(self.weights.items()))
         out = []
-        for _ in range(rng.randint(*self.per_episode)):
-            kind = rng.choices(kinds, weights)[0]
+        picks = [rng.choices(kinds, weights)[0] for _ in range(rng.randint(*self.per_episode))]
+        if self.cover_all:                                 # every kind once per episode, then the random draws
+            first = list(kinds)
+            rng.shuffle(first)
+            picks = first + picks[len(first):]
+        for kind in picks:
             fault, dur = make_fault(kind, rng, self.system)
             out.append((round(rng.uniform(0.0, episode_s * 0.7), 3), round(dur, 3), fault))
         return sorted(out, key=lambda x: x[0])
@@ -590,11 +618,11 @@ class Episode:
             fault.heal(ctx)
         except Exception as e:                             # noqa: BLE001 - logged; the fault is not counted
             fault.error = "%s: %s" % (type(e).__name__, str(e)[:160])
-            fault.effect = False
             try:
                 fault.heal(ctx)
             except Exception:                              # noqa: BLE001
                 pass
+            fault.effect = False                           # a failed injection is never counted
         finally:
             fault.t_heal = ctx.t()
             if quiet:

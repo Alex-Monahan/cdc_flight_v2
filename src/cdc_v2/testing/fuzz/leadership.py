@@ -38,13 +38,18 @@ PLATFORM_FAULTS = ["net_drop", "net_reset", "net_blackhole", "net_latency", "src
 def check_writer_log(rows: list) -> list:
     """Problems in the writer log (empty = none). rows: (order, epoch, run, position, xid, kind) by order."""
     problems = []
-    last_epoch, last_pos, seen, run_epoch = None, None, set(), {}
+    last_epoch, last_pos, seen, run_epoch, epoch_run = None, None, set(), {}, {}
     for n, epoch, run, pos, xid, kind in rows:
         if last_epoch is not None and epoch < last_epoch:
             problems.append({"two_writers": True, "order": n, "epoch": epoch, "after_epoch": last_epoch, "run": run})
         if run in run_epoch and run_epoch[run] != epoch:
             problems.append({"run_with_two_epochs": run, "epochs": [run_epoch[run], epoch]})
         run_epoch.setdefault(run, epoch)
+        if epoch in epoch_run and epoch_run[epoch] != run:
+            problems.append({"epoch_with_two_runs": epoch, "runs": [epoch_run[epoch], run], "order": n})
+        epoch_run.setdefault(epoch, run)
+        if kind == "takeover" and last_epoch is not None and epoch <= last_epoch:
+            problems.append({"takeover_without_new_epoch": epoch, "order": n, "run": run})
         if last_pos is not None and (pos < last_pos or (kind == "txn" and pos == last_pos)):
             problems.append({"position_not_rising": True, "order": n, "position": lsn.format(int(pos)),
                              "after": lsn.format(int(last_pos)), "kind": kind})
@@ -203,16 +208,18 @@ class LeadershipRun:
         return self.rec
 
     def _slow_newcomers(self, platform):
-        exits = {}
-        for e in getattr(self.system, "events", lambda: [])():
-            if e.get("kind") == "healthy_leader_found":
-                exits[e["tag"]] = e
+        """Runs that never took over and lived longer than newcomer_exit_s (alive or ended), unless this fuzzer
+        paused, killed or cancelled them (their life is then ours, not theirs)."""
+        leaders = {e["tag"] for e in getattr(self.system, "events", lambda: [])() if e.get("kind") == "took_over"}
+        touched = {a.get("run") for a in self.actions if a.get("action") in ("pause", "kill", "cancel")}
+        now = time.monotonic()
         slow = []
         for r in platform.runs:
-            if r.tag in exits and r.ended_at is not None:
-                took = r.ended_at - r.started
-                if took > self.newcomer_exit_s:
-                    slow.append({"run": r.tag, "exit_after_s": round(took, 2)})
+            if r.tag in leaders or r.tag in touched:
+                continue
+            took = (r.ended_at or now) - r.started
+            if took > self.newcomer_exit_s:
+                slow.append({"run": r.tag, "alive": r.ended_at is None, "seconds": round(took, 2)})
         return slow
 
     def _round(self, r, rng, platform, env, sup, fc, load):
@@ -225,7 +232,7 @@ class LeadershipRun:
             delay = off - (time.monotonic() - t0)
             if delay > 0:
                 time.sleep(delay)
-            kind = rng.choices(["start", "pause", "kill", "cancel", "handover", "fault"], [3, 3, 2, 2, 1,
+            kind = rng.choices(["start", "pause", "kill", "cancel", "handover", "fault"], [3, 4, 2, 2, 1,
                                                                                             3 * self.fault_prob])[0]
             alive = platform.alive()
             act = {"round": r, "t": self._t(), "action": kind}
@@ -242,7 +249,7 @@ class LeadershipRun:
                 elif kind == "cancel":
                     platform.cancel(run)
                 else:
-                    dur = rng.choice([rng.uniform(0.3, 1.5), rng.uniform(2.5, 5.0)])
+                    dur = rng.uniform(0.3, 1.5) if rng.random() < 0.4 else rng.uniform(2.5, 5.0)
                     act["seconds"] = round(dur, 2)
                     run.proc.stop_group()
 

@@ -71,6 +71,8 @@ class Campaign:
         self._queue = None
         self._deadline = None
         self.results = []
+        self.refused = 0
+        self.worker_errors = 0
 
     # ------------------------------------------------------------------ seeds
     def _system_label(self) -> str:
@@ -123,8 +125,19 @@ class Campaign:
             fid = "%s-%s-%s-s%d-%s" % (self.fuzzer, rec["system"], rec["source_mode"], seed,
                                        (rec.get("commit") or "nocommit")[:7])
             rec["failure_id"] = fid
-            self._keep_failure(fid, rec, run_like, workdir)
-        ledger.append_run(self.root, rec)
+            try:
+                self._keep_failure(fid, rec, run_like, workdir)
+            except Exception as e:                         # noqa: BLE001 - the run's line is still written
+                rec["failure_kept"] = "no: %s" % type(e).__name__
+        try:
+            ledger.append_run(self.root, rec)
+        except Exception as e:                             # noqa: BLE001 - e.g. EvidenceError: keep the facts
+            slim = {k: rec.get(k) for k in ("fuzzer", "system", "self_test", "tier", "source_mode", "seed",
+                                            "commit", "clean", "start", "duration_s", "counts", "faults",
+                                            "no_effect", "outcome", "failure_id", "system_spec", "campaign")}
+            slim["reason"] = "the full record was refused by the evidence writer (%s)" % type(e).__name__
+            ledger.append_run(self.root, slim)
+            self.refused += 1
         return rec
 
     def _keep_failure(self, fid, rec, run_like, workdir):
@@ -180,7 +193,12 @@ class Campaign:
                 if seed is None:
                     break
                 t = time.monotonic()
-                rec = self._run_one(lease, seed)
+                try:
+                    rec = self._run_one(lease, seed)
+                except Exception as e:                     # noqa: BLE001 - never a silent end of a worker
+                    self.worker_errors += 1
+                    self.log("seed %d: the runner failed: %s: %s" % (seed, type(e).__name__, str(e)[:200]))
+                    continue
                 self.results.append(rec)
                 if self.stop_on_failure and rec["outcome"] in FAILURES:
                     self.abort.set()

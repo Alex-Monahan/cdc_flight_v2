@@ -44,6 +44,8 @@ from cdc_v2.testing import frames as FE
 from cdc_v2.testing import pipefaults
 
 CORPUS_DIR = Path(__file__).resolve().parents[4] / "tests" / "fuzz" / "corpus"
+# faults after which a clean end at a frame boundary is the true outcome (the stream really is shorter)
+SHORTENING = ("pipefault", "cut_at_boundary", "raw_drop_frame", "drop_end", "flip_header_length")
 UNDETECTABLE = ("clean_end_at_boundary", "new_life_replay", "content_replaced_same_shape")
 BYTE_KINDS = ("pipefault", "flip_header_length", "flip_header_seq", "flip_header_type", "flip_payload",
               "raw_swap", "raw_dup_run", "raw_drop_frame", "cut_at_boundary")
@@ -461,8 +463,11 @@ def check_case(true_txns: list, result: dict, kind: str, details: dict) -> dict:
                    % (result["position"], last_true))
     elif complete or detected:
         out.update(ok=True, why="complete" if complete else "prefix, then a detected error")
-    else:
+    elif kind in SHORTENING:
         out.update(ok=True, why="prefix, then a clean end at a frame boundary", undetected="clean_end_at_boundary")
+    else:
+        out.update(ok=False, why="a clean end short of the true transactions after a fault that does not shorten "
+                                 "the stream")
     if kind == "content_replaced_same_shape" and complete is False and prefix is False:
         out.update(ok=True, why="content replaced upstream with a valid checksum: undetectable by design",
                    undetected="content_replaced_same_shape")

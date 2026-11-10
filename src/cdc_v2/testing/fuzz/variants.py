@@ -27,6 +27,7 @@ TABLE = {
     "swallow": ("workload", {}, "workload fuzzer"),
     "trust_frames": ("stream", {}, "stream fuzzer"),
 }
+FINDINGS = ("diverged", "violation", "stuck")          # an `error` is not the fuzzer finding the bug
 BOUND_SEEDS = {"fault": 6, "workload": 4, "stream": 4, "leadership": 3}
 
 
@@ -44,7 +45,7 @@ def run_variants(names=None, source_node="replica", out=None, log=print, budget=
                      rounds=rounds, stop_on_failure=True, log=log, **kw, **extra)
         c.seeds = _next_free(c, bound)
         res = c.run()
-        found = [r for r in res if r["outcome"] in FAILURES]
+        found = [r for r in res if r["outcome"] in FINDINGS]
         row = {"variant": v, "fuzzer": fuzzer, "expected_finder": expect, "bound_seeds": bound,
                "seeds_run": [r["seed"] for r in res], "found": bool(found),
                "seeds_until_found": (res.index(found[0]) + 1) if found else None,

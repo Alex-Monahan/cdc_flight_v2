@@ -197,6 +197,7 @@ class PgSystem(System):
             except Exception:                              # noqa: BLE001
                 pass
         self.proxies = {}
+        self.lease.forget_procs()
         if self.wl is not None:
             self.wl.close()
         if self.db is not None:

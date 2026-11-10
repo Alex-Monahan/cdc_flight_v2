@@ -35,15 +35,16 @@ from . import observers as obs
 
 OUTCOMES = ("pass", "diverged", "violation", "stuck", "error", "infrastructure")
 FAILURES = ("diverged", "violation", "stuck", "error")
+MIN_OBSERVATIONS = 20
 
 
 def git_state(repo: Path) -> dict:
     def g(*a):
         return subprocess.run(["git", *a], cwd=repo, capture_output=True, text=True, timeout=30).stdout.strip()
     try:
-        # clean = no change to a tracked file outside evidence/ (the ledger itself is written during campaigns)
+        # clean = no change (also no new file) outside evidence/ (the ledger itself is written during campaigns)
         return {"commit": g("rev-parse", "HEAD"),
-                "clean": g("status", "--porcelain", "--untracked-files=no", "--", ".", ":(exclude)evidence") == ""}
+                "clean": g("status", "--porcelain", "--", ".", ":(exclude)evidence") == ""}
     except Exception:                                      # noqa: BLE001
         return {"commit": None, "clean": False}
 
@@ -146,10 +147,16 @@ class Supervisor:
         return p
 
     def pause(self):
-        self._paused.set()
+        """Nested: overlapping faults each pause and resume; restarts resume when the last one resumes."""
+        with self._lock:
+            self._pauses = getattr(self, "_pauses", 0) + 1
+            self._paused.set()
 
     def resume(self):
-        self._paused.clear()
+        with self._lock:
+            self._pauses = max(0, getattr(self, "_pauses", 0) - 1)
+            if not self._pauses:
+                self._paused.clear()
 
     def stop(self, timeout=15):
         self._stop.set()
@@ -179,16 +186,22 @@ class Load:
         self._idle = threading.Event()
         self._idle.set()
         self._stop = threading.Event()
+        self._gate = threading.Lock()
         self._thread = threading.Thread(target=self._loop, name="load", daemon=True)
         self._thread.start()
 
     def _loop(self):
         while not self._stop.is_set():
-            if not self._run.is_set():
-                self._idle.set()
+            with self._gate:
+                if not self._run.is_set():
+                    self._idle.set()
+                    go = False
+                else:
+                    self._idle.clear()
+                    go = True
+            if not go:
                 self._run.wait(0.05)
                 continue
-            self._idle.clear()
             try:
                 self.wl.run_round()
                 self.rounds += 1
@@ -203,7 +216,8 @@ class Load:
         self._run.set()
 
     def pause(self, timeout=300):
-        self._run.clear()
+        with self._gate:
+            self._run.clear()
         if not self._idle.wait(timeout):
             raise DeadlineExceeded("the workload round did not end")
 
@@ -372,6 +386,10 @@ class Run:
             self.rec["observers"] = observers_.stop()
             if self.rec["outcome"] == "pass" and observers_.violations():
                 self._fail("violation", "consumer loop: %s" % _violation_summary(observers_))
+            blind = [o["check"] for o in self.rec["observers"] if o["observations"] < MIN_OBSERVATIONS]
+            if self.rec["outcome"] == "pass" and blind:
+                self._fail("error", "consumer loops that observed fewer than %d times prove nothing: %s"
+                           % (MIN_OBSERVATIONS, ", ".join(blind)))
         if sup is not None:
             try:
                 sup.stop()

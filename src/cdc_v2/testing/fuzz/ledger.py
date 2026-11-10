@@ -63,6 +63,19 @@ class Git:
         out = self.run("log", "--format=%H", "--", *paths)
         return [c for c in out.stdout.split() if c]
 
+    def missing_fixes(self, run_commit: str, paths: list, exempt: set) -> list:
+        """Commits of HEAD's history that touch `paths`, are not exempt, and are not in `run_commit`'s history: the
+        fixes the run did not have (merge order does not matter)."""
+        key = ("missing", run_commit)
+        if key not in self._anc:
+            out = self.run("rev-list", "%s..HEAD" % run_commit, "--", *paths)
+            if out.returncode != 0:
+                self._anc[key] = ["<unknown commit>"]
+            else:
+                self._anc[key] = [c for c in out.stdout.split() if c not in exempt
+                                  and not any(c.startswith(e) for e in exempt if len(e) >= 7)]
+        return self._anc[key]
+
     def is_ancestor(self, a: str, b: str) -> bool:
         key = (a, b)
         if key not in self._anc:
@@ -176,8 +189,9 @@ def build(root: Path, repo: Path) -> dict:
         totals = []
         for (system, tier, mode), rs in sorted(groups.items(), key=lambda kv: tuple(str(x) for x in kv[0])):
             self_test = any(r.get("self_test") for r in rs)
-            counted = [] if self_test else [r for r in rs if r.get("clean") and r.get("commit") and (
-                rc is None or git.is_ancestor(rc["commit"], r["commit"]))]
+            skip = {e["commit"] for e in exempt}
+            counted = [] if self_test else [r for r in rs if r.get("clean") and r.get("commit") and
+                                            not git.missing_fixes(r["commit"], AFFECTS[fz], skip)]
             g = {"system": system, "tier": tier, "source_mode": mode, "self_test": self_test,
                  "all_runs": summarize(rs), "counted": summarize(counted)}
             kinds = sorted({k for r in rs for k, v in ((r.get("config") or {}).get("schedule") or {}).get(
@@ -191,7 +205,9 @@ def build(root: Path, repo: Path) -> dict:
             entry["groups"].append(g)
         tot = summarize(totals)
         entry["counted_total"] = tot
-        entry["against_minimum_total"] = against(fz, tot)
+        kinds_all = sorted({k for r in totals for k in ((r.get("config") or {}).get("schedule") or {}).get(
+            "weights", {})}) or None
+        entry["against_minimum_total"] = against(fz, tot, kinds_all)
         combos = REQUIRED_COMBOS.get(fz)
         if combos:
             have = {(g["tier"], g["source_mode"]) for g in entry["groups"] if not g["self_test"]

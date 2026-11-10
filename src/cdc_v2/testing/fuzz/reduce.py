@@ -188,8 +188,9 @@ def reduce(case: dict, workdir: Path, attempts: int = 2, budget: int = 40,
             res = replay_case(c, workdir / ("r%d" % runs["n"]))
             if log:
                 log("reduce: %d entries %d faults -> %s" % (len(c["entries"]), len(c["faults"]), res["outcome"]))
-            if res["outcome"] not in ("pass", "infrastructure"):
-                return True
+            if res["outcome"] == c.get("outcome") or (res["outcome"] in ("diverged", "violation", "stuck")
+                                                       and c.get("outcome") in ("diverged", "violation", "stuck")):
+                return True                                # the same kind of failure; an error is not one
         return False
 
     if not fails(case):

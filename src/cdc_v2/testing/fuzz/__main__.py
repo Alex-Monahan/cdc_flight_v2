@@ -63,6 +63,7 @@ def main(argv=None) -> int:
     o.add_argument("--cases", type=int, default=100_000)
     o.add_argument("--seed", type=int, default=None, help="first case seed (default: after the ledger's)")
     o.add_argument("--negative-controls", action="store_true")
+    o.add_argument("--out", default=None, help="also write the summary to this evidence file")
     rd = sub.add_parser("reduce", help="reduce a kept failure to a seeded regression test")
     rd.add_argument("failure_id")
     sub.add_parser("clean", help="remove what killed campaigns left behind (by their lock records only)")
@@ -86,7 +87,7 @@ def main(argv=None) -> int:
         bad = [x for x in res if x["outcome"] not in ("pass", "infrastructure")]
         print(json.dumps({"runs": len(res), "outcomes": {o: sum(1 for x in res if x["outcome"] == o)
                                                          for o in sorted({x["outcome"] for x in res})}}))
-        return 1 if bad else 0
+        return 1 if bad or c.refused or c.worker_errors else 0
     if a.cmd == "status":
         data = ledger.write(root, REPO) if a.write else ledger.build(root, REPO)
         print(ledger.status_text(data))
@@ -107,8 +108,9 @@ def main(argv=None) -> int:
     if a.cmd == "stream-offline":
         from .run import git_state, utc_now
         from .stream_fuzzer import load_corpus, run_offline
-        held = ledger.held_seeds(root, "stream", "engine-reader", "offline", tier="offline")
-        first = a.seed if a.seed is not None else (max(held) + 1 if held else 1)
+        last = max([r.get("seeds", [r["seed"], r["seed"]])[1] for r in ledger.read_runs(root, "stream")
+                    if r.get("system") == "engine-reader"] or [0])
+        first = a.seed if a.seed is not None else last + 1
         t0 = time.monotonic()
         res = run_offline(range(first, first + a.cases))
         rec = {"fuzzer": "stream", "system": "engine-reader", "self_test": False, "tier": "offline",
@@ -124,6 +126,13 @@ def main(argv=None) -> int:
                               decoder="lenient")
             rec["negative_control"] = {"cases": neg["cases"], "failures_found": neg["failures"]}
         ledger.append_run(root, rec)
+        if a.out:
+            from cdc_v2.testing.harness_evidence import write_evidence
+            write_evidence(Path(a.out), dict(rec, about="The stream fuzzer against package E's frame decoder and the "
+                                                        "reference assembler, offline (docs/testing/fuzzers.md §5).",
+                                             command="tools/fuzz stream-offline --cases %d --seed %d%s" % (
+                                                 a.cases, first, " --negative-controls" if a.negative_controls
+                                                 else "")))
         print(json.dumps({k: rec[k] for k in ("outcome", "counts", "duration_s", "undetected_by_class")}))
         return 0 if rec["outcome"] == "pass" else 1
     if a.cmd == "reduce":

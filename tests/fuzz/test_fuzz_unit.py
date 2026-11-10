@@ -453,6 +453,24 @@ def test_toy_frame_path_round_trip_and_detection():
     assert [t["commit_lsn"] for t in toy.assemble(toy.lenient_frames(at_boundary), strict=False)] == [1000, 1100]
 
 
+def test_writer_log_epoch_belongs_to_one_run_and_takeover_raises_it():
+    base = [(1, 1, "a", 0, 0, "takeover"), (2, 1, "a", 100, 0, "resync"), (3, 1, "a", 110, 5, "txn")]
+    assert check_writer_log(base + [(4, 2, "b", 110, 0, "takeover"), (5, 2, "b", 120, 6, "txn")]) == []
+    shared = base + [(4, 1, "b", 120, 6, "txn")]
+    assert any("epoch_with_two_runs" in p for p in check_writer_log(shared))
+    stale = base + [(4, 1, "c", 110, 0, "takeover")]
+    assert any("takeover_without_new_epoch" in p for p in check_writer_log(stale))
+    late = base + [(4, 2, "b", 110, 0, "takeover"), (5, 1, "a", 120, 6, "txn")]   # old leader after the take-over
+    assert any(p.get("two_writers") for p in check_writer_log(late))
+
+
+def test_a_reader_that_drops_the_tail_is_caught_unless_the_fault_shortened_the_stream():
+    true = [{"ack": 1, "n": 1, "digest": "a"}, {"ack": 2, "n": 1, "digest": "b"}]
+    short = {"txns": true[:1], "ends": ["clean"], "position": 1}
+    assert sf.check_case(true, short, "flip_payload", {})["ok"] is False
+    assert sf.check_case(true, short, "cut_at_boundary", {})["ok"] is True
+
+
 def test_toy_points_per_variant():
     assert "toyrep.data_committed" in toy.points_for("position_apart")
     assert "toyrep.data_committed" not in toy.points_for("correct")

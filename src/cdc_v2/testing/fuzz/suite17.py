@@ -141,7 +141,7 @@ def run_suite(system_name: str, out_dir: Path, repo: Path, source_node: str = "r
             if not kinds:
                 summary["parts"][group] = {"skipped": "the system supports none of %s" % GROUPS[group]}
                 continue
-            sch = Schedule(sysm, only=kinds, per_episode=(2, 3))
+            sch = Schedule(sysm, only=kinds, per_episode=(len(kinds), len(kinds) + 1), cover_all=True)
             rec = run_once(sysm, 1000 + gi, work / group, RunConfig(fuzzer="fault", budget_s=group_budget_s,
                                                                      episode_s=8.0, schedule=sch), repo)
             missing = [k for k in kinds if not rec["faults"].get(k)]
@@ -152,7 +152,7 @@ def run_suite(system_name: str, out_dir: Path, repo: Path, source_node: str = "r
             runs.append(rec)
             log("%s: %s" % (group, json.dumps(summary["parts"][group])))
         sysm = make_system(system_name, lease, source_node)
-        sch = Schedule(sysm, per_episode=(2, 5))
+        sch = Schedule(sysm, per_episode=(3, 6))
         rec = run_once(sysm, 2000, work / "soak", RunConfig(fuzzer="fault", budget_s=soak_s, episode_s=10.0,
                                                             schedule=sch), repo)
         counted = sum(rec["faults"].values())

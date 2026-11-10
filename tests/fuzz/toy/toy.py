@@ -512,6 +512,9 @@ class Toy:
                     con.execute("ROLLBACK")
                     continue
                 con.execute("UPDATE _cdc.toy_fence SET epoch = ? WHERE k = 1", [epoch + 1])
+                # the take-over is a fact of the writer log too (leadership fuzzer: never two writers)
+                con.execute("INSERT INTO _cdc.toy_log SELECT nextval('_cdc.toy_log_seq'), ?, ?, applied_lsn, 0, "
+                            "'takeover' FROM _cdc.stream_state WHERE slot_name = ?", [epoch + 1, self.run_id, self.slot])
                 con.execute("COMMIT")
                 self.epoch = epoch + 1
                 self.last_beat = time.monotonic()

@@ -82,6 +82,11 @@ class HomeLease:
     def note_proc(self, pid: int) -> None:
         self.note("procs", {"pid": pid, "start": _ps_start(pid)})
 
+    def forget_procs(self) -> None:
+        """After a scenario has stopped its processes (checked: no survivor), its records go."""
+        self.record["procs"] = []
+        self.save()
+
     def mark_dirty(self, why: str) -> None:
         self.record["dirty"] = why
         self.save()
@@ -138,16 +143,24 @@ def acquire(prefer: Optional[int] = None, wait_s: float = 0.0) -> HomeLease:
             except OSError:
                 os.close(fd)
                 continue
+            if _is_fixture_home(n):
+                os.close(fd)                               # the T1 fixtures' cluster is never a fuzz scenario's
+                continue
             lease = HomeLease(n, fd)
             old = _read_record(n)
             if old:
-                _clean_record(old, lease)
                 lease.record["dirty"] = old.get("dirty", False)
+                _clean_record(old, lease)                  # may mark it dirty too; never clears a mark
             lease.save()
             return lease
         if time.monotonic() >= deadline:
             raise RuntimeError("no free fuzz home (pg-f0 … pg-f%d are all held)" % (HOMES - 1))
         time.sleep(0.5)
+
+
+def _is_fixture_home(n: int) -> bool:
+    named = os.environ.get("CDC_V2_PG_HOME")
+    return bool(named) and Path(named).expanduser().resolve() == home_path(n).resolve()
 
 
 def _read_record(n: int) -> Optional[dict]:
@@ -197,6 +210,9 @@ def clean(stop_clusters: bool = True) -> list:
         rec = _read_record(n)
         if rec is None and not (home_path(n) / "state.json").exists():
             continue
+        if _is_fixture_home(n):
+            out.append({"home": "pg-f%d" % n, "skipped": "the T1 fixtures' cluster (CDC_V2_PG_HOME)"})
+            continue
         fd = os.open(LOCK_DIR / ("pg-f%d.lock" % n), os.O_RDWR | os.O_CREAT, 0o600)
         try:
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -205,6 +221,7 @@ def clean(stop_clusters: bool = True) -> list:
             out.append({"home": "pg-f%d" % n, "skipped": "held by a running campaign"})
             continue
         lease = HomeLease(n, fd)
+        lease.record["dirty"] = (rec or {}).get("dirty", False)
         try:
             done = _clean_record(rec or {}, lease)
             if stop_clusters and (lease.home / "state.json").exists():
