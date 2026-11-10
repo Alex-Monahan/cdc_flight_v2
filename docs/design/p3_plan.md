@@ -235,6 +235,11 @@ same source value; a test compares them through a local Postgres for every basel
 cannot be converted raises `ConversionError` with table, column position and `seq`, never the value; it is never
 turned into NULL silently.
 
+Many small batches cost the transform one statement each for some type families. So the stream may concatenate
+`ROWS` batches of one table and schema version within a group before it calls the transform: in memory only, in
+stream order, bounded by `apply.max_group_bytes`. The transform still runs before anything is staged, spilled or
+sent.
+
 The backfill's text form is what Postgres prints under the session settings that package P fixes for every read
 connection (C7; `docs/design/source.md` section 1). The stream's form of every type is the table in section 3 of
 `docs/design/engine.md`; the engine's walsender session has settings of its own (`IntervalStyle=postgres`,
@@ -702,6 +707,20 @@ columns, deferrability, replica identity) is a schema change; they are part of t
 PII rules of P4: the mapping of a key column is injective up to the source's equality; a rule that masks or
 truncates a key column is refused. History of P4: a table with a deferrable primary key gets the plain changelog
 of a table without a key.
+
+**From the review of Y (transform).** S: the batch rule of C3 (concatenate before the transform). S and C10: a
+table whose key holds a column that the stream cannot deliver injectively (`plan.ambiguous_key`: a scalar
+`interval` key on a source of Postgres 17 or later, where `infinity`, `-infinity` and zero arrive alike) is not
+streamed: mode `full_refresh` with an alert; the repair read of C3 cannot help, because it reads by that key.
+Type wave of P4: `json` and `jsonb` become the native `JSON` type with the wide form `UNION(JSON, VARCHAR)` for a
+value DuckDB's JSON refuses (P3 delivers them as `VARCHAR`, lossless); enums stay `VARCHAR` until the owner
+rules (SPEC 2.4 names them among the native types; H-033); the engine's converter prints geometric types as
+Postgres does (P3: Java's float formatting in the stream form); a numeric domain keeps its typmod in the
+catalog's `TypeInfo`. Before P4 grades SPEC 2.4 the oracle gets: rules for the `VARCHAR` member of timestamp and
+interval columns; a timestamp form that does not overflow `bigint`; text comparison for arrays and composites
+delivered as text; the fallback through the type's output function instead of `::text`; `lc_monetary=C` pinned in
+its session; a `timetz` rule by (microseconds, offset). P9: the cost of a 200-column table (52 K rows/s in the
+stream here).
 
 ### 6.3 Simplifications taken
 
