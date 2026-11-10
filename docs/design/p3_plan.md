@@ -9,25 +9,51 @@ orchestrator; it does not change it alone, because another worker is building ag
 
 ## 1. Packages
 
+The data path, and which package owns each stage:
+
+```
+slot → engine (E) → frames → transform (Y) → transactions, groups (S) → apply (A) → MotherDuck, through a lane (D)
+table → chunk readers (B) → transform (Y) → load, pending log, swap (B, A)
+```
+
 | # | Package | Design sections | Depends on | Worker |
 |---|---|---|---|---|
 | O | Oracle and T1 harness | SPEC §4 evidence, 1.6, 1.7 | — | running |
 | H | Crash-point and fault harness | SPEC 1.7 | — | running |
 | X | Cut: where a snapshot lies in the stream | 7.2, open points 1, 12 | — | running (Fable) |
 | E | Engine: the JVM program, its frames, the Python side that starts it and turns frames into Arrow | 1, 3 steps 7–8, 6.1 | H (crash points in Java) | Opus |
-| M | Destination basics and leadership: connections, lanes, fence, clock, deadlines; `_cdc` schema; transition function and the leader machine; guard, take-over, heartbeat, release; bootstrap; local platform simulator | 4, 5, 9 | H | Fable |
-| A | Apply: the statements of 6.2, 6.3 and 6.5 over a group | 6.1–6.3, 6.5, open points 2, 3, 9 | O (canonical form) | Opus |
+| D | Destination basics: connections, lanes, fence, clock, deadlines; `_cdc` schema; transition function; alert records | 3 (fence, unknown outcome), 4.1–4.2, 9 | H | Fable |
+| A | Apply: the statements of 6.2, 6.3 and 6.5 over a change set | 6.1–6.3, 6.5, open points 2, 3, 9 | O (canonical form) | Opus |
 | P | Source: connections with deadlines, catalog, publication, slot on a standby and on a primary, slot facts, timeline history, primary heartbeat | 8 (facts only), SPEC 4.4 | — | Opus |
-| S | Stream: transaction assembly, groups, the commit and acknowledge protocol with its crash points, unknown commit outcome, supervisor, pipeline process; slot continuity decisions | 2, 3, 6.4, 8 | E, M, A, P, H | Fable |
-| F | Fuzzers and the campaign ledger: workload, fault, stream, leadership (value fuzzer in the P4 type wave) | SPEC §4, PLAN §6 | O, H; attacks S and M as they appear | Opus |
-| B | Backfill and hand-off: chunk planning and readers, pending log, catch-up with repair reads, swap; table and backfill machines | 7, 9 | X, S, A, P | Fable |
-| T | Truncate, drop, drop-and-recreate; remaining machines and the enumeration tests of 1.9 | 6.5, 9, SPEC 1.5 | S, B | Opus |
+| L | Leadership: guard, take-over, heartbeat, planned hand-over, release; bootstrap; platform interface and local simulator; the leader machine | 4, 5 | D, H | Fable |
+| Y | Transform: destination type per source type; conversion of the engine's transport form and of the backfill's text form into destination-typed Arrow, inside the process; baseline type families | 6.1, SPEC 2.4 (baseline), 8.3 (place only) | E, P | Opus |
+| S | Stream: transaction assembly, groups, the commit and acknowledge protocol with its crash points, unknown commit outcome, the oversized transaction, supervisor, pipeline process, configuration file | 2, 3, 6.4 | E, D, A; then Y, P, L | Fable |
+| V | Slot continuity: the decision at every slot acquisition and periodically; alert and automatic backfill request | 8, SPEC 1.8, 4.1 | P, D | Fable |
+| F | Fuzzers and the campaign ledger: workload, fault, stream, leadership (value fuzzer in the P4 type wave) | SPEC §4, PLAN §6 | O, H; attacks S and L as they appear | Opus |
+| B | Backfill and hand-off: chunk planning and readers, pending log, catch-up with repair reads, swap; table and backfill machines | 7, 9 | X, S, A, P, Y | Fable |
+| T | Truncate, drop, drop-and-recreate end to end; remaining machines and the enumeration tests of 1.9 | 6.5, 9, SPEC 1.5 | S, B | Opus |
 
-Order: E, M, A and P start as writer slots become free (at most four writers at once). S starts when E, M and A are
-merged; F when O and H are merged; B when X and S are merged; T last. The gate tests of 1.1–1.9 and 4.2 are written
-by the package that owns the behaviour and run by the T1 harness of package O.
+Order: E, D, A and P start as writer slots become free (at most four writers at once). Then L (after D), Y (after
+E and P), S (after E, D and A), V (after P and D), F (after O and H), B (after X and S), T last. The gate tests of
+1.1–1.9 and 4.2 are written by the package that owns the behaviour and run by the T1 harness of package O.
+
+Not in P3, but the contracts leave room for it: history tables and soft deletes (SPEC 8.1, 8.2: P4 builds them
+from the same change set, which is why a change set is never reduced before it reaches apply and carries the
+transaction of every row); PII rules (SPEC 8.3: P4 adds them to the transform, which is why the transform runs
+inside the process before a value is buffered on disk or sent anywhere); the long tail of types (P4 type wave).
 
 ## 2. Contracts
+
+### C0 Common
+
+- A **position** is a WAL location (LSN) as a Python `int`. Text form `X/Y` only at the edges, through
+  `cdc_v2.lsn.parse` and `cdc_v2.lsn.format`. In MotherDuck a position is a `UBIGINT` column.
+- Every package takes its settings as a small frozen dataclass of its own, with the defaults of PLAN §7 and of the
+  core design. Package S builds the loader of the one configuration file that fills them.
+- Time: durations are measured on the monotonic clock of the process; every comparison of times across processes
+  uses MotherDuck's clock (design 4.1). No code compares a local wall clock with a stored time.
+- Every blocking call takes a deadline (SPEC 4.5). A package offers no call that can wait for ever.
+- Logs go through `logging` with structured fields; no value of a source row is ever logged (SPEC 8.3).
 
 ### C1 Crash points and fault sites (package H)
 
@@ -50,7 +76,7 @@ fuzzer).
 | `HELLO` | protocol version, Debezium version, slot, the position the engine starts from |
 | `SCHEMA` | table, schema version (counter per table), per column: position, source name, Debezium type and semantic name, source type name with length and scale, nullable, part of the key, whether its values can be sent as "unchanged" |
 | `ROWS` | table, schema version, row count, columns as buffers (below) |
-| `BEGIN` / `END` | transaction id and all position fields of the record's offset; `END` also the event count in total and per table |
+| `BEGIN` / `END` | transaction id, commit time and all position fields of the record's offset; `END` also the event count in total and per table |
 | `TRUNCATE` | the tables of one truncate, in the order received |
 | `HEARTBEAT` | position fields of a heartbeat record (the position moved without data) |
 | `BATCH_END` | end of one engine batch |
@@ -99,24 +125,50 @@ engine.durable(position)
 engine.stop(deadline)        # then kill of the process group; engine.kill() at any time
 ```
 
-### C3 Change batch (stream → apply, pending log → apply)
-
-One Arrow table per destination table and segment: the columns of C2 `ROWS` (`seq`, `op`, `a<i>`, `b<i>`, `u<i>`,
-`k<i>`), containing only whole source transactions. With it travels the table's description for that schema version
-(`TableMeta`: per position the source name, destination name, transport form, destination type, key flag,
-"unchanged possible" flag). The names of source columns never appear as Arrow or SQL identifiers in transport, so a
-source column name can never collide with a name of ours.
+### C3 Transform (package Y)
 
 ```python
-apply_group(tx, meta: TableMeta, target: str, changes: pyarrow.Table | str) -> ApplyCounts
-truncate(tx, target)
+plan = transform.plan(source_table, schema_frame=None) -> TablePlan     # per column position: destination name and type
+transform.stream(plan, rows: pyarrow.RecordBatch) -> pyarrow.RecordBatch      # engine transport form → destination types
+transform.backfill(plan, rows: pyarrow.RecordBatch) -> pyarrow.RecordBatch    # text as Postgres prints it → destination types
 ```
 
-`tx` is an open lane transaction (C4). `changes` is local Arrow data, or the name of a relation in MotherDuck with
-the same columns (6.4, pending log). `apply_group` executes the statements of 6.2 or 6.3; it never commits. It
-raises `ApplyInvariantError` when a keyless delete finds fewer rows than it must remove.
+The transform is row-local and keeps the column names (`a<i>`, `b<i>`, `k<i>`; `seq`, `op` and `u<i>` pass through).
+It runs in a local DuckDB connection that is not attached to MotherDuck, and it runs on every batch as it arrives,
+before the batch is buffered, spilled to disk or sent anywhere. So nothing downstream ever holds an unconverted
+value, and the PII rules of SPEC 8.3 get one place (P4). Both paths must give the same destination value for the
+same source value; a test compares them through a local Postgres for every baseline type family. A value that
+cannot be converted raises `ConversionError` with table, column position and `seq`, never the value; it is never
+turned into NULL silently.
 
-### C4 Destination lanes (package M)
+The backfill's text form is what Postgres prints under the session settings that package P fixes for every read
+connection (C7).
+
+### C3a Change set (transform → stream → apply; pending log → apply)
+
+Per destination table and segment:
+
+- `rows`: an Arrow table with the columns of C2 `ROWS` in destination types (`seq`, `op`, `a<i>`, `b<i>`, `u<i>`,
+  `k<i>`) plus `txn` (index into `transactions`). It contains only whole source transactions, in `seq` order, and
+  it is **not reduced**: every change is there.
+- `transactions`: per `txn`: transaction id, commit position, commit time.
+- `meta`: `TableMeta` — per column position the destination name and type, the key flag and the "unchanged
+  possible" flag; whether the table has a key.
+
+The names of source columns never appear as Arrow or SQL identifiers on the way, so a source column name can never
+collide with a name of ours.
+
+```python
+apply_group(tx, target: str, change_set) -> ApplyCounts
+truncate(tx, target: str)
+```
+
+`tx` is an open lane transaction (C4). `change_set.rows` is local Arrow data, or the name of a relation in
+MotherDuck with the same columns (6.4, pending log). `apply_group` executes the statements of 6.2 or 6.3; it never
+commits. Applying the same change set twice to a table with a key gives the same table. It raises
+`ApplyInvariantError` when a delete or update on a table without a key finds fewer rows than it must remove.
+
+### C4 Destination lanes (package D)
 
 ```python
 conn = md.connect(role)                       # session time zone UTC, marker, client connection id recorded
@@ -135,18 +187,23 @@ ever (SPEC 4.5). No other module issues `BEGIN`, `COMMIT` or the fence statement
 
 `_cdc` schema: created and migrated by `cdc_v2.md.schema` only; every package adds its tables there.
 
-### C5 Transition function (package M)
+Alerts: `alerts.emit(tx, kind, severity, fields)` records an alert in `_cdc.alerts` inside the caller's transaction
+(delivery to Slack is built in the operations wave and reads that table). Packages raise alerts only this way.
+
+### C5 Transition function (package D)
 
 ```python
 state.transition(tx, machine, key, from_state, to_state, cause)   # inside the caller's transaction
 state.read(conn_or_tx, machine, key) -> state
 ```
 
-Each machine is declared once as a state set and a transition table (`cdc_v2.state.machines`); the function refuses
-a pair that is not in the table, refuses when the stored state is not `from_state`, and appends to
-`_cdc.transitions`. No other code writes a state column.
+Each machine is declared once as a state set and a transition table, by the package that owns it, with
+`state.declare(machine)`; the function refuses a pair that is not in the table, refuses when the stored state is
+not `from_state`, and appends to `_cdc.transitions`. No other code writes a state column. Package D also delivers
+the test helper that, for a declared machine, tries every pair of states and asserts that exactly the declared
+transitions are accepted (SPEC 1.9); every owning package calls it for its machines.
 
-### C6 Platform (package M)
+### C6 Platform (package L)
 
 What the leader code needs from the Flight platform, behind one interface with two implementations:
 
@@ -165,7 +222,8 @@ fuzzer drives it. Its behaviour follows `docs/spike/run_semantics.md`; each imit
 ### C7 Source (package P)
 
 ```python
-pg.connect(target, deadline)                       # target: 'primary' | 'replica' | a configured name; TLS verify-full
+pg.connect(target, deadline)                       # target: 'primary' | 'replica' | a configured name; TLS verify-full;
+                                                   # fixed session settings (time zone, date, interval, float, bytea output)
 catalog.tables(conn) -> [SourceTable]              # columns, types, key, replica identity, publication membership
 publication.ensure(primary, tables) ; slot.create(node, name, deadline) ; slot.drop(...)
 slot.facts(node, name) -> SlotFacts                # everything section 8 compares, read in one statement
@@ -197,13 +255,16 @@ never touched; every command names its port.
 | Package | `tools/localpg` home under `~/.cache/cdc_flight_v2/` and port base | MotherDuck databases |
 |---|---|---|
 | E | `pg-e`, 55620 | none |
-| M | none | `cdc_v2_t_m_*` |
+| D | none | `cdc_v2_t_d_*` |
 | A | none | `cdc_v2_t_a_*` |
 | P | `pg-p`, 55640 (a second home `pg-p2`, 55648) | none |
-| S | `pg-s`, 55660 (`pg-s2`, 55668) | `cdc_v2_t_s_*` |
-| B | `pg-b`, 55680 (`pg-b2`, 55688) | `cdc_v2_t_b_*` |
+| L | none | `cdc_v2_t_l_*` |
+| Y | `pg-y`, 55656 | none |
+| S | `pg-s`, 55664 (`pg-s2`, 55672) | `cdc_v2_t_s_*` |
+| V | `pg-v`, 55680 (`pg-v2`, 55688) | `cdc_v2_t_v_*` |
 | F | `pg-f<n>`, from 55700 in steps of 8, up to 55795 | `cdc_v2_t_f_*` |
-| T | `pg-t`, 55800 | `cdc_v2_t_t_*` |
+| B | `pg-b`, 55800 (`pg-b2`, 55808) | `cdc_v2_t_b_*` |
+| T | `pg-t`, 55816 | `cdc_v2_t_t_*` |
 
 TCP fault proxies listen on 55440–55459 (package H); a worker that needs proxies of its own takes ports from the
 upper half of its own range.
@@ -211,5 +272,5 @@ upper half of its own range.
 ## 5. Reviews
 
 Every package is reviewed before it is merged: by the P3 coordinator (Opus, fresh context, did not write the code)
-against SPEC, PLAN, the core design and this plan; the packages M, S and B additionally by a second reviewer who
-attacks the protocol with cases of its own.
+against SPEC, PLAN, the core design and this plan; the packages D, L, S, V and B additionally by a second reviewer
+who attacks the protocol with cases of its own.
