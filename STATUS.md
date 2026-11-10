@@ -53,17 +53,17 @@ green on T1 (local primary and standby, real MotherDuck, local JVM).
 |---|---|---|---|
 | H | Crash points, fault sites, process control, crash runner, TCP fault proxy, byte-stream relay | Opus | **merged** |
 | O | Oracle, T1 harness, evidence writer, workload generator and observer | Opus | **merged** (fix round included) |
-| X | The cut: where a snapshot lies in the stream | Fable | review: merge after fixes (below); fix round delivered (`23519bd`) and checked: merge after one text fix; **second, short round running** (below) |
+| X | The cut: where a snapshot lies in the stream | Opus (was Fable) | review: merge after fixes (below); fix round delivered (`23519bd`) and checked: merge after one text fix; **second, short round running** (below) |
 | E | Engine: the JVM program around stock Debezium, frames, the Python side | Opus | **merged** (two reviews, two fix rounds) |
-| D | Destination basics: lanes, fence, deadlines, errors, `_cdc` schema, transition function, alert records | Fable | **delivered** (`9e389cc`); the coordinator's review: **merge after named fixes**; the second reviewer's attack is running; one fix round follows it |
+| D | Destination basics: lanes, fence, deadlines, errors, `_cdc` schema, transition function, alert records | Opus (was Fable) | **delivered** (`9e389cc`); the coordinator's review: **merge after named fixes**; the second reviewer's attack is running; one fix round follows it |
 | A | Apply: the statements over a change set, keyed and keyless | Opus | **delivered**; two reviews; **fix round delivered** (13 items, `68df804`); the coordinator's re-check: **merge**, with two small fixes; the second reviewer's repeat campaigns (about 17,000 seeds) found no silent error inside the preconditions and one correct history that is refused; **second, short fix round running** |
 | P | Source: connections, catalog and its observation, publication, slot, slot facts, timeline, heartbeat | Opus | **merged** (with the repair of `tools/localpg` for Postgres 16; one fix after the review) |
-| L | Leadership: guard, take-over, heartbeat, hand-over, bootstrap, platform interface | Fable | task written; after D |
+| L | Leadership: guard, take-over, heartbeat, hand-over, bootstrap, platform interface | Opus (was Fable) | task written; after D |
 | Y | Transform: source types to destination types | Opus | **merged** (`362d00b`; one review, one fix round, one last check) |
-| S | Stream: transactions, groups, commit and acknowledge, supervisor, pipeline process | Fable | task written; after E, D, A, P, K |
-| V | Slot continuity | Fable | task written; after S |
+| S | Stream: transactions, groups, commit and acknowledge, supervisor, pipeline process | Opus (was Fable) | task written; after E, D, A, P, K |
+| V | Slot continuity | Opus (was Fable) | task written; after S |
 | F | Fuzzers (stream, workload, fault, leadership), the consumer loop of 1.3 and 3.2 | Opus | **round 1 delivered** (branch `p3-f-fuzzers`, against a toy replicator); coordinator: merge after a fix round (below), **running**; round 2, against the real system, after S, L, B, V |
-| B | Backfill and hand-off | Fable | task written; after X, S, A, P, Y |
+| B | Backfill and hand-off | Opus (was Fable) | task written; after X, S, A, P, Y |
 | T | The catalog gate, truncate, drop and recreate, the document and the test over all state machines | Opus | task written; after S, B |
 | K | The key rule: the catalog reads whether a primary key is deferrable, the engine is told which tables are without a key, what Debezium calls a key is measured (added 2026-11-10) | Opus | **delivered** (`f182e1e`; task `docs/tasks/p3_k_key_rule.md`); waits for the coordinator's review; S waits for it |
 
@@ -87,6 +87,7 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
 | Date | Decision | By |
 |---|---|---|
 | 2026-11-09 | The build runs in the session that failed start checks 2 and 3; it uses the session's lowercase `motherduck_token` and a salt given in chat. Consequences are in PLAN §9 | owner |
+| 2026-11-10 | No Fable any more: every role that named Fable (orchestrator, core-correctness workers, second reviewers) is Opus 5.5 at the same effort; stopped Fable agents are continued by new Opus agents in their worktrees (PLAN §9) | owner |
 | 2026-11-09 | Values given in chat are kept in `~/.config/cdc_flight_v2/env.local`; local commands run through `tools/with-env` | orchestrator |
 | 2026-11-09 | `duckdb==1.5.6` pinned: MotherDuck refuses a 2.0.0 client | orchestrator |
 | 2026-11-09 | Python project managed with `uv` (`pyproject.toml`, `uv.lock`), package `cdc_v2` under `src/` | orchestrator |
