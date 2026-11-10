@@ -3,6 +3,8 @@
 Companion to `SPEC.md`. Every owner decision is made (SPEC §5). The build starts when the owner hands both documents
 to the build orchestrator. It starts as a **fully local project** (stage 1) and moves to PlanetScale later (stage 2).
 
+**Read §9 together with §0, §4, §5 and §8**: it records what the owner changed when the build started.
+
 ## 0. Orchestrator: read this first
 
 You are the build orchestrator: a Fable session that the owner started in the root of this repository. You own SPEC
@@ -298,3 +300,37 @@ depend on it.
 Facts still to be confirmed with the owner: the MotherDuck organisation's region and plan (the plan decides the
 maximum run time; measure it in P2 if still unknown); the Slack channel for alerts; and, for stage 2, whether the
 PlanetScale instance restricts client addresses (the Flight egress addresses and this machine must be allowed).
+
+## 9. Owner amendments at the start of the build (2026-11-09)
+
+The first build session was not started through the project launcher, so session start checks 2 and 3 failed
+(`evidence/p1/session_start.md`). The orchestrator stopped and reported it. The owner answered: use the session's
+lowercase `motherduck_token`, and gave a salt value. The build continues in that session. Until the owner says
+otherwise, the points below replace the corresponding statements of §0, §4, §5 and §8. Everything else stands.
+
+- **MotherDuck account.** The build uses the token in the environment variable `motherduck_token` (lowercase). It
+  belongs to the owner's own account, not to the service account `cdc_flight_v2_build`, so databases that are not
+  part of this project are visible to it. The rule of §4 is unchanged and now rests on discipline: create, read,
+  write and drop **only** databases named `cdc_v2_*`. Never run a statement against any other database, never list
+  their tables or contents, and never write their names into the repository. Flights created by this build run as
+  that account; "the run-time token sees only this project's databases" (§2 A 4) cannot hold and is reported as such.
+- **Salt.** `CDC_PII_SALT` for local runs is kept in `~/.config/cdc_flight_v2/env.local` (outside the repository).
+- **Environment of local commands.** Run every local command through `tools/with-env` (it sources `tools/env.sh`):
+  the session's own variables win, then `env.local`, then the env file; both spellings of the MotherDuck token are
+  made equal with the lowercase one winning; `PGHOST=localhost` and `PGPORT=55432` are set.
+  **The session itself does not set `PGPORT`**: outside `tools/with-env`, a Postgres client that names no port reaches
+  the owner's service on port 5432, which is out of bounds. Every Postgres command and connection string names its
+  port explicitly, and code never falls back to the default port.
+- **DuckDB client version.** MotherDuck accepts DuckDB up to 1.5.6 on 2026-11-09 (a 2.0.0 client is refused). The
+  Python dependency is pinned to `duckdb==1.5.6`; raise it only after checking what MotherDuck supports.
+- **Boundary guard and audit.** In this session the tool-call guard does not enforce §4 and the hourly audit does not
+  read the session's logs. Every rule of §4 applies unchanged, by instruction: work only inside this repository,
+  `~/.config/cdc_flight_v2`, `~/.cache/cdc_flight_v2`, the usual tool caches and public documentation; do not open,
+  list or unlock any other folder of this machine; do not use MCP tools or browser tools even though the session
+  lists them; every agent call names `opus` or `fable` as its model. If a rule cannot be kept, stop and report it.
+- **Git.** The secret-scan hooks are active in this clone and its worktrees through the clone's git configuration
+  (verified by `tools/checks/secret_gate.sh`). Fetch and push use a credential that is valid for this repository
+  only, also through the clone's configuration. Neither setting is changed, and hooks are never skipped.
+- **Session start checks.** In a session that was not started through the launcher, check 3 is recorded as
+  "not enforced, owner informed" in `STATUS.md` instead of stopping the session. Checks 1, 2 (through
+  `tools/with-env`) and 4 are run as written.

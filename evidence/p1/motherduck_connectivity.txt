@@ -1,0 +1,5 @@
+duckdb client version: 1.5.6
+connected in 1.4 s
+rows visible on a second connection: 1000
+probe database dropped: True
+RESULT: PASS
