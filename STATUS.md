@@ -5,7 +5,10 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 ## Where the build stands
 
 - **Stage 1 (local). P1 Environment: gate passed on 2026-11-09** (one item cannot be shown from this session, see the
-  table). **P2 Platform spike: in progress**, with the hazard research of P5 running alongside.
+  table). **P2 Platform spike**: every spike is done and merged except the last measurement (local streaming rate
+  of stock Debezium), which is still running; the report and the architecture decision are written. **P3 Core: in
+  progress** (table below): the fault harness is merged, the oracle is finished and in review, four more packages
+  are being built, and the design was reviewed by the coordinator and revised.
 - Stage 2 (PlanetScale) cannot start: of its names only `PLANETSCALE_ORG` and `PLANETSCALE_DATABASE` are in the env
   file (checked again at the P1 gate). The service token and the connection values are owed by the owner.
 
@@ -31,6 +34,42 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 | 5 Local throughput (first indication) | part 1 (read rate from the replica, end to end into MotherDuck, hazards of long reads on a standby) done; part 2 (stock Debezium streaming rate on the replica's slot) running | `docs/spike/local_throughput.md`; part 2: `docs/spike/local_streaming.md` |
 | `docs/spike_report.md` and the architecture decision record | written and checked against the spike reports; the local streaming section of the report waits for part 2. Nothing found contradicts SPEC | `docs/spike_report.md`, `docs/adr/0001-architecture.md` |
 
+## P3 Core — in progress
+
+Plan and contracts: `docs/design/p3_plan.md`. Design: `docs/design/core.md`. Rules for every worker:
+`docs/tasks/README.md`. One task file per package under `docs/tasks/`. Gate: the tests of SPEC 1.1–1.9 and 4.2
+green on T1 (local primary and standby, real MotherDuck, local JVM).
+
+| Package | What | Worker | State on 2026-11-10 |
+|---|---|---|---|
+| H | Crash points, fault sites, process control, crash runner, TCP fault proxy, byte-stream relay | Opus | **merged** |
+| O | Oracle, T1 harness, evidence writer, workload generator and observer | Opus | **finished**; with the coordinator for review before the merge |
+| X | The cut: where a snapshot lies in the stream | Fable | running |
+| E | Engine: the JVM program around stock Debezium, frames, the Python side | Opus | running |
+| D | Destination basics: lanes, fence, deadlines, errors, `_cdc` schema, transition function, alert records | Fable | running |
+| A | Apply: the statements over a change set, keyed and keyless | Opus | task written; starts after O is merged |
+| P | Source: connections, catalog and its observation, publication, slot, slot facts, timeline, heartbeat | Opus | task written; starts when a writer slot is free |
+| L | Leadership: guard, take-over, heartbeat, hand-over, bootstrap, platform interface | Fable | after D |
+| Y | Transform: source types to destination types | Opus | after E and P |
+| S | Stream: transactions, groups, commit and acknowledge, supervisor, pipeline process | Fable | after E, D, A |
+| V | Slot continuity | Fable | after P, D, E |
+| F | Fuzzers (stream, workload, fault, leadership), the consumer loop of 1.3 and 3.2 | Opus | after O (H is merged) |
+| B | Backfill and hand-off | Fable | after X, S, A, P, Y |
+| T | Truncate, drop, the remaining state machines | Opus | after S, B |
+
+At most four workers write at once (PLAN §3). The coordinator (Opus, xhigh) writes no code: it reviewed the plan
+and reviews every package branch before its merge; D, L, S, V, B and the acknowledgement path of E get a second
+reviewer.
+
+Parts of the P3 gate items that need a later feature, and where they go (the list the plan promises at the gate):
+
+| Part | Carried to |
+|---|---|
+| 1.4 "with history mode on" | P4, CDC features |
+| 1.7 crash points at every step of a schema change | P4, schema and types |
+| 1.9 schema-change machine; the full quarantine machine (P3 has the exit to `quarantined` only) | P4 |
+| 1.7 soak of at least 1 h with at least 200 faults | a short soak at the P3 gate; the full one in the P6 campaign |
+
 ## Decisions
 
 | Date | Decision | By |
@@ -43,6 +82,11 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 | 2026-11-09 | The default `pytest` run is hermetic (tier T0). Suites that start local Postgres clusters or real Flights are opt-in markers (`localpg`, `flight_integration`), so parallel workers do not collide on ports | orchestrator |
 | 2026-11-09 | SPEC R23 "database user name" means names that come from the env file (provider or stage 2 roles; the scanner's exact-value layer enforces it). The role names that `tools/localpg` creates for local fixtures (`cdc_v2_boot`, `cdc_v2_admin`, `cdc_v2_runtime`) are code and appear in the repository | orchestrator |
 | 2026-11-09 | The JVM spike uses a throw-away Postgres installed inside the Flight container, as a spike fixture only, to prove that stock Debezium streams on F16. The product never installs Postgres; numbers from it are indications, not performance results | orchestrator |
+| 2026-11-10 | P3 is split into 14 packages with written contracts (`docs/design/p3_plan.md`). The orchestrator starts the workers and merges; the coordinator reviews and writes no code | orchestrator |
+| 2026-11-10 | Shared modules for every package: `cdc_v2.lsn` (positions as integers) and `cdc_v2.deadline` (every wait has a deadline) | orchestrator |
+| 2026-11-10 | The coordinator's review of the plan (11 findings that had to be fixed) is folded into the design and the contracts, commit `913a375`; the record is `docs/design/p3_plan.md` §6. The main changes: the pipeline registers its MotherDuck connections per leader epoch, and a take-over interrupts exactly those; the leader tables are created once, with every row, by the bootstrap, and their shape is frozen; the slot is checked before the engine starts **and** again after the engine holds it, and nothing is applied before the continuity decision; every backfill request is enacted inside a stream transaction; staging rows are written by fenced transactions only; a table whose apply fails repeatedly leaves the stream with an alert instead of stopping every table | orchestrator, after the coordinator's review |
+| 2026-11-10 | SPEC 1.3 during a re-backfill: a table that is re-backfilled **without a gap in the stream** (operator request, mode change) keeps receiving every transaction in the visible table until its swap, so it never leaves the cross-table guarantee. After a gap (slot finding, lag-triggered re-backfill, quarantine, drop and recreate) the visible table is frozen at its last complete version (SPEC 3.6) and each table swaps on its own; until its swap it is outside the guarantee, like a table in its first backfill. See the questions for the owner | orchestrator |
+| 2026-11-10 | Local test versions: Postgres 18 is required (SPEC R15); facts that differ by version are also run on the installed Postgres 16; Postgres 17 is not installed and nothing more is installed. The version of the stage 2 instance decides what else is needed | orchestrator |
 
 ## Questions for the owner / owed by the owner
 
@@ -58,6 +102,23 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
   valid when the account is otherwise idle; the build makes its own workers idle for such runs but cannot see the
   owner's other sessions. A dedicated service account for the pipeline removes both; SPEC already expects one in
   production.
+- **SPEC 1.3 and a re-backfill after a gap (design open point 15).** SPEC 1.3 names one exception to "one source
+  transaction is one MotherDuck transaction": a table in its *initial* backfill. SPEC 3.6 says that after a
+  lag-triggered re-backfill consumers keep the last complete version of each table until its swap. Both cannot
+  hold for several tables that are re-backfilled after a gap unless all of them swap in one transaction, which
+  would make every table wait for the largest. Working rule (see Decisions): each table swaps on its own and is
+  treated like a table in its initial backfill until then; the table-status log shows the window. Say so if the
+  tables of one re-backfill must instead swap together.
+- **SPEC 4.2 "a newcomer exits within 10 s" (design open point 17).** The pipeline can only bound the time from
+  the first line of its own `main.py` to the exit. The platform's own start of a run took up to 21 s in the spike
+  (p95 7 s) and is outside our control. The criterion is measured from the first line of `main.py` unless the
+  owner says otherwise.
+- **Identity of a replication slot (SPEC 1.8).** The design compares stored facts of the slot with the live slot
+  to find a slot that was dropped and recreated under the same name. Postgres may not expose anything that tells
+  the two apart when the new slot is created at a position the pipeline has not passed yet; package P tests this
+  on each version. If no such fact exists, a recreated slot that is not ahead of the applied position is treated
+  as continuous (nothing can have been lost: every change after the applied position is still delivered) and gets
+  an alert; a slot that is ahead triggers the re-backfill as SPEC 1.8 says.
 - `SLACK_WEBHOOK_URL` and the alert channel: not provided; alerts are tested against a local stub until then.
 - MotherDuck plan and region: measured in P2 — Business plan, us-east-1, maximum run time 8 h
   (`docs/spike/flight_platform.md`). No longer open.
@@ -124,15 +185,32 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 
 ## Background jobs in flight
 
-Each in its own worktree and branch (Opus, high effort); the orchestrator merges.
+Each in its own worktree and branch; the orchestrator merges. The P3 packages are in the table above.
 
 | Job | Phase | Started | Delivers |
 |---|---|---|---|
-| Spike worker: local streaming rate of stock Debezium on the replica's slot (same worker and private cluster as part 1: home `pg-spike-tp`, ports 55500–55509; JVM heap ≤ 1 GB). Also maps Debezium's position fields to the `pgoutput` BEGIN and COMMIT positions, which the design's position and cut rules rely on | P2 (§2 A 5, part 2) | 2026-11-10 | `docs/spike/local_streaming.md`, `evidence/p2/local_streaming/`, scripts in `spikes/local_throughput/` |
-| P3 worker, started early in a free slot: oracle, tier-T1 harness (isolated source and destination per test, evidence writer with redaction), seeded workload generator. MotherDuck databases `cdc_v2_t_*`; private clusters from port 55520 | P3 | 2026-11-10 | `src/cdc_v2/oracle/`, `src/cdc_v2/testing/`, `tools/oracle`, `docs/oracle.md`, `evidence/p3/oracle/` |
-| P3 worker, started early in a free slot: crash-point and fault-injection harness (named crash points, crash runner with a ledger, process control for competing runs, TCP fault proxy on ports 55440–55459, byte-stream fault relay, run-time fault sites, toy systems that prove the harness catches a wrong commit protocol). No MotherDuck use | P3 | 2026-11-10 | `src/cdc_v2/crashpoints.py`, `src/cdc_v2/faultsites.py`, `src/cdc_v2/testing/{procs,crash,netproxy,pipefaults,faults}.py`, `tools/netproxy`, `tests/harness/`, `docs/testing/harness.md`, `evidence/p3/harness/` |
+| Spike worker (Opus): local streaming rate of stock Debezium on the replica's slot (private cluster, home `pg-spike-tp`, ports 55500–55509; JVM heap ≤ 1 GB). Also maps Debezium's position fields to the `pgoutput` BEGIN and COMMIT positions | P2 (§2 A 5, part 2) | 2026-11-10 | `docs/spike/local_streaming.md`, `evidence/p2/local_streaming/`, scripts in `spikes/local_throughput/` |
+| Package X, the cut (Fable, xhigh). Library, a small `pgoutput` decoder for tests, a stress tool with a negative control, the argument from the Postgres source. Home `pg-cut`, ports 55600–55607. No MotherDuck use | P3 | 2026-11-10 | `src/cdc_v2/pg/cut.py`, `src/cdc_v2/testing/pgoutput.py`, `tools/cutstress`, `tests/cut/`, `docs/design/cut.md`, `evidence/p3/cut/` |
+| Package E, the engine (Opus, high). Home `pg-e`, ports 55620–55627. No MotherDuck use | P3 | 2026-11-10 | `jvm/src/cdc_v2/engine/`, `src/cdc_v2/stream/{frames,engine}.py`, `src/cdc_v2/testing/frames.py`, `docs/design/engine.md`, `evidence/p3/engine/` |
+| Package D, destination basics (Fable, xhigh). MotherDuck databases `cdc_v2_t_d_*`. No Postgres | P3 | 2026-11-10 | `src/cdc_v2/md/`, `src/cdc_v2/state/`, `src/cdc_v2/alerts.py`, `docs/design/destination.md`, `docs/state_machines.md`, `evidence/p3/destination/` |
+| Coordinator (Opus, xhigh): review of package O before its merge | P3 | 2026-11-10 | findings to the orchestrator |
 
-| P3 core-correctness worker (Fable, xhigh): the cut — where a snapshot lies in the stream (`docs/design/core.md` 7.2). Library, a small `pgoutput` decoder for tests, a stress tool with a negative control, the argument from the Postgres source. Private cluster, home `pg-cut`, ports 55600–55607. No MotherDuck use | P3 | 2026-11-10 | `src/cdc_v2/pg/cut.py`, `src/cdc_v2/testing/pgoutput.py`, `tools/cutstress`, `tests/cut/`, `docs/design/cut.md`, `evidence/p3/cut/` |
+Finished, not merged yet: **package O** (branch pushed; 8 commits, 36 files). Oracle `src/cdc_v2/oracle/` with
+`tools/oracle` and `docs/oracle.md`; T1 harness `src/cdc_v2/testing/{pg,md,loader,datasets}.py`; evidence writer
+`src/cdc_v2/evidence.py`; workload generator and observer. Its own numbers: 196 default tests in about 9 s; 80 T1
+tests in 2 min 38 s; 60 planted differences all detected; an equal 5M-row table compared at 213,000 rows/s, one
+changed value in it found in 76 s, 173 MB peak. Findings that change the design (they go into `docs/design/core.md`
+at the merge, and are already in the task of package A):
+
+- DuckDB does not write an `UPDATE` whose new value compares equal to the stored one: `-0` stays `-0` after
+  `SET 0`, `1 mon` stays after `SET 30 days` (local DuckDB and MotherDuck). The source and the oracle tell these
+  values apart, so the apply statements must use a shape that always writes.
+- `GROUP BY` and `PARTITION BY` merge `-0` and `0`, NaN and −NaN, and equal intervals of different form; the
+  keyless apply needs a grouping key that keeps them apart.
+- Open point 3 (canonical comparison) is settled by the oracle; a source NULL in a UNION column must be written
+  as a real NULL.
+- DuckDB reads a Postgres BC date text as an AD date; float texts differ between the two servers (the oracle
+  compares bits). Both go to the transform package.
 
 Written by the orchestrator for P3: `docs/design/p3_plan.md` — the packages of the core (engine, destination
 basics and leadership, apply, source, stream, fuzzers, backfill and hand-off, truncate/drop and the machines), the
@@ -151,6 +229,15 @@ for the cut worker.
 
 Finished and merged:
 
+- 2026-11-10 — P3 package H, the crash-point and fault harness: `src/cdc_v2/crashpoints.py`,
+  `src/cdc_v2/faultsites.py`, `src/cdc_v2/testing/{procs,crash,netproxy,pipefaults,faults,harness_evidence}.py`,
+  `tools/netproxy`, `tests/harness/`, `docs/testing/harness.md`, `evidence/p3/harness/`. Named crash points with
+  seeded actions (kill, kill later, freeze, hang), run-time fault sites, process control for competing runs, a
+  crash runner with a ledger, a TCP fault proxy (ports 55440–55459) and a byte-stream relay for the engine's pipe.
+  Proven against a toy system that is correct and one whose commit protocol is deliberately wrong (the harness
+  finds the wrong one). Finding used by later packages: a black hole on the path to Postgres is noticed only by a
+  client-side deadline (2.0 s in the test, which is the deadline); TCP keepalives and the server's
+  `statement_timeout` do not help, so every source call carries a deadline that closes the socket.
 - 2026-11-10 — Local read throughput, part 1 (§2 A 5): `spikes/local_throughput/`, `docs/spike/local_throughput.md`,
   `evidence/p2/local_throughput/`; dependency group `spike` (`psutil`, `pyarrow`) in `pyproject.toml`. TPC-H SF2
   `lineitem` (12.0M rows, 2 GB) on a private cluster; **indications only, laptop numbers**. Read rate from the
@@ -234,11 +321,11 @@ the exact-value layer.
 
 ## Next steps
 
-1. P2: merge part 2 of the local throughput spike when it reports; write `docs/spike_report.md` and the
-   architecture decision record; send the report to the owner and continue.
-2. P3 core: oracle, crash-point harness and fuzzers first. The harness must give parallel workers isolated sources:
-   a private database on the shared development cluster for ordinary tests, a private cluster (own home and port
-   block, through `tools/localpg`) for destructive drills.
+1. P2 gate: merge the local streaming measurement when it reports, fill its section in `docs/spike_report.md`,
+   send the report to the owner, continue.
+2. P3: merge package O after the coordinator's review (then start A and P); review and merge X, E, D as they
+   report; write the task files of L, Y, S, V, F, B, T from `docs/design/p3_plan.md` §6.2 and start them in the
+   order of the table above.
 3. Carry into P5 (from the `tools/localpg` work): slot creation on a standby waits for a running-transactions record
    and `pg_log_standby_snapshot()` needs a privileged role; a failover slot is synchronised to a standby only after it
    has advanced past the standby's catalog horizon; raising a standby-matched setting on the primary pauses replay.
