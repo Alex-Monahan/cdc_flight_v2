@@ -10,7 +10,7 @@ to the connection's worker thread and waits for the answer until the deadline. W
    within a fraction of a second and rolls the open transaction back);
 2. the caller waits for the answer during a short **grace period**;
 3. answer or not, the connection is **retired**: it is never used again, a reaper thread interrupts its server
-   connection once more, closes it in the background (``close()`` blocks until the statement in flight returns) and
+   connection once more, closes it in the background (so that no caller ever waits for a ``close()``) and
    ends the worker thread. The `Connection` object takes a new client connection at its next call and first
    interrupts the old server connection by id, so that no abandoned transaction keeps holding a row.
 
@@ -18,10 +18,10 @@ So one statement never blocks its caller longer than its deadline plus the grace
 a lane transaction adds for the clean-up after a failure (roll-back, removing views) is bounded in
 `cdc_v2.md.lane`.
 
-What a retired connection can leave behind. The client library cannot cancel a call that waits for the network,
-so the worker thread, the reaper thread and the client connection of a retired connection stay until the
-statement in flight returns. They are daemon threads; `background_threads()` and `open_connections()` count
-them.
+What a retired connection can leave behind. The client's ``interrupt()`` does not end a call that waits for
+the server (same evidence file), so the worker thread, the reaper thread and the client connection of a retired
+connection stay until the statement in flight returns. They are daemon threads; `background_threads()` and
+`open_connections()` count them.
 
 A destination that is a local DuckDB database (tier T0) runs the same code. The server's interrupt function does
 not exist there; `interrupt_server_connection` then acts on the connections of this process: it interrupts the

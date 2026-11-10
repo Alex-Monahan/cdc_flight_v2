@@ -4,7 +4,7 @@
   "results": {
     "conflict_in_a_statement": {
       "connection_kept": true,
-      "date_utc": "2026-11-10 08:13",
+      "date_utc": "2026-11-10 11:46",
       "loser_rolled_back": true,
       "raised": "Conflict",
       "text": "Conflict: lane control: write-write conflict in a statement",
@@ -13,51 +13,51 @@
     "interrupted_between_fence_and_commit": {
       "checked_after_s": 2.5,
       "committed": false,
-      "date_utc": "2026-11-10 08:13",
+      "date_utc": "2026-11-10 11:47",
       "raised": "CommitUnknown",
-      "text": "CommitUnknown: lane stream: the outcome of COMMIT is unknown (TransactionException: TransactionContext Error: Failed to commit: MotherDuck transaction statement failed: Connection Error: interrupted by user)",
+      "text": "CommitUnknown: lane stream: the outcome of COMMIT is unknown (TransactionException (Connection Error))",
       "what": "the lane transaction stands before COMMIT (fault site md.commit blocks), its server connection is interrupted, then COMMIT is sent"
     },
     "lost_connection_at_md.commit": {
       "committed": false,
-      "date_utc": "2026-11-10 08:14",
-      "next_transaction_on_a_new_connection_ms": 507.4,
+      "date_utc": "2026-11-10 11:47",
+      "next_transaction_on_a_new_connection_ms": 478.7,
       "raised": "CommitUnknown",
       "what": "fault site md.commit raises ConnectionError once inside a lane transaction with one UPDATE"
     },
     "lost_connection_at_md.commit_reply": {
       "committed": true,
-      "date_utc": "2026-11-10 08:14",
-      "next_transaction_on_a_new_connection_ms": 502.7,
+      "date_utc": "2026-11-10 11:47",
+      "next_transaction_on_a_new_connection_ms": 459.9,
       "raised": "CommitUnknown",
       "what": "fault site md.commit_reply raises ConnectionError once inside a lane transaction with one UPDATE"
     },
     "lost_connection_at_md.execute": {
       "committed": false,
-      "date_utc": "2026-11-10 08:13",
-      "next_transaction_on_a_new_connection_ms": 472.9,
+      "date_utc": "2026-11-10 11:47",
+      "next_transaction_on_a_new_connection_ms": 467.0,
       "raised": "ConnectionLost",
       "what": "fault site md.execute raises ConnectionError once inside a lane transaction with one UPDATE"
     },
     "lost_connection_at_md.fence": {
       "committed": false,
-      "date_utc": "2026-11-10 08:14",
-      "next_transaction_on_a_new_connection_ms": 479.9,
+      "date_utc": "2026-11-10 11:47",
+      "next_transaction_on_a_new_connection_ms": 478.9,
       "raised": "ConnectionLost",
       "what": "fault site md.fence raises ConnectionError once inside a lane transaction with one UPDATE"
     },
     "open_transaction_interrupted_then_leave_the_block": {
       "committed": false,
-      "date_utc": "2026-11-10 08:13",
+      "date_utc": "2026-11-10 11:47",
       "raised": "ConnectionLost",
-      "text": "ConnectionLost: lane stream: connection lost during the fence statement: TransactionException: TransactionContext Error: transaction already rolled back: Connection Error: interrupted by user",
+      "text": "ConnectionLost: lane stream: connection lost during the fence statement: ConnectionException (Connection Error)",
       "what": "a lane transaction that has run one UPDATE; its server connection is interrupted; then the block ends (the fence statement)"
     },
     "open_transaction_interrupted_then_statement": {
       "committed": false,
-      "date_utc": "2026-11-10 08:13",
+      "date_utc": "2026-11-10 11:46",
       "raised": "ConnectionLost",
-      "text": "ConnectionLost: lane stream: connection lost during a statement: TransactionException: TransactionContext Error: transaction already rolled back: Connection Error: interrupted by user",
+      "text": "ConnectionLost: lane stream: connection lost during a statement: ConnectionException (Connection Error)",
       "what": "a lane transaction that has run one UPDATE; its server connection is interrupted; then the block runs another statement"
     },
     "raw_texts": {
@@ -66,7 +66,7 @@
           {
             "class": "transport",
             "outcome": "InterruptException: INTERRUPT Error: Interrupted!",
-            "returned_after_ms": 4165.9,
+            "returned_after_ms": 4164.5,
             "sql": "an UPDATE that sleeps 4 s on the server; interrupt() of the client after 0.8 s",
             "stopped_early": false
           }
@@ -80,37 +80,37 @@
           },
           {
             "class": null,
-            "ms": 75.4,
+            "ms": 72.5,
             "outcome": "ok",
             "sql": "UPDATE t SET v = v + 1"
           },
           {
             "class": null,
-            "ms": 0.2,
+            "ms": 0.3,
             "outcome": "ok",
             "sql": "BEGIN"
           },
           {
             "class": null,
-            "ms": 75.1,
+            "ms": 71.9,
             "outcome": "ok",
             "sql": "UPDATE t SET v = v + 100"
           },
           {
             "class": "conflict",
-            "ms": 167.0,
+            "ms": 161.1,
             "outcome": "TransactionException: TransactionContext Error: Conflict on update!",
             "sql": "UPDATE t SET v = v + 1"
           },
           {
             "class": null,
-            "ms": 75.2,
+            "ms": 71.3,
             "outcome": "ok",
             "sql": "COMMIT"
           },
           {
             "class": null,
-            "ms": 73.1,
+            "ms": 69.3,
             "outcome": "ok",
             "sql": "ROLLBACK"
           }
@@ -124,31 +124,31 @@
           },
           {
             "class": null,
-            "ms": 75.3,
+            "ms": 85.3,
             "outcome": "ok",
             "sql": "UPDATE t SET v = v + 1"
           },
           {
             "class": null,
-            "ms": 80.9,
+            "ms": 92.8,
             "outcome": "ok",
             "sql": "SELECT md_interrupt_server_connection(?::UUID)"
           },
           {
             "class": "transport",
-            "ms": 86.4,
+            "ms": 84.4,
             "outcome": "ConnectionException: Connection Error: interrupted by user",
             "sql": "UPDATE t SET v = v + 1"
           },
           {
             "class": "transport",
-            "ms": 85.3,
+            "ms": 82.1,
             "outcome": "TransactionException: TransactionContext Error: transaction already rolled back: Connection Error: interrupted by user",
             "sql": "SELECT v FROM t"
           },
           {
             "class": null,
-            "ms": 84.1,
+            "ms": 68.2,
             "outcome": "ok",
             "sql": "COMMIT"
           }
@@ -162,19 +162,19 @@
           },
           {
             "class": null,
-            "ms": 74.8,
+            "ms": 71.3,
             "outcome": "ok",
             "sql": "UPDATE t SET v = v + 1"
           },
           {
             "class": null,
-            "ms": 79.2,
+            "ms": 73.6,
             "outcome": "ok",
             "sql": "SELECT md_interrupt_server_connection(?::UUID)"
           },
           {
             "class": "transport",
-            "ms": 74.1,
+            "ms": 72.2,
             "outcome": "TransactionException: TransactionContext Error: Failed to commit: MotherDuck transaction statement failed: Connection Error: interrupted by user",
             "sql": "COMMIT"
           }
@@ -182,7 +182,7 @@
         "statement_in_flight_interrupted_on_the_server": [
           {
             "class": "transport",
-            "ended_ms_after_the_interrupt_was_sent": 203.9,
+            "ended_ms_after_the_interrupt_was_sent": 206.5,
             "outcome": "ConnectionException: Connection Error: interrupted by user",
             "sql": "an UPDATE that sleeps 20 s on the server"
           }
@@ -196,13 +196,13 @@
           },
           {
             "class": null,
-            "ms": 74.4,
+            "ms": 72.4,
             "outcome": "ok",
             "sql": "UPDATE t SET v = v + 1"
           },
           {
             "class": null,
-            "ms": 81.6,
+            "ms": 77.3,
             "outcome": "ok",
             "sql": "COMMIT"
           }
@@ -210,37 +210,37 @@
         "two_transactions_create_one_table": [
           {
             "class": null,
-            "ms": 0.2,
+            "ms": 0.3,
             "outcome": "ok",
             "sql": "BEGIN"
           },
           {
             "class": null,
-            "ms": 74.1,
+            "ms": 75.6,
             "outcome": "ok",
             "sql": "CREATE TABLE x (i INTEGER)"
           },
           {
             "class": null,
-            "ms": 0.4,
+            "ms": 0.5,
             "outcome": "ok",
             "sql": "BEGIN"
           },
           {
             "class": "conflict",
-            "ms": 174.4,
+            "ms": 169.1,
             "outcome": "TransactionException: TransactionContext Error: Catalog write-write conflict on create with \"Schema\\0main\\0main\\0Table\\0main\\0x\"",
             "sql": "CREATE TABLE x (i INTEGER)"
           },
           {
             "class": null,
-            "ms": 74.1,
+            "ms": 72.1,
             "outcome": "ok",
             "sql": "ROLLBACK"
           },
           {
             "class": null,
-            "ms": 159.8,
+            "ms": 152.9,
             "outcome": "ok",
             "sql": "COMMIT"
           }
@@ -254,7 +254,7 @@
           },
           {
             "class": null,
-            "ms": 75.2,
+            "ms": 75.6,
             "outcome": "ok",
             "sql": "UPDATE t SET v = v + 1"
           },
@@ -266,34 +266,34 @@
           },
           {
             "class": "conflict",
-            "ms": 167.9,
+            "ms": 163.8,
             "outcome": "TransactionException: TransactionContext Error: Conflict on update!",
             "sql": "UPDATE t SET v = v + 1"
           },
           {
             "class": null,
-            "ms": 73.3,
+            "ms": 70.2,
             "outcome": "ok",
             "sql": "ROLLBACK"
           },
           {
             "class": null,
-            "ms": 82.2,
+            "ms": 79.7,
             "outcome": "ok",
             "sql": "COMMIT"
           }
         ]
       },
-      "date_utc": "2026-11-10 08:13",
+      "date_utc": "2026-11-10 11:46",
       "what": "plain client connections a and b to one MotherDuck database; each list is one case, statement by statement; 'class' is what cdc_v2.md.errors.kind_of makes of the error"
     },
     "statement_interrupted_on_the_server": {
       "committed": false,
-      "date_utc": "2026-11-10 08:13",
-      "ended_ms_after_the_interrupt": 104.2,
+      "date_utc": "2026-11-10 11:46",
+      "ended_ms_after_the_interrupt": 99.8,
       "lane_went_on_with_a_new_connection": true,
       "raised": "ConnectionLost",
-      "text": "ConnectionLost: lane stream: connection lost during a statement: ConnectionException: Connection Error: interrupted by user",
+      "text": "ConnectionLost: lane stream: connection lost during a statement: ConnectionException (Connection Error)",
       "what": "a lane statement that sleeps 20 s on the server; another connection calls md_interrupt_server_connection with the lane connection's id after 1.5 s"
     }
   },

@@ -1,0 +1,117 @@
+{
+  "command": "tools/with-env uv run -q pytest -q -m md tests/destination",
+  "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
+  "results": {
+    "arrow_types": {
+      "date_utc": "2026-11-10 11:47",
+      "registered_as": [
+        "UUID",
+        "JSON",
+        "TIME WITH TIME ZONE",
+        "TIMESTAMP WITH TIME ZONE",
+        "HUGEINT"
+      ],
+      "with_the_setting": [
+        "extension<arrow.uuid>",
+        "extension<arrow.json>",
+        "extension<arrow.opaque[storage_type=fixed_size_binary[8], type_name=time_tz, vendor_name=DuckDB]>",
+        "timestamp[us, tz=UTC]",
+        "extension<arrow.opaque[storage_type=fixed_size_binary[16], type_name=hugeint, vendor_name=DuckDB]>"
+      ],
+      "without_the_setting": [
+        "string",
+        "string",
+        "time64[us]",
+        "timestamp[us, tz=UTC]",
+        "decimal128(38, 0)"
+      ]
+    },
+    "drop_schema_cascade": {
+      "committed_value": 0,
+      "date_utc": "2026-11-10 11:47",
+      "error": "CommitUnknown",
+      "message": "the outcome of COMMIT is unknown (TransactionException)",
+      "schemas_left": 0
+    },
+    "merge_and_truncate": {
+      "date_utc": "2026-11-10 11:57",
+      "merge_returns": null,
+      "rows_after_merge": [
+        [
+          1,
+          10
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          9,
+          90
+        ]
+      ],
+      "rows_after_truncate": 0,
+      "truncate_returns": 3
+    },
+    "planted_values": {
+      "cases": [
+        [
+          "INSERT",
+          "ConversionException",
+          true
+        ],
+        [
+          "INSERT",
+          "ConversionException",
+          true
+        ],
+        [
+          "UPDATE",
+          "ConversionException",
+          true
+        ],
+        [
+          "SELECT",
+          "ConversionException",
+          true
+        ],
+        [
+          "INSERT",
+          "ConstraintException",
+          true
+        ],
+        [
+          "UNPARSED",
+          "ParserException",
+          true
+        ],
+        [
+          "SELECT",
+          "CatalogException",
+          true
+        ]
+      ],
+      "date_utc": "2026-11-10 11:47",
+      "what": "kind of statement, class of the client's error, its text names the value"
+    },
+    "settings_scope": {
+      "arrow_type_of_uuid": "extension<arrow.uuid>",
+      "date_utc": "2026-11-10 11:48",
+      "lane_after_a_global_change": [
+        "UTC",
+        true
+      ],
+      "new_connection_after_it": [
+        "UTC",
+        true
+      ],
+      "other_connection_has_lossless": false
+    }
+  },
+  "versions": {
+    "duckdb_client": "1.5.6",
+    "platform": "Darwin arm64",
+    "python": "3.13.1"
+  },
+  "what": "The seven points from the review of apply (contract C4), measured against MotherDuck"
+}

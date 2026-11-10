@@ -1,7 +1,7 @@
 """Tier T0 (local DuckDB): seeded regression tests for what the review of this package found (SPEC section 4).
 
 Each test builds the case of one finding and fails on the code as it was before the fix. The findings and what
-was done about each are in `docs/design/destination.md`, section "Findings".
+was done about each are in `docs/design/destination.md`, section 14.2.
 
 Two more seeded tests of the review stand where their subject is tested: the sorting of client errors by the head
 of their text in `test_errors.py`, two creators of one key in `test_state.py`.

@@ -179,6 +179,7 @@ def test_execute_one_never_takes_a_returned_value_for_a_count(led):
     ("CREATE TABLE t (k INT)", "CREATE"), ("CREATE TABLE u AS SELECT 1", "CREATE"), ("CREATE SCHEMA s", "CREATE"),
     ("DROP TABLE t", "DROP"), ("DROP SCHEMA s", "DROP"), ("ALTER TABLE t RENAME COLUMN a TO b", "ALTER"),
     ("MERGE INTO t USING s ON t.k = s.k WHEN MATCHED THEN DELETE", "MERGE_INTO"),
+    ("COPY t TO 'x.csv'", "COPY"), ("COPY t FROM 'x.csv'", "COPY"),            # not counted: C4 names three kinds
     ("EXPLAIN SELECT 1", "EXPLAIN"), ("SELEC 1", "UNPARSED"), ("", "UNPARSED"), ("SELECT 1; SELECT 2", "UNPARSED"),
     ("COMMIT", "UNPARSED"), (None, "UNPARSED"), (5, "UNPARSED"),
 ])
@@ -187,6 +188,7 @@ def test_the_kind_of_a_statement_comes_from_the_parser_of_the_client(sql, kind):
     is not exactly one statement of a caller has no kind."""
     assert md.statement_kind(sql) == kind
     assert set(mdc.COUNTED) == {"INSERT", "UPDATE", "DELETE"}
+    assert mdc.counts_rows(sql) is (kind in mdc.COUNTED and not mdc.returns_rows(sql))
 
 
 # ------------------------------------------------------------------------------- 2 and 3: fetchall, fetch_arrow
@@ -422,6 +424,35 @@ def test_the_two_settings_belong_to_the_connections_of_the_layer_only(led, measu
                                 "arrow_type_of_uuid": kind, "new_connection_after_it": list(later)})
     assert other is False                                       # the layer changed nothing for others
     assert mine == seen == later == ("UTC", True) and kind == "extension<arrow.uuid>"
+
+
+def test_a_plain_set_of_the_lossless_setting_reaches_the_other_connections_of_the_process(led):
+    """Why the layer says SESSION. Local DuckDB 1.5.6 only; this test does not run against MotherDuck. A plain
+    ``SET arrow_lossless_conversion`` on one connection changes what a second connection of the process to the
+    same database reads; ``SET SESSION`` does not. The connections of the layer keep their own value either way."""
+    read = "SELECT current_setting('arrow_lossless_conversion')"
+    lane = led.lane("stream", led.epoch)
+    a, b = led.raw(), led.raw()                                 # two connections that are not the layer's
+
+    def both():
+        return a.execute(read).fetchone()[0], b.execute(read).fetchone()[0]
+    try:
+        assert both() == (False, False)
+        a.execute("SET SESSION arrow_lossless_conversion = true")
+        assert both() == (True, False)
+        a.execute("RESET SESSION arrow_lossless_conversion")
+        try:
+            a.execute("SET arrow_lossless_conversion = true")
+            assert both() == (True, True)                       # the second connection sees it
+            a.execute("SET arrow_lossless_conversion = false")
+            assert both() == (False, False)
+            with lane.transaction() as tx:
+                assert tx.fetchone(read)[0] is True             # the layer's own value stays
+        finally:
+            a.execute("RESET GLOBAL arrow_lossless_conversion")
+    finally:
+        a.close()
+        b.close()
 
 
 # ------------------------------------------------------------------------- 6: no value of a row in an error

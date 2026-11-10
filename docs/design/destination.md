@@ -12,14 +12,14 @@ with its evidence, the deadline mechanism, and every place where the contract wa
 | `src/cdc_v2/md/settings.py` | `Settings`, the fixed lane names `LANES` |
 | `src/cdc_v2/md/connection.py` | `connect`, `Connection`: one worker thread per connection, deadlines, interrupt, replacement |
 | `src/cdc_v2/md/lane.py` | `Lane`, `Transaction`, the fence statement, the lane crash points |
-| `src/cdc_v2/md/errors.py` | the errors of C4 and the mapping of the client's exceptions onto them |
+| `src/cdc_v2/md/errors.py` | the errors of C4, `StatementError`, the mapping of the client's exceptions onto them, and what a message may repeat of the client's text |
 | `src/cdc_v2/md/registry.py` | `_cdc.connections`: register, interrupt the connections of earlier epochs, clean up |
 | `src/cdc_v2/md/schema.py` | the leader tables (constant text), the migrations |
 | `src/cdc_v2/state/` | `declare`, `transition`, `read`, `create`; `python -m cdc_v2.state` writes `docs/state_machines.md` |
 | `src/cdc_v2/alerts.py` | `emit`, `emit_now`, `resolve` |
 | `src/cdc_v2/testing/destination.py` | a destination for one test (local or MotherDuck), a small take-over (design 4.5) |
 | `src/cdc_v2/testing/machines.py` | `check_machine` (every pair of states of a declared machine), the search for state writes |
-| `tests/destination/` | the tests; `sut.py` is a small system under test, `connect_relay.py` a CONNECT relay |
+| `tests/destination/` | the tests; `sut.py` is a small system under test, `connect_relay.py` a CONNECT relay; `test_from_apply.py` holds the tests of the seven points from the review of apply (section 14.1), `test_review.py` the seeded tests from the review of this package (section 14.2) |
 | `evidence/p3/destination/` | the evidence that this document points to |
 
 ## 1. Words
@@ -60,10 +60,24 @@ interrupt_deadline_s=5.0)` is a frozen dataclass.
   path gives a local file. A connection string (`md:…`, a `?`) is refused: the token is never a setting; the
   client reads it from the environment itself.
 - `marker` is sent as `custom_user_agent`.
-- `md.connect(role, settings=None, deadline=None)` sets the session time zone to UTC and keeps the server
-  connection id. It tries `connect_attempts` times. Errors: `ConnectionLost`, `DeadlineExceeded`.
-  Test: `test_md.py::test_connect_keeps_the_server_id_and_the_session_is_utc`,
-  `test_lane.py::test_connect_has_a_deadline`.
+- `md.connect(role, settings=None, deadline=None)` keeps the server connection id. It tries
+  `connect_attempts` times. Errors: `ConnectionLost`, `DeadlineExceeded`. A connect that answers after its
+  deadline is `DeadlineExceeded` too, and nothing stays open. Tests:
+  `test_md.py::test_connect_keeps_the_server_id_and_the_session_is_utc`,
+  `test_lane.py::test_connect_has_a_deadline`,
+  `test_review.py::test_a_connect_that_answers_after_its_deadline_is_not_handed_out`.
+- **Two settings on every client connection of the layer**, before its first statement, also on a connection
+  that replaces one that was given up: `SET SESSION TimeZone = 'UTC'` and
+  `SET SESSION arrow_lossless_conversion = true` (C4, from the review of apply). With the first, Arrow data
+  with a `TIMESTAMPTZ` column needs no `pytz`. With the second, `UUID`, `JSON`, `TIMETZ` and `HUGEINT` keep
+  their type in Arrow data (section 2.2). Both are set for the session only. A plain `SET` of the second one on
+  one connection changes what the other connections of the process to the same database read; `SET SESSION`
+  does not (local DuckDB 1.5.6:
+  `test_from_apply.py::test_a_plain_set_of_the_lossless_setting_reaches_the_other_connections_of_the_process`).
+  So another connection keeps its own values and cannot change those of the layer. Tests:
+  `test_from_apply.py::test_every_connection_of_the_layer_has_the_two_settings`,
+  `test_from_apply.py::test_the_two_settings_belong_to_the_connections_of_the_layer_only`; on MotherDuck
+  `from_apply.json`, key `settings_scope`.
 - A deadline is always a `cdc_v2.deadline.Deadline`. `None` means the default of the settings. A number of
   seconds is refused with `TypeError`, in every call of the layer
   (`test_lane.py::test_arguments_are_checked_and_a_failed_connect_hides_the_path`; the same test covers the
@@ -75,15 +89,16 @@ A `Connection` has `role`, `settings`, `generation` (counts the client connectio
 | Method | What |
 |---|---|
 | `ensure(deadline)` | take a client connection now if there is none |
-| `execute`, `fetchall`, `fetchone(sql, params=None, deadline=None)` | one statement in autocommit |
+| `execute`, `fetchall`, `fetchone(sql, params=None, deadline=None)` | one statement in autocommit. `execute` returns the number of rows an `INSERT`, `UPDATE` or `DELETE` changed, else `None`, as `tx.execute` does (section 2.2) |
 | `clock_us(deadline=None)` | MotherDuck's clock as integer microseconds (section 10) |
 | `interrupt_server_connection(server_id, deadline=None)` | interrupt another connection by id; refuses its own id |
 | `abort()` | from any thread: end the call in flight now (section 4) |
 | `close(deadline=None)` | close; also a context manager |
 
-Errors of the autocommit methods: `Conflict` (nothing applied), `ConnectionLost` and `DeadlineExceeded` for a
-read, `CommitUnknown` for a write whose outcome is unknown (a single statement in autocommit is its own
-commit). A write that did complete but late returns its result; only the connection is replaced.
+Errors of the autocommit methods: `Conflict` (nothing applied), `StatementError` for a statement that the
+destination refused (nothing applied; section 5), `ConnectionLost` and `DeadlineExceeded` for a read,
+`CommitUnknown` for a write whose outcome is unknown (a single statement in autocommit is its own commit). A
+write that did complete but late returns its result; only the connection is replaced.
 Evidence: `deadlines.json`, key `long_statement_on_the_server` (read: `DeadlineExceeded`, write: `CommitUnknown`).
 
 Every statement of a caller is checked (`check_sql`): exactly one statement; never `BEGIN`, `COMMIT` or
@@ -91,6 +106,15 @@ Every statement of a caller is checked (`check_sql`): exactly one statement; nev
 `_cdc.leader`, `_cdc.fence` or `_cdc.heartbeat`, and never `DROP SCHEMA _cdc`. A refused statement raises
 `LaneMisuse` before anything is sent. Tests: `test_lane.py::test_misuse_is_refused`,
 `test_lane.py::test_leader_rows_cannot_be_deleted_or_inserted`.
+
+The check reads the statement with the parser of the client library and sends nothing. Text that the parser
+refuses is `StatementError` with the kind `UNPARSED`. `md.statement_kind(sql)` gives the name the parser has for
+a statement: `INSERT`, `UPDATE`, `DELETE`, `SELECT`, `CREATE`, `DROP`, `MERGE_INTO` and so on
+(`test_from_apply.py::test_the_kind_of_a_statement_comes_from_the_parser_of_the_client`). A statement on a
+scratch schema of apply (`_cdc_apply_<random>`, section 2.4) is not taken for one on the leader tables, also
+when its table is named `leader`, `fence` or `heartbeat`
+(`test_from_apply.py::test_a_statement_on_a_scratch_schema_is_not_taken_for_one_on_the_leader_tables`,
+`test_from_apply.py::test_the_leader_tables_stay_protected_next_to_scratch_schemas`).
 
 `md.open_connections()`, `md.background_threads()` and `md.wait_idle(deadline)` let a test check that nothing is
 left (`test_lane.py::test_no_connection_and_no_thread_is_left`).
@@ -110,11 +134,12 @@ A `Transaction` has `lane`, `epoch`, `deadline`, `is_motherduck`, and:
 
 | Method | What |
 |---|---|
-| `execute(sql, params=None, deadline=None)` | run a statement; returns the number of changed rows when the statement reports one |
-| `execute_one(sql, params=None, deadline=None)` | the statement must change exactly one row. Any other count rolls back and raises `Conflict`. A statement that reports no count is `LaneMisuse` |
-| `fetchall`, `fetchone`, `fetch_arrow` | read; `fetch_arrow` returns a `pyarrow.Table` |
+| `execute(sql, params=None, deadline=None)` | run one statement. Returns the number of rows an `INSERT`, `UPDATE` or `DELETE` changed, else `None` |
+| `execute_one(sql, params=None, deadline=None)` | the statement must change exactly one row. Any other count rolls back and raises `Conflict`. A statement that reports no count (a `SELECT`, a statement with `RETURNING`) rolls back and is `LaneMisuse` |
+| `fetchall(sql, params=None, deadline=None)`, `fetchone` | read rows: a list of tuples, or one tuple or `None` |
+| `fetch_arrow(sql, params=None, deadline=None)` | read a result as a `pyarrow.Table` that is complete in memory when the call returns |
 | `clock_us(deadline=None)` | MotherDuck's clock inside the transaction |
-| `register(name, data, deadline=None)` | make local Arrow data visible as a view until the block ends |
+| `register(name, data, deadline=None)` | make a `pyarrow.Table`, a record batch or a list of record batches readable under `name` until the block ends |
 | `fail(error)` | roll back now and remember `error`; leaving the block then raises it even if the caller swallowed it |
 
 Rules that the object enforces (`LaneMisuse` otherwise; `test_lane.py::test_misuse_is_refused`): one block per
@@ -124,6 +149,40 @@ ends: a failed transaction cannot end quietly (`test_lane.py::test_a_failed_tran
 
 The deadline of one statement is the smaller of `statement_deadline_s`, the statement's own `deadline` and what
 is left of the block's deadline.
+
+`execute`, `fetchall`, `fetch_arrow` and `register` have the shape that contract C4 got from the review of
+apply (section 14.1). The tests named here without a file are in `tests/destination/test_from_apply.py`.
+
+- **Counts.** `execute` returns a count only for a statement that the client's parser calls `INSERT`, `UPDATE`
+  or `DELETE` and that has no `RETURNING` clause. `TRUNCATE` is a `DELETE` to the parser and returns the number
+  of rows it removed. `MERGE INTO`, `CREATE TABLE … AS`, `COPY` and every statement with `RETURNING` return
+  `None` (`COPY` by its kind only; no test of this package runs one). The rows of `RETURNING` are read with `fetchall`. The layer looks for the `RETURNING` clause itself,
+  in the tokens of the client's tokenizer, because the client describes the result of `… RETURNING k AS "Count"`
+  like a count (finding 19). Two texts are taken for a `RETURNING` clause that are none: a column label
+  `AS returning` and a parameter named `$returning`. They give `None` where a count was possible, never a wrong
+  number. Tests: `test_execute_returns_a_count_for_insert_update_and_delete_only`,
+  `test_merge_reports_no_count_and_truncate_counts_as_a_delete`,
+  `test_a_returning_clause_is_found_by_the_tokenizer_of_the_client`,
+  `test_execute_one_never_takes_a_returned_value_for_a_count`.
+- **`fetch_arrow`** reads the whole result (`to_arrow_table()`). The client's `.arrow()` gives a lazy reader in
+  DuckDB 1.5.6; C4 says that registering such a reader on the connection that produced it and querying it
+  deadlocks (measured by package A, not measured again here). The layer never hands the reader out
+  (`test_static.py::test_the_layer_never_hands_out_the_lazy_reader_of_the_client`,
+  `test_fetch_arrow_gives_a_table_that_the_same_transaction_can_register`).
+- **`register`** takes a `pyarrow.Table`, a `pyarrow.RecordBatch`, or a list or tuple of record batches with one
+  schema. A `RecordBatchReader`, an empty list and anything else are `LaneMisuse`. The name must match
+  `^[a-z_][a-z0-9_]{0,62}$` from its first to its last character, else `LaneMisuse`. The name is removed when
+  the block ends, also when it ends by an error or a deadline; when the connection was given up, the name went
+  with it. Data that the client cannot register is `StatementError` with the kind `REGISTER`. Tests:
+  `test_register_takes_a_table_a_record_batch_or_a_list_of_batches`, `test_a_registered_name_is_checked`,
+  `test_a_registered_name_is_gone_when_the_block_ends_however_it_ends`,
+  `test_a_registered_name_is_gone_after_a_deadline_gave_the_connection_up`,
+  `test_a_value_in_local_data_that_cannot_be_registered_does_not_travel_on`.
+- **Types in Arrow data.** With the two settings of section 2.1, a table that `fetch_arrow` read and `register`
+  made readable again holds the same values and types: `UUID`, `JSON`, `TIME WITH TIME ZONE`,
+  `TIMESTAMP WITH TIME ZONE`, `HUGEINT`. On a connection without `arrow_lossless_conversion` the first two arrive
+  as `string`, `TIMETZ` as `time64[us]` without its offset and `HUGEINT` as `decimal128(38, 0)`
+  (`from_apply.json`, key `arrow_types`; `test_arrow_data_keeps_uuid_json_and_time_zones`).
 
 `md.crash_points(lane)` gives the three crash points of a lane. `md.clock_sql` is the expression of design 4.1.
 `md.FENCE_SQL` is the fence statement.
@@ -135,7 +194,9 @@ is left of the block's deadline.
 - `register(conn, lane, epoch, deadline=None)` returns the server connection id. The lane calls it itself
   before the first `BEGIN` on every new client connection. One statement inserts the row only if `_cdc.leader`
   still holds the epoch; no row inserted is `FenceLost`
-  (`test_lane.py::test_new_connection_of_a_stale_epoch_is_refused_at_registration`).
+  (`test_lane.py::test_new_connection_of_a_stale_epoch_is_refused_at_registration`). The statement runs on the
+  client connection whose id it writes. A connection that is replaced while it registers is `ConnectionLost`
+  (`test_review.py::test_registration_writes_the_id_of_the_connection_that_runs_it`).
 - `md.interrupt_earlier(conn, epoch, deadline=None)` returns `(listed, interrupted)`: the rows with an epoch
   **below** `epoch`, and how many of them the server interrupted. The caller's own connection is left out.
 - `registry.cleanup(conn_or_tx, epoch, deadline=None)` deletes the rows of epochs before `epoch - 1`.
@@ -175,6 +236,17 @@ with exactly `(1, 18, 18, 1)` rows; every process exited 0 after 0 or 1 repeats
 `test_schema.py::test_starters_at_once_end_with_exactly_one_row_set`).
 
 Migrations. Every other `_cdc` table is made by migration steps.
+
+One exception (C4, from the review of apply): a **scratch schema** named `_cdc_apply_<random>`. Apply creates
+it and drops it inside one lane transaction, so it never exists outside that transaction. The check of the
+leader tables, their initialisation and the migrations look at the schema `_cdc` only: they report nothing
+about a scratch schema and do not touch it, and no code of this package names or drops one
+(`test_from_apply.py::test_the_schema_check_and_the_migrations_leave_a_scratch_schema_alone`,
+`test_static.py::test_nothing_of_this_package_drops_a_schema_or_names_a_scratch_schema_of_apply`). Whoever
+drops what a transaction created drops the tables one by one and then the schema: `DROP SCHEMA … CASCADE` of
+tables made in the same transaction fails at `COMMIT` (finding 20;
+`test_from_apply.py::test_a_scratch_schema_of_apply_lives_inside_one_transaction`). No migration step of this
+package drops anything.
 
 ```python
 from cdc_v2.md import schema
@@ -224,6 +296,15 @@ state.read(conn_or_tx, CHUNK, (table_id, 0))        # the stored state, or None
   epoch, changed_at)` in the same transaction (`test_state.py::test_a_transition_is_part_of_the_callers_transaction`).
 - Two transactions cannot both make one transition
   (`test_state.py::test_two_transactions_cannot_both_make_one_transition`).
+- **Create the rows of one machine from one lane.** `create` looks for a row of the key with what its
+  transaction sees, and it writes nothing that a second creator reads. Two transactions that create one key at
+  the same time meet only in the fence row of their lane. On one lane name the second gets `Conflict`. On two
+  lanes both commit and the key has two rows; every later `read`, `transition` and `create` of that key then
+  fails with `StateError`, so the damage is seen. The layer does not prevent it (contract note 34; section 14.2;
+  `test_state.py::test_two_creators_of_one_key_meet_only_through_the_fence_row_of_their_lane`).
+- The log line `state transition` (logger `cdc_v2.state`) is written inside the caller's open transaction. Its
+  record says so: `committed: False`. `_cdc.transitions` is the record of what holds
+  (`test_review.py::test_a_log_line_written_inside_a_transaction_says_that_nothing_is_committed_yet`).
 - `cdc_v2.testing.machines.check_machine(lane, machine, key=…)` tries every pair of states and asserts that
   exactly the declared ones are accepted (SPEC 1.9). `test_state.py::test_the_enumeration_catches_a_wrong_transition_function`
   shows that it fails for a transition function that is wrong in one of three ways.
@@ -251,6 +332,10 @@ alerts.resolve(tx, alerts.dedup_key("table_quarantined", {"table_id": 16385}, ("
   the deliverer can send one message per condition.
 - `emit_now` tries again after `Conflict` and `ConnectionLost` until its deadline. It passes on `FenceLost` and
   `CommitUnknown` (`test_alerts.py::test_emit_now_passes_on_what_it_cannot_decide`).
+- Before the migrations ran the table does not exist: an emit fails with `md.StatementError` and writes nothing
+  (`test_alerts.py::test_an_alert_before_the_migrations_ran_fails_and_writes_nothing`).
+- The log line `alert` (logger `cdc_v2.alerts`) is written inside the open transaction and carries
+  `committed: False`, like the line of a state transition (section 2.5).
 
 ### 2.7 Test support
 
@@ -274,7 +359,7 @@ alerts.resolve(tx, alerts.dedup_key("table_quarantined", {"table_id": 16385}, ("
 
 | Step | What the layer does | Fault site | Crash point |
 |---|---|---|---|
-| 1 | On a new client connection: connect; interrupt the server connection it replaces, by id; register in `_cdc.connections` | `md.connect`, `md.execute` | |
+| 1 | On a new client connection: connect and set the two session settings; interrupt the server connection it replaces, by id; register in `_cdc.connections` (one `INSERT`) | `md.connect`, `md.execute` | |
 | 2 | `BEGIN` | `md.execute` | |
 | 3 | The caller's statements | `md.execute` | |
 | 4 | The fence statement; it must change exactly one row | `md.fence` | `<lane>.fenced` after it |
@@ -282,20 +367,46 @@ alerts.resolve(tx, alerts.dedup_key("table_quarantined", {"table_id": 16385}, ("
 | 6 | `COMMIT` | `md.commit` before it is sent, `md.commit_reply` after the destination has executed it | `<lane>.committed` after it returned |
 
 - An empty block still runs steps 4 to 6 (`test_lane.py::test_empty_transaction_still_runs_the_fence`).
-- An exception in step 3 rolls back and is passed on (`test_lane.py::test_an_exception_rolls_back_and_is_passed_on`).
-- The roll-back has its own short deadline (`rollback_deadline_s`). A roll-back that does not answer retires the
-  connection; the caller still gets its own exception (`deadlines.json`, key `roll_back_blocked`: after 3.17 s
-  with a roll-back deadline of 1.0 s and a grace of 2.0 s).
+- An exception that the caller's own code raises in step 3 rolls back and is passed on. A statement that the
+  destination refuses rolls back and raises `StatementError` (section 5). Both:
+  `test_lane.py::test_an_exception_rolls_back_and_is_passed_on`.
+- What the fault site `md.execute` sees before the caller's statements. On a lane's first connection: the
+  registering `INSERT`, then `BEGIN`. On a connection that replaces one that was given up, locally the same; on
+  MotherDuck the interrupt of the old id comes first, as a statement of its own. On a registered connection:
+  `BEGIN` only. (Locally the interrupt is a call inside the process and passes no fault site.)
+- The clean-up after a step that failed has one short deadline (`rollback_deadline_s`) for all of it: the
+  roll-back, the read of the fence row after a conflict in the fence statement, and the removal of registered
+  data. A roll-back that does not answer retires the connection; the caller still gets its own exception
+  (`deadlines.json`, key `roll_back_blocked`: after 3.17 s with a roll-back deadline of 1.0 s and a grace of
+  2.0 s; `test_review.py::test_the_clean_up_after_a_failed_step_has_one_time_budget`).
 - Every lane has its three crash points, and each is reached once per transaction
   (`test_lane.py::test_every_lane_has_its_three_crash_points`).
 
 ## 4. Deadlines
 
-**Rule.** No call of this layer waits longer than its deadline plus the grace period (`grace_s`, default 2 s).
+**Rule.** No statement of this layer holds its caller longer than its deadline plus the grace period (`grace_s`,
+default 2 s). A lane call that fails adds its clean-up: it returns at the latest `rollback_deadline_s` (default
+5 s) plus the grace period after the step that failed (section 3).
+
+What the rule does not cover:
+
+- **Threads of a connection that was given up.** The worker thread, the reaper thread and the client connection
+  of a retired connection stay until the statement in flight returns; the client library offers no way to end
+  them earlier (the next paragraph). They are daemon threads, and `md.background_threads()` and
+  `md.open_connections()` count them. On a network that answers nothing they can stay for as long as the client
+  waits. This is open (section 14.2).
+- **A process that cannot start a thread.** The watchdog thread is started at the deadline. When that fails,
+  the failure is logged (`md background thread not started`), the caller waits to the end of the grace period,
+  the connection is given up and the block fails
+  (`test_review.py::test_a_deadline_ends_the_transaction_also_when_no_watchdog_thread_can_start`).
+- **A wait that is broken off** by an exception in the caller's thread (`KeyboardInterrupt`) gives the
+  connection up and fails the transaction before the exception is passed on. Nothing is committed after it, also
+  when the caller swallows it
+  (`test_review.py::test_a_wait_that_is_broken_off_never_leaves_a_transaction_that_commits`).
 
 **Why a mechanism is needed.** The client library has no time limit for a statement. Its own `interrupt()` does
 not end a statement that runs on MotherDuck: an `UPDATE` that sleeps 4 s on the server and is interrupted by the
-client after 0.8 s returned after 4.17 s (`error_mapping.json`, key `raw_texts`, case
+client after 0.8 s returned after 4.16 s (`error_mapping.json`, key `raw_texts`, case
 `client_interrupt_while_the_statement_runs_on_the_server`, `stopped_early: false`).
 
 **Mechanism.**
@@ -310,7 +421,11 @@ client after 0.8 s returned after 4.17 s (`error_mapping.json`, key `raw_texts`,
    caller never calls `close()` on a connection that may hang.
 5. The `Connection` object takes a new client connection at its **next** call, not at once. Before the new one
    is used, it interrupts the old server connection by id, so that an abandoned transaction cannot keep holding
-   a fence row (C4). Test: `test_lane.py::test_a_replaced_connection_is_interrupted_by_id_before_the_new_one_is_used`,
+   a fence row (C4). An interrupt that the destination refuses fails that one call with `StatementError` (kind
+   `INTERRUPT`) and the id is dropped, so that it cannot block the lane for ever; an interrupt that is lost or
+   late is tried again at the next call
+   (`test_review.py::test_an_old_connection_id_that_the_destination_refuses_does_not_block_the_lane_for_ever`).
+   Test: `test_lane.py::test_a_replaced_connection_is_interrupted_by_id_before_the_new_one_is_used`,
    `test_lane.py::test_the_interrupt_of_a_replaced_connection_runs_on_the_new_connection`; on MotherDuck
    `registry_takeover.json`, key `replaced_connection_interrupted_by_id` (the interrupt statement took 76 ms; the
    next transaction with connect, interrupt and registration took 488 ms).
@@ -345,32 +460,84 @@ The rules, in the order they are applied (`src/cdc_v2/md/errors.py`):
 
 1. A deadline that passed decides first: before `COMMIT` `DeadlineExceeded`, from `COMMIT` on `CommitUnknown`.
 2. A **transport** error: the client's classes `ConnectionException`, `IOException`, `HTTPException`,
-   `InterruptException`; Python's `ConnectionError`, `TimeoutError`, `OSError`; and every client error whose text
-   holds one of the phrases `Connection Error`, `interrupted by user`, `lease expired`, `transaction already
+   `InterruptException`; Python's `ConnectionError`, `TimeoutError`, `OSError`; and every client error that is
+   not about data and whose text (its head, see below) holds one of the phrases `Connection Error`, `interrupted by user`, `lease expired`, `transaction already
    rolled back`, `Request failed`, `Could not connect`, `UNAVAILABLE`, `DEADLINE_EXCEEDED`, `Connection already
    closed`, `No open result set`, `connection … closed`. The phrases are needed because MotherDuck reports a
    server interrupt in a transaction as `TransactionException`, not as a connection error.
-3. A **conflict**: a client error whose text says `Conflict on …` or `write-write conflict`.
-4. Everything else is passed on unchanged before `COMMIT`, and is `CommitUnknown` from `COMMIT` on.
+3. A **conflict**: a client error that is not about data and whose head says `Conflict on …` or
+   `write-write conflict`.
+4. Everything else that a statement raises is `md.StatementError` before `COMMIT` was sent, and `CommitUnknown`
+   from `COMMIT` on. Inside a lane transaction the transaction was rolled back. A statement in autocommit was
+   refused as a whole. An exception of the caller's own code inside a block is no error of a statement: it is
+   passed on unchanged after the roll-back.
 
-The text decides nothing for an error about the data of a statement (the client's `DataError` and
-`IntegrityError` families: a conversion error, a constraint error). Such a text quotes a value of a row. Found
-while this document was written: `Could not convert string 'Conflict on update' to INT32` was sorted as a
-conflict, and a value with `Connection Error` in it as a lost connection; a caller answers both by running the
-transaction again. Seeded regression tests:
+**`md.StatementError(where, error_class, statement)`** is a `DestinationError`. Its message is
+`<where>: the destination refused a statement (<error_class> in <statement>)`, for example
+`lane stream: the destination refused a statement (ConversionException in INSERT)`. `error_class` is the name
+of the client's exception class. `statement` is the kind of the statement: the name the client's parser gives
+it, or `UNPARSED` (the parser refused the text), `BEGIN`, `FENCE` (the lane's own statements), `REGISTER` (data
+handed to `register`), `INTERRUPT` (the interrupt of an old connection id). Both come from fixed lists. Running
+the same statement again gives the same answer, so a caller does not try again; it reads the two attributes and
+decides (section 15).
+
+**What a message keeps of the client's text** (SPEC 8.3; C4, from the review of apply). The client names the
+value it could not use: with quotation marks (`Could not convert string '…'`, `duplicate key "…"`), without
+them (`Type INT64 with value 3000000000 can't be cast …`), or as a piece of the SQL text (a parser error, a
+table name in a catalog error). On MotherDuck 7 of 7 planted values came back in the client's text
+(`from_apply.json`, key `planted_values`). So no rule about the text makes it safe to repeat, and the errors of
+this layer repeat none of it:
+
+- `StatementError` holds the class and the kind of statement.
+- `ConnectionLost` and `CommitUnknown` hold a **label**: the class name and, for a client error, the transport
+  phrase that decided, taken from the list of rule 2 (`errors.label`; for example
+  `TransactionException (lease expired)`).
+- `Conflict` and `FenceLost` hold the lane and the step.
+- The client's exception is not attached (no `__cause__`, no `__context__`): a traceback in a log would print
+  its whole text.
+- The raw text is never logged and never written to an alert or to `_cdc`.
+- One exception: a failed **connect**. Nothing was sent, so its text holds no value of a row, and it says why
+  the connect failed. It is kept as the class name and the first line, with tokens, paths, host names and
+  addresses replaced (`errors.safe_text`).
+
+Tests: `test_from_apply.py::test_a_value_in_a_destination_error_never_travels_on` plants a marker text and a
+number in seven statements (conversion, constraint, parser and catalog errors), inside a lane transaction and
+in autocommit. It looks for them in the message, `repr`, arguments, attributes and formatted traceback of the
+exception, in every captured log line, in the alert a caller writes from the error, and in every row of every
+`_cdc` table. Also `test_review.py::test_a_key_value_that_commit_reports_does_not_travel_on`,
+`test_errors.py::test_a_label_is_a_class_name_and_at_most_a_phrase_from_the_list`,
+`test_errors.py::test_refused_names_the_class_and_the_kind_of_statement_and_nothing_else`,
+`test_errors.py::test_a_message_never_holds_a_token_a_path_a_host_or_an_address`,
+`test_errors.py::test_a_message_keeps_what_a_reader_needs`.
+
+**Where a text decides (rules 2 and 3), only its head does**: the first line up to the first quotation mark.
+The client quotes most values it repeats, so a quoted value that holds one of the phrases decides nothing
+(`test_errors.py::test_the_head_of_a_text_ends_at_the_first_quotation_mark`). And the text decides nothing at
+all for an error about the data of a statement (the client's `DataError` and `IntegrityError` families: a
+conversion error, a constraint error). Found while this document was written:
+`Could not convert string 'Conflict on update' to INT32` was sorted as a conflict, and a value with
+`Connection Error` in it as a lost connection; a caller answers both by running the transaction again. Seeded
+regression tests:
 `test_errors.py::test_a_value_that_holds_a_phrase_does_not_look_like_a_conflict_or_a_lost_connection` and the
-table in `test_errors.py::test_how_an_exception_is_sorted`. Limit: a `TransactionException` whose text quotes a
-key value (`Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key "…"`) is still sorted
-by its text. At `COMMIT` that is `CommitUnknown` or, with a phrase in the key, `Conflict`; both make the caller
-read again.
+table in `test_errors.py::test_how_an_exception_is_sorted`. The review of this package found the same for a
+`TransactionException` whose text quotes a key value
+(`Failed to commit: PRIMARY KEY or UNIQUE constraint violation: duplicate key "…"`); the head rule is the answer
+to it. Every text that MotherDuck gave in the runs of this package has its phrase in the head
+(`test_errors.py::test_no_text_that_motherduck_gave_has_its_phrase_only_inside_a_quoted_value`).
+
+Limit of the head rule: a value that the client repeats **without** quotation marks, in an error that is not
+about data, is part of the head. `Catalog Error: Table with name lease expired does not exist!` is sorted as a
+transport error (`test_errors.py::test_the_known_limit_of_the_head_rule`). The caller then runs the transaction
+again and meets the same error. It shows as a loop of retries that the caller's limit ends, not as wrong data.
 
 | Where | Transport error | Conflict | Other error | Deadline |
 |---|---|---|---|---|
 | connect | `ConnectionLost` after the last attempt | | every other error of the client is `ConnectionLost` too | `DeadlineExceeded` |
-| registration (one insert in autocommit) | `ConnectionLost`, also when its outcome is unknown | `Conflict` | passed on | `DeadlineExceeded` |
+| the interrupt of an old connection id | `ConnectionLost`; tried again at the next call | | `StatementError`, once; the id is dropped | `DeadlineExceeded`; tried again at the next call |
+| registration (one insert in autocommit) | `ConnectionLost`, also when its outcome is unknown | `Conflict` | `StatementError` | `DeadlineExceeded` |
 | registration inserted no row | `FenceLost` | | | |
-| `BEGIN`, a statement | `ConnectionLost`; the session is dropped | `Conflict` after roll-back | passed on after roll-back | `DeadlineExceeded` |
-| the fence statement | `ConnectionLost` | `FenceLost` if the fence row holds another epoch, else `Conflict` | passed on after roll-back | `DeadlineExceeded` |
+| `BEGIN`, a statement | `ConnectionLost`; the session is dropped | `Conflict` after roll-back | `StatementError` after roll-back | `DeadlineExceeded` |
+| the fence statement | `ConnectionLost` | `FenceLost` if the fence row holds another epoch, else `Conflict` | `StatementError` after roll-back | `DeadlineExceeded` |
 | the fence statement changed no row | `FenceLost` after roll-back | | | |
 | `COMMIT` | `CommitUnknown` | `Conflict` (the destination refused the commit; nothing applied) | `CommitUnknown` | `CommitUnknown` |
 
@@ -378,19 +545,16 @@ The `Conflict` of the row `COMMIT` was never seen for real: no run on MotherDuck
 `COMMIT` with a write-write conflict. The rule is tested with a fault site only
 (`test_lane.py::test_a_conflict_that_commit_reports_is_conflict`).
 
-A message of these errors never repeats the client's text of a conflict (it can hold a key value, SPEC 8.3). For
-a transport error it holds the first line of the client's text with tokens, paths, host names and addresses
-replaced (`errors.safe_text`; `test_errors.py::test_a_message_never_holds_a_token_a_path_a_host_or_an_address`).
+**Evidence on MotherDuck** (`error_mapping.json`; tests in `test_md.py`). The second column is the label in
+the layer's message.
 
-**Evidence on MotherDuck** (`error_mapping.json`; tests in `test_md.py`):
-
-| Case | The client's text (shortened) | Raised | Committed |
+| Case | Class of the client's error and the phrase that decided | Raised | Committed |
 |---|---|---|---|
-| a second lane updates a row that an open transaction has updated | `Conflict on update!` | `Conflict`; the connection is kept | no |
-| a statement in flight is interrupted on the server | `ConnectionException: Connection Error: interrupted by user`, 104 ms after the interrupt | `ConnectionLost` | no |
-| an open transaction is interrupted on the server, then a statement | `TransactionException: … transaction already rolled back: Connection Error: interrupted by user` | `ConnectionLost` | no |
-| the same, then the block ends (fence statement) | the same text | `ConnectionLost` | no |
-| the connection is interrupted between the fence statement and `COMMIT` | `TransactionException: … Failed to commit: MotherDuck transaction statement failed: Connection Error: interrupted by user` | `CommitUnknown` | no |
+| a second lane updates a row that an open transaction has updated | `TransactionException`; the text says `Conflict on update!` | `Conflict`; the connection is kept | no |
+| a statement in flight is interrupted on the server | `ConnectionException (Connection Error)`, 100 ms after the interrupt | `ConnectionLost` | no |
+| an open transaction is interrupted on the server, then a statement | `ConnectionException (Connection Error)`; in an earlier run `TransactionException` with `transaction already rolled back` (finding 18) | `ConnectionLost` | no |
+| the same, then the block ends (fence statement) | the same two | `ConnectionLost` | no |
+| the connection is interrupted between the fence statement and `COMMIT` | `TransactionException (Connection Error)`; the text is `… Failed to commit: MotherDuck transaction statement failed: Connection Error: interrupted by user` | `CommitUnknown` | no |
 | fault site `md.execute` raises `ConnectionError` | | `ConnectionLost` | no |
 | fault site `md.fence` raises `ConnectionError` | | `ConnectionLost` | no |
 | fault site `md.commit` raises `ConnectionError` | | `CommitUnknown` | no |
@@ -730,9 +894,11 @@ databases. At T0 `tests/destination/test_sut.py` runs the SUT on a local file.
   _cdc.leader` (median 74 ms). Use `conn.clock_us()` or `tx.clock_us()`, or write the expression inside DML.
   **Never read the clock with a bare `SELECT`.**
 - The clock counts whole milliseconds (30 of 30 values).
-- The client cannot fetch a `TIMESTAMPTZ` value without the module `pytz`, which is not a dependency. The layer
-  therefore reads times as integer microseconds (`epoch_us`). A caller that selects a `TIMESTAMPTZ` column does
-  the same or casts it.
+- The client cannot fetch a `TIMESTAMPTZ` value as a Python object without the module `pytz`, which is not a
+  dependency. The layer therefore reads times as integer microseconds (`epoch_us`). A caller that selects a
+  `TIMESTAMPTZ` column with `fetchall` or `fetchone` does the same or casts it. Arrow data is different: with
+  the session time zone UTC (section 2.1) a `TIMESTAMPTZ` column goes out through `fetch_arrow` and in through
+  `register` without `pytz` (`test_from_apply.py::test_arrow_data_keeps_uuid_json_and_time_zones`).
 
 ## 11. Timings on MotherDuck
 
@@ -767,6 +933,8 @@ transaction. `docs/spike/md_semantics.md` measured 8 ms per round trip from a Fl
 | `test_only_the_layer_holds_the_fence_statement` | the fence statement exists once | |
 | `test_no_text_deletes_or_inserts_leader_rows` | no SQL text deletes or inserts rows of the three leader tables | as the first |
 | `test_this_package_reads_no_local_wall_clock` | the layer never compares with the local wall clock | only this package's files |
+| `test_nothing_of_this_package_drops_a_schema_or_names_a_scratch_schema_of_apply` | no SQL text of this package holds `DROP SCHEMA`, `CASCADE` or the prefix of apply's scratch schemas, so nothing of it cleans one up or drops with `CASCADE` | only this package's files; SQL text as in the first row |
+| `test_the_layer_never_hands_out_the_lazy_reader_of_the_client` | no file of the layer uses the client's `.arrow`, `fetch_record_batch`, `fetch_arrow_reader` or `to_arrow_reader`; Arrow results are read in one place, with `to_arrow_table`, in `md/connection.py` | only this package's files; a call through another name is not seen |
 
 ## 13. Contract notes
 
@@ -782,7 +950,8 @@ the test that holds it. Tests without a file name are in `tests/destination/test
    process, or `md.connect(role, settings)`. `Settings.database` is a name, never a connection string (same
    test).
 3. **Every error of the client at connect is `ConnectionLost`**, also one that is no transport error. Its message
-   repeats no local path (same test; `test_connect_has_a_deadline`).
+   repeats no local path (same test; `test_connect_has_a_deadline`). It is the one message of the layer that
+   holds text of the client (section 5).
 4. **A connection that was given up is replaced at the next call**, not at once. C4 says only that the old server
    connection is interrupted "first". Built: the new client connection sends the interrupt, by the stored id,
    before anything else (`test_a_replaced_connection_is_interrupted_by_id_before_the_new_one_is_used`,
@@ -799,10 +968,11 @@ the test that holds it. Tests without a file name are in `tests/destination/test
    (`test_misuse_is_refused`).
 8. **`execute_one`.** C4 says it raises `Conflict` "when the statement changed no row". Built: every count other
    than 1 is `Conflict`; a statement that reports no count is `LaneMisuse`
-   (`test_execute_one_needs_exactly_one_row`).
-9. **`Transaction` has more methods than C4 names**: `fetchall`, `fetchone`, `fetch_arrow`, `register`,
-   `clock_us`, `fail` (`test_arrow_data_and_row_counts`, `test_a_failed_transaction_cannot_end_quietly`,
-   `test_state.py::test_two_rows_for_one_key_fail_the_transaction`).
+   (`test_execute_one_needs_exactly_one_row`). A statement with `RETURNING` reports no count (note 30).
+9. **`Transaction` has more methods than C4 names**: `fetchone`, `clock_us`, `fail`
+   (`test_arrow_data_and_row_counts`, `test_a_failed_transaction_cannot_end_quietly`,
+   `test_state.py::test_two_rows_for_one_key_fail_the_transaction`). `fetchall`, `fetch_arrow` and `register`
+   came into C4 with the review of apply (notes 29 to 33).
 10. **The fence statement writes `epoch` too.** Its text differs from design 4.2 (section 6).
 11. **`CommitUnknown` starts when the layer hands `COMMIT` to the client**, at the fault site `md.commit`. The
     layer cannot tell a `COMMIT` that was never sent from one whose answer was lost
@@ -816,8 +986,10 @@ the test that holds it. Tests without a file name are in `tests/destination/test
 13. **A fifth fault site, `md.commit_reply`.** C1 and C4 list four. It fires after the destination has executed
     `COMMIT` and before the caller sees the answer. Without it "committed, answer lost" cannot be tested at T0
     (`test_a_lost_connection_is_reported_by_where_it_happened`; section 9.1).
-14. **An error about the data of a statement is never sorted by its text** (section 5;
-    `test_errors.py::test_a_value_that_holds_a_phrase_does_not_look_like_a_conflict_or_a_lost_connection`).
+14. **An error about the data of a statement is never sorted by its text**, and where a text decides, only its
+    head does (section 5;
+    `test_errors.py::test_a_value_that_holds_a_phrase_does_not_look_like_a_conflict_or_a_lost_connection`,
+    `test_errors.py::test_the_known_limit_of_the_head_rule`).
 
 **Registry and leader tables**
 
@@ -873,6 +1045,39 @@ the test that holds it. Tests without a file name are in `tests/destination/test
 28. **Test databases** are named `cdc_v2_t_d_<random>` and are created and dropped through `cdc_v2.testing.md`
     (section 2.7). The tests run with `CDC_V2_MD_PREFIX` unset or set to `cdc_v2_t_d_`.
 
+**Added with the review of apply and the review of this package** (tests without a file name are in
+`tests/destination/test_from_apply.py`)
+
+29. **`md.StatementError` is not in C4; it is a proposal for it.** C4 said that an error which is none of its
+    four "is passed on unchanged after the roll-back". The review of apply asks for a destination error type
+    whose message keeps "the error class and the statement shape, never a value", and leaves its name open.
+    Built: `md.StatementError(where, error_class, statement)`, a subclass of `DestinationError` (section 5). The
+    "statement shape" is read as the kind of the statement: the name the client's parser gives it. Nothing
+    finer was built, because any piece of the SQL text can hold a value
+    (`test_a_value_in_a_destination_error_never_travels_on`).
+30. **What `execute` counts.** The review of apply says: the number of rows an `INSERT`, `UPDATE` or `DELETE`
+    changed, else `None`. Open were `TRUNCATE`, `MERGE`, `COPY`, `CREATE TABLE … AS` and `RETURNING`. Built:
+    the kind comes from the client's parser, so `TRUNCATE` counts (the parser calls it `DELETE`) and the others
+    return `None`; a statement with `RETURNING` returns `None` and is `LaneMisuse` in `execute_one` (section
+    2.2). `Connection.execute` follows the same rule.
+31. **What `register` takes.** The review of apply says "a `pyarrow.Table` or record batches". Built: a table,
+    one record batch, or a list or tuple of record batches with one schema. A `RecordBatchReader` is refused:
+    the layer cannot tell whether the connection itself produced it, and that case deadlocks. A name is checked
+    as a whole (`fullmatch`), so a name with a line break after it is refused (`test_a_registered_name_is_checked`).
+32. **The two settings are set with `SET SESSION`.** The review of apply says "sets". A plain `SET` reaches the
+    other connections of the process (section 2.1).
+33. **Scratch schemas of apply.** `check_sql` does not take a statement on `_cdc_apply_<random>` for one on the
+    leader tables, and still refuses the same statements on `_cdc` (section 2.1). The check of the leader tables and the migrations
+    never look outside `_cdc` (section 2.4).
+34. **The rows of one state machine are created from one lane.** C5 does not say what happens when two
+    transactions create one key. Built: nothing prevents it on two lanes; the damage is seen at the next use of
+    the key (section 2.5). A unique constraint or a row that both creators write would prevent it; that is a
+    change of the design and a question for the coordinator (section 14.2).
+35. **Log lines of alerts and state transitions carry `committed: False`** (sections 2.5 and 2.6). C4 and C5 name
+    no log lines.
+36. **The bound of a lane call that fails** is `rollback_deadline_s` plus the grace period after the failed
+    step, for the whole clean-up (section 4). C4 says only that the roll-back has a short deadline.
+
 ## 14. Findings that differ from the design or the spike reports
 
 Each finding names what the design (`docs/design/core.md`) or the spike report (`docs/spike/md_semantics.md`)
@@ -921,11 +1126,43 @@ says, what was measured, and where the evidence is.
     error within the times tested** (section 9.2; `connection_break.json`, key `real_break`).
 14. **Kill at `commit_sent`**: 0 ms after it 0 of 4 commits landed; 10 to 60 ms after it 4 of 4 landed and the
     client had not seen the answer (section 8.4; `commit_unknown.json`).
-15. **The text of a conversion or constraint error quotes a value of a row**, and the text of a failed connect
-    can hold a local path (section 5; contract note 3). Both are kept out of the errors of this layer.
-16. **The client cannot hand out a `TIMESTAMPTZ` value without `pytz`**
-    (`test_lane.py::test_times_are_read_as_integer_microseconds`).
+15. **The text of a client error names a value of a row**: with quotation marks, without them, or as a piece of
+    the SQL text (section 5; `from_apply.json`, key `planted_values`). The text of a failed connect can hold a
+    local path (contract note 3). Both are kept out of the errors of this layer.
+16. **The client cannot hand out a `TIMESTAMPTZ` value as a Python object without `pytz`**
+    (`test_lane.py::test_times_are_read_as_integer_microseconds`). Arrow data with the session time zone UTC
+    needs no `pytz` (section 10).
 17. **The clock counts whole milliseconds** (section 10).
+18. **The class of the client's error after a server interrupt of an open transaction is not always the
+    same.** In one test (`test_md.py::test_an_open_transaction_interrupted_on_the_server_is_connection_lost`) the
+    first statement that the lane sent after the interrupt was answered with `TransactionException` (`…
+    transaction already rolled back: Connection Error: interrupted by user`) in the run of 08:13 UTC and with
+    `ConnectionException` in the run of 11:46 UTC (both 2026-11-10; the file of the first run is in the git
+    history of `error_mapping.json`). A plain client connection got `ConnectionException` for the first
+    statement after the interrupt and `TransactionException` for the next one, in both runs (`error_mapping.json`,
+    key `raw_texts`, case `idle_open_transaction_interrupted_on_the_server_then_a_statement`). The code of the
+    layer changed between the two runs, so they do not show why the lane saw the other class the first time.
+    Both classes are transport errors by rule 2 of section 5, and the tests assert `ConnectionLost`, not the
+    class.
+19. **The client describes the result of a statement with `RETURNING` like a count when a returned column is
+    named `Count`.** `INSERT … RETURNING k AS "Count"` came back from `execute` as 41, the first returned value,
+    and `execute_one` took a returned 1 for "one row changed" although two rows had changed. Found while the
+    seven points of section 14.1 were tested, fixed (section 2.2), with seeded tests that fail on the code
+    before the fix: `test_from_apply.py::test_execute_returns_a_count_for_insert_update_and_delete_only`,
+    `test_from_apply.py::test_execute_one_never_takes_a_returned_value_for_a_count`. Both also pass on MotherDuck.
+20. **`DROP SCHEMA … CASCADE` of tables made in the same transaction is accepted, and then `COMMIT` fails**, on
+    MotherDuck (measured first by package A) and on local DuckDB 1.5.6. To the lane it is an error after
+    `COMMIT` was sent: `CommitUnknown` with the label `TransactionException`, and the connection is given up.
+    Nothing was committed and no schema was left (`from_apply.json`, key `drop_schema_cascade`;
+    `test_from_apply.py::test_drop_schema_cascade_of_tables_made_in_the_same_transaction_fails_at_commit`).
+21. **A plain `SET arrow_lossless_conversion` on one connection changes what the other connections of the
+    process to the same database read** (local DuckDB 1.5.6; section 2.1). It was not measured on MotherDuck.
+    There, after another connection had set both settings globally to other values, the connections of the
+    layer still read their own (`from_apply.json`, key `settings_scope`). Package A sets both settings with a
+    plain `SET` on local DuckDB databases of its own (`src/cdc_v2/apply/backend.py` and `core.py` on its
+    branch); those are not connections of the layer and not connections to the destination.
+22. **`MERGE INTO` reports no count through the layer, and `TRUNCATE` reports the rows it removed**
+    (`from_apply.json`, key `merge_and_truncate`: `None`, and 3 for a table of 3 rows).
 
 **Agreement with the spike report**
 
@@ -937,6 +1174,76 @@ says, what was measured, and where the evidence is.
 itself and never returned. It needs a destination that has `md_interrupt_server_connection`, so no T0 test had
 reached it. Seeded regression test:
 `test_lane.py::test_the_interrupt_of_a_replaced_connection_runs_on_the_new_connection`.
+
+**A wrong assumption of a test that only the MotherDuck run found.**
+`test_lane.py::test_an_unclassified_error_after_commit_was_sent_is_commit_unknown` assumed that a connection
+which replaces another one sends one statement before `BEGIN`. On MotherDuck it sends two: the interrupt of the
+old id, then the registering `INSERT` (section 3). The test failed in the md run of 2026-11-10 (1 of 71). It
+now walks the statements of a lane's first connection, which are the same in both places. It asserts the same
+classes and kinds as before.
+
+### 14.1 From the review of apply
+
+The review of package A added seven points to contract C4. All seven are built, and none of them is wrong on
+MotherDuck. The tests are in `tests/destination/test_from_apply.py` (85 test cases in the default run) and two
+are in `tests/destination/test_static.py`. Fifteen of the tests run again against MotherDuck through
+`test_md_again.py`; they are marked (md). What they measured there is in `from_apply.json`.
+
+| Point of C4 | Built | Tests | Measured on MotherDuck |
+|---|---|---|---|
+| 1. `tx.execute(sql, params=None, deadline=None) -> int \| None`: the rows an `INSERT`, `UPDATE` or `DELETE` changed, else `None` | section 2.2, "Counts"; contract note 30 | `test_execute_returns_a_count_for_insert_update_and_delete_only` (md), `test_merge_reports_no_count_and_truncate_counts_as_a_delete` (md), `test_a_returning_clause_is_found_by_the_tokenizer_of_the_client`, `test_execute_one_never_takes_a_returned_value_for_a_count` (md), `test_the_kind_of_a_statement_comes_from_the_parser_of_the_client` | `MERGE` returns `None`; `TRUNCATE` of 3 rows returns 3 (key `merge_and_truncate`) |
+| 2. `tx.fetchall(sql, params=None, deadline=None) -> list` | section 2.2 | `test_fetch_arrow_gives_a_table_that_the_same_transaction_can_register` (md) reads with both | |
+| 3. `tx.fetch_arrow(…) -> pyarrow.Table`, materialised; never a lazy reader | section 2.2 | the same test (md); `test_static.py::test_the_layer_never_hands_out_the_lazy_reader_of_the_client` | a table read with `fetch_arrow` was registered and read again in the same transaction |
+| 4. `tx.register(name, data, deadline=None)`; the name rule; gone when the block ends, also by an error or a deadline | section 2.2; contract note 31 | `test_register_takes_a_table_a_record_batch_or_a_list_of_batches` (md), `test_a_registered_name_is_checked` (md), `test_a_registered_name_is_gone_when_the_block_ends_however_it_ends` (md), `test_a_registered_name_is_gone_after_a_deadline_gave_the_connection_up` (md) | the same results as locally |
+| 5. `TimeZone = 'UTC'` and `arrow_lossless_conversion = true` on every lane connection before its first statement | section 2.1; contract note 32 | `test_arrow_data_keeps_uuid_json_and_time_zones` (md), `test_every_connection_of_the_layer_has_the_two_settings` (md), `test_the_two_settings_belong_to_the_connections_of_the_layer_only` (md), `test_a_plain_set_of_the_lossless_setting_reaches_the_other_connections_of_the_process` (local only) | with the setting: `extension<arrow.uuid>`, `extension<arrow.json>`, `time_tz` and `hugeint` as `arrow.opaque`, `timestamp[us, tz=UTC]`; without: `string`, `string`, `time64[us]`, `decimal128(38, 0)` (key `arrow_types`). After another connection set both globally to other values, the lane and a new connection of the layer still read `UTC` and `true` (key `settings_scope`) |
+| 6. A destination error keeps the error class and the statement shape, never a value; the raw text is never logged, never in an alert or in `_cdc`; a test with a planted value | section 5; contract note 29 | `test_a_value_in_a_destination_error_never_travels_on` (md), `test_a_value_in_local_data_that_cannot_be_registered_does_not_travel_on`, `test_review.py::test_a_key_value_that_commit_reports_does_not_travel_on` | 7 of 7 client texts named the planted value; none of the layer's texts, log lines, alert records or `_cdc` rows did (key `planted_values`) |
+| 7. `DROP SCHEMA … CASCADE` of tables created in the same transaction fails at `COMMIT`; scratch schemas `_cdc_apply_<random>` are not reported and not cleaned up | sections 2.1 and 2.4; contract note 33; finding 20 | `test_a_scratch_schema_of_apply_lives_inside_one_transaction` (md), `test_drop_schema_cascade_of_tables_made_in_the_same_transaction_fails_at_commit` (md), `test_a_statement_on_a_scratch_schema_is_not_taken_for_one_on_the_leader_tables`, `test_the_leader_tables_stay_protected_next_to_scratch_schemas`, `test_the_schema_check_and_the_migrations_leave_a_scratch_schema_alone` (md), `test_static.py::test_nothing_of_this_package_drops_a_schema_or_names_a_scratch_schema_of_apply` | `CommitUnknown`, label `TransactionException`, nothing committed, 0 scratch schemas left (key `drop_schema_cascade`) |
+
+What goes beyond the seven points, or reads one of them:
+
+- The name of the error type of point 6, `md.StatementError`, and the reading of "statement shape" as the kind
+  of the statement are a proposal (contract note 29).
+- Point 1 does not say what a statement with `RETURNING` returns. It returns `None` (finding 19).
+- Point 5: the settings are set with `SET SESSION` (finding 21).
+- Point 7: no migration step and no staging of this package drops what it created in the same transaction, so
+  there was nothing to change. A caller that sends `DROP SCHEMA … CASCADE` in that case gets `CommitUnknown`
+  and a new connection, not a refusal before the statement is sent (finding 20).
+- This package read `src/cdc_v2/apply/backend.py` of the branch of package A (read only). It calls
+  `tx.execute`, `tx.fetch_arrow` and `tx.register`, with the arguments and results as built here. It drops its
+  scratch tables one by one and then the schema. No test of this package runs the code of package A.
+
+### 14.2 What the review of this package found
+
+One read-only reviewer with a fresh context (model `opus`) read the code of this package, as
+`docs/tasks/README.md` allows. The table gives its results by topic. Each seeded test fails on the code as it
+was before the fix; it was run against a copy of that code.
+
+| Topic | What was wrong | What was done | Seeded test |
+|---|---|---|---|
+| A wait that raises | The wait for a statement starts a watchdog thread at the deadline. When no thread could start, `RuntimeError` came out of the wait; a caller that swallowed it left the block normally, and the block committed a transaction whose statement had no answer. Any other exception in the waiting thread left the connection as it was | section 4, "What the rule does not cover" | `test_review.py::test_a_deadline_ends_the_transaction_also_when_no_watchdog_thread_can_start`, `test_review.py::test_a_wait_that_is_broken_off_never_leaves_a_transaction_that_commits` |
+| The bound of a call that fails | The roll-back and the read of the fence row each had `rollback_deadline_s` plus the grace period, twice the documented bound | one budget for the clean-up (section 3) | `test_review.py::test_the_clean_up_after_a_failed_step_has_one_time_budget` |
+| Values in the texts of the client | The errors of the layer carried the first line of the client's text and the client's exception as their cause; a text was sorted by a phrase anywhere in it | labels, no cause, the head rule (section 5) | `test_review.py::test_a_key_value_that_commit_reports_does_not_travel_on`; in `test_errors.py` the rows marked "seeded (review)" of `test_how_an_exception_is_sorted`, `test_the_head_of_a_text_ends_at_the_first_quotation_mark`, `test_the_known_limit_of_the_head_rule` |
+| A connect that answers late | A connect that answered inside the grace period, after its deadline, was handed to the caller although it was being closed | `DeadlineExceeded`; nothing stays open (section 2.1) | `test_review.py::test_a_connect_that_answers_after_its_deadline_is_not_handed_out` |
+| The id that registration writes | Registration read the id and then ran its statement through the ordinary path, which replaces a connection that was given up meanwhile. The row then held the id of the old connection, and a take-over would have interrupted the wrong one | the statement runs on the connection whose id it writes (section 2.3) | `test_review.py::test_registration_writes_the_id_of_the_connection_that_runs_it` |
+| An old id that the destination refuses to interrupt | The id stayed first in the list, so every later call of the lane failed in the same way | the call fails once and the id is dropped (section 4) | `test_review.py::test_an_old_connection_id_that_the_destination_refuses_does_not_block_the_lane_for_ever` |
+| Log lines before the commit | The lines `alert` and `state transition` read like facts and are written inside an open transaction that can still roll back | `committed: False` in the record (sections 2.5 and 2.6) | `test_review.py::test_a_log_line_written_inside_a_transaction_says_that_nothing_is_committed_yet` |
+| Two creators of one key | On two lanes both commit and the key has two rows | **not solved**; the damage is seen, and the rule is the callers' (contract note 34) | `test_state.py::test_two_creators_of_one_key_meet_only_through_the_fence_row_of_their_lane` |
+
+Open after the review:
+
+- **Two creators of one key on two lanes** (above). It needs a decision about the design: a unique constraint
+  on the key, or a row that both creators write. A question for the coordinator.
+- **Threads of a retired connection on a network that answers nothing** (section 4). The client library gives
+  no way to end a call that waits for the server; no test of this package shows how long such a call waits.
+- **A connection of an old run that registers late.** The registering `INSERT` is refused once it sees another
+  epoch in the leader row (section 2.3). One that read the old epoch just before the take-over committed can
+  still land right after it. The call of `md.interrupt_earlier` after the take-over (finding 2) interrupts such
+  a connection only if its row is there when the call runs; one that lands later is not interrupted. Its
+  transaction cannot commit (the fence statement refuses it), but a frozen old run can then hold data rows until
+  MotherDuck ends its transaction, about 29 s (finding 2). It delays the new run; it cannot make a result
+  wrong. This window was not built in a test; it follows from the order of the statements.
+- **The limit of the head rule** (section 5) and the two texts that the `RETURNING` rule takes for a clause
+  (section 2.2).
 
 ## 15. What the callers must know
 
@@ -952,14 +1259,32 @@ For packages A, L, S, V, B and the integrator. Each line is backed by the sectio
   assume either outcome. The wait is no proof (finding 4); the condition of the next write is.
 - `Conflict` can come again. After an interrupt the row is free after about 1 s; without one, after about 29 s
   (sections 7 and 8.3). Try again with a pause and a limit.
-- An error about data (a conversion error, a constraint error) is passed on unchanged. Its text can quote a
-  value of a row, so do not log it as it is (section 5; SPEC 8.3).
+- A statement that the destination refuses (a conversion error, a constraint error, a name that does not
+  exist, text that does not parse) raises `md.StatementError`, a `DestinationError`. The transaction was rolled
+  back. Running it again gives the same answer, so do not put it into a retry loop together with `Conflict` and
+  `ConnectionLost`. Read `error_class` and `statement`; both are safe to log and to put into an alert. The
+  client's text is not available, on purpose (section 5; SPEC 8.3).
+- `tx.execute` returns a count only for `INSERT`, `UPDATE`, `DELETE` (and `TRUNCATE`) without `RETURNING`. It
+  returns `None` for `MERGE`, `CREATE TABLE … AS`, `COPY` and for every statement with `RETURNING`; read the rows
+  of `RETURNING` with `tx.fetchall`. `tx.execute_one` with `RETURNING` is `LaneMisuse` (section 2.2).
+- `tx.fetch_arrow` gives a complete table; a large result is in memory. `tx.register` takes a table or record
+  batches, never a reader, and a name of lower-case letters, digits and `_` of at most 63 characters. The name
+  is gone when the block ends (section 2.2).
+- The layer sets `TimeZone = 'UTC'` and `arrow_lossless_conversion = true` on its connections, for the session.
+  Do not set them on a lane. On a connection of your own to the same database use `SET SESSION`: a plain `SET`
+  reaches the other connections of the process to that database (finding 21).
+- Drop what a transaction created table by table, then the schema. `DROP SCHEMA … CASCADE` in that case ends as
+  `CommitUnknown`, and nothing is committed (finding 20).
+- Create the rows of one state machine from one lane (section 2.5).
+- A log line `alert` or `state transition` with `committed: False` says what a transaction wrote, not what
+  holds. The tables say what holds (sections 2.5 and 2.6).
 - A block whose deadline has passed gets `DeadlineExceeded` before `COMMIT` and commits nothing (section 4). A
   run that was frozen for longer than its block deadline meets this first, before `FenceLost`
   (`takeover_open_tx.json`, key `without_interrupt`).
 - Never read the clock with a bare `SELECT`. Use `tx.clock_us()` or `conn.clock_us()`, or write `md.clock_sql`
   inside a statement on a MotherDuck table (section 10).
-- Read a `TIMESTAMPTZ` column with `epoch_us(…)` or a cast (section 10).
+- Read a `TIMESTAMPTZ` column with `epoch_us(…)` or a cast when you read rows; Arrow data needs neither
+  (section 10).
 - An empty lane transaction costs two round trips, about 155 ms from a laptop (section 11).
 - `LaneMisuse` is a programming error. Do not catch it together with `DestinationError` (contract note 6).
 - `alerts.emit_now` passes on `FenceLost` and `CommitUnknown`
