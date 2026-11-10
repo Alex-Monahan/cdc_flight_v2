@@ -1,0 +1,172 @@
+{
+  "cases": [
+    {
+      "jvm_cpu_s": 5.6,
+      "jvm_cpu_us_per_row": 280.0,
+      "load_s": 3.6,
+      "program": "engine",
+      "rows": 20000,
+      "rows_per_s": 15867,
+      "rows_per_txn": 1,
+      "seconds": 1.26,
+      "threads_cpu_ms": {
+        "cpu_cdc_v2_aux_ms": 5,
+        "cpu_dbz_stream_ms": 1395,
+        "cpu_engine_poll_ms": 649,
+        "cpu_other_ms": 321,
+        "gc_ms": 42,
+        "handler_cpu_ms": 232,
+        "handler_write_ms": 122,
+        "process_cpu_ms": 5627
+      },
+      "variant": "default: batch 8192, queue 32768, 1 processing thread",
+      "walsender_cpu_s": 0.21
+    },
+    {
+      "jvm_cpu_s": 6.13,
+      "jvm_cpu_us_per_row": 306.5,
+      "program": "spike EngineMain (struct, ack none)",
+      "rows": 20000,
+      "rows_per_s": 19177,
+      "rows_per_txn": 1,
+      "seconds": 1.04
+    },
+    {
+      "jvm_cpu_s": 13.06,
+      "jvm_cpu_us_per_row": 43.5,
+      "load_s": 0.9,
+      "program": "engine",
+      "rows": 300000,
+      "rows_per_s": 59721,
+      "rows_per_txn": 1000,
+      "seconds": 5.02,
+      "threads_cpu_ms": {
+        "cpu_cdc_v2_aux_ms": 6,
+        "cpu_dbz_stream_ms": 5033,
+        "cpu_engine_poll_ms": 1091,
+        "cpu_other_ms": 1281,
+        "gc_ms": 140,
+        "handler_cpu_ms": 427,
+        "handler_write_ms": 35,
+        "process_cpu_ms": 13065
+      },
+      "variant": "default: batch 8192, queue 32768, 1 processing thread",
+      "walsender_cpu_s": 1.3
+    },
+    {
+      "jvm_cpu_s": 14.81,
+      "jvm_cpu_us_per_row": 49.4,
+      "program": "spike EngineMain (struct, ack none)",
+      "rows": 300000,
+      "rows_per_s": 56989,
+      "rows_per_txn": 1000,
+      "seconds": 5.26
+    },
+    {
+      "jvm_cpu_s": 29.78,
+      "jvm_cpu_us_per_row": 29.8,
+      "load_s": 3.8,
+      "program": "engine",
+      "rows": 1000000,
+      "rows_per_s": 64566,
+      "rows_per_txn": 1000000,
+      "seconds": 15.49,
+      "threads_cpu_ms": {
+        "cpu_cdc_v2_aux_ms": 16,
+        "cpu_dbz_stream_ms": 15252,
+        "cpu_engine_poll_ms": 2596,
+        "cpu_other_ms": 4455,
+        "gc_ms": 340,
+        "handler_cpu_ms": 1287,
+        "handler_write_ms": 114,
+        "process_cpu_ms": 29784
+      },
+      "variant": "default: batch 8192, queue 32768, 1 processing thread",
+      "walsender_cpu_s": 7.34
+    },
+    {
+      "jvm_cpu_s": 27.54,
+      "jvm_cpu_us_per_row": 27.5,
+      "load_s": 3.8,
+      "program": "engine",
+      "rows": 1000000,
+      "rows_per_s": 69356,
+      "rows_per_txn": 1000000,
+      "seconds": 14.42,
+      "threads_cpu_ms": {
+        "cpu_cdc_v2_aux_ms": 18,
+        "cpu_dbz_stream_ms": 14266,
+        "cpu_engine_poll_ms": 2645,
+        "cpu_other_ms": 3563,
+        "gc_ms": 275,
+        "handler_cpu_ms": 1288,
+        "handler_write_ms": 115,
+        "process_cpu_ms": 27538
+      },
+      "variant": "batch 2048, queue 8192",
+      "walsender_cpu_s": 7.17
+    },
+    {
+      "jvm_cpu_s": 27.58,
+      "jvm_cpu_us_per_row": 27.6,
+      "load_s": 3.8,
+      "program": "engine",
+      "rows": 1000000,
+      "rows_per_s": 69734,
+      "rows_per_txn": 1000000,
+      "seconds": 14.34,
+      "threads_cpu_ms": {
+        "cpu_cdc_v2_aux_ms": 15,
+        "cpu_dbz_stream_ms": 14114,
+        "cpu_engine_poll_ms": 2449,
+        "cpu_other_ms": 3059,
+        "gc_ms": 323,
+        "handler_cpu_ms": 1189,
+        "handler_write_ms": 104,
+        "process_cpu_ms": 27583
+      },
+      "variant": "batch 32768, queue 131072",
+      "walsender_cpu_s": 7.83
+    },
+    {
+      "jvm_cpu_s": 27.59,
+      "jvm_cpu_us_per_row": 27.6,
+      "load_s": 3.8,
+      "program": "engine",
+      "rows": 1000000,
+      "rows_per_s": 70932,
+      "rows_per_txn": 1000000,
+      "seconds": 14.1,
+      "threads_cpu_ms": {
+        "cpu_cdc_v2_aux_ms": 15,
+        "cpu_dbz_stream_ms": 13828,
+        "cpu_engine_poll_ms": 3051,
+        "cpu_other_ms": 3163,
+        "gc_ms": 361,
+        "handler_cpu_ms": 1229,
+        "handler_write_ms": 114,
+        "process_cpu_ms": 27590
+      },
+      "variant": "record.processing.threads 2",
+      "walsender_cpu_s": 8.47
+    },
+    {
+      "jvm_cpu_s": 32.1,
+      "jvm_cpu_us_per_row": 32.1,
+      "program": "spike EngineMain (struct, ack none)",
+      "rows": 1000000,
+      "rows_per_s": 60486,
+      "rows_per_txn": 1000000,
+      "seconds": 16.53
+    }
+  ],
+  "gc": "parallel",
+  "heap_mb": 512,
+  "load_average": [
+    5.2626953125,
+    5.69970703125,
+    5.15771484375
+  ],
+  "note": "indications only: shared 10-core laptop, source, walsender, JVM and reader on the same host; load average recorded below",
+  "test": "CDC_V2_E_MEASURE=1 uv run pytest -m 'jvm and localpg' tests/engine/test_engine_measure.py -s"
+}

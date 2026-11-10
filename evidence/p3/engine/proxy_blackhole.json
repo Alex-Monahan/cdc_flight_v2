@@ -1,0 +1,19 @@
+{
+  "engine_alive_at_bound": true,
+  "fault": "blackhole",
+  "heartbeat_frames_during_fault": 9,
+  "heartbeat_interval_ms": 1000,
+  "last_heartbeat_frame_at_s": 8.2,
+  "message": "",
+  "outcome": "no end within 150 s",
+  "proxy_stats": {
+    "accepted": 7,
+    "closed_by_fault": 0,
+    "reset_by_fault": 0
+  },
+  "seconds": 150.0,
+  "server_walsender_ended_at_s": 59.8,
+  "slot_active_after_kill": false,
+  "test": "tests/engine/test_engine_attach.py::test_broken_source_connection_through_the_proxy[blackhole]",
+  "wal_sender_timeout": "60s (default)"
+}
