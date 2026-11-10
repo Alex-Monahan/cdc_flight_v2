@@ -1,8 +1,9 @@
 # Source side (package P): `cdc_v2.pg`
 
 Status: built in P3 (2026-11-10). Contract: `docs/design/p3_plan.md` C0, C1, C7. Evidence: `evidence/p3/source/`
-(`localpg_pg18.json`, `localpg_pg16.json`, written by the `localpg` suite with `CDC_V2_P_EVIDENCE=1`). Every number
-below comes from those files; they were measured on a shared laptop and are indications only.
+(`localpg_pg18.json`, `localpg_pg16.json`, written by the `localpg` suite with `CDC_V2_P_EVIDENCE=1`; five files
+of single tests are named where they are used). Every number below comes from those files; they were measured on a
+shared laptop and are indications only.
 
 Modules under `src/cdc_v2/pg/`:
 
@@ -158,7 +159,8 @@ catalog columns are read (no `format_type`, no `regclass` casts): those use the 
   ended at or before `b` is visible, none that committed after `a` is.
 - **On a primary** only the upper bound is a guarantee: no commit inserted after `a` is visible. A commit record is
   written before its transaction becomes visible (and with synchronous replication it can stay invisible for long), so
-  a DDL whose commit ended before `b` may still be invisible (measured: §7). Whether a given transaction is in the
+  a DDL whose commit ended before `b` may still be invisible (shown with a commit held in that state: §7). Whether a
+  given transaction is in the
   observation is `CatalogObservation.visible(xid)`: below the snapshot's `xmax` and not in its in-progress list
   (a transaction at or above `xmax` is invisible without being listed). A DDL transaction's catalog change becomes
   visible at its commit, never before.
@@ -171,6 +173,13 @@ primary, each in its own transaction, recording an interval that holds its commi
 transaction, `L1` = after COMMIT), while an observer observes all names in a loop. Rule checked for every
 observation and DDL: `L1 ≤ b` ⇒ visible; `L0 ≥ a` ⇒ not visible. Negative control in the same run: an upper bound
 read **before** the observing statement (with 20 ms between) must be caught. Results: see §7.
+
+**[test] the lower bound on a primary** (`test_lower_bound_on_primary_while_a_commit_waits`, on the breakable pair):
+a transaction creates a table; `synchronous_standby_names` is then set to a standby that does not exist, so its
+COMMIT writes and flushes the commit record and waits (`wait_event = SyncRep`) before the transaction becomes
+visible. The commit record's end is read from the WAL (`pg_walinspect`). An observation taken now must have
+`b ≥` that end, must not contain the table, and `visible(xid)` must be false. The setting is removed, the COMMIT
+returns, and the next observation contains the table with `visible(xid)` true.
 
 `catalog.diff(old, new) -> CatalogDiff` over two observations, two lists of `SourceTable`/`TableFacts`, or maps
 OID → value: `appeared`, `disappeared`, `recreated` (same name, new OID, old OID gone: H-007), `renamed` (same OID;
@@ -201,6 +210,13 @@ name and type is a drop of one `attnum` and an add of another, never a rename.
   `ALTER TABLE` on the parent does not reach the partitions; a partition attached later needs its own call). The catalog observation reports the same rule as `TableFacts.replica_identity_problem`.
   The wrong order is shown by test: a keyless table added without FULL makes the source's own `UPDATE` and `DELETE`
   fail (SQLSTATE 55000, "does not have a replica identity and publishes updates").
+- What Postgres lets a key be is measured in `tests/pg_source/test_pg_keys.py` (Postgres 16.6 and 18.6, hazard
+  H-015, evidence `replica_identity_keys_pg16.json` and `replica_identity_keys_pg18.json`): an immediate key is
+  checked row by row, so the decoded stream never shows two rows with one key; a deferrable primary key is not a
+  replica identity (a published table with one and `REPLICA IDENTITY DEFAULT` refuses its own `UPDATE` and
+  `DELETE`, SQLSTATE 55000), and with `REPLICA IDENTITY FULL` it is the only table shape whose stream can show two
+  rows with one key. **Open until package K is merged:** the catalog and `check` do not read
+  `pg_index.indimmediate` yet and call such a table keyed.
 - `next_xid` (X of design 7.5) = `pg_snapshot_xmax(pg_current_snapshot())` read after the change committed: the first
   unassigned transaction id. Every transaction with a smaller id started before the change.
 - `publication.state(conn)` → `PublicationState(exists, oid, owner, all_tables, publish, via_root,
@@ -384,7 +400,8 @@ the 17 column list of `slot.facts` (`invalidation_reason`, `inactive_since`, `fa
 | Point | Answer | Evidence key |
 |---|---|---|
 | Bracket on a standby (H-008) | 0 violations in either direction over 125–160 observations of 400 DDLs per run, on 18 and 16; the negative control (upper bound read before the observing statement) was caught 230–290 times per run | `bracket.standby` |
-| Bracket on a primary | upper bound: 0 violations in every run; lower bound: 0 in the committed runs, but 12 cases in an earlier run of the same test on 18 (a DDL whose commit ended before `b` was not yet visible; that run's file was overwritten by the final one) — as predicted, the lower bound is not a guarantee on a primary; use `visible(xid)` | `bracket.primary` |
+| Bracket on a primary, concurrent writer | upper bound: 0 violations in every run. Lower bound: 0 violations in the committed runs and in 40 repeats on 18 (12,000 DDLs, 5,081 observations, `bracket_primary_repeats_pg18.json`). An earlier run of the same test on 18 was reported with 12 cases; no file of that run exists, and the repeats did not reproduce it, so that number is not evidence | `bracket.primary`, `bracket.primary_repeats` |
+| Lower bound on a primary, commit held between its WAL record and its visibility | on 18 and 16: the observation's `b` and `a` both equal the end of the commit record, the table is not in the observation and `visible(xid)` is false; after the release the table is there and `visible(xid)` is true. The lower bound is not a guarantee on a primary; use `visible(xid)` | `bracket.primary_commit_waiting` in `primary_commit_waiting_pg18.json`, `primary_commit_waiting_pg16.json` |
 | Observation cost, 1,000 tables × 30 columns | p50 ≈ 0.07 s, max ≈ 0.1 s on standby and primary (one round trip; local); a single observation of a few hundred names ≈ 0.006–0.01 s | `observe_cost`, `bracket.*.observe_p50_s` |
 | Session settings vs `ALTER ROLE/DATABASE … SET` | held, on SQL and replication connections, primary and standby | `session_settings` |
 | Deadlines with the fault proxy (grace 0.5 s) | black hole: connect (deadline 1.5 s) 2.0 s, statement (1.0 s) 1.5 s, idle in transaction (1.0 s) 1.5 s and the server session gone after ≈ 2.1 s; reset and refused: < 1 ms; 0.2 s delay each way: statement 0.40 s; `pg_sleep(30)` with 0.5 s: 0.51 s | `proxy`, `deadlines` |
@@ -422,7 +439,10 @@ identifier, applied position on the timeline history, a valid slot of our plugin
 2. On 16, a standby slot invalidated by `max_slot_wal_keep_size` shows `conflicting = true` (the research note
    says `conflicting` is true only for recovery conflicts). On 18 it is false with `invalidation_reason =
    wal_removed`. `SlotFacts.invalid` treats any of `wal_status = lost`, a reason, or `conflicting` as invalid.
-3. On a primary the observation's lower bound is not a guarantee (finding 12 cases in one run); see §2.
+3. On a primary the observation's lower bound is not a guarantee: a commit that waits for a synchronous standby
+   has its record in the WAL below `b` and is not visible (§2, §7). With a concurrent writer and no synchronous
+   standby the window is the time between the flush of the commit record and the end of the transaction in the
+   process array; 40 repeats of the bracket test did not hit it.
 4. `pg_stat_wal_receiver` columns other than `pid` are hidden from the runtime role, so a standby's timeline in
    `slot.facts` comes from `pg_control_checkpoint()` and can lag behind a timeline switch until the next
    restartpoint; `IDENTIFY_SYSTEM` gives the exact one.
@@ -500,6 +520,9 @@ uv run -q pytest -q tests/pg_source/test_pg_hermetic.py                        #
 uv run pytest -m localpg tests/pg_source                                        # Postgres 18: pg-p (55640) + pg-p2
 CDC_V2_P_PG_MAJOR=16 uv run pytest -m localpg tests/pg_source                   # Postgres 16: pg-p2 (55648)
 CDC_V2_P_EVIDENCE=1 …                                                           # also writes evidence/p3/source/
+CDC_V2_P_EVIDENCE=1 CDC_V2_P_EVIDENCE_NAME=x.json … -k <test>                   # a partial run names its own file
+CDC_V2_P_BRACKET_RUNS=40 … -k test_bracket_on_primary                           # repeats the primary bracket run
+CDC_V2_P_EVIDENCE=1 CDC_V2_P_EVIDENCE_NAME=replica_identity_keys_pg18.json … tests/pg_source/test_pg_keys.py  # H-015
 ```
 
 The `localpg` suite builds or starts its own pairs through `tools/localpg`, runs ≈ 9–11 minutes per version (the

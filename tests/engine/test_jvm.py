@@ -12,7 +12,7 @@ from cdc_v2 import crashpoints
 from cdc_v2.stream import frames as F
 from cdc_v2.stream.engine import JAVA_CRASH_POINTS, java_crash_points
 from cdc_v2.testing import frames as T
-from conftest import LONG
+from stream_helpers import LONG
 
 pytestmark = [pytest.mark.jvm, pytest.mark.timeout(600)]
 MAIN = "cdc_v2.engine.CdcEngine"

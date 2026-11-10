@@ -47,6 +47,24 @@ says elsewhere, these points and that document hold.
 - A TRUNCATE of a table outside the include list inside a transaction that also touches included tables: the
   engine's document says what arrives; build on what it shows.
 
+## From the source package as built — build on it
+
+Package P is built and reviewed. `docs/design/source.md` is the full account; where it differs from what this task
+or contract C7 says elsewhere, these points and that document hold.
+
+- `catalog.observe` gives one observation of every configured table under one snapshot, with the position it
+  covers; `catalog.diff` compares two. Build on both; add no catalog reader of your own.
+- `TableFacts.identity` is the identity the gate compares (OID, columns by `attnum` with type and modifier,
+  key). `relfilenode` is not part of it: a rewrite keeps the table. `published` includes membership through a
+  partition ancestor.
+- **Primary mode.** On a primary, an observation is usable for `group_end` only if `visible(xid)` holds for
+  every transaction of the group (64-bit, widened by the observation's `xmax`) and S's `GapMark` at `group_end`
+  admits its snapshot (contract C9). A transaction that holds only DDL carries no row, so the stream never sees
+  it; one that is still waiting on a synchronous standby can be seen one group late. This is a stated limit of
+  primary mode: write it into your document and into the list of residual cases, with the test that shows it.
+- Publication membership is decided when a transaction is decoded: a transaction that wrote a table before it
+  joined the publication and committed after is delivered with all its rows (`source.md` section 7).
+
 ## What may be missing when you start
 
 Packages S and B are merged, and with them X, E, D, A, P, Y, O and H. Packages V, L and F may or may not be.

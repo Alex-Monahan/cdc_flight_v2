@@ -19,7 +19,7 @@ Debezium 3.7.1.Final (the 73 locked jars); Homebrew OpenJDK 23.0.2 (the JDK lock
 | `attach_*.json`, `proxy_*.json` | `test_engine_attach.py` | HELLO holder, walsender terminated, slot already active, reset/close/blackhole |
 | `parent_death.json` | `test_engine_attach.py::test_parent_death_ends_the_jvm_and_frees_the_slot` | JVM and slot free after the parent's SIGKILL |
 | `position_mapping.json` | `test_engine_attach.py::test_positions_map_to_pgoutput_begin_and_commit` | END ack_position = pgoutput Commit end_lsn |
-| `slot_flush_backwards_pg18.json` | `test_engine_attach.py::test_lower_flush_position_does_not_move_the_slot_back` | core design open point 14 on 18.6 |
+| `slot_flush_backwards_pg18.json`, `slot_flush_backwards_pg16.json` | `test_engine_attach.py::test_lower_flush_position_and_the_slot` | core design open point 14: a lower flush position leaves the slot on 18.6 and moves it back on 16.6 (`CDC_V2_PG_BIN` = the 16 binaries) |
 | `end_only_heartbeat_storm.json` | `test_engine_ack.py::test_end_only_acknowledgement_under_a_heartbeat_storm` | 40,000 + 2,000 transactions, heartbeat 1 ms, kills: nothing lost or doubled, slot never above DURABLE |
 | `held_list_bound.json` | `test_engine_ack.py::test_held_list_keeps_following_far_behind` | 60,000 ENDs behind: DURABLE confirms within the stated bound |
 | `idle_ack_bound.json` | `test_engine_ack.py::test_idle_acknowledgement_bound` | idle delay against heartbeat interval + 1 s |

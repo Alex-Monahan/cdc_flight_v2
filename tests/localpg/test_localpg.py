@@ -11,8 +11,8 @@ import uuid
 import psycopg
 import pytest
 
-from conftest import (LOCALPG, PG_BIN, PG_MAJOR, TEST_BASE, TEST_HOME, Cluster, alive, child_pids, lp, lp_env,
-                      needs_17, port_open, wait_for)
+from localpg_support import (LOCALPG, PG_BIN, PG_MAJOR, TEST_BASE, TEST_HOME, Cluster, alive, child_pids, lp, lp_env,
+                             needs_17, port_open, wait_for)
 
 pytestmark = [pytest.mark.localpg, pytest.mark.timeout(300)]
 
