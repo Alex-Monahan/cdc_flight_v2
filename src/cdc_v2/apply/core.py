@@ -33,6 +33,9 @@ class ApplySettings:
     statement_rows: int = 1_000_000
     #: threads of the private DuckDB connection that plans a local change set (None: DuckDB's default)
     local_threads: Optional[int] = 2
+    #: memory limit of that connection; beyond it DuckDB spills to `local_temp_directory` (None: its default)
+    local_memory_limit: Optional[str] = "1GB"
+    local_temp_directory: Optional[str] = None
 
 
 @dataclass
@@ -89,7 +92,8 @@ def apply_group(tx, target: Target, change_set: Union[LocalChangeSet, RelationCh
     meta = change_set.meta
     ucols = _ucols(change_set)
     if isinstance(change_set, LocalChangeSet):
-        backend = LocalBackend(ctx, target, meta, change_set.rows, settings.statement_rows, settings.local_threads)
+        backend = LocalBackend(ctx, target, meta, change_set.rows, settings.statement_rows, settings.local_threads,
+                               settings.local_memory_limit, settings.local_temp_directory)
     elif isinstance(change_set, RelationChangeSet):
         backend = RemoteBackend(ctx, target, meta, change_set.sql, change_set.params, change_set.scratch_prefix)
     else:
@@ -109,19 +113,39 @@ def apply_group(tx, target: Target, change_set: Union[LocalChangeSet, RelationCh
     return counts
 
 
+#: relations that the statements, the counts or the result read after the plan has run
+_KEEP = {"r0", "r", "kp", "act", "del", "ins", "upd", "copy", "unres", "neg", "delta", "plus"}
+
+
 def _run_plan(ctx, backend, steps):
-    for st in steps:
+    """Run the steps; in the local form drop each intermediate table after the last step that reads it, so that
+    client memory stays near the change set's own size (design 6.1)."""
+    last = {}
+    for i, st in enumerate(steps):
+        text = st.sql + st.ix_sql
+        for other in steps[:i]:
+            if backend.rel(other.name) in text or (other.kind == "lookup" and backend.rel(other.name) in text):
+                last[other.name] = i
+        if st.kind == "lookup":
+            last[st.source] = i
+    for i, st in enumerate(steps):
         ctx.shape = "lookup" if st.kind == "lookup" else "plan"
         backend.run(st)
+        for name, j in last.items():
+            if j == i and name not in _KEEP:
+                backend.drop(name)
 
 
 def _check_shape(stats, target):
     if stats["n_badop"]:
         raise ChangeSetError("%s: %d records with an op other than c, u, d" % (target, stats["n_badop"]))
+    if stats["n_nullorder"]:
+        raise ChangeSetError("%s: %d records without a transaction order or seq" % (target, stats["n_nullorder"]))
 
 
 def _keyed(ctx, backend, target, meta, ucols, mode, cs, counts):
-    steps = keyed_steps(meta, backend.src_sql, cs.order_column, ucols, mode, backend.rel, backend.src_params)
+    steps = keyed_steps(meta, backend.src_sql, cs.order_column, ucols, mode, backend.rel, backend.src_params,
+                        backend.pos)
     _run_plan(ctx, backend, steps)
     ctx.shape = "plan"
     stats = backend.query_one(keyed_stats_sql(meta, ucols, backend.rel, mode))
@@ -181,15 +205,13 @@ def _keyed(ctx, backend, target, meta, ucols, mode, cs, counts):
         for rel in backend.statement_relations("ins", chunked=True):
             counts.inserted += ctx.execute(sh.k6_insert(rel)) or 0
     if mode == "catch_up":
-        if stats["n_unres"] or isinstance(backend, LocalBackend):
-            ctx.shape = "plan"
-            counts.unresolved = backend.fetch_arrow("unres")
-        else:
-            counts.unresolved = pa.table({c.a: pa.array([], type=pa.null()) for c in meta.key_columns})
+        ctx.shape = "plan"
+        counts.unresolved = backend.fetch_arrow("unres")         # with the key types, also when empty
 
 
 def _keyless(ctx, backend, target, meta, ucols, cs, counts):
-    steps = keyless_steps(meta, backend.src_sql, cs.order_column, ucols, backend.rel, backend.src_params)
+    steps = keyless_steps(meta, backend.src_sql, cs.order_column, ucols, backend.rel, backend.src_params,
+                          backend.pos)
     _run_plan(ctx, backend, steps)
     ctx.shape = "plan"
     stats = backend.query_one(keyless_stats_sql(backend.rel))
@@ -218,7 +240,7 @@ def _keyless_statements(ctx, backend, target, meta, ucols, stats, counts):
         counts.deleted += got
     if stats["n_pos_rows"]:
         ctx.shape = "L2"
-        for rel in backend.statement_relations("pos", chunked=True):
+        for rel in backend.statement_relations("plus", chunked=True):
             counts.inserted += ctx.execute(sh.l2_insert(rel)) or 0
 
 

@@ -37,6 +37,12 @@ class Step:
     sql: str = ""
     source: str = ""
     params: tuple = ()
+    view: bool = False          # a view where the backend allows it (local form): read once, never stored
+    # Local form only: the output is assembled from the change set's Arrow columns by position (Arrow `take`),
+    # not by SQL joins: `ix_sql` gives the positions, `recipe` the output columns, each ("ix", column of ix),
+    # ("take", source column, position column) or ("take2", a column, b column, index column into a ++ b).
+    ix_sql: str = ""
+    recipe: tuple = ()
 
 
 def struct_of(parts: list) -> str:
@@ -64,20 +70,20 @@ def x_join(meta: TableMeta, left: str, right: str) -> str:
                                      join_wrap("%s.x%d" % (right, c.position), c.dtype)) for c in meta.key_columns)
 
 
-def _ordered(src_sql: str, order_col: str, cols: str, params: tuple) -> List[Step]:
-    """r0: the records with a record number in (order column, seq) order. The number is computed on the order
-    columns alone and joined back, so that no value passes through the window."""
-    return [
-        Step("r0", "sql", "SELECT {oc} AS tord, seq, CAST(op AS VARCHAR) AS op, {cols} FROM {src}".format(
-            oc=order_col, cols=cols, src=src_sql), params=tuple(params)),
-    ]
+def _ordered(src_sql: str, order_col: str, cols: str, params: tuple, pos: str) -> List[Step]:
+    """r0: the records as given, with their position `pos` (local: a column added to the Arrow data; relation form:
+    the row id of the copy). r0 is the only relation that holds the values of the rows; every later relation holds
+    numbers and keys, and values are read from r0 by position at the end."""
+    sel = "SELECT {oc} AS tord, seq, CAST(op AS VARCHAR) AS op, {cols}{pos} FROM {src}".format(
+        oc=order_col, cols=cols, src=src_sql, pos=", pos" if pos == "pos" else "")
+    return [Step("r0", "sql", sel, params=tuple(params), view=True)]
 
 
 # ------------------------------------------------------------------------------------------------ keyed
 
 
 def keyed_steps(meta: TableMeta, src_sql: str, order_col: str, ucols: List[Column], mode: str,
-                rel: Callable[[str], str], src_params: tuple = ()) -> List[Step]:
+                rel: Callable[[str], str], src_params: tuple = (), pos: str = "pos") -> List[Step]:
     keys = meta.key_columns
     ucols = [c for c in ucols if not c.key]
     upos = {c.position for c in ucols}
@@ -90,16 +96,17 @@ def keyed_steps(meta: TableMeta, src_sql: str, order_col: str, ucols: List[Colum
                                                                          for c in keys]))
     kv = struct_of([(c.a, c.a) for c in keys])
     src_cols = ", ".join([c.a for c in allcols] + [c.u for c in ucols] + [c.k for c in keys])
-    steps = _ordered(src_sql, order_col, src_cols, src_params)
+    steps = _ordered(src_sql, order_col, src_cols, src_params, pos)
 
-    # r: the records with their record number and exact keys (values pass through a join only).
+    # r: per record its number in (transaction, seq) order, its position in r0, its keys and flags; no values
+    # but the key columns (the number is computed on the order columns alone and joined back).
     steps.append(Step("r", "sql", """
-SELECT o.rn, q.tord, q.seq, q.op, {kx} AS kx, {okx} AS okx, {kv} AS kv,
+SELECT o.rn, q.{pos} AS pos, q.tord, q.seq, q.op, {kx} AS kx, {okx} AS okx, {kv} AS kv,
        ({kn}) AS key_null, (NOT ({okn}) AND ({okp})) AS okey_partial, {a}{u}
 FROM {r0} AS q
 JOIN (SELECT tord, seq, row_number() OVER (ORDER BY tord, seq) AS rn FROM {r0}) AS o
   ON o.tord = q.tord AND o.seq = q.seq
-""".format(kx=kx, okx=okx, kv=kv, a=", ".join("q.%s" % c.a for c in allcols),
+""".format(pos=pos, kx=kx, okx=okx, kv=kv, a=", ".join("q.%s" % c.a for c in keys),
            u="".join(", coalesce(q.%s, false) AS %s" % (c.u, c.u) for c in ucols), r0=R("r0"),
            kn=" OR ".join("q.%s IS NULL" % c.a for c in keys), okn=okx_null,
            okp=" OR ".join("q.%s IS NULL" % c.k for c in keys))))
@@ -251,7 +258,9 @@ LEFT JOIN {rc} AS r3 ON {j3}
     if any(needs_exact(c.dtype) for c in keys):
         # a key that changes only in representation (-0 -> 0, 1 mon -> 30 days) cannot be moved by UPDATE: the
         # stored key would stay; such a row is copied (docs/design/apply.md 3.4). Raw keys compared with `=`.
-        rep = " AND ".join("rr.%s = rf.%s" % (c.a, c.a) for c in keys)
+        # any such key column whose value stays `=`-equal while its exact form changes (other columns may change)
+        rep = "(%s)" % " OR ".join("(rr.{a} = rf.{a} AND {er} IS DISTINCT FROM {ef})".format(
+            a=c.a, er=exact("rr." + c.a, c.dtype), ef=exact("rf." + c.a, c.dtype)) for c in keys if needs_exact(c.dtype))
         act_sql = """
 SELECT a.* REPLACE (CASE WHEN a.action = 'upd' AND a.root <> a.kx AND {rep} THEN 'copy' ELSE a.action END AS action)
 FROM (SELECT *, {root} AS root, {action} AS action FROM {src}) AS a
@@ -274,17 +283,33 @@ SELECT {fx} FROM {kp} AS kp
 WHERE true{pfilter}
   AND NOT EXISTS (SELECT 1 FROM {act} AS a WHERE a.action IN ('upd', 'copy') AND a.root = kp.kx)
 """.format(fx=flat_x(meta, "kp.kx"), kp=R("kp"), act=R("act"), pfilter=pfilter)))
-    vjoins = "JOIN {r} AS rl ON rl.rn = a.lrn".format(r=R("r")) + "".join(
+    # values: the newest record of the final row (lrn) supplies the key and every column that cannot be
+    # unchanged; record s<i> supplies unchanged-possible column i. Read from r0 by position.
+    vjoins = "JOIN {r} AS rl ON rl.rn = a.lrn JOIN {r0} AS vl ON vl.{pos} = rl.pos".format(r=R("r"), r0=R("r0"), pos=pos)
+    vjoins += "".join(" LEFT JOIN {r} AS r{p} ON r{p}.rn = a.s{p} LEFT JOIN {r0} AS v{p} ON v{p}.{pos} = r{p}.pos"
+                      .format(r=R("r"), r0=R("r0"), p=c.position, pos=pos) for c in ucols)
+    vcols = (["vl.%s AS %s" % (c.a, c.a) for c in keys] + ["vl.%s AS %s" % (c.a, c.a) for c in nonu]
+             + ["v%d.%s AS %s" % (c.position, c.a, c.a) for c in ucols])
+    ixjoins = "JOIN {r} AS rl ON rl.rn = a.lrn".format(r=R("r")) + "".join(
         " LEFT JOIN {r} AS r{p} ON r{p}.rn = a.s{p}".format(r=R("r"), p=c.position) for c in ucols)
-    vcols = (["rl.%s AS %s" % (c.a, c.a) for c in keys] + ["rl.%s AS %s" % (c.a, c.a) for c in nonu]
-             + ["r%d.%s AS %s" % (c.position, c.a, c.a) for c in ucols])
+    ixcols = ["rl.pos AS p_l"] + ["r%d.pos AS p_%d" % (c.position, c.position) for c in ucols]
+    vrecipe = ([(c.a, "take", c.a, "p_l") for c in keys] + [(c.a, "take", c.a, "p_l") for c in nonu]
+               + [(c.a, "take", c.a, "p_%d" % c.position) for c in ucols])
     steps.append(Step("ins", "sql", "SELECT %s FROM %s AS a %s WHERE a.action = 'ins'"
-                      % (", ".join(vcols), R("act"), vjoins)))
-    upd_cols = ([flat_x(meta, "a.root", "rx"), flat_x(meta, "a.kx")] + vcols
-                + ["(a.s%d IS NOT NULL) AS h%d" % (c.position, c.position) for c in ucols])
+                      % (", ".join(vcols), R("act"), vjoins),
+                      ix_sql="SELECT %s FROM %s AS a %s WHERE a.action = 'ins'" % (", ".join(ixcols), R("act"), ixjoins),
+                      recipe=tuple(vrecipe)))
+    keycols = [flat_x(meta, "a.root", "rx"), flat_x(meta, "a.kx")]
+    hcols = ["(a.s%d IS NOT NULL) AS h%d" % (c.position, c.position) for c in ucols]
+    keyrecipe = ([("rx%d" % c.position, "ix", "rx%d" % c.position) for c in keys]
+                 + [("x%d" % c.position, "ix", "x%d" % c.position) for c in keys])
+    hrecipe = [("h%d" % c.position, "ix", "h%d" % c.position) for c in ucols]
     for name in ("upd", "copy"):
         steps.append(Step(name, "sql", "SELECT %s FROM %s AS a %s WHERE a.action = '%s'"
-                          % (", ".join(upd_cols), R("act"), vjoins, name)))
+                          % (", ".join(keycols + vcols + hcols), R("act"), vjoins, name),
+                          ix_sql="SELECT %s FROM %s AS a %s WHERE a.action = '%s'"
+                          % (", ".join(keycols + ixcols + hcols), R("act"), ixjoins, name),
+                          recipe=tuple(keyrecipe + vrecipe + hrecipe)))
     if mode == "catch_up":
         kvs = ", ".join("q.%s AS %s" % (c.a, c.a) for c in keys)
         steps.append(Step("unres", "sql", """
@@ -306,17 +331,19 @@ def keyed_stats_sql(meta: TableMeta, ucols: List[Column], rel: Callable[[str], s
         "(SELECT count(*) FROM {r} WHERE key_null) AS n_keynull",
         "(SELECT count(*) FROM {r} WHERE okey_partial) AS n_okeypartial",
         "(SELECT count(*) FROM (SELECT tord, seq FROM {r0} GROUP BY ALL HAVING count(*) > 1)) AS n_dupseq",
+        "(SELECT count(*) FROM {r0} WHERE tord IS NULL OR seq IS NULL) AS n_nullorder",
         "(SELECT count(*) FROM {kp} WHERE bad) AS n_bad",
         "(SELECT count(*) FROM {act} WHERE action = 'unres') AS n_unres_final",
         "(SELECT count(*) FROM {del}) AS n_del",
-        "(SELECT count(*) FROM {ins}) AS n_ins",
-        "(SELECT count(*) FROM {upd}) AS n_upd",
-        "(SELECT count(*) FROM {copy}) AS n_copy",
+        "(SELECT count(*) FROM {act} WHERE action = 'ins') AS n_ins",
+        "(SELECT count(*) FROM {act} WHERE action = 'upd') AS n_upd",
+        "(SELECT count(*) FROM {act} WHERE action = 'copy') AS n_copy",
     ]
     if mode == "catch_up":
         parts.append("(SELECT count(*) FROM {unres}) AS n_unres")
     for c in ucols:
-        parts.append("(SELECT count(*) FROM {upd} WHERE h%d) AS h%d" % (c.position, c.position))
+        parts.append("(SELECT count(*) FROM {act} WHERE action = 'upd' AND s%d IS NOT NULL) AS h%d"
+                     % (c.position, c.position))
     names = {n: rel(n) for n in ("r0", "r", "kp", "act", "del", "ins", "upd", "copy", "unres")}
     return "SELECT " + ", ".join(p.format(**names) for p in parts)
 
@@ -325,42 +352,46 @@ def keyed_stats_sql(meta: TableMeta, ucols: List[Column], rel: Callable[[str], s
 
 
 def keyless_steps(meta: TableMeta, src_sql: str, order_col: str, ucols: List[Column],
-                  rel: Callable[[str], str], src_params: tuple = ()) -> List[Step]:
+                  rel: Callable[[str], str], src_params: tuple = (), pos: str = "pos") -> List[Step]:
     """delta: per exact row image, +1 for every new image and -1 for every old image (docs/design/apply.md 4).
-    The images are grouped by their exact form; a representative record is chosen by number and its values are
-    read by a join."""
+    Order does not matter for a multiset. The images are grouped by their exact form; a representative image is
+    chosen by number (position * 2, + 1 for a new image) and its values are read from r0 by position."""
     cols = list(meta.columns)
     upos = {c.position for c in ucols}
-    newv = {c.position: ("CASE WHEN coalesce(%s, false) THEN %s ELSE %s END" % (c.u, c.b, c.a)
-                         if c.position in upos else c.a) for c in cols}
+
+    def newv(c, q=""):
+        if c.position in upos:
+            return "CASE WHEN coalesce({q}{u}, false) THEN {q}{b} ELSE {q}{a} END".format(q=q, u=c.u, b=c.b, a=c.a)
+        return q + c.a
     src_cols = ", ".join([c.a for c in cols] + [c.b for c in cols] + [c.u for c in ucols])
     ecols = ", ".join("e%d" % c.position for c in cols)
-    steps = _ordered(src_sql, order_col, src_cols, src_params)
-    steps.append(Step("r", "sql", """
-SELECT o.rn, q.* FROM {r0} AS q
-JOIN (SELECT tord, seq, row_number() OVER (ORDER BY tord, seq) AS rn FROM {r0}) AS o ON o.tord = q.tord AND o.seq = q.seq
-""".format(r0=rel("r0"))))
+    steps = _ordered(src_sql, order_col, src_cols, src_params, pos)
     old_e = ", ".join("%s AS e%d" % (exact(c.b, c.dtype), c.position) for c in cols)
-    new_e = ", ".join("%s AS e%d" % (exact(newv[c.position], c.dtype), c.position) for c in cols)
+    new_e = ", ".join("%s AS e%d" % (exact(newv(c), c.dtype), c.position) for c in cols)
     steps.append(Step("img", "sql", """
-SELECT rn * 2 AS iid, -1 AS w, {old_e} FROM {r} WHERE op IN ('d', 'u')
+SELECT {pos} * 2 AS iid, -1 AS w, {old_e} FROM {r0} WHERE op IN ('d', 'u')
 UNION ALL
-SELECT rn * 2 + 1 AS iid, 1 AS w, {new_e} FROM {r} WHERE op IN ('c', 'u')
-""".format(old_e=old_e, new_e=new_e, r=rel("r"))))
+SELECT {pos} * 2 + 1 AS iid, 1 AS w, {new_e} FROM {r0} WHERE op IN ('c', 'u')
+""".format(pos=pos, old_e=old_e, new_e=new_e, r0=rel("r0"))))
     steps.append(Step("delta", "sql", """
 SELECT row_number() OVER () AS gid, * FROM (
   SELECT {ecols}, CAST(sum(w) AS BIGINT) AS n, min(iid) AS iid FROM {img} GROUP BY {ecols} HAVING sum(w) <> 0
 ) AS g
 """.format(ecols=ecols, img=rel("img"))))
     steps.append(Step("neg", "sql", "SELECT gid, -n AS n, %s FROM %s WHERE n < 0" % (ecols, rel("delta"))))
-    def _new(c, q):
-        if c.position in upos:
-            return "CASE WHEN coalesce({q}.{u}, false) THEN {q}.{b} ELSE {q}.{a} END".format(q=q, u=c.u, b=c.b, a=c.a)
-        return "%s.%s" % (q, c.a)
-    vals = ", ".join("CASE WHEN d.iid %% 2 = 0 THEN q.%s ELSE %s END AS v%d" % (c.b, _new(c, "q"), c.position)
+    vals = ", ".join("CASE WHEN d.iid %% 2 = 0 THEN q.%s ELSE %s END AS v%d" % (c.b, newv(c, "q."), c.position)
                      for c in cols)
-    steps.append(Step("pos", "sql", "SELECT d.n, %s FROM %s AS d JOIN %s AS q ON q.rn = d.iid // 2 WHERE d.n > 0"
-                      % (vals, rel("delta"), rel("r"))))
+    # local form: index into a<i> ++ b<i> (positions 0..N-1 are a, N..2N-1 are b)
+    def bidx(c):
+        use_b = "d.iid % 2 = 0" + (" OR coalesce(q.%s, false)" % c.u if c.position in upos else "")
+        return "CASE WHEN %s THEN q.%s + (SELECT count(*) FROM %s) ELSE q.%s END AS j%d" % (
+            use_b, pos, rel("r0"), pos, c.position)
+    steps.append(Step("plus", "sql", "SELECT d.n, %s FROM %s AS d JOIN %s AS q ON q.%s = d.iid // 2 WHERE d.n > 0"
+                      % (vals, rel("delta"), rel("r0"), pos),
+                      ix_sql="SELECT d.n, %s FROM %s AS d JOIN %s AS q ON q.%s = d.iid // 2 WHERE d.n > 0"
+                      % (", ".join(bidx(c) for c in cols), rel("delta"), rel("r0"), pos),
+                      recipe=tuple([("n", "ix", "n")] + [("v%d" % c.position, "take2", c.a, c.b, "j%d" % c.position)
+                                                          for c in cols])))
     return steps
 
 
@@ -369,6 +400,8 @@ def keyless_stats_sql(rel: Callable[[str], str]) -> str:
             "(SELECT count(*) FROM {r} WHERE op = 'u') AS n_u, (SELECT count(*) FROM {r} WHERE op = 'd') AS n_d, "
             "(SELECT count(*) FROM {r} WHERE op NOT IN ('c', 'u', 'd') OR op IS NULL) AS n_badop, "
             "(SELECT count(*) FROM (SELECT tord, seq FROM {r0} GROUP BY ALL HAVING count(*) > 1)) AS n_dupseq, "
+            "(SELECT count(*) FROM {r0} WHERE tord IS NULL OR seq IS NULL) AS n_nullorder, "
             "(SELECT count(*) FROM {neg}) AS n_neg_groups, (SELECT coalesce(sum(n), 0) FROM {neg}) AS n_neg_rows, "
-            "(SELECT count(*) FROM {pos}) AS n_pos_groups, (SELECT coalesce(sum(n), 0) FROM {pos}) AS n_pos_rows"
-            ).format(r0=rel("r0"), r=rel("r"), neg=rel("neg"), pos=rel("pos"))
+            "(SELECT count(*) FROM {delta} WHERE n > 0) AS n_pos_groups, "
+            "(SELECT coalesce(sum(n), 0) FROM {delta} WHERE n > 0) AS n_pos_rows"
+            ).format(r0=rel("r0"), r=rel("r0"), neg=rel("neg"), delta=rel("delta"))

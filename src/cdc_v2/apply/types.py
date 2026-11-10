@@ -235,9 +235,10 @@ def join_wrap(expr: str, t: DType) -> str:
     """SQL: what one side of an equality join on a value of type t compares. A hash join whose two sides are plain
     DATE or TIMESTAMP values misses ±infinity in rows that the same transaction wrote (DuckDB 1.5.6, local and
     MotherDuck: the join filter pushdown; `evidence/p3/apply/duckdb_semantics.json`). The join is right when both
-    sides are expressions, so both sides of every key join go through this function."""
+    sides are expressions, so both sides of every key join go through this function. (`date + 0` and not a cast to
+    TIMESTAMP: DATE reaches year 5874897, TIMESTAMP only 294247.)"""
     if t.base == "DATE":
-        return "CAST(%s AS TIMESTAMP)" % expr
+        return "(%s + 0)" % expr
     if t.base in ("TIMESTAMP", "TIMESTAMP WITH TIME ZONE"):
         return "(%s + INTERVAL '0 microseconds')" % expr
     return expr

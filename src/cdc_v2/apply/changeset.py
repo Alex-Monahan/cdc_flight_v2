@@ -58,9 +58,10 @@ class LocalChangeSet:
         return "txn"
 
     def u_columns(self) -> list:
-        """The `u<i>` columns present (a column that cannot be unchanged has none)."""
+        """The non-key columns whose `u<i>` column is present. Presence wins over the meta flag: a `u<i>` that the
+        meta does not expect is still honoured, so that an absent value is never written as NULL."""
         names = set(self.rows.column_names)
-        return [c for c in self.meta.unchanged_columns if c.u in names]
+        return [c for c in self.meta.value_columns if c.u in names]
 
 
 @dataclass(frozen=True)

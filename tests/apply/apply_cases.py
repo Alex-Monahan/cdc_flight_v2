@@ -219,6 +219,23 @@ def special_cases() -> List[Case]:
     cs.append(Case("interval_key_delete_removes_only_its_form", KI, [{0: "INTERVAL '30 days'", 1: "'B'"},
                                                                     {0: "INTERVAL '720 hours'", 1: "'C'"}],
                    [r.out], [{0: "INTERVAL '30 days'", 1: "'B'"}]))
+    # found by the review: a composite key whose DOUBLE part changes only in form while the other part changes
+    KC = TableMeta((Column(0, "id", "INTEGER", key=True), Column(1, "d", "DOUBLE", key=True),
+                    Column(2, "v", "VARCHAR", unchanged_possible=True)))
+    r = R().move(1, {0: "1", 1: NZ}, {0: "2", 1: "0.0::DOUBLE", 2: None}, unchanged=[2])
+    cs.append(Case("composite_key_with_a_double_part_changing_form", KC, [{0: "1", 1: NZ, 2: "'x'"}], [r.out],
+                   [{0: "2", 1: "0.0::DOUBLE", 2: "'x'"}], forms=("local", "relation")))
+    r1 = R().move(1, {0: "1", 1: NZ}, {0: "2", 1: "0.0::DOUBLE", 2: None}, unchanged=[2])
+    r2 = R().u(2, {0: "2", 1: "0.0::DOUBLE", 2: "'y'"})
+    cs.append(Case("composite_key_changed_form_then_updated", KC, [{0: "1", 1: NZ, 2: "'x'"}], [r1.out, r2.out],
+                   [{0: "2", 1: "0.0::DOUBLE", 2: "'y'"}]))
+    # found by the review: a DATE beyond the TIMESTAMP range (Postgres dates reach 5874897 AD)
+    KF = TableMeta((Column(0, "k", "DATE", key=True), Column(1, "v", "VARCHAR", unchanged_possible=True)))
+    far = [{0: "'300000-01-01'::DATE", 1: "'far'"}, {0: "'2020-01-01'::DATE", 1: "'near'"}]
+    r = R().u(1, {0: "'2020-01-01'::DATE", 1: None}, unchanged=[1]).u(1, {0: "'300000-01-01'::DATE", 1: "'far2'"})
+    cs.append(Case("date_key_beyond_the_timestamp_range", KF, far, [r.out],
+                   [{0: "'300000-01-01'::DATE", 1: "'far2'"}, {0: "'2020-01-01'::DATE", 1: "'near'"}],
+                   forms=("local", "relation")))
     r = R().d(1, {0: "0.0::DOUBLE"}).u(1, {0: NZ, 1: "'X'"})
     cs.append(Case("double_keys_negative_zero_and_zero_are_two_keys", KD, [{0: NZ, 1: "'B'"}, {0: "0.0::DOUBLE", 1: "'C'"}],
                    [r.out], [{0: NZ, 1: "'X'"}]))
@@ -326,6 +343,10 @@ def keyless_cases() -> List[Case]:
     r = R().kl(1, "u", a=kv("1", big=None, d="5.0::DOUBLE"), b=kv("1", big="'x'"), unchanged=[1])
     cs.append(Case("keyless_unchanged_value_comes_from_the_old_image", KL, three, [r.out],
                    [kv("1"), kv("1"), kv("1", d="5.0::DOUBLE"), kv("2")]))
+    KLD = TableMeta((Column(0, "dt", "DATE"), Column(1, "v", "VARCHAR")))
+    r = R().kl(1, "d", b={0: "'300000-01-01'::DATE", 1: "'a'"})
+    cs.append(Case("keyless_date_beyond_the_timestamp_range", KLD, [{0: "'300000-01-01'::DATE", 1: "'a'"}] * 2,
+                   [r.out], [{0: "'300000-01-01'::DATE", 1: "'a'"}]))
     RW = TableMeta((Column(0, "rowid", "INTEGER"), Column(1, "v", "VARCHAR")))
     r = R().kl(1, "d", b={0: "1", 1: "'a'"})
     cs.append(Case("keyless_with_a_column_named_rowid", RW, [{0: "1", 1: "'a'"}] * 3, [r.out], [{0: "1", 1: "'a'"}] * 2))

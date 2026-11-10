@@ -46,40 +46,55 @@ _local = threading.local()
 _calls = itertools.count()
 
 
-def _planning_db(threads: Optional[int]):
+def _planning_db(threads: Optional[int], memory_limit: Optional[str] = None, temp_directory: Optional[str] = None):
     """One private in-memory DuckDB database per thread; each call works in a cursor and a schema of its own
-    (a new database costs about 5 ms, a cursor and a schema well under 1 ms)."""
+    (a new database costs about 5 ms, a cursor and a schema well under 1 ms). With a memory limit DuckDB spills
+    the plan's sorts and tables to `temp_directory` instead of growing."""
     db = getattr(_local, "db", None)
     if db is None:
         db = duckdb.connect(":memory:")
         if threads:
             db.execute("SET threads = %d" % int(threads))
+        if memory_limit:
+            db.execute("SET memory_limit = '%s'" % memory_limit.replace("'", ""))
+        if temp_directory:
+            db.execute("SET temp_directory = '%s'" % temp_directory.replace("'", "''"))
         _local.db = db
     return db
 
 
 class LocalBackend:
     def __init__(self, tx, target: Target, meta: TableMeta, rows: pa.Table, statement_rows: int,
-                 threads: Optional[int] = None):
+                 threads: Optional[int] = None, memory_limit: Optional[str] = None,
+                 temp_directory: Optional[str] = None):
         self.tx, self.target, self.meta = tx, target, meta
         self.statement_rows = max(1, int(statement_rows))
-        self.L = _planning_db(threads).cursor()
+        self.L = _planning_db(threads, memory_limit, temp_directory).cursor()
         self.L.execute("SET TimeZone = 'UTC'")
         # UUID, TIME WITH TIME ZONE and JSON leave as Arrow extension types; without this they would become
         # VARCHAR and TIME (the offset lost) on their way to the destination.
         self.L.execute("SET arrow_lossless_conversion = true")
         self.schema = "p_%d" % next(_calls)
         self.L.execute("CREATE SCHEMA %s" % self.schema)
-        self.L.register("src_rows", rows)
+        # the position of each record: values are read by it at the end (plan.py, r0)
+        self.rows = rows
+        self.recipes = {}
+        self.L.register("src_rows", rows.append_column("pos", pa.array(range(rows.num_rows), type=pa.int64())))
         self.src_sql = "src_rows"
         self.src_params = ()
+        self.pos = "pos"
 
     def rel(self, name: str) -> str:
         return "%s.%s" % (self.schema, quote_ident(name))
 
     def run(self, step: Step) -> None:
         if step.kind == "sql":
-            self.L.execute("CREATE TABLE %s AS %s" % (self.rel(step.name), step.sql), list(step.params) or None)
+            if step.ix_sql:
+                self.recipes[step.name] = step.recipe
+                self.L.execute("CREATE TABLE %s AS %s" % (self.rel(step.name + "_ix"), step.ix_sql))
+                return
+            what = "VIEW" if step.view else "TABLE"
+            self.L.execute("CREATE %s %s AS %s" % (what, self.rel(step.name), step.sql), list(step.params) or None)
             return
         cand = self.L.execute("SELECT row_number() OVER () AS ci, * FROM %s" % self.rel(step.source)).to_arrow_table()
         if cand.num_rows == 0:
@@ -96,6 +111,9 @@ class LocalBackend:
         self.L.unregister("lookup_result")
         self.L.unregister("lookup_cand")
 
+    def drop(self, name: str) -> None:
+        self.L.execute("DROP TABLE IF EXISTS %s" % self.rel(name))
+
     def query_one(self, sql: str):
         cur = self.L.execute(sql)
         row = cur.fetchone()
@@ -104,9 +122,28 @@ class LocalBackend:
     def fetch_arrow(self, name: str) -> pa.Table:
         return self.L.execute("SELECT * FROM %s" % self.rel(name)).to_arrow_table()
 
+    def assemble(self, name: str) -> pa.Table:
+        """An output relation from its positions (`<name>_ix`) and the change set's own Arrow columns. Values are
+        copied by Arrow `take`, never by a SQL operator (docs/design/apply.md 3.1)."""
+        ix = self.L.execute("SELECT * FROM %s" % self.rel(name + "_ix")).to_arrow_table()
+        cols, names = [], []
+        for item in self.recipes[name]:
+            out, kind = item[0], item[1]
+            if kind == "ix":
+                arr = ix.column(item[2])
+            elif kind == "take":
+                arr = self.rows.column(item[2]).take(ix.column(item[3]))
+            else:                                            # take2: from a ++ b
+                both = pa.chunked_array(self.rows.column(item[2]).chunks + self.rows.column(item[3]).chunks,
+                                        type=self.rows.column(item[2]).type)
+                arr = both.take(ix.column(item[4]))
+            cols.append(arr)
+            names.append(out)
+        return pa.table(cols, names=names)
+
     def statement_relations(self, name: str, chunked: bool) -> Iterator[str]:
         """Register the relation `name` on the transaction (whole, or in slices) and yield its name per slice."""
-        data = self.fetch_arrow(name)
+        data = self.assemble(name) if name in self.recipes else self.fetch_arrow(name)
         view = VIEW_PREFIX + name
         if not chunked or data.num_rows <= self.statement_rows:
             self.tx.register(view, data)
@@ -133,6 +170,7 @@ class RemoteBackend:
         self.schema = "%s_%s" % (prefix, secrets.token_hex(6))
         self.src_sql = "(%s) AS src" % src_sql
         self.src_params = tuple(src_params)
+        self.pos = "rowid"                                  # r0 is a table here: its row id is the position
         self.created = []
         self.tx.execute("CREATE SCHEMA %s" % quote_ident(self.schema))
 
@@ -146,6 +184,9 @@ class RemoteBackend:
             return
         self.tx.execute("CREATE TABLE %s AS %s" % (self.rel(step.name),
                                                      lookup_sql(self.meta, self.target, self.rel(step.source))))
+
+    def drop(self, name: str) -> None:
+        pass                                                 # dropped with the others at the end
 
     def query_one(self, sql: str):
         rows = self.tx.fetch_arrow(sql).to_pylist()
