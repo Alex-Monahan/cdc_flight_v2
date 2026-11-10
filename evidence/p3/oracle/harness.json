@@ -22,9 +22,9 @@
   },
   "quiesce": {
     "equal_at_first": true,
-    "first": "0/BFD01B8",
-    "rounds": 82,
-    "second": "0/C1350D0"
+    "first": "1/B9510990",
+    "rounds": 83,
+    "second": "1/B96CC588"
   },
   "wait_for_applied": {
     "returned": "1/2000",

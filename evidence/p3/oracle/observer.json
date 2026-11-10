@@ -22,10 +22,10 @@
         "observation": 2,
         "sum": 23989
       },
-      "observations": 161,
-      "seconds": 14.249,
+      "observations": 150,
+      "seconds": 14.568,
       "unavailable": 0,
-      "violations": 143
+      "violations": 132
     },
     "transfers": 10
   },
@@ -40,7 +40,7 @@
       "expected": 24000,
       "first_violation": null,
       "observations": 38,
-      "seconds": 3.599,
+      "seconds": 3.302,
       "unavailable": 0,
       "violations": 0
     },

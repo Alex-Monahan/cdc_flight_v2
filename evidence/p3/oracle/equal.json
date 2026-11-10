@@ -24,10 +24,10 @@
   "extra_tables": [],
   "missing_tables": [],
   "rows_compared": 3014,
-  "rows_per_second": 5017.7,
-  "seconds": 0.601,
+  "rows_per_second": 4973.0,
+  "seconds": 0.606,
   "source_in_recovery": false,
-  "source_lsn": "1/B4F428F0",
+  "source_lsn": "1/BA52A818",
   "source_server_version": 180006,
   "tables": [
     {
@@ -71,7 +71,7 @@
         "extra": [],
         "missing": []
       },
-      "seconds": 0.137,
+      "seconds": 0.141,
       "source": "other.big",
       "source_rows": 3000,
       "truncated": false
@@ -101,7 +101,7 @@
         "extra": [],
         "missing": []
       },
-      "seconds": 0.088,
+      "seconds": 0.091,
       "source": "public.dups",
       "source_rows": 7,
       "truncated": false
@@ -156,7 +156,7 @@
         "extra": [],
         "missing": []
       },
-      "seconds": 0.26,
+      "seconds": 0.253,
       "source": "public.types_k",
       "source_rows": 7,
       "truncated": false
