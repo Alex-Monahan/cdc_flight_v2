@@ -240,16 +240,23 @@ class SrcSignal(Fault):
     def inject(self, ctx):
         fn = "pg_terminate_backend" if self.kind == "src_terminate" else "pg_cancel_backend"
         active = "" if self.kind == "src_terminate" else " AND state = 'active'"     # a cancel needs a statement
-        n = 0
+        n, tries = 0, 0
         nodes = sorted({ctx.system.slot_node, ctx.system.primary_node})
-        for node in nodes:
-            with ctx.admin(node) as c:
-                rows = c.execute("SELECT %s(pid) FROM pg_stat_activity WHERE application_name LIKE %%s "
-                                 "AND pid <> pg_backend_pid() AND datname = current_database()%s" % (fn, active),
-                                 (ctx.system.app_prefix + "%",)).fetchall()
-            n += sum(1 for (ok,) in rows if ok)
+        # a cancel acts only on a running statement: look for one for up to 3 s (a terminate acts at once)
+        deadline = time.monotonic() + (3.0 if active else 0.0)
+        while True:
+            tries += 1
+            for node in nodes:
+                with ctx.admin(node) as c:
+                    rows = c.execute("SELECT %s(pid) FROM pg_stat_activity WHERE application_name LIKE %%s "
+                                     "AND pid <> pg_backend_pid() AND datname = current_database()%s" % (fn, active),
+                                     (ctx.system.app_prefix + "%",)).fetchall()
+                n += sum(1 for (ok,) in rows if ok)
+            if n or time.monotonic() >= deadline:
+                break
+            time.sleep(0.02)
         self.effect = n > 0
-        self.proof = {"backends": n, "nodes": nodes}
+        self.proof = {"backends": n, "nodes": nodes, "tries": tries}
 
 
 class SrcLock(Fault):
