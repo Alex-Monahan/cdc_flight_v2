@@ -208,6 +208,13 @@ F's consumer loop need to know what a consumer may see.
 
 ### 5. Catch up
 
+- **Apply as built** (`docs/design/apply.md` 2.3, 2.6; plan C3a): the preconditions of a catch-up call are in
+  apply.md 2.6, word for word; follow them. Never repeat a catch-up call after a later one (after a crash, resume
+  from the stored round). Load every repair read with `apply.repair_keys` (it deletes by the source's equality,
+  then inserts); never with a plain INSERT. Once a call has passed `R1` of every snapshot, repairs included, and
+  reported nothing, later rounds and the swap group use mode `stream`. The second review's campaigns had 2–3 % of
+  records unresolved: budget the repair reads. `ApplySpillFull` is not a failure of the table (package S's rule).
+
 - For a table with a key, catch-up starts when all chunks are loaded, and replays the log from the smallest `R0`
   of the table's snapshots; `unknown` counts as `outside`. For a table without a key the log is replayed from
   exactly its cut.

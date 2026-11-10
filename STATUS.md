@@ -8,9 +8,7 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
   table). **P2 Platform spike: gate passed on 2026-11-10** — every spike is done and merged, the report
   (`docs/spike_report.md`) is complete and was sent to the owner; nothing found contradicts SPEC, so the build
   continues without waiting. **P3 Core: in progress** (table below): the fault harness, the oracle, the source
-  package, the engine and the transform are merged; the apply package is reviewed twice and its fix round is checked
-  (verdict: merge; the second reviewer's repeat campaigns found one correct history that is refused, so it is in a
-  second, short fix round); the question the second review raised — which tables have a key — is measured and decided
+  package, the engine, the transform and the apply package are merged; the question the second review raised — which tables have a key — is measured and decided
   (rule K, below) and has a small package of its own, which is merged; the cut is merged; the destination basics are
   reviewed twice and in a fix round of sixteen items (the first is one unexplained result at the fence: once in 30
   runs on MotherDuck an old run's empty transaction was answered "committed" after a take-over; it did not recur in
@@ -58,7 +56,7 @@ green on T1 (local primary and standby, real MotherDuck, local JVM).
 | X | The cut: where a snapshot lies in the stream | Opus (was Fable) | **merged** (`1cd62c9`; three reviews, three fix rounds; with it the oracle's reader on a standby was repaired) |
 | E | Engine: the JVM program around stock Debezium, frames, the Python side | Opus | **merged** (two reviews, two fix rounds) |
 | D | Destination basics: lanes, fence, deadlines, errors, `_cdc` schema, transition function, alert records | Opus (was Fable) | **delivered** (`9e389cc`); two reviews: the coordinator **merge after named fixes**, the second reviewer **not yet** (one unexplained result at the fence on MotherDuck, defects in the error mapping, the state module and the migrations); **fix round running** (Opus, xhigh; 16 items) |
-| A | Apply: the statements over a change set, keyed and keyless | Opus | **delivered**; two reviews; two fix rounds (`68df804`, `6d5e87b`: the refused history repaired, per-key checks, the new-key check inside the statements — one round trip for an insert-only change set, 359 ms instead of 567 ms at 10,000 records on MotherDuck); the coordinator's re-check: **merge after two small items** (one more case; `apply.repair_keys` for the backfill), **running** |
+| A | Apply: the statements over a change set, keyed and keyless | Opus | **merged** (`a6728f9`; two reviews, three fix rounds; with `apply.repair_keys` for the backfill) |
 | P | Source: connections, catalog and its observation, publication, slot, slot facts, timeline, heartbeat | Opus | **merged** (with the repair of `tools/localpg` for Postgres 16; one fix after the review) |
 | L | Leadership: guard, take-over, heartbeat, hand-over, bootstrap, platform interface | Opus (was Fable) | task written; after D |
 | Y | Transform: source types to destination types | Opus | **merged** (`362d00b`; one review, one fix round, one last check) |
@@ -130,6 +128,11 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
 
 ## Questions for the owner / owed by the owner
 
+- **From the apply package (two questions).** (1) A table whose key column can be TOASTed (a long text or bytea
+  key) needs `REPLICA IDENTITY FULL`, because Postgres can send the key of such a row as "unchanged"; that costs
+  more WAL on every update. Working rule until you rule: refuse such a table without `FULL` (with F-7). (2) Apply
+  works around a DuckDB defect in a join filter; should it be reported upstream? Nothing is reported without your
+  word.
 - **For your information (no ruling needed): table names with a double quote.** Stock Debezium 3.7.1 cannot stream a
   table whose schema or table name contains `"` (measured by package K, H-051): it stops at every start, or drops
   the table's rows without a sign, or — worst — delivers the rows of a table `"q"` as rows of the table `q` in the
@@ -331,7 +334,6 @@ Each in its own worktree and branch; the orchestrator merges. The P3 packages ar
 | Job | Phase | Started | Delivers |
 |---|---|---|---|
 | Package D, destination basics: **delivered** on branch `worktree-agent-a5e245130333b3efe` (`9e389cc`). The coordinator's review is in; the second reviewer (Opus, xhigh, reading only; the first one was stopped by the spend limit, its MotherDuck test runs are kept; MotherDuck databases `cdc_v2_t_d_rv_*`) that attacks the fence, the unknown commit outcome, deadlines, the error mapping and the transition function with cases of its own and runs the package's MotherDuck tests once more on the last commit | P3 | 2026-11-10 | the second verdict (the coordinator's is in: merge after named fixes); then one fix round — `_cdc.transitions` gets the lane, a sequence that gives the order of commit, and the facts of a group; a connection's registration must fail when a take-over came in between; a machine declares which lane creates its rows; the evidence names the commit and the command that really ran — then the merge, and D's notes in the tasks of L and S |
-| Package A, apply: the last two small items before the merge, on branch `worktree-agent-adbee9c1aec8e2051` (from `6d5e87b`). The second round's campaign from zero: 10,249 seeds, 0 failures; the second reviewer's keyed program, unchanged: 3,521 seeds, 0 bad | P3 | 2026-11-10 | one case (a row inserted earlier in the same transaction whose key changes only its form) and `apply.repair_keys`; then the merge and the sentences for design 6.1–6.5 and plan C0, C3a, C4, C10 |
 | Package F, fuzzers (Opus, high): **fix round running** on branch `p3-f-fuzzers` (15 items: ledger rules, suite 1.7 again, reductions, two table shapes, the shared-memory repair of `tools/localpg`, the frame reader's allocation). Homes `pg-f<n>`, ports 55700 + 8·n; localpg self-test ports | P3 | 2026-11-10 | the four fuzzers with seeds and replay, the consumer loop of SPEC 1.3 and 3.2, their self-tests with planted defects. Owed: the fix round below |
 
 **Package A, apply — delivered 2026-11-10; two reviews; fix round delivered, under its last checks.** The
@@ -677,17 +679,12 @@ the exact-value layer.
 
 ## Next steps
 
-1. P3, as writer slots become free (at most four; now D, K and the fix rounds of X and F). A's fix round is
-   delivered: the coordinator checks A again and the second reviewer repeats its campaigns; then A
-   is merged and the review's sentences go into design 6.1–6.3, plan C0, C3a, C4 and C10, the tasks of D, Y, S and B,
-   the hazard notes (a new entry for a TOASTed key column sent as unchanged) and `docs/spike/md_semantics.md`. Review
-   and merge D, X, K and F as they report: the coordinator reviews each, D also gets a second reviewer. Then L after
-   D; S after D and A; then V, B, T in the order of the table above. When X merges: design 7.1–7.4 and open points 1
-   and 12 take its text, plan C9 is completed, and the tasks of B, S, V and T take the rules of the cut (settle floor,
-   `R0 ≥ P0` for every snapshot, the tracker on a primary, timeline).
-2. Add to the owner's questions when A merges: `REPLICA IDENTITY FULL` for a table whose key column can be
-   TOASTed (more WAL; with F-7); whether the DuckDB join-filter defect that apply works around should be
-   reported upstream.
+1. P3, as writer slots become free (at most four; now D's fix round and F's last fixes). Merge D and F as they
+   report (the coordinator checks each). Then L after D; S after D (E, A, P, K, X, Y are merged); then V, B, T in
+   the order of the table above. Still to do from A's merge: the hazard note for a TOASTed key column sent as
+   unchanged, `docs/spike/md_semantics.md` (rowid stable within a transaction; the join of a stored `-0` with an
+   Arrow-side `0` finds no row on MotherDuck), and after D's merge `tests/apply/test_apply_md.py` through D's real
+   lane instead of the stand-in.
 3. Carry into P4: the preflight warning for a server without the confirmed-flush guard. Carry into P5 (from the
    `tools/localpg` work): slot creation on a standby waits for a running-transactions record
    and `pg_log_standby_snapshot()` needs a privileged role; a failover slot is synchronised to a standby only after it

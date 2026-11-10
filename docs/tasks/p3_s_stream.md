@@ -422,8 +422,11 @@ Package F points its fuzzers at your pipeline after you are merged. It must be a
   `state.transition` has no place for such facts, say so at once; do not build a second log.
 - The applied position only through `stream.applied_position` (C8).
 - **The spill area can be made tiny by a setting** (the transform connection's and apply's planning database's
-  `max_temp_directory_size`), and "spill area full" is an alert through `alerts.emit`: the alert row is the
-  fuzzer's proof that the fault had an effect. Apply raises `ApplySpillFull` for its part; it is the same wait.
+  `max_temp_directory_size`), and "spill area full" is an alert through `alerts.emit`: the alert row is the fuzzer's
+  proof that the fault had an effect. `ApplySpillFull` (apply's part): roll the group back. It is not a table failure:
+  no attempt is counted and the table is never quarantined. Alert once. If the spill area holds nothing else, stage
+  that table's change set and apply it in the relation form; otherwise wait (a declared wait) and run the group again.
+  The transform connection and each planning thread get shares of one `max_temp_directory_size`.
 - **Every source address is a setting, per node** (primary, replica, the engine's replication connection), so
   that each link can pass through package H's proxy. MotherDuck is reached only through the `md.*` fault sites.
 - **Crash points** for every durable step (section 5), declared through `cdc_v2.crashpoints`; a point that is

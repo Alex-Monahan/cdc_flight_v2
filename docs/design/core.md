@@ -302,8 +302,10 @@ Rules that follow from the measurements:
 
 - Arrow data is handed to DuckDB in bounded record batches, never as one reader over an unbounded stream (a
   reader over 12M rows grew to 2 GB of client memory).
-- `net` (6.2) and `delta` (6.3) are computed once per table and group on the client; the statements that follow
-  read that result, so the rows are uploaded once per statement that needs them.
+- Apply plans once per table and segment on the client, in a private DuckDB with a memory limit and a spill limit
+  inside the pipeline's one spill area (`docs/design/apply.md` 3.1); the statements that follow read that plan, so
+  the rows are uploaded once per statement that needs them. No value of a row passes through an aggregate, a
+  window or `QUALIFY` on the way: they do not keep every form of a value (6.3).
 - The memory a group may hold is `apply.max_group_bytes`. The buffer in front of it has a byte limit; when it is
   full the pipeline stops reading the engine's pipe, which stops the engine's queue and then the slot read
   (back-pressure, SPEC 5.4).
@@ -317,44 +319,66 @@ statements of 6.2–6.3 are the same for both inputs; only the input relation di
 
 ### 6.2 Tables with a key
 
-For one table and one segment, with `net` = the last record per key by `_seq`:
+Only a table with a key by rule K takes this path, so in the stream no two rows hold one key after any record. A
+key's first record in the change set therefore fixes its start state (`c`: the key was free; `u`, `d`: it held one
+row), and after every record a key holds at most one row. A change set that breaks this is not a history of the
+source: `ApplyInvariantError` in both modes, never a best effort.
 
-1. `DELETE FROM t USING net WHERE t.key = net.key` for keys whose net record is a delete or a complete image.
-2. `INSERT INTO t SELECT … FROM net` for complete images.
-3. Partial images (some column unchanged) are applied with `UPDATE … FROM net`, never by delete and insert, and
-   never write a column whose value is unchanged. A column that is unchanged in the last record takes the newest
-   changed value from earlier records of the same key in the group, if there is one.
+For one table and one segment the plan gives, per key, the final row if there is one and where each of its values
+comes from. `docs/design/apply.md` section 3 names the statements and says why their order is right: K1 deletes;
+C0 reads the row ids of the copy roots before any row moves; K2 and K3 move and update the roots of key changes
+in one statement (a swap or a rotation is a parallel assignment); K7 and K8 copy a root whose key changes only in
+form, found by its row id; K4 and K5 write, per column that can be unchanged, the values the change set supplies;
+K6 inserts complete final images. A column whose value is unchanged is never written and never read into the
+client (SPEC 2.6). The destination has no keys or indexes, so no intermediate state can violate a constraint.
+Apply relies on `rowid` staying the same within one transaction, from C0 to K7 and K8, also for a row inserted
+earlier in that transaction (tested locally and on MotherDuck).
 
-Chains and swaps of key values (SPEC 1.4): the delete and the create of each key change are ordinary records, and
-the last record per key decides. One case needs more. The create of a key change can be a partial image; its
-unchanged values belong to the row that had the old key. The engine therefore copies the old key onto the create
-record (Debezium links the two records with the headers `__debezium.oldkey` and `__debezium.newkey` **[test]**),
-and the applier resolves a chain of key changes inside a group back to the key the row had before the group, and
-takes the unchanged values from that row before it deletes it. The destination has no keys or indexes, so no intermediate
-state can violate a constraint.
+In stream mode the destination equals the source at the start of the change set, and apply checks the start state
+it relies on, per key and inside the statements: K1 removes exactly one row per held key and none per new key, or
+nothing; K3 moves a root only if it is alone at its key, and onto a free target where the source did not hold it;
+K6 inserts through an anti join, so its count is short exactly when a new key is already held (`check_new_keys`,
+default on; an insert-only change set is one statement: 359 ms against 567 ms before, at 10,000 records on
+MotherDuck). Two final keys that the source's equality merges raise. A difference is `ApplyInvariantError` (a
+double apply, a table wrongly taken as keyed, a lost row). With `check_new_keys` off, inserts at held keys and
+moves onto held free keys go unchecked.
 
-An unchanged value is never lost silently (H-003). It is resolved in this order: from an earlier record of the
-same row in the change set; from the destination row that has the key the row had before the change set; and,
-only when a log is replayed onto a table that was loaded separately (catch-up, 7.3), from the destination row
-with the new key if no earlier record of the set addressed that key. A value that is still unresolved is an
-invariant violation in the stream (`ApplyInvariantError`: the destination has diverged), and a key for a repair
-read in catch-up (7.3). Applying a change set a second time gives the same table, except for keys reported as
-unresolved.
+Chains and swaps of key values (SPEC 1.4): a key change is a `d` of the old key directly followed by a `c` of the
+new key that carries the old key (`k<i>`: Debezium links the two records with the headers `__debezium.oldkey` and
+`__debezium.newkey`, and the engine copies the old key onto the create record). The unchanged values of a partial
+create follow these links back to the *root*: the destination row with the key the row had before the change set.
+A key that changes only in form (`-0` to `0` in a `float8` key, `1 month` to `30 days`) is a key change like any
+other; its root is copied, because an update to an equal value stores nothing (below).
 
-DuckDB does not write an `UPDATE` whose new value compares equal to the stored one, and keeps the old
-representation: after `SET x = 0` a stored `-0` is still `-0`, and after `SET i = INTERVAL '30 days'` a stored `1
-mon` is still `1 mon`, also through `UPDATE … FROM`, locally and on MotherDuck (package O,
-`evidence/p3/oracle/duckdb_equal_update.json`). The source and the oracle tell these values apart. For columns whose
-types have such values (real, double precision, interval, and what package A's list adds), step 3 must therefore use
-a shape that always writes the changed column; the rule that an unchanged column is never written stays. Package A
-chooses the shape and proves it against the oracle.
+An unchanged value is never lost silently (H-003). It comes from an earlier record of the same row in the change
+set, else from the root. In the stream, a value without a source, or a root that the destination lacks, is
+`ApplyInvariantError`: the destination has diverged. When a log is replayed onto a table that was loaded under
+several snapshots (catch-up, 7.3), a destination row is some version of its row, older or newer than the start of
+the change set. Catch-up uses the root if the destination holds exactly one row for it and no `c` of the change
+set lands on its key (this also resolves a root whose only create is the final row's own `d(K) c(K, k=K)`).
+Otherwise it uses the row with the final key, if that key's first record in the change set is this row's `c` and
+the destination holds exactly one row for it. Otherwise the key is *unresolved*: its destination row is deleted
+and the key is reported for a repair read (7.3), which covers every reported key, including keys the source no
+longer holds. Only the immediate repeat of a call is safe: a call repeated after a later call can leave a wrong
+row and report nothing. A repair deletes the key's rows by the source's equality and inserts, in one transaction
+(`apply.repair_keys`); a plain insert would duplicate a row that a later call resolved. The preconditions of a
+catch-up call are in the plan (C10).
+
+DuckDB does not write an `UPDATE` whose new value compares equal to the stored one, and keeps the old representation:
+after `SET x = 0` a stored `-0` is still `-0`, and after `SET i = INTERVAL '30 days'` a stored `1 mon` is still `1
+mon`, also through `UPDATE … FROM`, locally and on MotherDuck (package O,
+`evidence/p3/oracle/duckdb_equal_update.json`). The source and the oracle tell these values apart. For FLOAT, DOUBLE,
+INTERVAL and STRUCTs that hold them, apply therefore writes a sentinel first (a value unequal to the new one) and then
+the value, only for rows where the stored and the new value differ exactly; the rule that an unchanged column is never
+written stays (`docs/design/apply.md` 3.3).
 
 The number of statement shapes per table depends on the table's columns, not on the data (SPEC 2.6).
 
 ### 6.3 Tables without a key
 
-Every record carries the full old and new image. For one table and one segment, `delta` = per distinct row image
-the sum of +1 for every new image and −1 for every old image (`GROUP BY` all columns, which treats NULLs as equal).
+Every record carries the full old and new image. For one table and one segment, `delta` = per distinct row image the
+sum of +1 for every new image and −1 for every old image (grouped by each column's exact form, `types.exact`; NULLs
+are equal).
 
 1. Images with a negative sum: delete exactly `-sum` rows among the identical rows, chosen by `rowid` through
    `row_number() OVER (PARTITION BY <all columns>)`.
@@ -364,13 +388,14 @@ A delete that finds fewer rows than it must remove is an invariant violation: th
 the table goes to quarantine handling (SPEC 4.0); it is never ignored.
 
 The grouping key must keep apart every pair of values that the source tells apart. DuckDB's `GROUP BY`, `PARTITION
-BY`, `DISTINCT` and `=` do not: `-0` and `0` form one group, NaN and −NaN one, and `1 mon`, `30 days` and `720
-hours` one; UNION values of different members compare unequal although they can stand for the same source value
-(package O, `docs/oracle.md` 1.5). The delta and the choice of rows to delete therefore use an exact key for columns
-of such types — the canonical form the oracle compares by (`docs/oracle.md` 1.2: a UNION value by its member and
-that member's rule, NaN equal to NaN, `-0` different from `0`, an interval by its three fields) — and the value
-itself elsewhere. Package A writes down the full list of destination types that need it. A source NULL in a UNION
-column is written as a real NULL: a UNION whose member holds NULL is not NULL in DuckDB. This settles open point 3.
+BY`, `DISTINCT` and `=` do not: `-0` and `0` form one group, NaN and −NaN one, and `1 mon`, `30 days` and `720 hours`
+one; UNION values of different members compare unequal although they can stand for the same source value (package O,
+`docs/oracle.md` 1.5). The delta and the choice of rows to delete therefore use an exact key for columns of such types
+— the canonical form the oracle compares by (`docs/oracle.md` 1.2: a UNION value by its member and that member's rule,
+NaN equal to NaN, `-0` different from `0`, an interval by its three fields) — and the value itself elsewhere. Apply
+compares a UNION by member and value (`docs/design/apply.md` 5.1 has the list of types). A source NULL in a UNION
+column is written as a real NULL: a UNION whose member holds NULL is not NULL in DuckDB, and a change set staged by
+SQL must keep that. This settles open point 3.
 
 The stream path and the backfill path must produce identical destination values for identical source values; the
 type fuzzer checks this for every type, because a keyless delete can only find a row that was written the same way.
@@ -388,7 +413,8 @@ becomes visible, until that commit. Nothing is ever applied from an unfinished s
 A TRUNCATE (all relations named in the message, so CASCADE needs nothing extra) or a schema change cuts the group
 into segments. Inside the one destination transaction: apply segment 1, execute the truncate or the DDL, apply
 segment 2, and so on, in commit order. DDL in MotherDuck is transactional, so a rolled-back group leaves no
-half-changed schema.
+half-changed schema. A segment is a contiguous run of records. It may start and end inside a source transaction,
+but never between the `d` and the `c` of one key change.
 
 ## 7. Snapshot and stream
 
