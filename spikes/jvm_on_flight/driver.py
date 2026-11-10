@@ -718,8 +718,10 @@ def phase_profile():
     prepare()
     n = int(os.environ.get("CDC_V2_TPUT_ROWS", "1000000"))
     tx_test("profile_default", n, {}, "1g", (), timeout=300, jfr=True)
+    only = [x for x in os.environ.get("CDC_V2_TPUT_ONLY", "").split(",") if x and x != "all"]
     for name, props, opts in PROFILE_VARIANTS:
-        tx_test(name, n, props, "1g", opts, timeout=300)
+        if not only or name in only:
+            tx_test(name, n, props, "1g", opts, timeout=300)
 
 
 PROFILE_VARIANTS = [
