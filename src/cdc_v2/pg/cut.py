@@ -352,6 +352,80 @@ class PrimaryCut:
         """The in-progress ids below ``X`` that keep :meth:`usable_after_xid` false (for the report)."""
         return tuple(i for i in self.bounds.xip if i < x)
 
+    def sees_all(self, full_xids) -> bool:
+        """The exact rule: every one of these (64-bit) ids of committed transactions is inside."""
+        return all(self.classify_full(x) is INSIDE for x in full_xids)
+
+    def not_seen(self, full_xids) -> tuple[int, ...]:
+        """Those of the (64-bit) ids that are not inside (for the report)."""
+        return tuple(sorted(x for x in full_xids if self.classify_full(x) is not INSIDE))
+
+
+@dataclass(frozen=True)
+class GapMark:
+    """What the stream on a primary knows, at one stream position, about transactions it has delivered and a
+    snapshot may not see yet.  Made by :meth:`GapTracker.mark`."""
+
+    gap: frozenset                      # 64-bit ids of delivered transactions that no probe snapshot has seen
+    unknown_below: Optional[int] = None  # transactions delivered before the tracker existed have ids below this
+
+    def admits(self, cut: "PrimaryCut") -> bool:
+        """True if the snapshot sees every transaction the stream had delivered when the mark was made.
+
+        The snapshot must have been taken after the mark was made.
+        """
+        if self.unknown_below is not None and cut.bounds.xmin < self.unknown_below:
+            return False
+        return cut.sees_all(self.gap)
+
+    def blocking(self, cut: "PrimaryCut") -> tuple[int, ...]:
+        """The transaction ids that keep :meth:`admits` false (for the report)."""
+        ids = set(cut.not_seen(self.gap))
+        if self.unknown_below is not None:
+            ids.update(x for x in cut.bounds.xip if x < self.unknown_below)
+        return tuple(sorted(ids))
+
+
+class GapTracker:
+    """On a primary: which delivered transactions may a new snapshot still not see?
+
+    A commit record is written, and the slot can deliver the transaction, before the transaction becomes visible
+    to snapshots (docs/design/cut.md, "The cut on a primary").  A snapshot that sees a committed transaction
+    proves that every later snapshot sees it too.  So the tracker keeps only the delivered transactions that no
+    probe snapshot has seen so far; normally that set is empty.
+
+    * :meth:`delivered` for every transaction the stream delivers (64-bit id: :func:`widen_xid`);
+    * :meth:`probe` with any snapshot of the primary, as often as wanted (once per applied group keeps the set
+      small; without probes it holds every delivered id);
+    * :meth:`mark` at a table's switch.  A snapshot taken after that is usable for the table exactly if
+      :meth:`GapMark.admits` it.
+
+    ``unknown_below``: a tracker that starts while the stream is already running (an engine restart) does not
+    know the ids delivered before.  Give it an id assigned after the start (:func:`next_xid_marker`); every
+    earlier delivered transaction has a smaller id.  Until a probe has ``xmin`` at or above it, marks also
+    demand ``xmin >= unknown_below``, which is the simple rule :meth:`PrimaryCut.usable_after_xid`.
+    """
+
+    def __init__(self, unknown_below: Optional[int] = None):
+        self._gap: set[int] = set()
+        self._unknown_below = unknown_below
+
+    def delivered(self, full_xid: int) -> None:
+        self._gap.add(int(full_xid))
+
+    def probe(self, cut: "PrimaryCut") -> None:
+        """Forget every delivered transaction this snapshot sees.  Call it only with snapshots taken before the
+        snapshots that will later be judged with a mark (snapshots of the stream's own connection, in order)."""
+        self._gap = {x for x in self._gap if cut.classify_full(x) is not INSIDE}
+        if self._unknown_below is not None and cut.bounds.xmin >= self._unknown_below:
+            self._unknown_below = None
+
+    def mark(self) -> GapMark:
+        return GapMark(frozenset(self._gap), self._unknown_below)
+
+    def __len__(self) -> int:
+        return len(self._gap)
+
 
 # --------------------------------------------------------------------------------------------------------------
 # SQL: taking a cut

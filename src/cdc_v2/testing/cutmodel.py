@@ -392,8 +392,28 @@ def describe(w: Standby, k0: int, ks: int, k1: int) -> str:
 # Primary: rules, sound and wrong
 # --------------------------------------------------------------------------------------------------------------
 
-PRIMARY_SOUND = ("exact", "xmin_ge_x", "xmin_gt_max_delivered", "delivered_inside")
-PRIMARY_WRONG = ("later_snapshot", "xmax_ge_x")
+PRIMARY_SOUND = ("exact", "xmin_ge_x", "xmin_gt_max_delivered", "delivered_inside", "gap_tracker",
+                 "gap_tracker_blind")
+PRIMARY_WRONG = ("later_snapshot", "xmax_ge_x", "probe_after_snapshot")
+
+# when the stream takes a probe snapshot: after every event, never, after every second event (both phases)
+PROBE_PATTERNS = (lambda k: True, lambda k: False, lambda k: k % 2 == 0, lambda k: k % 2 == 1)
+
+
+def _tracker_at(st: list, upto: int, probe, start: int = 0, unknown_below=None):
+    """The library's gap tracker after the events ``start`` .. ``upto``: every commit record written in that
+    range is delivered to it, and it probes with the snapshot after event ``k`` where ``probe(k)`` says so."""
+    from cdc_v2.pg.cut import GapTracker, PrimaryCut
+
+    tracker = GapTracker(unknown_below)
+    seen = len(st[start - 1]["delivered"]) if start else 0
+    for k in range(start, upto + 1):
+        for t in st[k]["delivered"][seen:]:
+            tracker.delivered(st[k]["xid"][t])
+        seen = len(st[k]["delivered"])
+        if probe(k):
+            tracker.probe(PrimaryCut(st[k]["bounds"]))
+    return tracker
 
 
 def check_primary(events: tuple) -> dict:
@@ -405,8 +425,14 @@ def check_primary(events: tuple) -> dict:
       xmin_ge_x              snapshot xmin >= X => nothing lost
       xmin_gt_max_delivered  snapshot xmin > the largest id delivered at or before P0 => nothing lost
       delivered_inside       nothing lost exactly when the cut calls every delivered transaction inside
+      gap_tracker            the library's GapTracker, fed with the stream and with probe snapshots in four
+                             patterns: its mark at P0 admits a later snapshot exactly when nothing is lost
+      gap_tracker_blind      a tracker that starts at a marker (it knows nothing delivered before) with
+                             ``unknown_below`` = that marker: what its mark at P0 admits loses nothing
       later_snapshot (wrong) a snapshot taken after P0 loses nothing
       xmax_ge_x (wrong)      snapshot xmax >= X => nothing lost
+      probe_after_snapshot (wrong)  judging a snapshot with what the tracker knows after a probe that was
+                             taken later than the snapshot
     """
     from cdc_v2.pg.cut import INSIDE, PrimaryCut
 
@@ -439,6 +465,29 @@ def check_primary(events: tuple) -> dict:
                         bad.setdefault("xmin_ge_x", (p, m, i))
                     if lost and snap["bounds"].xmax >= st[m]["marker"]:
                         bad.setdefault("xmax_ge_x", (p, m, i))
+    for p, at_p in enumerate(st):
+        delivered = at_p["delivered"]
+        for probe in PROBE_PATTERNS:
+            mark = _tracker_at(st, p, probe).mark()
+            for i in range(p + 1, len(st)):
+                lost = any(t not in st[i]["visible"] for t in delivered)
+                if mark.admits(cuts[i]) == lost:
+                    bad.setdefault("gap_tracker", (p, None, i))
+        for m in markers:
+            if m > p:
+                continue
+            for probe in PROBE_PATTERNS:
+                mark = _tracker_at(st, p, probe, start=m + 1, unknown_below=st[m]["marker"]).mark()
+                for i in range(p + 1, len(st)):
+                    if mark.admits(cuts[i]) and any(t not in st[i]["visible"] for t in delivered):
+                        bad.setdefault("gap_tracker_blind", (p, m, i))
+        for i in range(p + 1, len(st)):
+            lost = any(t not in st[i]["visible"] for t in delivered)
+            for j in range(i + 1, len(st)):
+                late = _tracker_at(st, p, lambda k: False)
+                late.probe(cuts[j])
+                if lost and late.mark().admits(cuts[i]):
+                    bad.setdefault("probe_after_snapshot", (p, None, i))
     return bad
 
 

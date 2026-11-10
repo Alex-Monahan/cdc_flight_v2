@@ -120,4 +120,4 @@ def test_primary_gap_smallest_witness():
     assert st_[1]["delivered"] == (0,) and st_[1]["visible"] == frozenset()
     assert st_[2]["marker"] == 11 and str(st_[2]["bounds"]) == "10:12:10"      # xmin 10 < X: not usable yet
     assert str(st_[3]["bounds"]) == "12:12:" and st_[3]["visible"] == {0}      # xmin 12 >= X: usable
-    assert set(M.check_primary(events)) == {"later_snapshot", "xmax_ge_x"}
+    assert set(M.check_primary(events)) == {"later_snapshot", "xmax_ge_x", "probe_after_snapshot"}

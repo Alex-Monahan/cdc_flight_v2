@@ -337,3 +337,122 @@ def test_primary_cut_refused_on_a_standby():
     with pytest.raises(C.CutError):
         C.take_primary_cut(conn)
     assert conn.log[-1] == "ROLLBACK"
+
+
+# -- the exact rule on a primary: the gap tracker ----------------------------------------------------------------
+
+def test_gap_tracker_keeps_only_what_no_probe_has_seen():
+    t = C.GapTracker()
+    for x in (101, 104, 107):
+        t.delivered(x)
+    assert len(t) == 3
+    # 104 has written its commit record (the stream delivered it) and is still listed as in progress: the gap
+    t.probe(PrimaryCut(SnapshotBounds(xmin=104, xmax=108, xip=(104,))))
+    assert len(t) == 1
+    mark = t.mark()
+    assert mark.gap == frozenset({104}) and mark.unknown_below is None
+    later_still_in_gap = PrimaryCut(SnapshotBounds(xmin=104, xmax=120, xip=(104, 111)))
+    assert not mark.admits(later_still_in_gap) and mark.blocking(later_still_in_gap) == (104,)
+    # an unrelated open transaction does not block: the exact rule waits only for the gap itself
+    later = PrimaryCut(SnapshotBounds(xmin=111, xmax=120, xip=(111,)))
+    assert mark.admits(later) and mark.blocking(later) == ()
+    # the mark is frozen: what the tracker learns afterwards does not change it
+    t.delivered(130)
+    t.probe(later)
+    assert mark.gap == frozenset({104}) and len(t) == 1
+
+
+def test_gap_tracker_delivered_id_at_or_above_xmax_stays():
+    t = C.GapTracker()
+    t.delivered(110)
+    quiet = PrimaryCut(SnapshotBounds(xmin=110, xmax=110))
+    t.probe(quiet)                       # 110 is not below xmax: this snapshot does not see it
+    assert len(t) == 1 and not t.mark().admits(quiet)
+    assert t.mark().admits(PrimaryCut(SnapshotBounds(xmin=111, xmax=111)))
+
+
+def test_gap_tracker_blind_start_demands_xmin_until_a_probe_clears_it():
+    t = C.GapTracker(unknown_below=200)
+    mark = t.mark()
+    blocked = PrimaryCut(SnapshotBounds(xmin=150, xmax=260, xip=(150, 230)))
+    assert not mark.admits(blocked) and mark.blocking(blocked) == (150,)
+    assert mark.admits(PrimaryCut(SnapshotBounds(xmin=230, xmax=260, xip=(230,))))
+    t.probe(blocked)
+    assert t.mark().unknown_below == 200
+    t.probe(PrimaryCut(SnapshotBounds(xmin=200, xmax=260, xip=(230,))))
+    assert t.mark().unknown_below is None and t.mark().admits(blocked)
+
+
+class _ModelPrimary:
+    """Ids are assigned in order; a transaction writes its commit record (delivered) and later ends (visible)."""
+
+    def __init__(self):
+        self.next = 100
+        self.running: list[int] = []      # has an id, has not ended
+        self.recorded: list[int] = []     # commit record written, not ended yet: the gap
+        self.ended: set[int] = set()
+        self.latest_completed = 99
+
+    def snapshot(self) -> PrimaryCut:
+        xmax = self.latest_completed + 1
+        xip = tuple(sorted(x for x in self.running if x < xmax))
+        return PrimaryCut(SnapshotBounds(xmin=xip[0] if xip else xmax, xmax=xmax, xip=xip))
+
+
+@given(st.lists(st.tuples(st.sampled_from(["start", "record", "end", "probe", "mark", "abort"]),
+                          st.integers(0, 7)), max_size=40),
+       st.booleans())
+def test_gap_tracker_is_exact(events, blind):
+    """Against a model of the primary: a mark admits a later snapshot exactly if the snapshot sees every
+    transaction that had been delivered when the mark was made."""
+    p = _ModelPrimary()
+    delivered_before_start: set[int] = set()
+    if blind:                           # the stream ran before the tracker existed
+        for _ in range(3):
+            p.running.append(p.next)
+            p.next += 1
+        p.recorded = [p.running[0], p.running[2]]
+        delivered_before_start = set(p.recorded)
+        marker = p.next                 # an id assigned after the start
+        p.next += 1
+        p.ended.add(marker)
+        p.latest_completed = max(p.latest_completed, marker)
+        tracker = C.GapTracker(unknown_below=marker)
+    else:
+        tracker = C.GapTracker()
+    delivered = set(delivered_before_start)
+    marks = []                          # (mark, ids delivered when it was made)
+    for kind, pick in events:
+        if kind == "start":
+            p.running.append(p.next)
+            p.next += 1
+        elif kind == "record":
+            open_ = [x for x in p.running if x not in p.recorded]
+            if open_:
+                x = open_[pick % len(open_)]
+                p.recorded.append(x)
+                delivered.add(x)
+                tracker.delivered(x)
+        elif kind == "end" and p.recorded:
+            x = p.recorded.pop(pick % len(p.recorded))
+            p.running.remove(x)
+            p.ended.add(x)
+            p.latest_completed = max(p.latest_completed, x)
+        elif kind == "abort":
+            open_ = [x for x in p.running if x not in p.recorded]
+            if open_:
+                x = open_[pick % len(open_)]
+                p.running.remove(x)
+                p.latest_completed = max(p.latest_completed, x)
+        elif kind == "probe":
+            tracker.probe(p.snapshot())
+        elif kind == "mark":
+            marks.append((tracker.mark(), set(delivered)))
+        cut = p.snapshot()
+        for mark, had in marks:
+            sees_all = all(x in p.ended for x in had)
+            if mark.admits(cut):
+                assert sees_all                                  # never admits a snapshot that misses one
+            elif mark.unknown_below is None:
+                assert not sees_all, (mark, cut)                 # exact: refuses only when one is missed
+            assert set(mark.blocking(cut)) or mark.admits(cut)   # a refusal names what it waits for

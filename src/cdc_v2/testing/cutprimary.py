@@ -326,7 +326,9 @@ def _failover_slot(cl: S.Cluster, o, key: int, holds: tuple) -> dict:
 # A campaign of cuts taken on a primary
 # --------------------------------------------------------------------------------------------------------------
 
-PRIMARY_SOUND = ("exact", "passed_insert", "xmin_ge_x", "xmin_gt_m")
+PRIMARY_SOUND = ("exact", "passed_insert", "xmin_ge_x", "xmin_gt_m", "delivered_inside", "gap_tracker",
+                 "gap_tracker_blind")
+JUDGED = 40     # cuts judged with each mark of the gap tracker
 PRIMARY_WRONG = ("later_snapshot", "status_check", "xmax_ge_x", "passed_flush")
 WINDOW = 64     # transactions per key checked on each side of what the snapshot saw
 
@@ -334,10 +336,10 @@ WINDOW = 64     # transactions per key checked on each side of what the snapshot
 class PCut:
     """One cut taken on the primary, with the evidence read under its snapshot."""
 
-    __slots__ = ("t", "head", "bounds", "fired", "insert", "flush", "vis")
+    __slots__ = ("t0", "t", "head", "bounds", "fired", "insert", "flush", "vis")
 
-    def __init__(self, t, head, bounds, fired, insert, flush, vis):
-        self.t, self.head, self.bounds, self.fired = t, head, bounds, fired
+    def __init__(self, t0, t, head, bounds, fired, insert, flush, vis):
+        self.t0, self.t, self.head, self.bounds, self.fired = t0, t, head, bounds, fired    # t0 < snapshot < t
         self.insert, self.flush, self.vis = insert, flush, vis
 
 
@@ -347,6 +349,7 @@ def _ptaker(cl: S.Cluster, stream: S.Stream, out: list, stop: threading.Event, s
             C.set_statement_timeout(conn, 30)
             while not stop.is_set():
                 head = stream.count              # transactions the stream had delivered before the snapshot
+                t0 = time.monotonic()
                 cut = C.take_primary_cut(conn)
                 t = time.monotonic()
                 try:
@@ -356,7 +359,7 @@ def _ptaker(cl: S.Cluster, stream: S.Stream, out: list, stop: threading.Event, s
                     vis = dict(conn.execute(S.READ_COUNTERS).fetchall())
                 finally:
                     C.end_transaction(conn)
-                out.append(PCut(t, head, cut.bounds, bool(fired), C.parse_lsn(a), C.parse_lsn(b), vis))
+                out.append(PCut(t0, t, head, cut.bounds, bool(fired), C.parse_lsn(a), C.parse_lsn(b), vis))
                 if sleep_s:
                     stop.wait(sleep_s)
     except Exception as exc:
@@ -408,6 +411,7 @@ def check_primary(stream: S.Stream, cuts: list, markers: list, ref_xid: int) -> 
     for i in range(n):
         prefix_max[i + 1] = max(prefix_max[i], full[i])
     marker_x = [m[2] for m in markers]
+    where = {x: i for i, x in enumerate(full)}      # the place of each transaction id in the stream
     violations, wrong, stats = Counter(), Counter(), Counter()
     examples: dict = {}
 
@@ -418,6 +422,10 @@ def check_primary(stream: S.Stream, cuts: list, markers: list, ref_xid: int) -> 
     def missing(c: PCut, i0: int) -> int:
         """Transactions among the first i0 delivered that the snapshot does not see."""
         return sum(max(0, bisect_left(ix, i0) - c.vis.get(k, 0)) for k, ix in stream.idx.items())
+
+    def all_inside(c: PCut, i0: int) -> bool:
+        """The exact rule, from transaction ids alone: each of the first i0 delivered transactions is inside."""
+        return prefix_max[i0] < c.bounds.xmax and all(where.get(x, n) >= i0 for x in c.bounds.xip)
 
     cuts.sort(key=lambda c: c.t)
     for c in cuts:
@@ -441,6 +449,14 @@ def check_primary(stream: S.Stream, cuts: list, markers: list, ref_xid: int) -> 
                 if e > c.flush:
                     note(wrong, "passed_flush", c, {"key": k, "e": C.format_lsn(e), "flush": C.format_lsn(c.flush)})
         bad = missing(c, c.head)
+        if all_inside(c, c.head):
+            stats["cuts_the_exact_rule_accepts"] += 1
+            if bad:
+                note(violations, "delivered_inside", c, {"delivered_but_not_seen": bad})
+        else:
+            stats["cuts_the_exact_rule_rejects"] += 1
+            if not bad:
+                stats["complete_cuts_the_exact_rule_rejects"] += 1
         if bad:
             stats["cuts_that_miss_a_delivered_transaction"] += 1
             note(wrong, "later_snapshot", c, {"delivered_but_not_seen": bad})
@@ -461,14 +477,80 @@ def check_primary(stream: S.Stream, cuts: list, markers: list, ref_xid: int) -> 
         m = bisect_right(marker_x, c.bounds.xmax) - 1        # wrong: only xmax is at or after the marker
         if m >= 0 and missing(c, markers[m][1]):
             note(wrong, "xmax_ge_x", c, {"marker": markers[m][2]})
-    # How long does each rule make a table wait after its switch?
     times = [c.t for c in cuts]
-    waits: dict = {"xmin_ge_x": [], "xmin_gt_m": [], "exact": []}
+    waits: dict = {"xmin_ge_x": [], "xmin_gt_m": [], "exact": [], "gap_tracker": []}
+    # The library's gap tracker, fed as an engine would feed it: the stream's transactions in order, and a probe
+    # with every snapshot taken before the mark.  The mark made at a marker must admit exactly those later cuts
+    # that see every transaction delivered before the marker.
+    tracker = C.GapTracker()
+    fed = probed = 0
+    gap_sizes = Counter()
+    for t, i0, x in markers:
+        for xid in full[fed:i0]:
+            tracker.delivered(xid)
+        fed = max(fed, i0)
+        while probed < len(cuts) and cuts[probed].t < t:
+            tracker.probe(C.PrimaryCut(cuts[probed].bounds))
+            probed += 1
+        mark = tracker.mark()
+        gap_sizes[len(mark.gap)] += 1
+        judged = 0
+        admitted = False
+        for c in cuts[bisect_left(times, t):]:
+            if c.t0 < t:
+                continue                                   # its snapshot may be older than the mark
+            judged += 1
+            if judged > JUDGED:
+                break
+            stats["cuts_judged_with_a_gap_mark"] += 1
+            admits = mark.admits(C.PrimaryCut(c.bounds))
+            if admits and missing(c, i0):
+                note(violations, "gap_tracker", c, {"mark": sorted(mark.gap)[:8], "marker": x})
+            if admits != all_inside(c, i0):
+                note(violations, "gap_tracker", c, {"mark": sorted(mark.gap)[:8], "differs_from_exact_rule": True})
+            if not admits:
+                stats["cuts_a_gap_mark_refuses"] += 1
+            elif not admitted:
+                admitted = True
+                waits["gap_tracker"].append(c.t - t)
+    # A tracker that starts blind at a marker (an engine restart): it knows nothing delivered before, only that
+    # those ids are below the marker's id.  Its mark, made five markers later, must not admit a cut that misses
+    # a transaction delivered before that mark.
+    for m in range(0, len(markers) - 5, 10):
+        t1, i1, x1 = markers[m]
+        t2, i2, _ = markers[m + 5]
+        blind = C.GapTracker(unknown_below=x1)
+        for xid in full[i1:i2]:
+            blind.delivered(xid)
+        for c in cuts[bisect_left(times, t1):bisect_left(times, t2)]:
+            if c.t0 >= t1:
+                blind.probe(C.PrimaryCut(c.bounds))
+        mark = blind.mark()
+        stats["blind_marks"] += 1
+        if mark.unknown_below is not None:
+            stats["blind_marks_still_blind"] += 1
+        judged = 0
+        for c in cuts[bisect_left(times, t2):]:
+            if c.t0 < t2:
+                continue
+            judged += 1
+            if judged > JUDGED:
+                break
+            if mark.admits(C.PrimaryCut(c.bounds)):
+                stats["cuts_a_blind_mark_admits"] += 1
+                if missing(c, i2):
+                    note(violations, "gap_tracker_blind", c, {"mark": sorted(mark.gap)[:8], "marker": x1})
+            else:
+                stats["cuts_a_blind_mark_refuses"] += 1
+    stats["gap_mark_empty"] = gap_sizes.get(0, 0)
+    stats["gap_mark_not_empty"] = sum(v for k, v in gap_sizes.items() if k)
+    stats["gap_mark_largest"] = max(gap_sizes) if gap_sizes else 0
+    # How long does each rule make a table wait after its switch?
     unanswered = Counter()
     for t, i0, x in markers:
         start = bisect_left(times, t)
         tests = {"xmin_ge_x": lambda c: c.bounds.xmin >= x, "xmin_gt_m": lambda c: c.bounds.xmin > prefix_max[i0],
-                 "exact": lambda c: not missing(c, i0)}
+                 "exact": lambda c: all_inside(c, i0)}
         for rule, accept in tests.items():
             for c in cuts[start:start + 20000]:
                 if accept(c):
@@ -726,6 +808,121 @@ def promotion(cl: S.Cluster) -> dict:
 
 
 # --------------------------------------------------------------------------------------------------------------
+# A standby that starts from a checkpoint taken while a commit was still waiting
+# --------------------------------------------------------------------------------------------------------------
+
+NO_STANDBY = "cdc_v2_cut_no_such_standby"
+CONTROL = "SELECT redo_lsn::text, next_xid FROM pg_control_checkpoint()"
+
+
+def _control_xid(text: str) -> int:
+    epoch, _, xid = text.partition(":")
+    return (int(epoch) << 32) | int(xid)
+
+
+def _connect_when_up(cl: S.Cluster, name: str, timeout_s: float = 60):
+    deadline = time.monotonic() + timeout_s
+    while True:
+        try:
+            return cl.connect(name)
+        except psycopg.OperationalError:
+            if time.monotonic() > deadline:
+                raise
+            time.sleep(0.2)
+
+
+def _standby_view(conn, txn: P.Transaction, key: int) -> dict:
+    """One cut on the standby and what its snapshot reads, next to what the rule says about the transaction."""
+    cut = C.take_standby_cut_own(conn)
+    try:
+        seen = conn.execute(GET, (key,)).fetchone()[0]
+        redo, next_xid = conn.execute(CONTROL).fetchone()
+    finally:
+        C.end_transaction(conn)
+    full = C.widen_xid(txn.xid, cut.bounds.xmax)
+    floor = _control_xid(next_xid)
+    return {"snapshot": str(cut.bounds), "stream_xid": full, "snapshot_reads": seen,
+            "commit_record_end_at_or_before_r0": txn.e <= cut.r0,
+            "rule_by_position": cut.classify_by_position(txn.e).name,
+            "xid_at_or_above_xmax": full >= cut.bounds.xmax,
+            "restart_point_redo_after_the_commit_record": C.parse_lsn(redo) > txn.e,
+            "control_file_next_xid": floor,
+            "snapshot_xmax_at_or_above_control_file_next_xid": cut.bounds.xmax >= floor}
+
+
+def standby_start(cl: S.Cluster) -> dict:
+    """A transaction has written its commit record and waits for a synchronous standby that does not answer.
+    A checkpoint is taken.  The standby we read from (not the synchronous one) makes that checkpoint its restart
+    point and is restarted.  Its replay position is then beyond the commit record: does its snapshot see the
+    transaction?"""
+    out: dict = {}
+    key, later_key = 2, 3
+    S.setup(cl, [1, key, later_key], "primary")
+    done = threading.Event()
+    errors: list = []
+
+    def committer() -> None:
+        try:
+            with cl.connect("primary") as w:
+                w.execute(INC, (key,))
+        except Exception as exc:
+            errors.append(cl.redact(str(exc))[:200])
+        done.set()
+
+    t = threading.Thread(target=committer, daemon=True)
+    try:
+        with cl.connect("primary") as o:
+            out["server_version_num"] = _version_num(o)
+            o.execute("SET synchronous_commit = local")
+            cl.localpg("set", "primary", "synchronous_standby_names=" + NO_STANDBY)
+            t.start()
+            dec = P.StreamDecoder()
+            txns = _read_slot(o, S.SLOT, dec)
+            if len(txns) != 1 or _key_of(txns[0], dec) != key:
+                return {**out, "error": "the slot delivered %d transactions; %s" % (len(txns), errors)}
+            txn = txns[0]
+            out["commit_record_end"] = C.format_lsn(txn.e)
+            out["commit_returned_when_delivered"] = done.is_set()
+            S.wait_replay(cl, txn.e, timeout=30)
+            with cl.connect("replica") as r:
+                out["before_the_restart"] = _standby_view(r, txn, key)
+            cl.boot_sql("primary", "CHECKPOINT")
+            redo, next_xid = o.execute(CONTROL).fetchone()
+            out["primary_checkpoint"] = {"redo_after_the_commit_record": C.parse_lsn(redo) > txn.e,
+                                         "next_xid": _control_xid(next_xid),
+                                         "commit_returned": done.is_set()}
+            _flush_and_replay(cl, o)
+            cl.boot_sql("replica", "CHECKPOINT")
+            cl.localpg("kill", "replica")
+            cl.localpg("up")
+            with _connect_when_up(cl, "replica") as r:
+                out["after_the_restart"] = _standby_view(r, txn, key)
+                out["commit_returned_while_the_standby_restarted"] = done.is_set()
+                cl.localpg("unset", "primary", "synchronous_standby_names")
+                t.join(120)
+                out["commit_returned_after_release"] = done.is_set() and not errors
+                _flush_and_replay(cl, o)
+                out["after_the_commit_returned"] = _standby_view(r, txn, key)
+                o.execute(INC, (later_key,))
+                _flush_and_replay(cl, o)
+                out["after_a_later_commit"] = _standby_view(r, txn, key)
+        views = [out[k] for k in ("before_the_restart", "after_the_restart", "after_the_commit_returned",
+                                  "after_a_later_commit")]
+        out["rule_violated"] = any(v["rule_by_position"] == "INSIDE" and v["snapshot_reads"] != 1 for v in views)
+        out["guard_accepts_a_wrong_cut"] = any(v["snapshot_xmax_at_or_above_control_file_next_xid"]
+                                               and v["rule_by_position"] == "INSIDE" and v["snapshot_reads"] != 1
+                                               for v in views)
+        out["ok"] = not errors and views[-1]["snapshot_reads"] == 1
+    finally:
+        cl.localpg("unset", "primary", "synchronous_standby_names", check=False)
+        cl.localpg("up", check=False)
+        if t.is_alive():
+            t.join(60)
+        out["slot_dropped"] = S.drop_slot(cl, "primary")
+    return out
+
+
+# --------------------------------------------------------------------------------------------------------------
 # Command line (subcommands of tools/cutstress)
 # --------------------------------------------------------------------------------------------------------------
 
@@ -749,6 +946,8 @@ def add_commands(sub) -> None:
     sub.add_parser("positions", help="known transactions and their positions in the stream").add_argument("--out")
     sub.add_parser("promotion", help="an open cut across a promotion (adds and removes a standby)").add_argument(
         "--out")
+    sub.add_parser("standby-start", help="a standby restarted from a checkpoint taken while a commit waited"
+                   ).add_argument("--out")
 
 
 def primary_summary(r: dict) -> str:
@@ -783,6 +982,9 @@ def dispatch(cl: S.Cluster, args) -> int:
         ok = result.get("ok", False)
     elif args.cmd == "promotion":
         result = promotion(cl)
+        ok = result.get("ok", False)
+    elif args.cmd == "standby-start":
+        result = standby_start(cl)
         ok = result.get("ok", False)
     else:
         raise SystemExit("unknown command %s" % args.cmd)
