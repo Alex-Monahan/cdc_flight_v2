@@ -1,0 +1,26 @@
+$ tools/cutstress run --label v5c_restart_crash --seconds 180 --writers plain,async,subxact,abort --takers-own 2 --takers-exported 0 --chaos restart,crash --chaos-period 10 --out evidence/p3/cut/v5c_restart_crash.json
+load average before: 17.42 19.53 16.29
+   30s cuts=11994 transactions=117209 violations=0 waiting=27
+   60s cuts=23209 transactions=227474 violations=0 waiting=32
+   90s cuts=35499 transactions=344803 violations=0 waiting=58
+  120s cuts=47397 transactions=457477 violations=0 waiting=28
+  150s cuts=57141 transactions=572123 violations=0 waiting=10
+v5c_restart_crash: OK
+  Postgres 18.6 (Homebrew), 184 s, writers plain,async,subxact,abort, disturbances restart,crash, slot on replica
+  cuts checked 69663 (not checked 0), transactions delivered 687039
+  violations of the sound rules: none
+  stream out of E order: 0
+  wrong rules caught (cuts): stmt_as_r0=1173, r1_inside=1173, r1_outside=1, naive_sharp=0, xmax_inside=28964, xmin_outside=36152
+  unknown set (transactions per cut)   empty     mean   max
+    base                                 0.00%    4.194  7748
+    xid                                 56.16%    1.952   296
+    sharp                               55.64%    3.214  7747
+    xid+sharp                           63.01%    1.877   296
+    really_visible                      56.80%    3.150  7747
+  cuts_with_r0_below_received: 0
+  cuts_that_miss_a_received_transaction: 0
+  cuts_with_r0_eq_r1: 39320
+  cuts taken the own way: 69663, of them quiet (xmin = xmax): 33480 (48.1%), with a violation: 0
+  snapshots dropped because the standby had not settled: 0
+  checker steps: unknown_window, per_key_boundary, missing_rows; rows missing from a cut: 0
+  load average at start [17.42, 19.53, 16.29], at end [13.6, 17.24, 15.96]

@@ -1,0 +1,259 @@
+{
+ "cases": [
+  {
+   "held_by": "standby stopped",
+   "kind": "plain",
+   "synchronous_commit": "on",
+   "stream_delivered_after_s": 0.064,
+   "commit_returned_when_delivered": false,
+   "at_delivery": {
+    "snapshot": "11509508:11509510:11509508",
+    "stream_xid": 11509508,
+    "in_the_snapshot_in_progress_list": true,
+    "library_verdict": "OUTSIDE",
+    "row_visible": false,
+    "pg_xact_status": "in progress",
+    "status_check_discards_the_snapshot": false,
+    "rule_xmin_at_or_after_marker_accepts_the_snapshot": false,
+    "commit_record_end_at_or_before_insert_position": true,
+    "commit_record_end_at_or_before_flush_position": true,
+    "sessions_waiting_for_the_synchronous_standby": 1
+   },
+   "held_s": 3.0,
+   "commit_returned_while_held": false,
+   "while_held": {
+    "snapshot": "11509508:11509511:11509508",
+    "stream_xid": 11509508,
+    "in_the_snapshot_in_progress_list": true,
+    "library_verdict": "OUTSIDE",
+    "row_visible": false,
+    "pg_xact_status": "in progress",
+    "status_check_discards_the_snapshot": false,
+    "rule_xmin_at_or_after_marker_accepts_the_snapshot": false,
+    "commit_record_end_at_or_before_insert_position": true,
+    "commit_record_end_at_or_before_flush_position": true,
+    "sessions_waiting_for_the_synchronous_standby": 1
+   },
+   "commit_returned_after_release": true,
+   "after_release": {
+    "snapshot": "11509512:11509512:",
+    "stream_xid": 11509508,
+    "in_the_snapshot_in_progress_list": false,
+    "library_verdict": "INSIDE",
+    "row_visible": true,
+    "pg_xact_status": "committed",
+    "status_check_discards_the_snapshot": false,
+    "rule_xmin_at_or_after_marker_accepts_the_snapshot": true,
+    "commit_record_end_at_or_before_insert_position": true,
+    "commit_record_end_at_or_before_flush_position": true,
+    "sessions_waiting_for_the_synchronous_standby": 0
+   }
+  },
+  {
+   "held_by": "standby stopped",
+   "kind": "subtransaction",
+   "synchronous_commit": "on",
+   "stream_delivered_after_s": 0.059,
+   "commit_returned_when_delivered": false,
+   "at_delivery": {
+    "snapshot": "11509512:11509515:11509512",
+    "stream_xid": 11509512,
+    "in_the_snapshot_in_progress_list": true,
+    "library_verdict": "OUTSIDE",
+    "row_visible": false,
+    "pg_xact_status": "in progress",
+    "status_check_discards_the_snapshot": false,
+    "rule_xmin_at_or_after_marker_accepts_the_snapshot": false,
+    "commit_record_end_at_or_before_insert_position": true,
+    "commit_record_end_at_or_before_flush_position": true,
+    "sessions_waiting_for_the_synchronous_standby": 1
+   },
+   "held_s": 3.0,
+   "commit_returned_while_held": false,
+   "while_held": {
+    "snapshot": "11509512:11509516:11509512",
+    "stream_xid": 11509512,
+    "in_the_snapshot_in_progress_list": true,
+    "library_verdict": "OUTSIDE",
+    "row_visible": false,
+    "pg_xact_status": "in progress",
+    "status_check_discards_the_snapshot": false,
+    "rule_xmin_at_or_after_marker_accepts_the_snapshot": false,
+    "commit_record_end_at_or_before_insert_position": true,
+    "commit_record_end_at_or_before_flush_position": true,
+    "sessions_waiting_for_the_synchronous_standby": 1
+   },
+   "commit_returned_after_release": true,
+   "after_release": {
+    "snapshot": "11509517:11509517:",
+    "stream_xid": 11509512,
+    "in_the_snapshot_in_progress_list": false,
+    "library_verdict": "INSIDE",
+    "row_visible": true,
+    "pg_xact_status": "committed",
+    "status_check_discards_the_snapshot": false,
+    "rule_xmin_at_or_after_marker_accepts_the_snapshot": true,
+    "commit_record_end_at_or_before_insert_position": true,
+    "commit_record_end_at_or_before_flush_position": true,
+    "sessions_waiting_for_the_synchronous_standby": 0
+   }
+  },
+  {
+   "held_by": "standby stopped",
+   "kind": "prepared",
+   "skipped": "max_prepared_transactions is 0"
+  },
+  {
+   "held_by": "standby replay paused",
+   "kind": "plain",
+   "synchronous_commit": "remote_apply",
+   "stream_delivered_after_s": 0.062,
+   "commit_returned_when_delivered": false,
+   "at_delivery": {
+    "snapshot": "11509517:11509519:11509517",
+    "stream_xid": 11509517,
+    "in_the_snapshot_in_progress_list": true,
+    "library_verdict": "OUTSIDE",
+    "row_visible": false,
+    "pg_xact_status": "in progress",
+    "status_check_discards_the_snapshot": false,
+    "rule_xmin_at_or_after_marker_accepts_the_snapshot": false,
+    "commit_record_end_at_or_before_insert_position": true,
+    "commit_record_end_at_or_before_flush_position": true,
+    "sessions_waiting_for_the_synchronous_standby": 1
+   },
+   "held_s": 3.0,
+   "commit_returned_while_held": false,
+   "while_held": {
+    "snapshot": "11509517:11509520:11509517",
+    "stream_xid": 11509517,
+    "in_the_snapshot_in_progress_list": true,
+    "library_verdict": "OUTSIDE",
+    "row_visible": false,
+    "pg_xact_status": "in progress",
+    "status_check_discards_the_snapshot": false,
+    "rule_xmin_at_or_after_marker_accepts_the_snapshot": false,
+    "commit_record_end_at_or_before_insert_position": true,
+    "commit_record_end_at_or_before_flush_position": true,
+    "sessions_waiting_for_the_synchronous_standby": 1
+   },
+   "commit_returned_after_release": true,
+   "after_release": {
+    "snapshot": "11509521:11509521:",
+    "stream_xid": 11509517,
+    "in_the_snapshot_in_progress_list": false,
+    "library_verdict": "INSIDE",
+    "row_visible": true,
+    "pg_xact_status": "committed",
+    "status_check_discards_the_snapshot": false,
+    "rule_xmin_at_or_after_marker_accepts_the_snapshot": true,
+    "commit_record_end_at_or_before_insert_position": true,
+    "commit_record_end_at_or_before_flush_position": true,
+    "sessions_waiting_for_the_synchronous_standby": 0
+   }
+  },
+  {
+   "held_by": "standby replay paused",
+   "kind": "subtransaction",
+   "synchronous_commit": "remote_apply",
+   "stream_delivered_after_s": 0.062,
+   "commit_returned_when_delivered": false,
+   "at_delivery": {
+    "snapshot": "11509521:11509524:11509521",
+    "stream_xid": 11509521,
+    "in_the_snapshot_in_progress_list": true,
+    "library_verdict": "OUTSIDE",
+    "row_visible": false,
+    "pg_xact_status": "in progress",
+    "status_check_discards_the_snapshot": false,
+    "rule_xmin_at_or_after_marker_accepts_the_snapshot": false,
+    "commit_record_end_at_or_before_insert_position": true,
+    "commit_record_end_at_or_before_flush_position": true,
+    "sessions_waiting_for_the_synchronous_standby": 1
+   },
+   "held_s": 3.0,
+   "commit_returned_while_held": false,
+   "while_held": {
+    "snapshot": "11509521:11509525:11509521",
+    "stream_xid": 11509521,
+    "in_the_snapshot_in_progress_list": true,
+    "library_verdict": "OUTSIDE",
+    "row_visible": false,
+    "pg_xact_status": "in progress",
+    "status_check_discards_the_snapshot": false,
+    "rule_xmin_at_or_after_marker_accepts_the_snapshot": false,
+    "commit_record_end_at_or_before_insert_position": true,
+    "commit_record_end_at_or_before_flush_position": true,
+    "sessions_waiting_for_the_synchronous_standby": 1
+   },
+   "commit_returned_after_release": true,
+   "after_release": {
+    "snapshot": "11509526:11509526:",
+    "stream_xid": 11509521,
+    "in_the_snapshot_in_progress_list": false,
+    "library_verdict": "INSIDE",
+    "row_visible": true,
+    "pg_xact_status": "committed",
+    "status_check_discards_the_snapshot": false,
+    "rule_xmin_at_or_after_marker_accepts_the_snapshot": true,
+    "commit_record_end_at_or_before_insert_position": true,
+    "commit_record_end_at_or_before_flush_position": true,
+    "sessions_waiting_for_the_synchronous_standby": 0
+   }
+  },
+  {
+   "held_by": "standby replay paused",
+   "kind": "prepared",
+   "skipped": "max_prepared_transactions is 0"
+  },
+  {
+   "held_by": "nothing",
+   "kind": "plain",
+   "synchronous_commit": "off",
+   "at_delivery": {
+    "snapshot": "11509528:11509528:",
+    "stream_xid": 11509526,
+    "in_the_snapshot_in_progress_list": false,
+    "library_verdict": "INSIDE",
+    "row_visible": true,
+    "pg_xact_status": "committed",
+    "status_check_discards_the_snapshot": false,
+    "rule_xmin_at_or_after_marker_accepts_the_snapshot": true,
+    "commit_record_end_at_or_before_insert_position": true,
+    "commit_record_end_at_or_before_flush_position": true,
+    "sessions_waiting_for_the_synchronous_standby": 0
+   }
+  }
+ ],
+ "failover_slot": {
+  "standby stopped": {
+   "synchronous_commit": "on",
+   "failover_slot_delivered_the_transaction": false,
+   "slot_read_blocked_until_timeout": true,
+   "commit_returned": false
+  },
+  "standby replay paused": {
+   "synchronous_commit": "remote_apply",
+   "failover_slot_delivered_the_transaction": true,
+   "commit_returned": false,
+   "at_delivery": {
+    "snapshot": "11509529:11509531:11509529",
+    "stream_xid": 11509529,
+    "in_the_snapshot_in_progress_list": true,
+    "library_verdict": "OUTSIDE",
+    "row_visible": false,
+    "pg_xact_status": "in progress",
+    "status_check_discards_the_snapshot": false,
+    "rule_xmin_at_or_after_marker_accepts_the_snapshot": false,
+    "commit_record_end_at_or_before_insert_position": true,
+    "commit_record_end_at_or_before_flush_position": true,
+    "sessions_waiting_for_the_synchronous_standby": 1
+   }
+  }
+ },
+ "server_version_num": 180006,
+ "slots_dropped": [
+  true,
+  true
+ ]
+}

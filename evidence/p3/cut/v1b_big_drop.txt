@@ -1,0 +1,24 @@
+$ tools/cutstress run --label v1b_big_drop --seconds 120 --writers big,drop,plain,long --takers-own 2 --takers-exported 0 --out evidence/p3/cut/v1b_big_drop.json
+load average before: 10.42 7.52 7.02
+   30s cuts=24425 transactions=40229 violations=0 waiting=626
+   60s cuts=47912 transactions=78996 violations=0 waiting=282
+   90s cuts=71132 transactions=116619 violations=0 waiting=490
+v1b_big_drop: OK
+  Postgres 18.6 (Homebrew), 121 s, writers big,drop,plain,long, disturbances none, slot on replica
+  cuts checked 95014 (not checked 0), transactions delivered 155847
+  violations of the sound rules: none
+  stream out of E order: 0
+  wrong rules caught (cuts): stmt_as_r0=562, r1_inside=562, r1_outside=7638, naive_sharp=2, xmax_inside=42898, xmin_outside=85935
+  unknown set (transactions per cut)   empty     mean   max
+    base                                 0.00%    1.489   182
+    xid                                 69.16%    0.585   181
+    sharp                               71.48%    0.575   181
+    xid+sharp                           72.90%    0.544   181
+    really_visible                      71.97%    0.562   181
+  cuts_with_r0_below_received: 0
+  cuts_that_miss_a_received_transaction: 0
+  cuts_with_r0_eq_r1: 61747
+  cuts taken the own way: 95014, of them quiet (xmin = xmax): 8888 (9.4%), with a violation: 0
+  snapshots dropped because the standby had not settled: 0
+  checker steps: unknown_window, per_key_boundary, missing_rows; rows missing from a cut: 0
+  load average at start [10.42, 7.52, 7.02], at end [42.64, 22.15, 12.89]

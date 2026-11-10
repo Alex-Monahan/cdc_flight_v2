@@ -1,0 +1,21 @@
+$ tools/cutstress run --label v3_ddl_walswitch_pause --seconds 120 --writers plain,async,subxact,abort --takers-own 2 --takers-exported 0 --chaos ddl,walswitch,pause --out evidence/p3/cut/v3_ddl_walswitch_pause.json
+load average before: 4.71 6.12 7.00
+   30s cuts=21881 transactions=121764 violations=0 waiting=80
+   60s cuts=41879 transactions=242817 violations=0 waiting=49
+   90s cuts=62577 transactions=362184 violations=0 waiting=61
+v3_ddl_walswitch_pause: OK
+  Postgres 18.6 (Homebrew), 121 s, writers plain,async,subxact,abort, disturbances ddl,walswitch,pause, slot on replica
+  cuts checked 84094 (not checked 0), transactions delivered 483333
+  violations of the sound rules: none
+  stream out of E order: 0
+  wrong rules caught (cuts): stmt_as_r0=696, r1_inside=696, r1_outside=0, naive_sharp=0, xmax_inside=32239, xmin_outside=38436
+  unknown set (transactions per cut)   empty     mean   max
+    base                                 0.00%    1.831   490
+    xid                                 70.53%    0.655   234
+    sharp                               72.91%    0.844   489
+    xid+sharp                           77.85%    0.579   234
+    really_visible                      74.11%    0.817   489
+  cuts_with_r0_below_received: 0
+  cuts_that_miss_a_received_transaction: 0
+  cuts_with_r0_eq_r1: 61835
+  cuts taken the own way: 84094, of them quiet (xmin = xmax): 45610 (54.2%), with a violation: 0
