@@ -757,7 +757,8 @@ This holds on every version.
 
 Core 7.1 reads a keyless table "under one snapshot" through an exporter and importers, and 7.4 depends on it.
 On a released server that is unsafe. The coordinator has decided the rule; it goes to the owner as a decision
-made, not as a question.
+made, not as a question. Which tables are without a key is rule K of core section 6; a table whose primary key
+is deferrable is one of them. This library does not decide it: the caller does, and calls the entry below.
 
 On a standby, for a table without a key:
 
@@ -1533,7 +1534,9 @@ from this work: on a primary the repair snapshot needs the rule of section 10.4 
 The text below replaces section 7.2 of `docs/design/core.md` as it stands on `main` (commit `29d345f`; its
 section 7.2 and the rows 1 and 12 of its open points are those of `95ab8ee`), and those two rows. Changes
 against the present text are marked **[new]** or **[changed]**; the marks are not part of the text. After it
-come the changes outside 7.2.
+come the changes outside 7.2. Since that commit `main` has added the rule about which tables have a key (rule K)
+to section 6 of the core design and nothing else (checked at `3140887`): section 7 and the open points are as
+they were.
 
 Nothing in this text uses the start of the commit record: the pipeline does not have it (section 2).
 
