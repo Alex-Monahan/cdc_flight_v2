@@ -311,7 +311,8 @@ Finished and merged:
 
 - 2026-11-10 — P3 package O, the oracle and the T1 harness (reviewed by the coordinator, fix round included):
   `src/cdc_v2/oracle/`, `tools/oracle`, `docs/oracle.md`; T1 harness
-  `src/cdc_v2/testing/{pg,md,loader,datasets}.py` and the shared fixtures in `tests/conftest.py`; redaction library `src/cdc_v2/evidence.py` with one writer of
+  `src/cdc_v2/testing/{pg,md,loader,datasets}.py` and the shared fixtures in `tests/conftest.py`; redaction
+  library `src/cdc_v2/evidence.py` with one writer of
   evidence files (`cdc_v2.testing.harness_evidence.write_evidence`); seeded workload generator and transfers
   observer; `evidence/p3/oracle/`. A comparison is taken at a stated stream position (`compare(..., position=Q,
   slot_name=…)`: the source snapshot is at or past Q and the destination's applied position is read in the same
