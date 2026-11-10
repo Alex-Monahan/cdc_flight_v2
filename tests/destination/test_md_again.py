@@ -1,8 +1,8 @@
 """Marker `md`: the tier T0 tests of this package once more, against real MotherDuck.
 
-The test functions are the ones of `test_lane.py`, `test_schema.py`, `test_state.py`, `test_alerts.py` and
-`test_from_apply.py`, unchanged. Only the fixture `dest` differs: here it is a MotherDuck database
-`cdc_v2_t_d_<random>`, created for the test and dropped after it. Left out are the tests whose times are set for a
+The test functions are the ones of `test_lane.py`, `test_schema.py`, `test_state.py`, `test_alerts.py`,
+`test_from_apply.py` and `test_fix_round.py`, unchanged. Only the fixture `dest` differs: here it is a MotherDuck
+database `cdc_v2_t_d_<random>`, created for the test and dropped after it. Left out are the tests whose times are set for a
 local database (deadlines of a fraction of a second) or that use a local mechanism; `test_md.py` has those again in
 a form made for MotherDuck. What the tests of `test_from_apply.py` measure here goes to
 `evidence/p3/destination/from_apply.json` (the fixture `measured`).
@@ -20,6 +20,21 @@ from test_alerts import (al,  # noqa: F401 - a fixture
                          test_emit_writes_one_row_inside_the_callers_transaction,
                          test_nothing_is_written_when_an_alert_is_refused, test_resolve,
                          test_the_table_carries_what_delivery_needs, test_two_alerts_in_one_transaction_and_defaults)
+from test_fix_round import (test_a_changed_or_renamed_applied_step_refuses_to_start,
+                            test_a_connection_that_is_not_a_lane_registers_under_control_and_retries_a_conflict,
+                            test_a_missing_file_is_refused_and_not_a_lost_connection,
+                            test_a_registration_frozen_between_its_check_and_its_commit_and_a_take_over_in_between,
+                            test_a_registration_while_a_take_over_is_open_does_not_commit,
+                            test_a_returning_column_named_count_that_holds_text_is_no_count,
+                            test_a_rolled_back_transaction_leaves_no_transition_row,
+                            test_a_run_that_bypasses_the_fence_shows_a_duplicate_seq,
+                            test_a_transition_row_carries_its_lane_epoch_seq_and_detail,
+                            test_ddl_on_one_lane_while_another_lane_writes_is_a_conflict_and_runs_again,
+                            test_seq_has_no_gaps_and_equals_the_fence_counter_on_two_lanes_and_two_epochs,
+                            test_the_misleading_statements_through_the_layer_are_refused,
+                            test_the_state_module_and_alerts_write_only_inside_a_lane_transaction,
+                            test_three_simultaneous_starters_have_exactly_one_leader,
+                            test_values_and_expect_in_the_same_conditional_update)
 from test_from_apply import (test_a_registered_name_is_checked,
                              test_a_registered_name_is_gone_after_a_deadline_gave_the_connection_up,
                              test_a_registered_name_is_gone_when_the_block_ends_however_it_ends,

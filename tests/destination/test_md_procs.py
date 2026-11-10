@@ -389,7 +389,9 @@ def takeover_case(scene, n, hold, fate, interrupt):
         time.sleep(0.5)                                      # the statement that moves the position, then the hold
     else:
         fc = FaultControl(scene.dir, name="faults-" + old_tag)
-        fc.delay_at("md.commit", SLOW_S, hits=1)
+        # the first COMMIT of the run is the registration of its lane's connection (a transaction of its own
+        # since the fix round, item 2); the second one is the data transaction that holds the fence row
+        fc.delay_at("md.commit", SLOW_S, skip=1, hits=1)
         old = scene.start(old_tag, env=fc.env())
         wait_for("the slow run reached its COMMIT", lambda: fc.fired("md.commit"), 150, proc=old)
     n_old = len(events(old))
