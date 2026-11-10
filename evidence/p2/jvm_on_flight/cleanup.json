@@ -1,0 +1,31 @@
+{
+ "created_by_this_spike": {
+  "flights": [
+   "cdc_v2_spike_jvm"
+  ],
+  "flight_secrets": [],
+  "databases": []
+ },
+ "active_runs_before_delete": [],
+ "delete": {
+  "deleted": true,
+  "flight_id": "ff81b6f6-8cea-4f5d-b6f6-7de4f01d4d61",
+  "flight_name": "cdc_v2_spike_jvm"
+ },
+ "cdc_v2_flights_left_after_delete": [
+  {
+   "created_at": "2026-11-10T03:13:44.925+00:00",
+   "current_version": 1,
+   "flight_id": "ac451f4d-d2ad-4f60-9898-81c2eebe1084",
+   "flight_name": "cdc_v2_spike_md",
+   "owner_name": "<redacted>",
+   "schedule_cron": null,
+   "schedule_status": null,
+   "state": "ACTIVE",
+   "status": "ACTIVE",
+   "updated_at": "2026-11-10T03:13:45.725+00:00"
+  }
+ ],
+ "cdc_v2_secrets_left_after_delete": [],
+ "note": "cdc_v2_spike_md is the MotherDuck-semantics spike of another worker (created 03:13 UTC); not created or touched here. No Flight secret and no database was created by this spike."
+}
