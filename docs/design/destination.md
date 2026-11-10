@@ -998,3 +998,42 @@ For packages A, L, S, V, B and the integrator. Each line is backed by the sectio
 - By finding 10, a deadline that relies on the client's `interrupt()` alone does not end a statement that runs
   on MotherDuck. Whether the oracle's own guard is affected was not tested here; it is an inference.
 - Test databases go through `cdc_v2.testing.md` and its ledger (section 2.7).
+
+## 16. How to run the suites
+
+**The default run** needs no network: `uv run -q pytest -q`. On 2026-11-10, on this branch with `origin/main`
+merged: 567 passed, 1 skipped, 263 deselected in 61 s. The tests of this package alone
+(`uv run -q pytest -q tests/destination`): 200 passed, 96 deselected in 13 s.
+
+**The MotherDuck tests** (marker `md`) need the token that `tools/with-env` supplies. They create and drop only
+databases named `cdc_v2_t_d_<random>`. Leave `CDC_V2_MD_PREFIX` unset or set it to `cdc_v2_t_d_`. The command
+that the evidence files record is `tools/with-env uv run -q pytest -q -m md tests/destination`.
+`pyproject.toml` already passes `-q` to pytest, so that command prints no line with the counts; the commands
+below leave the second `-q` out.
+
+| Command | Tests | Last run (2026-11-10) |
+|---|---|---|
+| `tools/with-env uv run -q pytest -m md tests/destination/test_md.py` | 31: what MotherDuck answers, deadlines, the registry, the clock, timings | 31 passed in 310 s |
+| `tools/with-env uv run -q pytest -m md tests/destination/test_md_again.py` | 55: the T0 tests of lanes, leader tables, migrations, state and alerts, with a MotherDuck database | 55 passed in 462 s |
+| `tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py` | 10: real processes (sections 8 and 9) | 10 passed in 1079 s, as six runs chosen with `-k` (95 to 308 s each) |
+
+All 96 passed. The whole of `test_md_procs.py` takes about 18 minutes in one run. The six runs were, by `-k`:
+`different_epochs or same_epoch`, `middle_of_an_open_transaction`, `commit_outcome_unknown`,
+`run_again_rule or by_fault_sites`, `real_connection_break`, `crash_runner`.
+
+**After a run** no test database may be left. This reads only the ledger (section 2.7) and prints `[]`:
+
+    uv run python -c "from cdc_v2.testing import destination as td; print(td.leftover_databases('cdc_v2_t_d_'))"
+
+A name that it prints belongs to a run that was killed. Drop it with
+`tools/with-env uv run python -c "from cdc_v2.testing import destination as td; td.drop_database('<name>')"`.
+
+**The probe** of section 6: `tools/with-env uv run python tests/destination/probes/probe_fence_columns.py`. It
+writes `fence_columns.json`.
+
+**The document of the state machines**: `uv run python -m cdc_v2.state > docs/state_machines.md`.
+
+**The numbers in this document** are the ones in `evidence/p3/destination/`, each file with the date of its
+run. The md tests write these files again at every run. Times and the counts of conflicts move from run to
+run; the tests assert only what the layer promises and record the rest. The last run named in the table above
+passed with counts in the same ranges; its files were not kept, except `commit_unknown.json` (section 8.4).
