@@ -169,9 +169,10 @@ The pieces exist: the `TRUNCATE` frame (E), segments in a change set (C3a), `tru
   enumerated machine, or a part of the table machine that the document names as such. For the batch commit and
   acknowledge machine, which is one row per slot (plan 6.3): document it and make sure a test enumerates its
   transitions; if that needs a change in S's commit path, report it instead of making it.
-- `docs/state_machines.md`: for every machine its purpose, its key, where the state is stored and with which
-  data it commits, the states, the transition table (from, to, who, cause), and the transitions P4 will add. A
-  default-run test compares the document with the declarations, so that the two cannot drift.
+- `docs/state_machines.md` (package D started it, every owner added its machine; you complete it): for every
+  machine its purpose, its key, where the state is stored and with which data it commits, the states, the
+  transition table (from, to, who, cause), and the transitions P4 will add. A default-run test compares the
+  document with the declarations, so that the two cannot drift.
 - One default-run test walks the registry and runs package D's enumeration helper for every declared machine:
   every pair of states, exactly the declared ones accepted. It fails when a machine exists that the document
   lacks. The leader machine's copy in `main.py` is compared as C5 says.
