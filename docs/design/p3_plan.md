@@ -106,6 +106,15 @@ Every frame: magic, frame type, sequence number (starts at 0, no gaps), payload 
 configured maximum, and treats the stream as broken: nothing from a broken stream is applied (SPEC §4, stream
 fuzzer).
 
+What the frame format does and does not promise (from the stream fuzzer, package F): The stream has no end frame.
+Only the pipeline's own `STOP` ends a stream cleanly; an end at a frame boundary that the pipeline did not ask
+for is `EngineExited`, and a transaction without its `END` is never applied. A new engine life (`HELLO`,
+sequence 0) may repeat transactions that are already applied; the consumer discards them by position (design 2).
+The checksum protects the pipe, not the engine's encoding: wrong content that was encoded before the checksum
+arrives with a valid checksum, and E's value tests and Y's cross-path test are the defence against it. The reader
+allocates a payload as its bytes arrive, never ahead by the length field, so that a damaged length cannot reserve
+memory (SPEC 5.4). A checksum of the header alone belongs to a later protocol version.
+
 | Frame | Content |
 |---|---|
 | `HELLO` | protocol version, Debezium version, slot, the position the engine starts from, and what identifies this engine's replication session among the server's backends (attach rule below) |
@@ -721,6 +730,43 @@ interval columns; a timestamp form that does not overflow `bigint`; text compari
 delivered as text; the fallback through the type's output function instead of `::text`; `lc_monetary=C` pinned in
 its session; a `timetz` rule by (microseconds, offset). P9: the cost of a 200-column table (52 K rows/s in the
 stream here).
+
+**From the review of F (fuzzers, round 1).** Round 2 of F points the fuzzers at the real system and needs the
+following; each owner's task takes its line. S (C5, C10, with L for epoch and run): the facts for "never two
+writers" are part of the row that the batch machine appends to `_cdc.transitions` for every committed group —
+epoch, run id, previous and new applied position, first and last commit position of its source transactions and
+their count, and a sequence that gives the order of commit; no extra statement per group (SPEC 6.1; the
+round-trip budget); a backfill lane writes the same with table and chunk (B). S (C8): the applied-position
+reader. S: the spill area can be made tiny by a setting (`max_temp_directory_size` of the transform connection
+and of apply's planning database), and "spill area full" is an alert through `alerts.emit` (C4), which is the
+fuzzer's proof of effect. P (C7), E (C2) and S (C12): every source address is configurable per node, so that each
+link can pass through a proxy; MotherDuck is reached only through the `md.*` fault sites. Every owner (C1):
+crash points for the steps of design 3, the lane points of C4, take-over, release, heartbeat, slot creation,
+backfill chunk commit, pending log append and swap, each declared through `cdc_v2.crashpoints`; a point that is
+reached only on some paths says so. P (C7) and the engine's probe: one `application_name` prefix (`cdc_v2_`) for
+every SQL session of the pipeline; the replication session is named by Debezium and is found through the
+`active_pid` of `HELLO`. L (C6): the local platform starts and cancels runs and reports each run's state, start,
+end and exit code. S with D (C10, C4): the quarantine exit and `ApplyInvariantError` are alert rows. B (C10): the
+backfill request table and the `versions` observer for SPEC 3.2. V (C10, `reposition`): the enactment after a
+dropped or invalidated slot and after a promotion. Bug classes that no planted defect of round 1 stands for,
+and that round 2 must plant in the real system or show found: a wrong cut or hand-off (design 7: `R0 < P0`
+accepted, a swap before `R1` is passed, catch-up before all snapshots are passed, a table without a key read
+under several snapshots, an unsettled standby); a double apply after `CommitUnknown`; a table with a deferrable
+key applied on the keyed path (rule K); a slot that is ahead or recreated and ignored (V); a `FATAL` repeated at
+one position (SPEC 4.3).
+
+**The ledger of SPEC section 4 (rules of the orchestrator, 2026-11-10).** No run against the toy replicator
+counts toward a bar. The counters of a fuzzer restart from zero after any change to correctness code, and a
+change of a pinned dependency (Debezium, the JDK, `uv.lock`, the dependencies of `pyproject.toml`) is such a
+change. A change to the measuring instrument (the fuzz package, the oracle, the workload generator, the fault
+harness) restarts the counters of the bars it measures as well, because counts made with a weaker instrument do
+not mean what the SPEC says; an entry in the ledger's exemption file, with its reason, is the only way around
+that, and the orchestrator reads every entry at every gate. A failure of the workload at the source counts as
+`infrastructure` only for causes on a short allow-list (a connection lost during an injected fault; the paused
+load of a primary kill); every other source error is a failure, because the pipeline itself can break the
+application's writes (H-014). Until the owner rules on the reading of "on local Postgres and on PlanetScale, in
+replica mode and in primary mode", a bar with that clause is met when its totals are met and each of the four
+combinations holds at least a quarter of each quantity.
 
 ### 6.3 Simplifications taken
 
