@@ -31,7 +31,7 @@ None of them says anything about overlapping scheduled runs, retries, cancel sig
 
 ## Findings that contradict SPEC 4.2 / 5.2 or force a design choice
 
-1. **A cancelled run keeps running for about 2.3 s and can still commit.** `MD_CANCEL_FLIGHT_RUN` marks the run
+1. **A cancelled run keeps running for 2.3–2.5 s and can still commit.** `MD_CANCEL_FLIGHT_RUN` marks the run
    `CANCELLED` 0.5–0.6 s after the call, but its processes (main, child, detached grandchild) keep running and
    committing until **2.28–2.51 s** after the call (n = 4; 12–14 committed rows per process after the call). No
    catchable signal arrives first: they are killed outright. A `CANCELLED` status therefore does **not** mean the
@@ -66,8 +66,9 @@ None of them says anything about overlapping scheduled runs, retries, cancel sig
    were measured), a newcomer of the next minute is `RUNNING` while the guard runs, and a pending scheduled run is not
    listed at all. The guard must cancel exactly the run number stored in the leader record (Q2, Q9).
 
-None of these breaks R18 or the 90 s replacement target; findings 1, 2 and 5 change how the guard, the supervisor
-and fencing must be built.
+None of these breaks R18. The 90 s replacement target of 4.2 holds only if its "plus start-up" counts the newcomer's
+own guard decision (measured worst case ≈ 98 s from death to a new leader, see the closing section). Findings 1, 2
+and 5 change how the guard, the supervisor and fencing must be built.
 
 ## Finding 0: clocks
 
