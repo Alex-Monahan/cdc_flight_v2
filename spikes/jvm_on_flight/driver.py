@@ -361,9 +361,8 @@ class Engine:
         return keep[:limit]
 
     def debezium_version_lines(self):
-        pat = re.compile(r"(Debezium version|debezium=|Kafka version|version: 3\.|PostgreSQL server version|"
-                         r"Starting PostgresConnectorTask)", re.I)
-        return [ln[:300] for ln in self.log_lines() if pat.search(ln)][:8]
+        pat = re.compile(r"(version|debezium=|Starting PostgresConnectorTask)", re.I)
+        return [ln[:300] for ln in self.log_lines() if pat.search(ln) and "password" not in ln.lower()][:12]
 
     def stop(self, sig=signal.SIGTERM, timeout=60):
         """Signal the JVM and wait for it and the consumer to exit. Returns the time to JVM exit."""
