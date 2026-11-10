@@ -41,7 +41,9 @@ def git_state(repo: Path) -> dict:
     def g(*a):
         return subprocess.run(["git", *a], cwd=repo, capture_output=True, text=True, timeout=30).stdout.strip()
     try:
-        return {"commit": g("rev-parse", "HEAD"), "clean": g("status", "--porcelain", "--untracked-files=no") == ""}
+        # clean = no change to a tracked file outside evidence/ (the ledger itself is written during campaigns)
+        return {"commit": g("rev-parse", "HEAD"),
+                "clean": g("status", "--porcelain", "--untracked-files=no", "--", ".", ":(exclude)evidence") == ""}
     except Exception:                                      # noqa: BLE001
         return {"commit": None, "clean": False}
 
@@ -378,6 +380,11 @@ class Run:
                     self._fail("error", "survivor: %s" % e)
             self.rec["instances"] = {"started": len(sup.procs), "exits": Counter(
                 (e["exit"].get("signal_name") or "code %s" % e["exit"].get("code")) for e in sup.exits)}
+        extra = {}
+        try:
+            extra = self.system.run_counts()
+        except Exception:                                  # noqa: BLE001
+            pass
         try:
             self.system.teardown()
         except Exception as e:                             # noqa: BLE001
@@ -386,6 +393,9 @@ class Run:
         faults, no_effect = Counter(), Counter()
         for f in self.fault_log:
             (faults if f.get("effect") else no_effect)[f["kind"]] += 1
+        if self.cfg.fuzzer == "stream":
+            faults["stream_bytes"] = extra.get("stream_faults", 0)
+            self.rec["stream_detected"] = extra.get("stream_detected", 0)
         wl = getattr(self.system, "wl", None)
         stats = dict(wl.stats) if wl is not None else {}
         self.rec.update(

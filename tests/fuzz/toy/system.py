@@ -303,6 +303,11 @@ class ToySystem(PgSystem):
             except FileNotFoundError:
                 pass
 
+    def run_counts(self):
+        ev = self.events()
+        return {"stream_faults": sum(1 for e in ev if e["kind"] == "stream_fault"),
+                "stream_detected": sum(1 for e in ev if e["kind"] == "stream_broken")}
+
     def divergence_reported(self, since):
         n = [e.get("detail", "") for e in self.events() if e["kind"] == "retry" and e.get("t", 0) >= since
              and e.get("error") == "ApplyInvariantError"]

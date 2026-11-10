@@ -161,6 +161,7 @@ class ConsumerLoop:
         self._stop = threading.Event()
         self._thread = None
         self._pause = threading.Event()
+        self._t0 = time.monotonic()
 
     def observe_once(self, conn) -> Optional[bool]:
         try:

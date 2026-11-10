@@ -29,6 +29,7 @@ def _opts(pairs):
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="tools/fuzz")
+    ap.add_argument("--ledger-root", default=str(LEDGER_ROOT), help=argparse.SUPPRESS)
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run", help="run a campaign")
     r.add_argument("--fuzzer", required=True, choices=("workload", "fault", "stream", "leadership"))
@@ -66,6 +67,7 @@ def main(argv=None) -> int:
     rd.add_argument("failure_id")
     sub.add_parser("clean", help="remove what killed campaigns left behind (by their lock records only)")
     a = ap.parse_args(argv)
+    root = Path(a.ledger_root)
 
     if a.cmd == "run":
         if a.workers > 2:
@@ -73,7 +75,7 @@ def main(argv=None) -> int:
             return 2
         c = Campaign(a.fuzzer, a.system, a.source_node, seeds=parse_seeds(a.seeds) if a.seeds else None,
                      hours=a.hours, workers=a.workers, budget_s=a.budget, rounds=a.rounds, options=_opts(a.option),
-                     reduce_failures=a.reduce, keep_workdir=a.keep,
+                     reduce_failures=a.reduce, keep_workdir=a.keep, ledger_root=root,
                      kinds=a.kinds.split(",") if a.kinds else None)
         if a.seeds is None and a.hours is None:
             c.seeds = None
@@ -86,7 +88,7 @@ def main(argv=None) -> int:
                                                          for o in sorted({x["outcome"] for x in res})}}))
         return 1 if bad else 0
     if a.cmd == "status":
-        data = ledger.write(LEDGER_ROOT, REPO) if a.write else ledger.build(LEDGER_ROOT, REPO)
+        data = ledger.write(root, REPO) if a.write else ledger.build(root, REPO)
         print(ledger.status_text(data))
         return 0
     if a.cmd == "suite-1.7":
@@ -105,7 +107,7 @@ def main(argv=None) -> int:
     if a.cmd == "stream-offline":
         from .run import git_state, utc_now
         from .stream_fuzzer import load_corpus, run_offline
-        held = ledger.held_seeds(LEDGER_ROOT, "stream", "engine-reader", "offline", tier="offline")
+        held = ledger.held_seeds(root, "stream", "engine-reader", "offline", tier="offline")
         first = a.seed if a.seed is not None else (max(held) + 1 if held else 1)
         t0 = time.monotonic()
         res = run_offline(range(first, first + a.cases))
@@ -121,14 +123,14 @@ def main(argv=None) -> int:
             neg = run_offline(range(first, first + min(a.cases, 2000)), assembler_cls=TrustingAssembler,
                               decoder="lenient")
             rec["negative_control"] = {"cases": neg["cases"], "failures_found": neg["failures"]}
-        ledger.append_run(LEDGER_ROOT, rec)
+        ledger.append_run(root, rec)
         print(json.dumps({k: rec[k] for k in ("outcome", "counts", "duration_s", "undetected_by_class")}))
         return 0 if rec["outcome"] == "pass" else 1
     if a.cmd == "reduce":
         from . import reduce as red
         fid = a.failure_id
         fz = fid.split("-")[0]
-        fdir = LEDGER_ROOT / fz / "failures" / fid
+        fdir = root / fz / "failures" / fid
         meta = json.loads((fdir / "failure.json").read_text())
         rec = json.loads((fdir / "bundle" / "record.json").read_text())
         src = Path(meta["local_bundle"].replace("<runs>", str(pool.CACHE / "fuzz" / "runs"))) \
@@ -140,7 +142,7 @@ def main(argv=None) -> int:
         if small is None:
             print(json.dumps({"reproduced": False, **stats}))
             return 1
-        out = red.write_regression(LEDGER_ROOT, fid, small, stats, bool(meta.get("self_test")))
+        out = red.write_regression(root, fid, small, stats, bool(meta.get("self_test")))
         print(json.dumps(out))
         return 0
     if a.cmd == "clean":

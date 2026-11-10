@@ -113,10 +113,6 @@ class Campaign:
             holder = {}
             rec = run_once(system, seed, workdir, cfg, REPO, on_failure=lambda r: holder.setdefault("run", r))
             run_like = holder.get("run")
-            if self.fuzzer == "stream":
-                ev = system.events() if hasattr(system, "events") else []
-                rec["faults"] = {"stream_bytes": sum(1 for e in ev if e.get("kind") == "stream_fault")}
-                rec["stream_detected"] = sum(1 for e in ev if e.get("kind") == "stream_broken")
         rec["system_spec"] = self.system
         rec["options"] = self.options
         rec["campaign"] = self.id

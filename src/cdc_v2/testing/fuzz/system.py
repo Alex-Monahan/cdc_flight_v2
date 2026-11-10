@@ -105,6 +105,11 @@ class System(Adapter):
     def set_spill_full(self, full: bool) -> None:
         raise NotImplementedError
 
+    def run_counts(self) -> dict:
+        """Counts the system keeps of its own during a run (read before teardown): `stream_faults` (byte faults
+        injected on the engine-to-applier path) and `stream_detected` (broken streams it detected)."""
+        return {}
+
     def divergence_reported(self, since: float) -> str:
         """Non-empty when the system itself reported, repeatedly since `since` (wall clock), that its destination
         no longer matches the source (in stream mode an unresolved unchanged value or a missing row to delete is

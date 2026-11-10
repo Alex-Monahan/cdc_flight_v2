@@ -54,22 +54,22 @@ VARIANTS = ("correct", "ack_early", "position_apart", "split", "reorder", "no_fe
 
 # name -> (description, once, variants that reach it (None = all))
 POINTS = {
-    "toy.schema_ready": ("start-up transaction that creates the destination tables committed", True, None),
-    "toy.taken_over": ("take-over transaction committed", True, None),
-    "toy.resync_marked": ("resynchronisation marked pending in the destination", True, None),
-    "toy.slot_created": ("slot created with its snapshot, destination not loaded yet", True, None),
-    "toy.resync_committed": ("tables loaded from the snapshot and position set, committed", True, None),
-    "toy.heartbeat_written": ("heartbeat transaction committed", False, None),
-    "toy.begun": ("BEGIN of a group transaction", False, None),
-    "toy.applied": ("every change of the group applied, not committed", False, None),
-    "toy.data_committed": ("position_apart: data committed, position not yet written", False, ("position_apart",)),
-    "toy.position_written": ("applied position updated, not committed", False, None),
-    "toy.fenced": ("fence statement executed, not committed", False, None),
-    "toy.acked_early": ("ack_early: slot confirmed before the destination commit", False, ("ack_early",)),
-    "toy.commit_sent": ("immediately before COMMIT of the group (run with kill_later: COMMIT in flight)", False, None),
-    "toy.committed": ("COMMIT of the group returned", False, None),
-    "toy.slot_advanced": ("slot confirmed up to the durable position", False, None),
-    "toy.released": ("planned release committed", True, None),
+    "toyrep.schema_ready": ("start-up transaction that creates the destination tables committed", True, None),
+    "toyrep.taken_over": ("take-over transaction committed", True, None),
+    "toyrep.resync_marked": ("resynchronisation marked pending in the destination", True, None),
+    "toyrep.slot_created": ("slot created with its snapshot, destination not loaded yet", True, None),
+    "toyrep.resync_committed": ("tables loaded from the snapshot and position set, committed", True, None),
+    "toyrep.heartbeat_written": ("heartbeat transaction committed", False, None),
+    "toyrep.begun": ("BEGIN of a group transaction", False, None),
+    "toyrep.applied": ("every change of the group applied, not committed", False, None),
+    "toyrep.data_committed": ("position_apart: data committed, position not yet written", False, ("position_apart",)),
+    "toyrep.position_written": ("applied position updated, not committed", False, None),
+    "toyrep.fenced": ("fence statement executed, not committed", False, None),
+    "toyrep.acked_early": ("ack_early: slot confirmed before the destination commit", False, ("ack_early",)),
+    "toyrep.commit_sent": ("immediately before COMMIT of the group (run with kill_later: COMMIT in flight)", False, None),
+    "toyrep.committed": ("COMMIT of the group returned", False, None),
+    "toyrep.slot_advanced": ("slot confirmed up to the durable position", False, None),
+    "toyrep.released": ("planned release committed", True, None),
 }
 for _n, (_d, _once, _v) in POINTS.items():
     declare(_n, _d, once=_once)
@@ -79,9 +79,9 @@ SITES = {
     "md.execute": "one destination statement",
     "md.fence": "the fence statement of a data transaction",
     "md.commit": "COMMIT of a destination transaction",
-    "toy.slot_peek": "read changes from the slot",
-    "toy.slot_advance": "confirm the slot up to a position",
-    "toy.source_connect": "open the source connection",
+    "toyrep.slot_peek": "read changes from the slot",
+    "toyrep.slot_advance": "confirm the slot up to a position",
+    "toyrep.source_connect": "open the source connection",
 }
 for _n, _d in SITES.items():
     declare_site(_n, _d)
@@ -89,7 +89,7 @@ for _n, _d in SITES.items():
 
 def points_for(variant: str, include_release: bool = False) -> list:
     out = [n for n, (_d, _o, v) in POINTS.items() if v is None or variant in v]
-    return [p for p in out if include_release or p != "toy.released"]
+    return [p for p in out if include_release or p != "toyrep.released"]
 
 
 class FenceLost(Exception):
@@ -478,7 +478,7 @@ class Toy:
             con.execute("COMMIT")
         finally:
             con.close()
-        crash_point("toy.schema_ready")
+        crash_point("toyrep.schema_ready")
 
     # ------------------------------------------------------------------ leadership
     def guard(self):
@@ -516,7 +516,7 @@ class Toy:
                 self.epoch = epoch + 1
                 self.last_beat = time.monotonic()
                 self.event("took_over", epoch=self.epoch, previous_state=state, previous_age_ms=age)
-                crash_point("toy.taken_over")
+                crash_point("toyrep.taken_over")
                 return
             except duckdb.Error:
                 time.sleep(0.05)
@@ -541,7 +541,7 @@ class Toy:
         finally:
             con.close()
         self.last_beat = time.monotonic()
-        crash_point("toy.heartbeat_written")
+        crash_point("toyrep.heartbeat_written")
 
     def release(self):
         con = self.dconnect()
@@ -553,7 +553,7 @@ class Toy:
         finally:
             con.close()
         self.event("released", epoch=self.epoch)
-        crash_point("toy.released")
+        crash_point("toyrep.released")
         sys.exit(0)
 
     # ------------------------------------------------------------------ source
@@ -569,7 +569,7 @@ class Toy:
         return p
 
     def sconnect(self):
-        fault_site("toy.source_connect")
+        fault_site("toyrep.source_connect")
         if int(self.cfg["source"]["port"]) == 5432:
             raise RuntimeError("refusing port 5432")
         conn = psycopg.connect(autocommit=True, **self.src_params())
@@ -657,7 +657,7 @@ class Toy:
         return {"confirmed": lsn.parse(cf) if cf else 0, "invalid": wal == "lost" or bool(conflicting) or bool(reason)}
 
     def advance(self, position: int):
-        fault_site("toy.slot_advance")
+        fault_site("toyrep.slot_advance")
         try:
             self.sq("SELECT pg_replication_slot_advance(%s, %s::pg_lsn)", (self.slot, lsn.format(position)))
         except psycopg.errors.ObjectInUse:
@@ -675,7 +675,7 @@ class Toy:
             self.commit(con)
         finally:
             con.close()
-        crash_point("toy.resync_marked")
+        crash_point("toyrep.resync_marked")
         rows = self.sq("SELECT active_pid FROM pg_replication_slots WHERE slot_name = %s", (self.slot,))
         if rows:
             if rows[0][0]:
@@ -705,7 +705,7 @@ class Toy:
             created = ex("CREATE_REPLICATION_SLOT %s LOGICAL test_decoding (SNAPSHOT 'use')" % self.slot)
             nudge_stop.set()
             consistent = lsn.parse(created[0][1])
-            crash_point("toy.slot_created")
+            crash_point("toyrep.slot_created")
             data = {}
             for t, m in self.meta.items():
                 cols = ", ".join("%s::text" % qi(c) for c, _ in m["columns"])
@@ -731,7 +731,7 @@ class Toy:
         finally:
             con.close()
         self.event("resync_done", position=lsn.format(consistent), rows=sum(len(v) for v in data.values()))
-        crash_point("toy.resync_committed")
+        crash_point("toyrep.resync_committed")
 
     def _nudge(self, stop):
         try:
@@ -828,7 +828,7 @@ class Toy:
         con = self.dconnect()
         try:
             con.execute("BEGIN")
-            crash_point("toy.begun")
+            crash_point("toyrep.begun")
             cur = self.dx(con, "SELECT applied_lsn FROM _cdc.stream_state WHERE slot_name = ?", [self.slot]).fetchone()
             if cur is None or int(cur[0]) != prev:
                 con.execute("ROLLBACK")
@@ -863,11 +863,11 @@ class Toy:
                         con.execute("BEGIN")
                 self.dx(con, "INSERT INTO _cdc.toy_log VALUES (nextval('_cdc.toy_log_seq'), ?, ?, ?, ?, 'txn')",
                         [self.epoch, self.run_id, txn["commit_lsn"], txn["xid"]])
-            crash_point("toy.applied")
+            crash_point("toyrep.applied")
             if self.variant == "position_apart":
                 self.fence(con)
                 self.commit(con)                                    # the bug: data and position apart
-                crash_point("toy.data_committed")
+                crash_point("toyrep.data_committed")
                 con.execute("BEGIN")
                 prev = int(self.dx(con, "SELECT applied_lsn FROM _cdc.stream_state WHERE slot_name = ?",
                                    [self.slot]).fetchone()[0])
@@ -876,15 +876,15 @@ class Toy:
             if n != 1:
                 con.execute("ROLLBACK")
                 return False
-            crash_point("toy.position_written")
+            crash_point("toyrep.position_written")
             self.fence(con)
-            crash_point("toy.fenced")
+            crash_point("toyrep.fenced")
             if self.variant == "ack_early":
                 self.advance(end)                                   # the bug: confirmed before the commit
-                crash_point("toy.acked_early")
-            crash_point("toy.commit_sent")
+                crash_point("toyrep.acked_early")
+            crash_point("toyrep.commit_sent")
             self.commit(con)
-            crash_point("toy.committed")
+            crash_point("toyrep.committed")
         except BaseException:
             try:
                 con.execute("ROLLBACK")
@@ -973,7 +973,7 @@ class Toy:
             return
         if self.meta is None:
             self.load_meta()
-        fault_site("toy.slot_peek")
+        fault_site("toyrep.slot_peek")
         try:
             rows = self.sq("SELECT lsn::text, xid::text, data FROM pg_logical_slot_peek_changes(%s, NULL, %s, "
                            "'include-xids', '1', 'skip-empty-xacts', '1')",
@@ -998,7 +998,7 @@ class Toy:
         if self.apply_group(group, prev):
             end = group[-1]["commit_lsn"]
             if self.advance(end):
-                crash_point("toy.slot_advanced")
+                crash_point("toyrep.slot_advanced")
 
     def run(self):
         self.ensure_schema()

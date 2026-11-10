@@ -30,7 +30,9 @@ TABLE = {
 BOUND_SEEDS = {"fault": 6, "workload": 4, "stream": 4, "leadership": 3}
 
 
-def run_variants(names=None, source_node="replica", out=None, log=print, budget=None, correct=True) -> dict:
+def run_variants(names=None, source_node="replica", out=None, log=print, budget=None, correct=True,
+                 ledger_root=None) -> dict:
+    extra = {"ledger_root": ledger_root} if ledger_root else {}
     rows = []
     for v in names or list(TABLE):
         fuzzer, kw, expect = TABLE[v]
@@ -39,7 +41,7 @@ def run_variants(names=None, source_node="replica", out=None, log=print, budget=
         bound = BOUND_SEEDS[fuzzer]
         t = time.monotonic()
         c = Campaign(fuzzer, "toy:" + v, source_node, seeds=None, hours=None, workers=1, budget_s=budget,
-                     rounds=rounds, stop_on_failure=True, log=log, **kw)
+                     rounds=rounds, stop_on_failure=True, log=log, **kw, **extra)
         c.seeds = _next_free(c, bound)
         res = c.run()
         found = [r for r in res if r["outcome"] in FAILURES]
@@ -55,7 +57,7 @@ def run_variants(names=None, source_node="replica", out=None, log=print, budget=
                "wall_s": round(time.monotonic() - t, 1)}
         if correct:
             cc = Campaign(fuzzer, "toy:correct", source_node, seeds=row["seeds_run"], workers=1, budget_s=budget,
-                          rounds=rounds, log=log, **kw)
+                          rounds=rounds, log=log, **kw, **extra)
             cc.seeds = row["seeds_run"]
             cres = cc.run()
             outcomes = {str(r["seed"]): r["outcome"] for r in cres}
