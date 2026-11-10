@@ -1,0 +1,247 @@
+{
+ "campaign": "20261110T185322-48f8",
+ "checkpoints": [
+  {
+   "catch_up_s": 2.478,
+   "compare_s": 0.028,
+   "equal": true,
+   "final": false,
+   "q": "0/45351438",
+   "t": 10.868
+  },
+  {
+   "catch_up_s": 3.093,
+   "compare_s": 0.028,
+   "equal": true,
+   "final": false,
+   "q": "0/457458E8",
+   "t": 23.637
+  },
+  {
+   "catch_up_s": 4.771,
+   "compare_s": 0.068,
+   "equal": false,
+   "final": false,
+   "q": "0/45ADC768",
+   "t": 36.846
+  }
+ ],
+ "clean": true,
+ "commit": "cd4c032356f1c4b39990cb724701258fa0c0a6a5",
+ "config": {
+  "budget_s": 60.0,
+  "catch_up_s": 90.0,
+  "episode_s": 10.0,
+  "fuzzer": "fault",
+  "ignore_self_report": true,
+  "keep_workdir": false,
+  "observer_interval_s": 0.005,
+  "observers": false,
+  "pace_s": 0.25,
+  "schedule": {
+   "not_attacked": [
+    "dest_delay",
+    "dest_error",
+    "dest_hang",
+    "freeze",
+    "hang_point",
+    "net_blackhole",
+    "net_drop",
+    "net_latency",
+    "net_reset",
+    "replica_promote",
+    "replica_restart",
+    "slot_drop",
+    "slot_invalidate",
+    "spill_full",
+    "src_cancel",
+    "src_lock",
+    "src_long_txn",
+    "src_restart_primary",
+    "src_terminate",
+    "src_wal_switch"
+   ],
+   "per_episode": [
+    1,
+    3
+   ],
+   "weights": {
+    "kill_group": 6,
+    "kill_point": 10,
+    "kill_point_later": 4
+   }
+  },
+  "start_timeout_s": 120.0
+ },
+ "counts": {
+  "checkpoints": 3,
+  "final_rows": 1216,
+  "observations": 0,
+  "rolled_back": 143,
+  "rounds": 108,
+  "transactions": 2160
+ },
+ "duration_s": 42.396,
+ "failure_id": "fault-toy-ack_early-replica-s11-cd4c032",
+ "faults": {
+  "kill_group": 1,
+  "kill_point": 2,
+  "kill_point_later": 1
+ },
+ "faults_without_effect": [
+  {
+   "error": null,
+   "kind": "kill_point_later",
+   "params": {
+    "delay_ms": 0,
+    "hit": "seed:4286899733652:3",
+    "point": "toyrep.commit_sent"
+   },
+   "proof": {
+    "exit": {
+     "code": null,
+     "signal": 9,
+     "signal_name": "SIGKILL"
+    },
+    "fired": null,
+    "hit": null,
+    "instance": "i2"
+   }
+  },
+  {
+   "error": null,
+   "kind": "kill_group",
+   "params": {},
+   "proof": {
+    "alive": false
+   }
+  },
+  {
+   "error": null,
+   "kind": "kill_point",
+   "params": {
+    "hang_s": 1.207209520415135,
+    "hit": "seed:128842089374915:3",
+    "point": "toyrep.position_written"
+   },
+   "proof": {
+    "exit": {
+     "code": null,
+     "signal": 9,
+     "signal_name": "SIGKILL"
+    },
+    "fired": null,
+    "hit": null,
+    "instance": "i6"
+   }
+  }
+ ],
+ "first_failure_s": 41.82,
+ "fuzzer": "fault",
+ "instances": {
+  "exits": {
+   "SIGKILL": 8
+  },
+  "started": 9
+ },
+ "no_effect": {
+  "kill_group": 1,
+  "kill_point": 1,
+  "kill_point_later": 1
+ },
+ "options": {},
+ "oracle": {
+  "equal": false,
+  "tables": [
+   {
+    "destination_rows": 49,
+    "different_rows": 0,
+    "equal": false,
+    "extra_rows": 1,
+    "missing_on_destination": false,
+    "missing_rows": 2,
+    "source": "public.w_child",
+    "source_rows": 50
+   },
+   {
+    "destination_rows": 90,
+    "different_rows": 1,
+    "equal": false,
+    "extra_rows": 0,
+    "missing_on_destination": false,
+    "missing_rows": 7,
+    "source": "public.w_credit",
+    "source_rows": 97
+   },
+   {
+    "destination_rows": 65,
+    "different_rows": 1,
+    "equal": false,
+    "extra_rows": 0,
+    "missing_on_destination": false,
+    "missing_rows": 5,
+    "source": "public.w_debit",
+    "source_rows": 70
+   },
+   {
+    "destination_rows": 44,
+    "different_rows": 37,
+    "equal": false,
+    "extra_rows": 0,
+    "missing_on_destination": false,
+    "missing_rows": 15,
+    "source": "public.w_dk",
+    "source_rows": 59
+   },
+   {
+    "destination_rows": 10,
+    "different_rows": 0,
+    "equal": false,
+    "extra_rows": 7,
+    "missing_on_destination": false,
+    "missing_rows": 12,
+    "source": "public.w_nk",
+    "source_rows": 15
+   },
+   {
+    "destination_rows": 61,
+    "different_rows": 0,
+    "equal": false,
+    "extra_rows": 8,
+    "missing_on_destination": false,
+    "missing_rows": 7,
+    "source": "public.w_nkt",
+    "source_rows": 60
+   },
+   {
+    "destination_rows": 12,
+    "different_rows": 0,
+    "equal": false,
+    "extra_rows": 1,
+    "missing_on_destination": false,
+    "missing_rows": 0,
+    "source": "public.w_parent",
+    "source_rows": 11
+   },
+   {
+    "destination_rows": 29,
+    "different_rows": 0,
+    "equal": false,
+    "extra_rows": 29,
+    "missing_on_destination": false,
+    "missing_rows": 4,
+    "source": "public.w_toast",
+    "source_rows": 4
+   }
+  ]
+ },
+ "outcome": "diverged",
+ "reason": "oracle: public.w_child missing 2 extra 1 different 0; public.w_credit missing 7 extra 0 different 1; public.w_debit missing 5 extra 0 different 1; public.w_dk missing 15 extra 0 different 37; public.w_nk missing 12 extra 7 different 0; public.w_nkt missing 7 extra 8 different 0",
+ "seed": 11,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T18:53:23Z",
+ "system": "toy-ack_early",
+ "system_spec": "toy:ack_early",
+ "tier": "local"
+}

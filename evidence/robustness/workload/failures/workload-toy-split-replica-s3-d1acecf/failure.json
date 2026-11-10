@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "d1acecfb2f0696a8a4a6701242d459d4c75e301a",
+  "first_failure_s": 0.995,
+  "fixed_commit": null,
+  "fuzzer": "workload",
+  "id": "workload-toy-split-replica-s3-d1acecf",
+  "local_bundle": {
+    "campaign": "20261110T185737-59df",
+    "dir": "bundle-workload-toy-split-replica-s3-d1acecf"
+  },
+  "outcome": "violation",
+  "reason": "consumer loop: parent_child 1 of 12 ([{\"parents_with_wrong_count\": 1, \"orphan_parent_ids\": 0, \"sample_parent_id_count_children\": [[14, 2, 0]], \"sample_orphans\": [], \"parents\": 1, \"observation\": 12, \"t\": 0.203}]); debit_credit 4 of 12 ([{\"debits\": 0, \"credits\": 6411, \"debit_rows\": 0, \"credit_rows\": 1, \"observation\": 8, \"t\": 0.128}])",
+  "regression_test": null,
+  "seed": 3,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-split",
+  "system_spec": "toy:split"
+}

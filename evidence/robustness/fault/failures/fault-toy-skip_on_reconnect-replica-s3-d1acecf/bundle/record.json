@@ -1,0 +1,210 @@
+{
+ "campaign": "20261110T190026-ce54",
+ "checkpoints": [
+  {
+   "catch_up_s": 0.007,
+   "compare_s": 0.03,
+   "equal": true,
+   "final": false,
+   "q": "0/4F518FB8",
+   "t": 10.945
+  }
+ ],
+ "clean": true,
+ "commit": "d1acecfb2f0696a8a4a6701242d459d4c75e301a",
+ "config": {
+  "budget_s": 60.0,
+  "catch_up_s": 90.0,
+  "episode_s": 10.0,
+  "fuzzer": "fault",
+  "ignore_self_report": false,
+  "keep_workdir": false,
+  "observer_interval_s": 0.005,
+  "observers": true,
+  "pace_s": 0.25,
+  "schedule": {
+   "not_attacked": [
+    "dest_delay",
+    "dest_error",
+    "dest_hang",
+    "freeze",
+    "hang_point",
+    "kill_group",
+    "kill_point",
+    "kill_point_later",
+    "net_latency",
+    "replica_promote",
+    "replica_restart",
+    "slot_drop",
+    "slot_invalidate",
+    "spill_full",
+    "src_cancel",
+    "src_lock",
+    "src_long_txn",
+    "src_restart_primary",
+    "src_wal_switch"
+   ],
+   "per_episode": [
+    1,
+    3
+   ],
+   "weights": {
+    "net_blackhole": 5,
+    "net_drop": 4,
+    "net_reset": 5,
+    "src_terminate": 5
+   }
+  },
+  "start_timeout_s": 120.0
+ },
+ "counts": {
+  "checkpoints": 1,
+  "final_rows": 1123,
+  "observations": 2180,
+  "rolled_back": 60,
+  "rounds": 46,
+  "transactions": 920
+ },
+ "duration_s": 14.36,
+ "failure_id": "fault-toy-skip_on_reconnect-replica-s3-d1acecf",
+ "faults": {
+  "src_terminate": 3
+ },
+ "faults_without_effect": [],
+ "first_failure_s": 13.96,
+ "fuzzer": "fault",
+ "instances": {
+  "exits": {},
+  "started": 1
+ },
+ "no_effect": {},
+ "observers": [
+  {
+   "check": "transfers",
+   "errors": [],
+   "first_violations": [
+    {
+     "expected": 24000,
+     "observation": 536,
+     "sum": 23831,
+     "t": 13.01
+    },
+    {
+     "expected": 24000,
+     "observation": 537,
+     "sum": 23831,
+     "t": 13.023
+    },
+    {
+     "expected": 24000,
+     "observation": 538,
+     "sum": 23831,
+     "t": 13.037
+    }
+   ],
+   "last": {
+    "expected": 24000,
+    "sum": 23831
+   },
+   "longest_gap_s": 0.544,
+   "observations": 546,
+   "seconds": 13.144,
+   "unavailable": 0,
+   "violations": 11
+  },
+  {
+   "check": "parent_child",
+   "errors": [],
+   "first_violations": [
+    {
+     "observation": 532,
+     "orphan_parent_ids": 1,
+     "parents": 8,
+     "parents_with_wrong_count": 0,
+     "sample_orphans": [
+      3029
+     ],
+     "sample_parent_id_count_children": [],
+     "t": 13.012
+    },
+    {
+     "observation": 533,
+     "orphan_parent_ids": 1,
+     "parents": 8,
+     "parents_with_wrong_count": 0,
+     "sample_orphans": [
+      3029
+     ],
+     "sample_parent_id_count_children": [],
+     "t": 13.025
+    },
+    {
+     "observation": 534,
+     "orphan_parent_ids": 1,
+     "parents": 8,
+     "parents_with_wrong_count": 0,
+     "sample_orphans": [
+      3029
+     ],
+     "sample_parent_id_count_children": [],
+     "t": 13.039
+    }
+   ],
+   "last": {
+    "orphan_parent_ids": 1,
+    "parents": 8,
+    "parents_with_wrong_count": 0,
+    "sample_orphans": [
+     3029
+    ],
+    "sample_parent_id_count_children": []
+   },
+   "longest_gap_s": 0.543,
+   "observations": 542,
+   "seconds": 13.144,
+   "unavailable": 0,
+   "violations": 11
+  },
+  {
+   "check": "debit_credit",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "credit_rows": 18,
+    "credits": 95485,
+    "debit_rows": 15,
+    "debits": 95485
+   },
+   "longest_gap_s": 0.543,
+   "observations": 545,
+   "seconds": 13.144,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "large_marked",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "batches": 2,
+    "batches_partial_or_unmarked": 0,
+    "sample_batch_rows_marked": []
+   },
+   "longest_gap_s": 0.544,
+   "observations": 547,
+   "seconds": 13.144,
+   "unavailable": 0,
+   "violations": 0
+  }
+ ],
+ "options": {},
+ "outcome": "violation",
+ "reason": "consumer loop: transfers 1 of 536 ([{\"sum\": 23831, \"expected\": 24000, \"observation\": 536, \"t\": 13.01}]); parent_child 1 of 532 ([{\"parents_with_wrong_count\": 0, \"orphan_parent_ids\": 1, \"sample_parent_id_count_children\": [], \"sample_orphans\": [3029], \"parents\": 8, \"observation\": 532, \"t\": 13.012}])",
+ "seed": 3,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T19:00:26Z",
+ "system": "toy-skip_on_reconnect",
+ "system_spec": "toy:skip_on_reconnect",
+ "tier": "local"
+}
