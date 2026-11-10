@@ -1,0 +1,423 @@
+"""The plan: from a change set to the relations that the statements read (docs/design/apply.md section 3).
+
+The plan is a list of SQL steps. Each step materialises one relation from the change set and earlier relations.
+The same text runs in a local DuckDB connection over Arrow data (local form) and inside the caller's MotherDuck
+transaction over the rows already there (relation form); a `Backend` decides where (`backend.py`).
+
+Tables with a key (docs/design/apply.md 2): only an immediate key reaches this path, so no two source rows hold one
+key after any record (rule K, H-015). Per exact key, records are ordered by (transaction, seq); the first record
+fixes `p`, whether the source held the key when the change set starts (c: 0; u, d: 1), and a key whose records
+leave it with less than none or more than one row (or a u without a row) is `bad` (both modes raise). A `c` creates
+an arrival (index p + creates before it), `d` and `u` act on arrival `d_before`; the key ends with arrival `n_d`
+if p + n_c - n_d = 1. Arrival 0 of a held key is the destination row. A key change (`d` of the old key directly
+followed by its `c` with `k<i>` set, in one transaction) links the new arrival to the arrival that `d` removed;
+the value of an unchanged column is found by following these links back (`res`) to a record that carries it or to
+a destination row (a *root*). Stream mode asks the destination nothing: the root is the row the source held at the
+start. Catch-up looks the root up (`rootcnt`, one statement) and uses it only under rules 1 and 3
+(docs/design/apply.md 2.3); otherwise the key is unresolved. Outputs: `del` (keys whose row goes), `upd` (rows
+moved from root `rx` to key `x` and set), `copy` (the same for a key whose stored form cannot be changed by an
+UPDATE), `ins` and, in catch-up, `unres`.
+
+One rule for every step (docs/design/apply.md 5): a value of a row never passes through an aggregate, a window or
+QUALIFY. DuckDB normalises -0 and NaN inside nested values there (and in a CREATE TABLE AS with QUALIFY, even
+inside a STRUCT). Those operators see only integers and exact keys (`types.exact`, which hold no FLOAT, DOUBLE or
+INTERVAL); values are read from r0 by record position at the end (local form: by Arrow `take`).
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Callable, List
+
+from .meta import Column, TableMeta
+from .types import exact, join_wrap, needs_exact
+
+__all__ = ["Step", "keyed_steps", "keyless_steps", "key_join", "flat_x", "keyed_stats_sql", "keyless_stats_sql"]
+
+
+@dataclass
+class Step:
+    """`kind` is 'sql' (materialise `sql` as `name`) or 'lookup' (count destination rows per exact key of the
+    relation `source`, into `name` with columns x<i>..., n)."""
+    name: str
+    kind: str
+    sql: str = ""
+    source: str = ""
+    params: tuple = ()
+    view: bool = False          # a view where the backend allows it (local form): read once, never stored
+    # Local form only: the output is assembled from the change set's Arrow columns by position (Arrow `take`),
+    # not by SQL joins: `ix_sql` gives the positions, `recipe` the output columns, each ("ix", column of ix),
+    # ("take", source column, position column) or ("take2", a column, b column, index column into a ++ b).
+    ix_sql: str = ""
+    recipe: tuple = ()
+
+
+def struct_of(parts: list) -> str:
+    return "struct_pack(%s)" % ", ".join("%s := %s" % (n, e) for n, e in parts)
+
+
+def flat_x(meta: TableMeta, struct_expr: str, prefix: str = "x") -> str:
+    """The exact-key struct as columns x<i> (or rx<i> ...)."""
+    return ", ".join("%s.x%d AS %s%d" % (struct_expr, c.position, prefix, c.position) for c in meta.key_columns)
+
+
+def key_join(meta: TableMeta, t_alias: str, rel_alias: str, prefix: str = "x") -> str:
+    """Join condition of a destination row with a relation's exact key columns: ex(t.k) = n.x<i> for every key
+    column. For a key type whose `=` is exact this is a plain column comparison (a hash join on the raw column);
+    DATE and TIMESTAMP keys are compared through `join_wrap` on both sides."""
+    return " AND ".join("%s = %s" % (join_wrap(exact("%s.%s" % (t_alias, c.qname), c.dtype), c.dtype),
+                                     join_wrap("%s.%s%d" % (rel_alias, prefix, c.position), c.dtype))
+                        for c in meta.key_columns)
+
+
+def x_join(meta: TableMeta, left: str, right: str) -> str:
+    """Equality of exact keys held by two of apply's own relations (`left`.x<i>, `right`.x<i>; either may be a
+    struct expression such as `kb.kx`)."""
+    return " AND ".join("%s = %s" % (join_wrap("%s.x%d" % (left, c.position), c.dtype),
+                                     join_wrap("%s.x%d" % (right, c.position), c.dtype)) for c in meta.key_columns)
+
+
+def _ordered(src_sql: str, order_col: str, cols: str, params: tuple, pos: str) -> List[Step]:
+    """r0: the records as given, with their position `pos` (local: a column added to the Arrow data; relation form:
+    the row id of the copy). r0 is the only relation that holds the values of the rows; every later relation holds
+    numbers and keys, and values are read from r0 by position at the end."""
+    sel = "SELECT {oc} AS tord, seq, CAST(op AS VARCHAR) AS op, {cols}{pos} FROM {src}".format(
+        oc=order_col, cols=cols, src=src_sql, pos=", pos" if pos == "pos" else "")
+    return [Step("r0", "sql", sel, params=tuple(params), view=True)]
+
+
+# ------------------------------------------------------------------------------------------------ keyed
+
+
+def keyed_steps(meta: TableMeta, src_sql: str, order_col: str, ucols: List[Column], mode: str,
+                rel: Callable[[str], str], src_params: tuple = (), pos: str = "pos",
+                check_new_keys: bool = True) -> List[Step]:
+    keys = meta.key_columns
+    ucols = [c for c in ucols if not c.key]
+    upos = {c.position for c in ucols}
+    nonu = [c for c in meta.value_columns if c.position not in upos]
+    allcols = list(meta.columns)
+    R = rel
+    kx = struct_of([("x%d" % c.position, exact(c.a, c.dtype)) for c in keys])
+    okx_null = " AND ".join("%s IS NULL" % c.k for c in keys)
+    okx = "CASE WHEN %s THEN NULL ELSE %s END" % (okx_null, struct_of([("x%d" % c.position, exact(c.k, c.dtype))
+                                                                         for c in keys]))
+    kv = struct_of([(c.a, c.a) for c in keys])
+    src_cols = ", ".join([c.a for c in allcols] + [c.u for c in ucols] + [c.k for c in keys])
+    steps = _ordered(src_sql, order_col, src_cols, src_params, pos)
+
+    # r: per record its number in (transaction, seq) order, its position in r0, its keys and flags; no values
+    # but the key columns (the number is computed on the order columns alone and joined back).
+    steps.append(Step("r", "sql", """
+SELECT o.rn, q.{pos} AS pos, q.tord, q.seq, q.op, {kx} AS kx, {okx} AS okx, {kv} AS kv,
+       ({kn}) AS key_null, (NOT ({okn}) AND ({okp})) AS okey_partial, {a}{u}
+FROM {r0} AS q
+JOIN (SELECT tord, seq, row_number() OVER (ORDER BY tord, seq) AS rn FROM {r0}) AS o
+  ON o.tord = q.tord AND o.seq = q.seq
+""".format(pos=pos, kx=kx, okx=okx, kv=kv, a=", ".join("q.%s" % c.a for c in keys),
+           u="".join(", coalesce(q.%s, false) AS %s" % (c.u, c.u) for c in ucols), r0=R("r0"),
+           kn=" OR ".join("q.%s IS NULL" % c.a for c in keys), okn=okx_null,
+           okp=" OR ".join("q.%s IS NULL" % c.k for c in keys))))
+
+    # w: running sums per key, and the record just before (a key change is a d directly followed by its c).
+    steps.append(Step("w", "sql", """
+SELECT *, lag(op) OVER o AS prev_op, lag(kx) OVER o AS prev_kx, lag(tord) OVER o AS prev_tord,
+       lag(d_before) OVER o AS prev_dbefore
+FROM (
+  SELECT rn, tord, op, kx, okx,
+         CAST(sum(CASE op WHEN 'c' THEN 1 WHEN 'd' THEN -1 ELSE 0 END) OVER wk AS BIGINT) AS s_after,
+         CAST(coalesce(sum(CASE WHEN op = 'd' THEN 1 ELSE 0 END) OVER wb, 0) AS BIGINT) AS d_before,
+         CAST(coalesce(sum(CASE WHEN op = 'c' THEN 1 ELSE 0 END) OVER wb, 0) AS BIGINT) AS c_before,
+         first_value(op) OVER wk AS first_op
+  FROM {r}
+  WINDOW wk AS (PARTITION BY kx ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW),
+         wb AS (PARTITION BY kx ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING)
+) AS s
+WINDOW o AS (ORDER BY rn)
+""".format(r=R("r"))))
+
+    # kp: per key, p (did the source hold the key when the change set starts?) and whether its records are a
+    # source history. For a table keyed by an immediate replica-identity key no two rows hold one key at any
+    # record of the stream (rule K, H-015), so the first record fixes p (c: 0; u, d: 1) and after every record the
+    # key holds no row or one row (p + S in {0, 1}; a u needs one). A key that breaks this is `bad`: a divergence.
+    steps.append(Step("kp", "sql", """
+SELECT kx, first_rn, n_c, n_d, p,
+       bool_or(p + s_after < 0 OR p + s_after > 1 OR (op = 'u' AND p + s_after <> 1)) AS bad
+FROM (SELECT w.*, CASE w.first_op WHEN 'c' THEN 0 ELSE 1 END AS p,
+             min(rn) OVER (PARTITION BY kx) AS first_rn,
+             CAST(sum(CASE WHEN op = 'c' THEN 1 ELSE 0 END) OVER (PARTITION BY kx) AS BIGINT) AS n_c,
+             CAST(sum(CASE WHEN op = 'd' THEN 1 ELSE 0 END) OVER (PARTITION BY kx) AS BIGINT) AS n_d
+      FROM {w} AS w) AS q
+GROUP BY kx, first_rn, n_c, n_d, p
+""".format(w=R("w"))))
+
+    # ev: every record with its arrival index (c: the arrival it creates; d: the one it removes; u: the one it
+    # changes) and, for the c of a key change, the link to the d before it.
+    steps.append(Step("ev", "sql", """
+SELECT w.rn, w.op, w.kx, w.okx, kp.p,
+       CASE WHEN w.op = 'c' THEN kp.p + w.c_before ELSE w.d_before END AS idx,
+       CASE WHEN w.op <> 'c' OR w.okx IS NULL THEN 'none'
+            WHEN w.prev_op = 'd' AND w.prev_kx = w.okx AND w.prev_tord = w.tord THEN 'ok' ELSE 'broken' END AS plink,
+       w.prev_dbefore AS pidx
+FROM {w} AS w JOIN {kp} AS kp ON kp.kx = w.kx
+WHERE kp.p IS NOT NULL
+""".format(w=R("w"), kp=R("kp"))))
+
+    # arr: one row per arrival that a record creates or changes: its newest record (lrn, which carries every
+    # column that cannot be unchanged) and, per unchanged-possible column, the newest record that carries it.
+    srcs = "".join(", max(CASE WHEN NOT r.%s THEN e.rn END) OVER wa AS s%d" % (c.u, c.position) for c in ucols)
+    steps.append(Step("arr", "sql", """
+WITH s AS (
+  SELECT e.kx, e.idx, e.p, e.rn AS lrn, max(CASE WHEN e.op = 'c' THEN e.rn END) OVER wa AS crn{srcs}
+  FROM {ev} AS e JOIN {r} AS r ON r.rn = e.rn
+  WHERE e.op IN ('c', 'u')
+  WINDOW wa AS (PARTITION BY e.kx, e.idx)
+  QUALIFY row_number() OVER (PARTITION BY e.kx, e.idx ORDER BY e.rn DESC) = 1
+)
+SELECT s.*, c.plink AS c_plink, c.okx AS pkx, c.pidx AS pidx
+FROM s LEFT JOIN {ev} AS c ON c.rn = s.crn
+""".format(srcs=srcs, ev=R("ev"), r=R("r"))))
+
+    snames = ["s%d" % c.position for c in ucols]
+    steps.append(Step("arrx", "sql", """
+SELECT kx, idx, p, CASE WHEN idx < p THEN 'dest' ELSE c_plink END AS plink, pkx, pidx, crn, lrn{scopy} FROM {arr}
+UNION ALL BY NAME
+SELECT kp.kx, CAST(0 AS BIGINT) AS idx, kp.p, 'dest' AS plink, NULL AS pkx, NULL AS pidx, NULL AS crn,
+       NULL AS lrn{snull}
+FROM {kp} AS kp
+WHERE kp.p = 1 AND NOT EXISTS (SELECT 1 FROM {arr} AS a WHERE a.kx = kp.kx AND a.idx = 0)
+""".format(scopy="".join(", " + s for s in snames), snull="".join(", CAST(NULL AS BIGINT) AS " + s for s in snames),
+           arr=R("arr"), kp=R("kp"))))
+
+    # fin: the arrival each key holds when the change set ends.
+    steps.append(Step("fin", "sql", """
+SELECT a.*, kp.first_rn FROM {kp} AS kp JOIN {arrx} AS a ON a.kx = kp.kx AND a.idx = kp.n_d
+WHERE kp.p IS NOT NULL AND kp.p + kp.n_c - kp.n_d = 1
+""".format(kp=R("kp"), arrx=R("arrx"))))
+
+    # res: where each unchanged column's value comes from, following key-change links back to a destination row.
+    if ucols:
+        any_null = " OR ".join("%s.s%d IS NULL" % ("{t}", c.position) for c in ucols)
+        steps.append(Step("res", "sql", """
+WITH RECURSIVE res AS (
+  SELECT f.kx AS fkx, f.kx AS ckx, f.idx AS cidx, f.plink AS clink, f.pkx AS cpkx, f.pidx AS cpidx,
+         0 AS depth{sbase}
+  FROM {fin} AS f WHERE {fnull}
+  UNION ALL
+  SELECT res.fkx, a.kx, a.idx, a.plink, a.pkx, a.pidx, res.depth + 1{sstep}
+  FROM res JOIN {arrx} AS a ON a.kx = res.cpkx AND a.idx = res.cpidx
+  WHERE res.clink = 'ok' AND ({rnull})
+)
+SELECT * FROM res QUALIFY row_number() OVER (PARTITION BY fkx ORDER BY depth DESC) = 1
+""".format(sbase="".join(", f.s%d" % c.position for c in ucols),
+           sstep="".join(", coalesce(res.s%d, a.s%d) AS s%d" % (c.position, c.position, c.position) for c in ucols),
+           fin=R("fin"), arrx=R("arrx"), fnull=any_null.replace("{t}", "f"), rnull=any_null.replace("{t}", "res"))))
+        all_set = " AND ".join("res.s%d IS NOT NULL" % c.position for c in ucols)
+        res_join = "LEFT JOIN %s AS res ON res.fkx = f.kx" % R("res")
+        how = ("CASE WHEN res.fkx IS NULL OR ({all}) THEN 'complete' WHEN res.clink = 'dest' THEN 'ref' "
+               "ELSE 'unres' END".format(all=all_set))
+        rkx = "CASE WHEN res.fkx IS NOT NULL AND NOT ({all}) AND res.clink = 'dest' THEN res.ckx END".format(all=all_set)
+        svals = "".join(", CASE WHEN res.fkx IS NULL THEN f.s{p} ELSE res.s{p} END AS s{p}".format(p=c.position)
+                        for c in ucols)
+    else:
+        res_join, how, rkx, svals = "", "'complete'", "CASE WHEN false THEN f.kx END", ""
+    steps.append(Step("dec", "sql", """
+SELECT f.kx, f.crn, f.first_rn, f.lrn, {how} AS how, {rkx} AS rkx{svals}
+FROM {fin} AS f {res_join}
+""".format(how=how, rkx=rkx, svals=svals, fin=R("fin"), res_join=res_join)))
+
+    # act: what happens to each final key. Catch-up checks the destination rows it would take values from.
+    if mode == "catch_up":
+        steps.append(Step("cand_r", "sql", """
+SELECT DISTINCT {fx} FROM (
+  SELECT rkx AS kx FROM {dec} WHERE how = 'ref'
+  UNION ALL SELECT d.kx FROM {dec} AS d
+            WHERE d.how IN ('ref', 'unres') AND d.crn IS NOT NULL AND d.crn = d.first_rn
+) AS c
+""".format(fx=flat_x(meta, "kx"), dec=R("dec"), kp=R("kp"))))
+        steps.append(Step("rootcnt", "lookup", source="cand_r"))
+        rc = lambda alias, sx: x_join(meta, alias, sx)
+        steps.append(Step("act0", "sql", """
+SELECT d.*,
+  CASE WHEN d.how = 'complete' THEN 'ins'
+       WHEN d.how = 'ref' AND r2.n = 1 AND (kr.n_c = 0 OR (kr.n_c = 1 AND {same})) THEN 'upd'
+       WHEN d.how IN ('ref', 'unres') AND d.crn IS NOT NULL AND d.crn = d.first_rn AND r3.n = 1 THEN 'upd3'
+       ELSE 'unres' END AS action0
+FROM {dec} AS d
+LEFT JOIN {rc} AS r2 ON {j2}
+LEFT JOIN {kp} AS kr ON kr.kx = d.rkx
+LEFT JOIN {rc} AS r3 ON {j3}
+""".format(dec=R("dec"), rc=R("rootcnt"), kp=R("kp"), j2=rc("r2", "d.rkx"), j3=rc("r3", "d.kx"),
+           same="d.rkx = d.kx")))
+        root = "CASE WHEN action0 = 'upd3' THEN kx ELSE rkx END"
+        action = "CASE WHEN action0 = 'upd3' THEN 'upd' ELSE action0 END"
+        src_act = R("act0")
+    else:
+        root = "rkx"
+        action = "CASE how WHEN 'complete' THEN 'ins' WHEN 'ref' THEN 'upd' ELSE 'unres' END"
+        src_act = R("dec")
+    if any(needs_exact(c.dtype) for c in keys):
+        # a key that changes only in representation (-0 -> 0, 1 mon -> 30 days) cannot be moved by UPDATE: the
+        # stored key would stay; such a row is copied (docs/design/apply.md 3.4). Raw keys compared with `=`.
+        # any such key column whose value stays `=`-equal while its exact form changes (other columns may change)
+        rep = "(%s)" % " OR ".join("(rr.{a} = rf.{a} AND {er} IS DISTINCT FROM {ef})".format(
+            a=c.a, er=exact("rr." + c.a, c.dtype), ef=exact("rf." + c.a, c.dtype)) for c in keys if needs_exact(c.dtype))
+        act_sql = """
+SELECT a.* REPLACE (CASE WHEN a.action = 'upd' AND a.root <> a.kx AND {rep} THEN 'copy' ELSE a.action END AS action)
+FROM (SELECT *, {root} AS root, {action} AS action FROM {src}) AS a
+LEFT JOIN {kp} AS kr ON kr.kx = a.root
+LEFT JOIN {r} AS rr ON rr.rn = kr.first_rn
+LEFT JOIN {r} AS rf ON rf.rn = a.lrn
+""".format(rep=rep, root=root, action=action, src=src_act, kp=R("kp"), r=R("r"))
+    else:
+        act_sql = "SELECT *, {root} AS root, {action} AS action FROM {src}".format(root=root, action=action, src=src_act)
+    steps.append(Step("act", "sql", act_sql))
+
+    # outputs: values are read from the records by record number
+    # del. Stream: the keys the source held at the start (p = 1), except roots that K3 moves or K7 copies; the
+    # destination equals the source then, so each has exactly one row. Keys with p = 0 must have no row: a key
+    # that ends with a row is checked inside K6, K3 or K7 (`check_new_keys`, docs/design/apply.md 2.5); a key that
+    # the change set creates and removes again is checked here, in K1. K1 counts per key (statements.k1_delete).
+    # Catch-up: every key of the change set (the table was loaded under other snapshots), the row of an unresolved
+    # key included: it is stale, a later call must not take values from it, and the repair read loads it (2.6).
+    if mode == "stream":
+        pfilter = (" AND (kp.p = 1 OR (%s AND NOT EXISTS (SELECT 1 FROM %s AS a0 WHERE a0.kx = kp.kx)))"
+                   % ("true" if check_new_keys else "false", R("act")))
+    else:
+        pfilter = ""
+    steps.append(Step("del", "sql", """
+SELECT {fx}, kp.p FROM {kp} AS kp
+WHERE true{pfilter}
+  AND NOT EXISTS (SELECT 1 FROM {act} AS a WHERE a.action IN ('upd', 'copy') AND a.root = kp.kx)
+""".format(fx=flat_x(meta, "kp.kx"), kp=R("kp"), act=R("act"), pfilter=pfilter)))
+    # values: the newest record of the final row (lrn) supplies the key and every column that cannot be
+    # unchanged; record s<i> supplies unchanged-possible column i. Read from r0 by position.
+    vjoins = "JOIN {r} AS rl ON rl.rn = a.lrn JOIN {r0} AS vl ON vl.{pos} = rl.pos".format(r=R("r"), r0=R("r0"), pos=pos)
+    vjoins += "".join(" LEFT JOIN {r} AS r{p} ON r{p}.rn = a.s{p} LEFT JOIN {r0} AS v{p} ON v{p}.{pos} = r{p}.pos"
+                      .format(r=R("r"), r0=R("r0"), p=c.position, pos=pos) for c in ucols)
+    vcols = (["vl.%s AS %s" % (c.a, c.a) for c in keys] + ["vl.%s AS %s" % (c.a, c.a) for c in nonu]
+             + ["v%d.%s AS %s" % (c.position, c.a, c.a) for c in ucols])
+    ixjoins = "JOIN {r} AS rl ON rl.rn = a.lrn".format(r=R("r")) + "".join(
+        " LEFT JOIN {r} AS r{p} ON r{p}.rn = a.s{p}".format(r=R("r"), p=c.position) for c in ucols)
+    ixcols = ["rl.pos AS p_l"] + ["r%d.pos AS p_%d" % (c.position, c.position) for c in ucols]
+    vrecipe = ([(c.a, "take", c.a, "p_l") for c in keys] + [(c.a, "take", c.a, "p_l") for c in nonu]
+               + [(c.a, "take", c.a, "p_%d" % c.position) for c in ucols])
+    # ins also carries its exact key x<i> (K6 checks that the key is free, check_new_keys)
+    insx = [flat_x(meta, "a.kx")]
+    insx_recipe = [("x%d" % c.position, "ix", "x%d" % c.position) for c in keys]
+    steps.append(Step("ins", "sql", "SELECT %s FROM %s AS a %s WHERE a.action = 'ins'"
+                      % (", ".join(insx + vcols), R("act"), vjoins),
+                      ix_sql="SELECT %s FROM %s AS a %s WHERE a.action = 'ins'"
+                      % (", ".join(insx + ixcols), R("act"), ixjoins),
+                      recipe=tuple(insx_recipe + vrecipe)))
+    # xp: whether the source held the target key at the start (a target with p = 0 must have no row; K3, K7)
+    keycols = [flat_x(meta, "a.root", "rx"), flat_x(meta, "a.kx"),
+               "CAST((SELECT kq.p FROM %s AS kq WHERE kq.kx = a.kx) AS BIGINT) AS xp" % R("kp")]
+    hcols = ["(a.s%d IS NOT NULL) AS h%d" % (c.position, c.position) for c in ucols]
+    keyrecipe = ([("rx%d" % c.position, "ix", "rx%d" % c.position) for c in keys]
+                 + [("x%d" % c.position, "ix", "x%d" % c.position) for c in keys] + [("xp", "ix", "xp")])
+    hrecipe = [("h%d" % c.position, "ix", "h%d" % c.position) for c in ucols]
+    for name in ("upd", "copy"):
+        steps.append(Step(name, "sql", "SELECT %s FROM %s AS a %s WHERE a.action = '%s'"
+                          % (", ".join(keycols + vcols + hcols), R("act"), vjoins, name),
+                          ix_sql="SELECT %s FROM %s AS a %s WHERE a.action = '%s'"
+                          % (", ".join(keycols + ixcols + hcols), R("act"), ixjoins, name),
+                          recipe=tuple(keyrecipe + vrecipe + hrecipe)))
+    if mode == "catch_up":
+        kvs = ", ".join("q.%s AS %s" % (c.a, c.a) for c in keys)
+        steps.append(Step("unres", "sql", """
+SELECT {kvs} FROM {act} AS a JOIN {r} AS q ON q.rn = a.lrn WHERE a.action = 'unres'
+""".format(kvs=kvs, act=R("act"), r=R("r"))))
+    return steps
+
+
+def keyed_stats_sql(meta: TableMeta, ucols: List[Column], rel: Callable[[str], str], mode: str) -> str:
+    """One row: records by op, problems, rows per output, and per unchanged column how many updates carry it."""
+    ucols = [c for c in ucols if not c.key]
+    parts = [
+        "(SELECT count(*) FROM {r}) AS n_records",
+        "(SELECT count(*) FROM {r} WHERE op = 'c') AS n_c",
+        "(SELECT count(*) FROM {r} WHERE op = 'u') AS n_u",
+        "(SELECT count(*) FROM {r} WHERE op = 'd') AS n_d",
+        "(SELECT count(*) FROM {r} WHERE op NOT IN ('c', 'u', 'd') OR op IS NULL) AS n_badop",
+        "(SELECT count(*) FROM {r} WHERE key_null) AS n_keynull",
+        "(SELECT count(*) FROM {r} WHERE okey_partial) AS n_okeypartial",
+        "(SELECT count(*) FROM (SELECT tord, seq FROM {r0} GROUP BY ALL HAVING count(*) > 1)) AS n_dupseq",
+        "(SELECT count(*) FROM {r0} WHERE tord IS NULL OR seq IS NULL) AS n_nullorder",
+        "(SELECT count(*) FROM {kp} WHERE bad) AS n_bad",
+        # two keys the change set ends with that the source's equality merges (-0 and 0, 1 mon and 30 days):
+        # not a source history (DuckDB's GROUP BY merges them as the source does)
+        "(SELECT count(*) FROM (SELECT 1 FROM {act} AS a JOIN {r} AS q ON q.rn = a.lrn GROUP BY %s "
+        "HAVING count(*) > 1)) AS n_samesrc" % ", ".join("q.%s" % c.a for c in meta.key_columns),
+        "(SELECT count(*) FROM {act} WHERE action = 'unres') AS n_unres_final",
+        "(SELECT count(*) FROM {del}) AS n_del",
+        "(SELECT count(*) FROM {del} WHERE p = 1) AS n_del_held",
+        "(SELECT count(*) FROM {act} WHERE action = 'ins') AS n_ins",
+        "(SELECT count(*) FROM {act} WHERE action = 'upd') AS n_upd",
+        "(SELECT count(*) FROM {act} WHERE action = 'copy') AS n_copy",
+    ]
+    if mode == "catch_up":
+        parts.append("(SELECT count(*) FROM {unres}) AS n_unres")
+    for c in ucols:
+        parts.append("(SELECT count(*) FROM {act} WHERE action = 'upd' AND s%d IS NOT NULL) AS h%d"
+                     % (c.position, c.position))
+    names = {n: rel(n) for n in ("r0", "r", "kp", "act", "del", "ins", "upd", "copy", "unres")}
+    return "SELECT " + ", ".join(p.format(**names) for p in parts)
+
+
+# ------------------------------------------------------------------------------------------------ keyless
+
+
+def keyless_steps(meta: TableMeta, src_sql: str, order_col: str, ucols: List[Column],
+                  rel: Callable[[str], str], src_params: tuple = (), pos: str = "pos") -> List[Step]:
+    """delta: per exact row image, +1 for every new image and -1 for every old image (docs/design/apply.md 4).
+    Order does not matter for a multiset. The images are grouped by their exact form; a representative image is
+    chosen by number (position * 2, + 1 for a new image) and its values are read from r0 by position."""
+    cols = list(meta.columns)
+    upos = {c.position for c in ucols}
+
+    def newv(c, q=""):
+        if c.position in upos:
+            return "CASE WHEN coalesce({q}{u}, false) THEN {q}{b} ELSE {q}{a} END".format(q=q, u=c.u, b=c.b, a=c.a)
+        return q + c.a
+    src_cols = ", ".join([c.a for c in cols] + [c.b for c in cols] + [c.u for c in ucols])
+    ecols = ", ".join("e%d" % c.position for c in cols)
+    steps = _ordered(src_sql, order_col, src_cols, src_params, pos)
+    old_e = ", ".join("%s AS e%d" % (exact(c.b, c.dtype), c.position) for c in cols)
+    new_e = ", ".join("%s AS e%d" % (exact(newv(c), c.dtype), c.position) for c in cols)
+    steps.append(Step("img", "sql", """
+SELECT {pos} * 2 AS iid, -1 AS w, {old_e} FROM {r0} WHERE op IN ('d', 'u')
+UNION ALL
+SELECT {pos} * 2 + 1 AS iid, 1 AS w, {new_e} FROM {r0} WHERE op IN ('c', 'u')
+""".format(pos=pos, old_e=old_e, new_e=new_e, r0=rel("r0"))))
+    steps.append(Step("delta", "sql", """
+SELECT row_number() OVER () AS gid, * FROM (
+  SELECT {ecols}, CAST(sum(w) AS BIGINT) AS n, min(iid) AS iid FROM {img} GROUP BY {ecols} HAVING sum(w) <> 0
+) AS g
+""".format(ecols=ecols, img=rel("img"))))
+    steps.append(Step("neg", "sql", "SELECT gid, -n AS n, %s FROM %s WHERE n < 0" % (ecols, rel("delta"))))
+    vals = ", ".join("CASE WHEN d.iid %% 2 = 0 THEN q.%s ELSE %s END AS v%d" % (c.b, newv(c, "q."), c.position)
+                     for c in cols)
+    # local form: index into a<i> ++ b<i> (positions 0..N-1 are a, N..2N-1 are b)
+    def bidx(c):
+        use_b = "d.iid % 2 = 0" + (" OR coalesce(q.%s, false)" % c.u if c.position in upos else "")
+        return "CASE WHEN %s THEN q.%s + (SELECT count(*) FROM %s) ELSE q.%s END AS j%d" % (
+            use_b, pos, rel("r0"), pos, c.position)
+    steps.append(Step("plus", "sql", "SELECT d.n, %s FROM %s AS d JOIN %s AS q ON q.%s = d.iid // 2 WHERE d.n > 0"
+                      % (vals, rel("delta"), rel("r0"), pos),
+                      ix_sql="SELECT d.n, %s FROM %s AS d JOIN %s AS q ON q.%s = d.iid // 2 WHERE d.n > 0"
+                      % (", ".join(bidx(c) for c in cols), rel("delta"), rel("r0"), pos),
+                      recipe=tuple([("n", "ix", "n")] + [("v%d" % c.position, "take2", c.a, c.b, "j%d" % c.position)
+                                                          for c in cols])))
+    return steps
+
+
+def keyless_stats_sql(rel: Callable[[str], str]) -> str:
+    return ("SELECT (SELECT count(*) FROM {r}) AS n_records, (SELECT count(*) FROM {r} WHERE op = 'c') AS n_c, "
+            "(SELECT count(*) FROM {r} WHERE op = 'u') AS n_u, (SELECT count(*) FROM {r} WHERE op = 'd') AS n_d, "
+            "(SELECT count(*) FROM {r} WHERE op NOT IN ('c', 'u', 'd') OR op IS NULL) AS n_badop, "
+            "(SELECT count(*) FROM (SELECT tord, seq FROM {r0} GROUP BY ALL HAVING count(*) > 1)) AS n_dupseq, "
+            "(SELECT count(*) FROM {r0} WHERE tord IS NULL OR seq IS NULL) AS n_nullorder, "
+            "(SELECT count(*) FROM {neg}) AS n_neg_groups, (SELECT coalesce(sum(n), 0) FROM {neg}) AS n_neg_rows, "
+            "(SELECT count(*) FROM {delta} WHERE n > 0) AS n_pos_groups, "
+            "(SELECT coalesce(sum(n), 0) FROM {delta} WHERE n > 0) AS n_pos_rows"
+            ).format(r0=rel("r0"), r=rel("r0"), neg=rel("neg"), delta=rel("delta"))
