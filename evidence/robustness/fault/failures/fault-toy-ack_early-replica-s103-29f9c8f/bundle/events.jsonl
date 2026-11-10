@@ -1,0 +1,33 @@
+{"epoch": 1, "kind": "took_over", "pid": 92019, "previous_age_ms": 847633056236, "previous_state": "released", "run": "i1-92019", "t": 1794317856.239551, "tag": "i1"}
+{"epoch": 1, "kind": "started", "pid": 92019, "run": "i1-92019", "t": 1794317856.242326, "tag": "i1", "variant": "ack_early"}
+{"kind": "resync_start", "pid": 92019, "run": "i1-92019", "t": 1794317856.273943, "tag": "i1", "why": "pending"}
+{"kind": "resync_done", "pid": 92019, "position": "0/34A2338", "rows": 24, "run": "i1-92019", "t": 1794317856.529872, "tag": "i1"}
+{"detail": "write-write conflict on public.w_k0", "error": "ToyConflict", "kind": "retry", "pid": 92019, "run": "i1-92019", "t": 1794317858.341691, "tag": "i1"}
+{"epoch": 2, "kind": "took_over", "pid": 92281, "previous_age_ms": 2097, "previous_state": "leading", "run": "i2-92281", "t": 1794317863.529549, "tag": "i2"}
+{"epoch": 2, "kind": "started", "pid": 92281, "run": "i2-92281", "t": 1794317863.533836, "tag": "i2", "variant": "ack_early"}
+{"detail": "write-write conflict on public.w_xfer_2", "error": "ToyConflict", "kind": "retry", "pid": 92281, "run": "i2-92281", "t": 1794317863.896157, "tag": "i2"}
+{"epoch": 3, "kind": "took_over", "pid": 92340, "previous_age_ms": 2009, "previous_state": "leading", "run": "i3-92340", "t": 1794317866.311794, "tag": "i3"}
+{"epoch": 3, "kind": "started", "pid": 92340, "run": "i3-92340", "t": 1794317866.315511, "tag": "i3", "variant": "ack_early"}
+{"detail": "write-write conflict on public.w_xfer_0", "error": "ToyConflict", "kind": "retry", "pid": 92340, "run": "i3-92340", "t": 1794317871.307061, "tag": "i3"}
+{"detail": "write-write conflict on public.w_credit", "error": "ToyConflict", "kind": "retry", "pid": 92340, "run": "i3-92340", "t": 1794317871.584681, "tag": "i3"}
+{"epoch": 4, "kind": "took_over", "pid": 92513, "previous_age_ms": 2020, "previous_state": "leading", "run": "i4-92513", "t": 1794317876.747427, "tag": "i4"}
+{"epoch": 4, "kind": "started", "pid": 92513, "run": "i4-92513", "t": 1794317876.751091, "tag": "i4", "variant": "ack_early"}
+{"detail": "write-write conflict on public.w_xfer_0", "error": "ToyConflict", "kind": "retry", "pid": 92513, "run": "i4-92513", "t": 1794317878.212438, "tag": "i4"}
+{"detail": "write-write conflict on public.w_credit", "error": "ToyConflict", "kind": "retry", "pid": 92513, "run": "i4-92513", "t": 1794317879.155367, "tag": "i4"}
+{"detail": "write-write conflict on public.w_xfer_2", "error": "ToyConflict", "kind": "retry", "pid": 92513, "run": "i4-92513", "t": 1794317880.208991, "tag": "i4"}
+{"epoch": 5, "kind": "took_over", "pid": 92611, "previous_age_ms": 2651, "previous_state": "leading", "run": "i6-92611", "t": 1794317884.592926, "tag": "i6"}
+{"epoch": 5, "kind": "started", "pid": 92611, "run": "i6-92611", "t": 1794317884.596918, "tag": "i6", "variant": "ack_early"}
+{"epoch": 6, "kind": "took_over", "pid": 92636, "previous_age_ms": 2015, "previous_state": "leading", "run": "i7-92636", "t": 1794317887.235417, "tag": "i7"}
+{"epoch": 6, "kind": "started", "pid": 92636, "run": "i7-92636", "t": 1794317887.23947, "tag": "i7", "variant": "ack_early"}
+{"detail": "keyless public.w_dk found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 92636, "run": "i7-92636", "t": 1794317887.391514, "tag": "i7"}
+{"detail": "keyless public.w_dk found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 92636, "run": "i7-92636", "t": 1794317887.557815, "tag": "i7"}
+{"detail": "keyless public.w_dk found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 92636, "run": "i7-92636", "t": 1794317887.762535, "tag": "i7"}
+{"kind": "quarantined", "pid": 92636, "run": "i7-92636", "t": 1794317887.778375, "table": "public.w_dk", "tag": "i7"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 92636, "run": "i7-92636", "t": 1794317888.11036, "tag": "i7"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 92636, "run": "i7-92636", "t": 1794317888.642619, "tag": "i7"}
+{"detail": "unchanged value of public.w_toast has no earlier row", "error": "ApplyInvariantError", "kind": "retry", "pid": 92636, "run": "i7-92636", "t": 1794317889.570548, "tag": "i7"}
+{"kind": "quarantined", "pid": 92636, "run": "i7-92636", "t": 1794317889.586479, "table": "public.w_toast", "tag": "i7"}
+{"detail": "keyless public.w_nkt found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 92636, "run": "i7-92636", "t": 1794317890.766169, "tag": "i7"}
+{"detail": "keyless public.w_nkt found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 92636, "run": "i7-92636", "t": 1794317891.940905, "tag": "i7"}
+{"detail": "keyless public.w_nkt found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 92636, "run": "i7-92636", "t": 1794317893.115174, "tag": "i7"}
+{"kind": "quarantined", "pid": 92636, "run": "i7-92636", "t": 1794317893.131231, "table": "public.w_nkt", "tag": "i7"}

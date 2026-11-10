@@ -129,7 +129,14 @@ def replay_case(case: dict, workdir: Path, variant: Optional[str] = None, catch_
         if not r.equal:
             out.update(outcome="diverged", reason="oracle")
         elif observers_ is not None and observers_.violations():
-            out.update(outcome="violation", reason="consumer loop")
+            # the destination equals the source now: if an invariant fails on it, the reduced workload broke the
+            # invariant at the source itself (removed entries), and the case says nothing about the system
+            conn = system.observer_connect()
+            broken = [lp.check.name for lp in observers_.loops if lp.observe_once(conn) is False]
+            if broken:
+                out.update(outcome="invalid", reason="the case breaks the invariant at the source: %s" % broken)
+            else:
+                out.update(outcome="violation", reason="consumer loop")
         else:
             out["outcome"] = "pass"
         return out
@@ -188,9 +195,8 @@ def reduce(case: dict, workdir: Path, attempts: int = 2, budget: int = 40,
             res = replay_case(c, workdir / ("r%d" % runs["n"]))
             if log:
                 log("reduce: %d entries %d faults -> %s" % (len(c["entries"]), len(c["faults"]), res["outcome"]))
-            if res["outcome"] == c.get("outcome") or (res["outcome"] in ("diverged", "violation", "stuck")
-                                                       and c.get("outcome") in ("diverged", "violation", "stuck")):
-                return True                                # the same kind of failure; an error is not one
+            if res["outcome"] == c.get("outcome"):
+                return True                                # the same failure; another one is not the same case
         return False
 
     if not fails(case):

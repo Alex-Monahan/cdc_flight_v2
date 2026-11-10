@@ -205,7 +205,7 @@ def main(argv=None) -> int:
         entry = {"id": fid, "fuzzer": meta["fuzzer"], "system": meta["system_spec"], "seed": meta["seed"],
                  "outcome": meta["outcome"], "before": size(original), "after": size(case),
                  "reduction": meta.get("reduced"), "replays_of_the_reduced_case": replays,
-                 "both_replays_fail": all(o not in ("pass", "infrastructure", "error") for o in replays),
+                 "both_replays_fail": all(o == meta["outcome"] for o in replays),
                  "regression_test": meta["regression_test"], "regression_test_exit": p.returncode,
                  "regression_test_summary": summary, **git_state(REPO)}
         doc = json.loads(Path(a.out).read_text()) if Path(a.out).exists() else {
