@@ -672,3 +672,82 @@ def test_times_are_read_as_integer_microseconds(led):
         assert type(info.value).__name__ == "InvalidInputException" and "pytz" in str(info.value)
         assert c.generation == 1                                  # not taken for a lost connection
         assert c.fetchone("SELECT count(*) FROM seen")[0] == 1    # and the connection goes on
+
+
+def test_arguments_are_checked_and_a_failed_connect_hides_the_path(led, faults, tmp_path):
+    """Contract notes of `docs/design/destination.md`, section 13: a deadline is a `Deadline` object and never a
+    number of seconds; the database of the settings is a name and never a connection string; every error of the
+    client at connect is `ConnectionLost`, and its message does not repeat a local path."""
+    for bad in ("md:some_db", "motherduck:some_db", "MD:some_db", "some_db?motherduck_token=x", "", "a\nb",
+                ":memory:a-b", None, 7):
+        with pytest.raises(ValueError):
+            md.Settings(database=bad)
+    for bad in ("Bad Role", "", None):
+        with pytest.raises(ValueError):
+            md.connect(bad, led.settings)
+    with pytest.raises(TypeError):
+        md.connect("stream", "some_db")                         # settings, not a name
+    with pytest.raises(TypeError):
+        md.connect("stream", led.settings, 5.0)                 # a number of seconds is not a deadline
+    c = counter(led)
+    conn = led.connect("stream")
+    with pytest.raises(TypeError):
+        conn.fetchone("SELECT 1", None, 5)
+    lane = md.Lane(conn, "stream", led.epoch)
+    with pytest.raises(TypeError):
+        lane.transaction(5)
+    with lane.transaction(None) as tx:                          # None is the default of the settings
+        assert tx.deadline.remaining() <= led.settings.transaction_deadline_s
+        with pytest.raises(TypeError):
+            tx.execute(BUMP, None, 5.0)
+        tx.execute(BUMP)
+    assert value(c) == 1                                        # the refused call did not harm the transaction
+
+    missing = str(tmp_path / "no_such_dir" / "x.duckdb")
+    with pytest.raises(md.ConnectionLost) as info:
+        md.connect("down", md.Settings(database=missing, connect_attempts=1))
+    assert str(tmp_path) not in str(info.value) and "no_such_dir" not in str(info.value)
+    faults.raise_at("md.connect", "ValueError")                 # not a transport error: still ConnectionLost
+    with pytest.raises(md.ConnectionLost):
+        md.connect("down", led.settings)
+    assert len(faults.fired(site="md.connect", action="raise")) == led.settings.connect_attempts
+
+
+def test_a_conflict_that_commit_reports_is_conflict(led, faults):
+    """Contract note: C4 names `Conflict` for a statement. When `COMMIT` itself answers with a write-write conflict,
+    the destination has refused the commit, so that is `Conflict` too and not `CommitUnknown`; the connection is
+    kept. No run on MotherDuck or on local DuckDB gave such an answer, so the rule is tested with a fault site."""
+    c = counter(led)
+    lane = led.lane("stream", led.epoch)
+    faults.raise_at("md.commit", "duckdb.TransactionException",
+                    message="TransactionContext Error: Conflict on update!", hits=1)
+    with pytest.raises(md.Conflict) as info:
+        with lane.transaction() as tx:
+            tx.execute(BUMP)
+    assert "Conflict on" not in str(info.value)                 # the client's text is not repeated
+    assert value(c) == 0 and lane.conn.usable and lane.conn.generation == 1
+    with lane.transaction() as tx:
+        tx.execute(BUMP)
+    assert value(c) == 1 and lane.conn.generation == 1
+
+
+def test_a_connection_that_is_not_a_lane_registers_under_a_lane_name(led):
+    """Contract note: C4 speaks of 'every connection of a lane'. A connection that writes for an epoch without being
+    a lane (the heartbeat connection of package L) registers itself, under one of the fixed lane names."""
+    c = led.connect("look")
+    beat = led.connect("heartbeat")
+    mine = "SELECT epoch, lane FROM _cdc.connections WHERE connection_id = ?"
+    with pytest.raises(ValueError):
+        registry.register(beat, "heartbeat", led.epoch)         # only the fixed lane names
+    sid = registry.register(beat, "control", led.epoch)
+    assert sid == beat.server_id
+    assert c.fetchall(mine, [sid]) == [(led.epoch, "control")]
+    with pytest.raises(md.FenceLost):
+        registry.register(beat, "control", led.epoch + 1)       # an epoch that does not lead yet
+    assert led.take_over() == led.epoch + 1
+    with pytest.raises(md.FenceLost):
+        registry.register(beat, "control", led.epoch)           # an epoch that no longer leads
+    assert c.fetchall(mine, [sid]) == [(led.epoch, "control")]
+    before = registry.interrupt_earlier(c, led.epoch + 1)[0]
+    beat.close()
+    assert before >= 1                                          # the take-over of the next epoch finds it
