@@ -228,7 +228,8 @@ temporary, two-phase off; refuses an existing name (`SlotExists`).
   `pg_logical_emit_message(false, 'cdc_v2.nudge', '')`, which needs no table privilege). What the server does by
   itself: the primary's background writer logs a running-transactions record at most every 15 s and only when
   "important" WAL was written since the previous one (`LOG_SNAPSHOT_INTERVAL_MS`, `bgwriter.c`); a checkpoint also
-  logs one. So with only our writes, the record arrives within about 15 s of the first write; on a truly idle primary
+  logs one. So with only our writes, the record arrives within about 25 s of the first write (15 s plus up to 10 s
+  of background-writer hibernation, §7 finding 7); on a truly idle primary
   without writes it never arrives. `nudge` may also be any callable (for example the heartbeat write). A long
   transaction and a prepared transaction on the primary block creation for as long as they stay open (the snapshot
   builder waits for every transaction running at the first record).
@@ -429,9 +430,12 @@ identifier, applied position on the timeline history, a valid slot of our plugin
 6. Slot creation that is abandoned by a dead client finishes later unless `client_connection_check_interval` is set
    (fixed in `create`). A creation abandoned on a dead network path (no FIN reaches the server) can still finish
    later; the result is a fresh, unused slot of our name whose `confirmed_flush_lsn` is its consistent point.
-7. The background writer's 15 s cadence makes the `write` nudge take up to two cycles (21.7 s measured once on
-   16); with `pg_log_standby_snapshot` granted it is below 1 s. Package V's slot-creation deadline must be well above
-   30 s (the default of 120 s is).
+7. The background writer logs a running-transactions record at most every 15 s after important WAL, and while it
+   hibernates it wakes only every 10 s, so after a write the record can take ≈ 25 s (measured on 16: a
+   `Standby/RUNNING_XACTS` record of 50 bytes ≈ 20 s after a CHECKPOINT, identified with `pg_walinspect`; the
+   `write` nudge took 21.7 s once). With `pg_log_standby_snapshot` granted it is below 1 s. Package V's
+   slot-creation deadline must be well above 30 s (the default of 120 s is). "An idle primary" in a test therefore
+   means no new WAL for more than 25 s.
 8. `idle_replication_slot_timeout` (18) invalidates ordinary slots on a standby too (at a restartpoint), as H-037
    says; reading the setting is in `ServerFacts.idle_replication_slot_timeout_s`.
 9. Heartbeat statistics: `pg_stat_user_tables` update counters were not yet flushed when read (0); the table size
@@ -498,8 +502,8 @@ CDC_V2_P_PG_MAJOR=16 uv run pytest -m localpg tests/pg_source                   
 CDC_V2_P_EVIDENCE=1 …                                                           # also writes evidence/p3/source/
 ```
 
-The `localpg` suite builds or starts its own pairs through `tools/localpg`, runs ≈ 8 minutes per version (the
-recovery-conflict test waits 30 s; slot-creation tests wait for an idle primary, 17 s each), removes every schema,
+The `localpg` suite builds or starts its own pairs through `tools/localpg`, runs ≈ 9–11 minutes per version (the
+recovery-conflict test waits 30 s; slot-creation tests wait for an idle primary, 26 s each), removes every schema,
 publication and slot it created, and stops its clusters at the end. Tests that reconfigure or promote use the
 breakable pair (`pg-p2`), which is rebuilt after each of them. Do not run the two versions at the same time (they
 share `pg-p2`).

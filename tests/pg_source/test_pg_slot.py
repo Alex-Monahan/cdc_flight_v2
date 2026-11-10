@@ -35,10 +35,12 @@ def published_table(scratch, name="t"):
     scratch.c.replay_to_primary()
 
 
-def idle_primary(cluster, quiet_s=17, limit_s=180):
+def idle_primary(cluster, quiet_s=26, limit_s=240):
     """Wait until the primary is idle: its insert position has not moved for `quiet_s` seconds. Its background
-    writer then logs no running-transactions record until new important WAL is written (it logs one at most every
-    15 s and only after other WAL; autovacuum after earlier tests is such WAL)."""
+    writer then logs no running-transactions record until new important WAL is written: it logs one at most every
+    15 s and only after other WAL, and while it hibernates it wakes only every 10 s (bgwriter_delay × 50), so the
+    last record can come up to ≈ 25 s after the last important WAL (measured on 16: a RUNNING_XACTS record ≈ 20 s
+    after a CHECKPOINT). Autovacuum after earlier tests is such WAL."""
     # a checkpoint now, so that no timed checkpoint (which logs a running-transactions record) falls into the test
     cluster.boot("primary", "checkpoint")
     end = time.monotonic() + limit_s

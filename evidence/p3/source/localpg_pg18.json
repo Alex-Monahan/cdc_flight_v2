@@ -1,0 +1,330 @@
+{
+  "command": "CDC_V2_P_EVIDENCE=1 CDC_V2_P_PG_MAJOR=18 uv run pytest -m localpg tests/pg_source",
+  "machine_note": "shared 10-core laptop, up to three other workers running; indications only",
+  "major": 18,
+  "psycopg": "3.3.8",
+  "results": {
+    "bracket": {
+      "primary": {
+        "ddl": 300,
+        "observations": 120,
+        "observe_p50_s": 0.0061,
+        "violations_lower": 0,
+        "violations_upper": 0,
+        "wrong_bracket_observations": 120,
+        "wrong_bracket_violations_caught": 248
+      },
+      "standby": {
+        "ddl": 400,
+        "observations": 160,
+        "observe_p50_s": 0.0065,
+        "violations_lower": 0,
+        "violations_upper": 0,
+        "wrong_bracket_observations": 160,
+        "wrong_bracket_violations_caught": 288
+      }
+    },
+    "deadlines": {
+      "statement_cancel_s": 0.514
+    },
+    "errors": {
+      "recovery_conflict": {
+        "after_s": 30.0,
+        "class": "RecoveryConflict",
+        "max_standby_streaming_delay_ms": 30000,
+        "sqlstate": "40001"
+      }
+    },
+    "heartbeat": {
+      "cost": {
+        "note": "insert-position difference on an otherwise idle primary, divided by the writes; includes each transaction's commit record",
+        "rows_after_writes_two_slots": 2,
+        "table_bytes": 24576,
+        "updates_and_hot_updates": [
+          0,
+          0
+        ],
+        "wal_bytes_per_write_upper_bound": 234.0,
+        "writes": 200
+      },
+      "decoded": {
+        "beats": 4,
+        "commit_in_bracket": true,
+        "recognised_by_marker_and_xid": true,
+        "standby_lag": {
+          "bytes_behind": 56,
+          "replay_lag_s_visible_to_runtime": false,
+          "seconds_since_replayed_commit": 0.019205
+        }
+      },
+      "own_end_equals_position": {
+        "beats": 4,
+        "equal": 4
+      }
+    },
+    "invalidation": {
+      "idle_timeout_pg18": {
+        "primary_slot": {
+          "invalidation_reason": "idle_timeout",
+          "wal_status": "lost"
+        },
+        "standby_slot": {
+          "invalidation_reason": "idle_timeout",
+          "note": "a standby slot is invalidated at a restartpoint",
+          "wal_status": "lost"
+        }
+      },
+      "max_slot_wal_keep_size": {
+        "after": {
+          "conflicting": false,
+          "invalidation_reason": "wal_removed",
+          "restart_lsn": null,
+          "safe_wal_size": null,
+          "wal_status": "lost"
+        },
+        "before": {
+          "conflicting": false,
+          "invalidation_reason": null,
+          "safe_wal_size": 67108864,
+          "wal_status": "reserved"
+        }
+      }
+    },
+    "keepalive": {
+      "socket_options_macos": {
+        "SO_KEEPALIVE": true,
+        "TCP_KEEPALIVE": 30,
+        "TCP_KEEPCNT": 6,
+        "TCP_KEEPINTVL": 10
+      }
+    },
+    "observe_cost": {
+      "1000_tables_30_columns": {
+        "primary": {
+          "observe_max_s": 0.0974,
+          "observe_p50_s": 0.0738,
+          "tables": 1000,
+          "tables_full_read_s": 0.137
+        },
+        "replica": {
+          "observe_max_s": 0.0868,
+          "observe_p50_s": 0.0728,
+          "tables": 1000,
+          "tables_full_read_s": 0.1
+        }
+      }
+    },
+    "preflight": {
+      "runtime_role_pg18": {
+        "primary": {
+          "checkpoint_next_xid": 14308,
+          "pg_control_checkpoint_callable": true,
+          "problems": []
+        },
+        "replica": {
+          "checkpoint_next_xid": 14308,
+          "pg_control_checkpoint_callable": true,
+          "problems": []
+        }
+      }
+    },
+    "proxy": {
+      "blackhole_connect_deadline_1.5_s": 2.012,
+      "blackhole_idle_in_transaction": {
+        "client_deadline_1.0_s": 1.512,
+        "server_session_gone_after_s": 2.053
+      },
+      "blackhole_statement_deadline_1.0_s": 1.519,
+      "delay_0.2_each_way_statement_s": 0.406,
+      "refused_connect_s": 0.002,
+      "reset_noticed_s": 0.0
+    },
+    "publication": {
+      "add_under_writers": {
+        "all_of_them_decoded": true,
+        "before_next_xid": 442,
+        "before_next_xid_decoded": 2,
+        "committed_writer_transactions": 892,
+        "open_across_change_note": "-1 was written before the ALTER PUBLICATION, -2 after; both were decoded",
+        "open_across_change_rows_decoded": [
+          "-1",
+          "-2"
+        ],
+        "with_xid_ge_next_xid": 450
+      }
+    },
+    "session_settings": {
+      "pinned_against_role_and_database": {
+        "overridden_at_role_and_database": [
+          "DateStyle",
+          "IntervalStyle",
+          "TimeZone",
+          "bytea_output",
+          "default_transaction_isolation",
+          "extra_float_digits",
+          "lc_monetary",
+          "lock_timeout",
+          "row_security",
+          "search_path",
+          "statement_timeout"
+        ],
+        "result": "every fixed setting held, on the primary and the standby, on SQL and replication connections"
+      }
+    },
+    "slot_create": {
+      "idle_primary_no_nudge": {
+        "deadline_s": 4,
+        "report": {
+          "creator_terminated": false,
+          "leftover": false,
+          "nudge_errors": [],
+          "nudge_method": null,
+          "nudges": 0,
+          "waited_s": 4.04
+        },
+        "returned_after_s": 4.08
+      },
+      "killed_client": {
+        "ours": {
+          "creation_was_waiting_at_kill": true,
+          "slot_exists_afterwards": false
+        },
+        "plain_negative_control": {
+          "creation_was_waiting_at_kill": true,
+          "slot_exists_afterwards": true
+        }
+      },
+      "long_transaction": {
+        "after_commit_s": 10.69,
+        "timed_out_report": {
+          "creator_terminated": false,
+          "leftover": false,
+          "next_xid": 16375,
+          "nudge_errors": [],
+          "nudge_method": "write",
+          "nudges": 10,
+          "oldest_prepared_at": null,
+          "oldest_running_xid": 16375,
+          "prepared_transactions": 0,
+          "waited_s": 6.0
+        }
+      },
+      "prepared_transaction": {
+        "after_commit_prepared_s": 7.98,
+        "timed_out_report": {
+          "creator_terminated": false,
+          "leftover": false,
+          "next_xid": 759,
+          "nudge_errors": [],
+          "nudge_method": "write",
+          "nudges": 10,
+          "oldest_prepared_at": "2026-11-10T09:01:27.578754+00:00",
+          "oldest_running_xid": 759,
+          "prepared_transactions": 1,
+          "waited_s": 6.03
+        }
+      },
+      "standby_snapshot_granted_after_idle_s": 0.02,
+      "standby_write_nudge_after_idle_s": 6.88
+    },
+    "slot_facts": {
+      "advance_seen": {
+        "confirmed_flush_moved_bytes": 12992,
+        "timeline_source_standby": "checkpoint"
+      },
+      "holder_visible_to_runtime_primary": {
+        "application_name": "pg_recvlogical",
+        "backend_start_precision": "microseconds",
+        "backend_type": "walsender",
+        "inactive_since_after_detach": true,
+        "pg_read_all_stats": false
+      },
+      "holder_visible_to_runtime_replica": {
+        "application_name": "pg_recvlogical",
+        "backend_start_precision": "microseconds",
+        "backend_type": "walsender",
+        "inactive_since_after_detach": true,
+        "pg_read_all_stats": false
+      }
+    },
+    "slot_identity": {
+      "drop_and_recreate": {
+        "catalog_xmin": {
+          "differs": true,
+          "original": 16418,
+          "recreated": 16419
+        },
+        "confirmed_flush_lsn": {
+          "differs": true,
+          "original": 337105568,
+          "recreated": 337108120
+        },
+        "inactive_since": {
+          "differs": true,
+          "original": "2026-11-10T08:59:33.007750+00:00",
+          "recreated": "2026-11-10T08:59:53.795056+00:00"
+        },
+        "restart_lsn": {
+          "differs": true,
+          "original": 337096320,
+          "recreated": 337105568
+        },
+        "safe_wal_size": {
+          "differs": false,
+          "original": null,
+          "recreated": null
+        },
+        "stats_reset": {
+          "differs": false,
+          "original": null,
+          "recreated": null
+        },
+        "total_bytes": {
+          "differs": true,
+          "original": 6700,
+          "recreated": 0
+        },
+        "total_txns": {
+          "differs": true,
+          "original": 1,
+          "recreated": 0
+        },
+        "two_phase_at": {
+          "differs": false,
+          "original": null,
+          "recreated": null
+        },
+        "wal_status": {
+          "differs": false,
+          "original": "reserved",
+          "recreated": "reserved"
+        }
+      }
+    },
+    "terminate_holder": {
+      "races": {
+        "holder_exits_itself": "nothing terminated",
+        "other_session_takes_slot": "not terminated by the stale read; terminated in the next round only without expect"
+      }
+    },
+    "timeline": {
+      "promotion": {
+        "before": "0/302ECD8",
+        "contains": {
+          "before": true,
+          "new": true,
+          "old_after": false
+        },
+        "new_timeline": "0/30309E0",
+        "old_timeline_after_switch": "0/3030DF0",
+        "runtime_role_over_replication_connection": true,
+        "switch": "0/302ECD8"
+      }
+    }
+  },
+  "server_versions": {
+    "pg-p": "PostgreSQL 18.6 (Homebrew) on aarch64-apple-darwin25.6.0, compiled by Apple clang version 21.0.0 (clang-2100.3.34.2), 64-bit",
+    "pg-p2": "PostgreSQL 18.6 (Homebrew) on aarch64-apple-darwin25.6.0, compiled by Apple clang version 21.0.0 (clang-2100.3.34.2), 64-bit"
+  },
+  "what": "package P (source) tests on a private tools/localpg pair; times in seconds"
+}

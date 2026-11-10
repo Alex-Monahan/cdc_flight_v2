@@ -237,7 +237,7 @@ class CreatedSlot:
 def nudge_method(primary: PgConnection, deadline: Deadline) -> str:
     """How this role can make the primary log a running-transactions record: 'standby_snapshot' when it may call
     pg_log_standby_snapshot(), else 'write' (a non-transactional logical message: WAL that the background writer
-    follows with a running-transactions record within about 15 s), else 'none'."""
+    follows with a running-transactions record within about 25 s), else 'none'."""
     row = primary.execute(
         "SELECT coalesce(bool_or(has_function_privilege(p.oid, 'EXECUTE')) FILTER "
         "                (WHERE p.proname = 'pg_log_standby_snapshot'), false), "
