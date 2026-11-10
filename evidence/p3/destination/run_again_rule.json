@@ -1,0 +1,143 @@
+{
+  "command": "tools/with-env uv run -q pytest -q -m md tests/destination",
+  "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
+  "results": {
+    "naive_control": {
+      "cases": {
+        "kill_later": {
+          "check": {
+            "caught_up": true,
+            "doubles": 3,
+            "n": 12,
+            "ok": false,
+            "pos": 9,
+            "problems": [
+              "stream: 3 events applied more than once (first [4, 5, 6])",
+              "stream: counter 12 differs from position 9"
+            ],
+            "rows": 12,
+            "source": 9
+          },
+          "first_copy_commit_landed": true,
+          "rows": {
+            "first": 3,
+            "second": 6
+          },
+          "second_copy_read_position": 3
+        },
+        "sigkill": {
+          "check": {
+            "caught_up": true,
+            "doubles": 3,
+            "n": 12,
+            "ok": false,
+            "pos": 9,
+            "problems": [
+              "stream: 3 events applied more than once (first [4, 5, 6])",
+              "stream: counter 12 differs from position 9"
+            ],
+            "rows": 12,
+            "source": 9
+          },
+          "first_copy_commit_landed": true,
+          "rows": {
+            "first": 3,
+            "second": 6
+          },
+          "second_copy_read_position": 3
+        },
+        "sigstop": {
+          "check": {
+            "caught_up": true,
+            "doubles": 3,
+            "n": 12,
+            "ok": false,
+            "pos": 9,
+            "problems": [
+              "stream: 3 events applied more than once (first [4, 5, 6])",
+              "stream: counter 12 differs from position 9"
+            ],
+            "rows": 12,
+            "source": 9
+          },
+          "first_copy_commit_landed": true,
+          "rows": {
+            "first": 3,
+            "second": 6
+          },
+          "second_copy_read_position": 3
+        }
+      },
+      "date_utc": "2026-11-10 09:12",
+      "kill_later_ms": 60,
+      "second_copy_follows_the_rule": false
+    },
+    "with_the_rule": {
+      "cases": {
+        "kill_later": {
+          "check": {
+            "caught_up": true,
+            "doubles": 0,
+            "n": 21,
+            "ok": true,
+            "pos": 21,
+            "problems": [],
+            "rows": 21,
+            "source": 21
+          },
+          "first_copy_commit_landed": true,
+          "rows": {
+            "first": 3,
+            "second": 3
+          },
+          "second_copy_read_position": 15
+        },
+        "sigkill": {
+          "check": {
+            "caught_up": true,
+            "doubles": 0,
+            "n": 15,
+            "ok": true,
+            "pos": 15,
+            "problems": [],
+            "rows": 15,
+            "source": 15
+          },
+          "first_copy_commit_landed": true,
+          "rows": {
+            "first": 3,
+            "second": 3
+          },
+          "second_copy_read_position": 9
+        },
+        "sigstop": {
+          "check": {
+            "caught_up": true,
+            "doubles": 0,
+            "n": 9,
+            "ok": true,
+            "pos": 9,
+            "problems": [],
+            "rows": 9,
+            "source": 9
+          },
+          "first_copy_commit_landed": true,
+          "rows": {
+            "first": 3,
+            "second": 3
+          },
+          "second_copy_read_position": 3
+        }
+      },
+      "date_utc": "2026-11-10 09:11",
+      "kill_later_ms": 60,
+      "second_copy_follows_the_rule": true
+    }
+  },
+  "versions": {
+    "duckdb_client": "1.5.6",
+    "platform": "Darwin arm64",
+    "python": "3.13.1"
+  },
+  "what": "a first copy of a transaction (apply three events, move the position) whose COMMIT lands late, and a second copy started after a read that did not see it: the second process read the position outside any transaction and was frozen there (sut.read) until the first copy's COMMIT had landed or its process was dead. with_the_rule: the second copy reads the position again inside its transaction and moves it with a condition on the value read. naive_control: it uses the value read before and moves without a condition; the check then finds every event of the first copy twice"
+}

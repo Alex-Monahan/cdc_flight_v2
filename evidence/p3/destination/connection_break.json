@@ -85,6 +85,174 @@
           "transaction_at_the_fault_committed": false
         }
       }
+    },
+    "real_break": {
+      "cases": {
+        "blackhole_statement": {
+          "check": {
+            "doubles": 0,
+            "n": 12,
+            "pos": 12,
+            "rows": 12,
+            "source": 12
+          },
+          "child_frozen_at": "sut.begun",
+          "errors_the_sut_got": [
+            "DeadlineExceeded"
+          ],
+          "events": [
+            "error:DeadlineExceeded",
+            "intend:9-12",
+            "done:9-12",
+            "exit:0"
+          ],
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "signal_name": null
+          },
+          "ms_of_first_error_after_process_start": 8031,
+          "proxy_connections_accepted": 2,
+          "recovered_by_itself": true,
+          "rows_of_the_child": 6,
+          "seconds_from_lifting_to_exit": 4.8,
+          "transaction_at_the_break_committed": false,
+          "what": "nothing passes in either direction from the next statement on; the proxy passes again 8 s later (what it held is then delivered)"
+        },
+        "commit_answer_lost": {
+          "check": {
+            "doubles": 0,
+            "n": 18,
+            "pos": 18,
+            "rows": 18,
+            "source": 18
+          },
+          "child_frozen_at": "stream.commit_sent",
+          "errors_the_sut_got": [
+            "CommitUnknown"
+          ],
+          "events": [
+            "error:CommitUnknown",
+            "intend:18-18",
+            "done:18-18",
+            "exit:0"
+          ],
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "signal_name": null
+          },
+          "ms_of_first_error_after_process_start": 11876,
+          "proxy_connections_accepted": 4,
+          "recovered_by_itself": true,
+          "rows_of_the_child": 6,
+          "seconds_from_lifting_to_exit": 6.8,
+          "transaction_at_the_break_committed": true,
+          "what": "the COMMIT reaches MotherDuck, nothing comes back; after the child's error the connections are reset and the proxy passes again"
+        },
+        "commit_delivered_late": {
+          "check": {
+            "doubles": 0,
+            "n": 24,
+            "pos": 24,
+            "rows": 24,
+            "source": 24
+          },
+          "child_frozen_at": "stream.commit_sent",
+          "errors_the_sut_got": [
+            "CommitUnknown"
+          ],
+          "events": [
+            "error:CommitUnknown",
+            "intend:24-24",
+            "done:24-24",
+            "exit:0"
+          ],
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "signal_name": null
+          },
+          "ms_of_first_error_after_process_start": 12195,
+          "proxy_connections_accepted": 2,
+          "recovered_by_itself": true,
+          "rows_of_the_child": 6,
+          "seconds_from_lifting_to_exit": 4.7,
+          "transaction_at_the_break_committed": true,
+          "what": "the COMMIT is held by the proxy; 4 s after the child's error the proxy passes again and delivers what it held: the late COMMIT and the statements of the child's next attempt"
+        },
+        "commit_never_arrives": {
+          "check": {
+            "doubles": 0,
+            "n": 30,
+            "pos": 30,
+            "rows": 30,
+            "source": 30
+          },
+          "child_frozen_at": "stream.commit_sent",
+          "errors_the_sut_got": [
+            "CommitUnknown"
+          ],
+          "events": [
+            "error:CommitUnknown",
+            "intend:27-30",
+            "done:27-30",
+            "exit:0"
+          ],
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "signal_name": null
+          },
+          "ms_of_first_error_after_process_start": 11844,
+          "proxy_connections_accepted": 4,
+          "recovered_by_itself": true,
+          "rows_of_the_child": 6,
+          "seconds_from_lifting_to_exit": 6.8,
+          "transaction_at_the_break_committed": false,
+          "what": "the COMMIT is held by the proxy; after the child's error the connections are reset, so the COMMIT is never delivered"
+        },
+        "reset": {
+          "check": {
+            "doubles": 0,
+            "n": 6,
+            "pos": 6,
+            "rows": 6,
+            "source": 6
+          },
+          "child_frozen_at": "sut.written",
+          "errors_the_sut_got": [],
+          "events": [
+            "intend:3-6",
+            "done:3-6",
+            "exit:0"
+          ],
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "signal_name": null
+          },
+          "proxy_connections_accepted": 3,
+          "recovered_by_itself": true,
+          "rows_of_the_child": 6,
+          "seconds_from_lifting_to_exit": 4.5,
+          "transaction_at_the_break_committed": "committed normally, no error",
+          "what": "every TCP connection of the child is reset (RST) while its transaction is open; then the proxy passes again and the child goes on"
+        }
+      },
+      "child_options": {
+        "exit_idle": 4.0,
+        "grace": 1,
+        "stmt_deadline": 4,
+        "tx_deadline": 8
+      },
+      "date_utc": "2026-11-10 09:12",
+      "proxy": {
+        "accepted": 15,
+        "closed_by_fault": 0,
+        "reset_by_fault": 6
+      },
+      "relay_tunnels": 13
     }
   },
   "versions": {

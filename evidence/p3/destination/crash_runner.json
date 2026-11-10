@@ -1,0 +1,30 @@
+{
+  "command": "tools/with-env uv run -q pytest -q -m md tests/destination",
+  "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
+  "results": {
+    "sut_on_motherduck": {
+      "databases_created_and_dropped": 42,
+      "date_utc": "2026-11-10 09:19",
+      "declared_points": 9,
+      "ledger": "evidence/p3/destination/crash_ledger.jsonl",
+      "outcomes": {
+        "pass": 42
+      },
+      "reached_points": 9,
+      "runs": 42,
+      "runs_by_mode": {
+        "crash_point": 36,
+        "freeze": 3,
+        "random_kill": 3
+      },
+      "seconds": 234,
+      "summary": "evidence/p3/destination/crash_summary.json"
+    }
+  },
+  "versions": {
+    "duckdb_client": "1.5.6",
+    "platform": "Darwin arm64",
+    "python": "3.13.1"
+  },
+  "what": "the harness crash runner (cdc_v2.testing.crash) over the SUT with three lanes on MotherDuck: a kill at every lane crash point (3 seeds, the hit chosen by the seed), a kill 40 ms after every commit_sent point, random kills, and a freeze (SIGSTOP) with a second instance that takes over. After every scenario a fresh process catches up and the check compares the destination with the source"
+}

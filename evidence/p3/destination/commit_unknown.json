@@ -1,0 +1,150 @@
+{
+  "command": "tools/with-env uv run -q pytest -q -m md tests/destination",
+  "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
+  "results": {
+    "kill_at_commit_sent": {
+      "by_delay_ms": {
+        "0": {
+          "client_saw_the_answer": 0,
+          "commit_landed": 0,
+          "landed_without_an_answer_seen": 0,
+          "rows": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "victims": 4
+        },
+        "10": {
+          "client_saw_the_answer": 0,
+          "commit_landed": 4,
+          "landed_without_an_answer_seen": 4,
+          "rows": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "victims": 4
+        },
+        "100": {
+          "client_saw_the_answer": 4,
+          "commit_landed": 4,
+          "landed_without_an_answer_seen": 0,
+          "rows": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "victims": 4
+        },
+        "150": {
+          "client_saw_the_answer": 4,
+          "commit_landed": 4,
+          "landed_without_an_answer_seen": 0,
+          "rows": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "victims": 4
+        },
+        "20": {
+          "client_saw_the_answer": 0,
+          "commit_landed": 4,
+          "landed_without_an_answer_seen": 4,
+          "rows": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "victims": 4
+        },
+        "300": {
+          "client_saw_the_answer": 4,
+          "commit_landed": 4,
+          "landed_without_an_answer_seen": 0,
+          "rows": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "victims": 4
+        },
+        "40": {
+          "client_saw_the_answer": 0,
+          "commit_landed": 4,
+          "landed_without_an_answer_seen": 4,
+          "rows": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "victims": 4
+        },
+        "60": {
+          "client_saw_the_answer": 0,
+          "commit_landed": 4,
+          "landed_without_an_answer_seen": 4,
+          "rows": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "victims": 4
+        },
+        "80": {
+          "client_saw_the_answer": 4,
+          "commit_landed": 4,
+          "landed_without_an_answer_seen": 0,
+          "rows": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "victims": 4
+        }
+      },
+      "date_utc": "2026-11-10 09:09",
+      "delays_ms": [
+        0,
+        10,
+        20,
+        40,
+        60,
+        80,
+        100,
+        150,
+        300
+      ],
+      "exactly_once_after_every_victim": true,
+      "final_check": {
+        "doubles": 0,
+        "n": 108,
+        "pos": 108,
+        "rows": 108,
+        "source": 108
+      },
+      "killed_commits_that_did_not_land": 4,
+      "killed_commits_that_landed": 32,
+      "landed_without_an_answer_seen": 16,
+      "repetitions_per_delay": 4,
+      "rows_of_the_final_run": 12,
+      "victims": 36
+    }
+  },
+  "versions": {
+    "duckdb_client": "1.5.6",
+    "platform": "Darwin arm64",
+    "python": "3.13.1"
+  },
+  "what": "every victim is a SUT process that takes over from the one before, applies three events in one lane transaction and is killed (SIGKILL from another thread) the given time after the crash point stream.commit_sent, that is while its COMMIT is on its way or just answered. The next process is the successor: it follows the run-again rule (reads the position inside its transaction, moves it with a condition). The check (every event exactly once, counter equals position) ran after every victim"
+}

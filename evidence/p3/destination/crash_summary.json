@@ -1,0 +1,90 @@
+{
+  "adapter": "destination-sut",
+  "all_passed": true,
+  "by_point": {
+    "backfill.0.commit_sent": {
+      "pass": 6
+    },
+    "backfill.0.committed": {
+      "pass": 3
+    },
+    "backfill.0.fenced": {
+      "pass": 3
+    },
+    "control.commit_sent": {
+      "pass": 6
+    },
+    "control.committed": {
+      "pass": 3
+    },
+    "control.fenced": {
+      "pass": 3
+    },
+    "stream.commit_sent": {
+      "pass": 6
+    },
+    "stream.committed": {
+      "pass": 3
+    },
+    "stream.fenced": {
+      "pass": 3
+    }
+  },
+  "config": {
+    "catch_up_timeout": 90.0,
+    "crash_timeout": 90.0,
+    "freeze_after": [
+      4.0,
+      9.0
+    ],
+    "freeze_for": [
+      4.0,
+      8.0
+    ],
+    "kill_after": [
+      1.0,
+      9.0
+    ],
+    "kills": 3,
+    "max_hit": 3,
+    "max_workload_steps": 40,
+    "settle_after_cont": 1.0,
+    "stop_timeout": 10.0,
+    "workers": 3,
+    "workload_interval": 0.25
+  },
+  "coverage": "9/9",
+  "declared_points": [
+    "stream.fenced",
+    "stream.commit_sent",
+    "stream.committed",
+    "control.fenced",
+    "control.commit_sent",
+    "control.committed",
+    "backfill.0.fenced",
+    "backfill.0.commit_sent",
+    "backfill.0.committed"
+  ],
+  "failures": [],
+  "missing_points": [],
+  "outcomes": {
+    "pass": 42
+  },
+  "reached_points": [
+    "backfill.0.commit_sent",
+    "backfill.0.committed",
+    "backfill.0.fenced",
+    "control.commit_sent",
+    "control.committed",
+    "control.fenced",
+    "stream.commit_sent",
+    "stream.committed",
+    "stream.fenced"
+  ],
+  "runs": 42,
+  "runs_by_mode": {
+    "crash_point": 36,
+    "freeze": 3,
+    "random_kill": 3
+  }
+}
