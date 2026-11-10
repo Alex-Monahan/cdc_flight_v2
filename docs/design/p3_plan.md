@@ -360,16 +360,20 @@ fuzzer drives it. Its behaviour follows `docs/spike/run_semantics.md`; each imit
 ### C7 Source (package P)
 
 ```python
-pg.connect(target, deadline)                       # target: 'primary' | 'replica' | a configured name; TLS verify-full;
+pg.connect(target, deadline, replication=False)    # target: 'primary' | 'replica' | a configured name; TLS verify-full;
                                                    # fixed session settings (time zone, date, interval, float, bytea output)
 catalog.tables(conn) -> [SourceTable]              # columns, types, key, replica identity, publication membership
 catalog.observe(node) -> CatalogObservation        # the catalog facts of H-008 with the replay bracket (b, a)
+catalog.diff(old, new)                             # appeared, dropped, recreated (new OID), renamed, columns, rewritten
 publication.ensure(primary, tables)                # only ever adds tables
+publication.state(conn)                            # what exists, to compare with the configuration
+replica_identity.set_full(primary, table, deadline)
 slot.create(node, name, deadline) ; slot.drop(...)
 slot.facts(node, name) -> SlotFacts                # everything section 8 compares, read in one statement, with the
                                                    # holder: active_pid, that backend's start time and application
                                                    # name, and pg_is_in_recovery()
 slot.timeline_history(node) -> [...]               # over a replication connection
+timeline.contains(history, position, timeline)     # is a position on the history of the current timeline
 slot.terminate_holder(node, name)                  # our slot name only
 heartbeat.beat(primary)                            # the source-side heartbeat write of SPEC 4.4
 ```

@@ -13,9 +13,21 @@ and 5.2.
 - `docs/design/core.md` sections 2, 3, 6, 7.3 and 11 (open points 2, 3, 9, 10 are on your path).
 - `docs/spike/md_semantics.md`: Q2, Q3, Q4, Q7, the F16 follow-up and findings 2, 5, 6, 7, 10 (what the apply
   shapes cost on MotherDuck and which conflicts are not detected).
-- The oracle (package O): `docs/testing/oracle.md` and `src/cdc_v2/oracle/`. The canonical form in which the oracle
-  compares values is the form your keyless comparison must agree with (open point 3). If the two cannot agree,
-  stop and report.
+- The oracle (package O): `docs/oracle.md` and `src/cdc_v2/oracle/` (`canonical.py` holds the rules). The
+  canonical form in which the oracle compares values is the form your keyless comparison must agree with (open
+  point 3, settled by the oracle: a UNION value compares by member and by the rule of the member's source
+  family; NaN equals NaN; `-0` and `0` are different; a UNION whose member holds NULL is **not** NULL in DuckDB,
+  so the pipeline writes a real NULL for a source NULL). If the two cannot agree, stop and report.
+- The oracle's findings about DuckDB that decide your statements — read `docs/oracle.md` (findings) and
+  `evidence/p3/oracle/duckdb_equal_update.json` before you write any SQL:
+  1. **An `UPDATE` whose new value compares equal to the stored one is not written.** After `SET x = 0` a stored
+     `-0` is still `-0`; after `SET i = INTERVAL '30 days'` a stored `1 mon` is still `1 mon`; local DuckDB and
+     MotherDuck alike. `DELETE` followed by `INSERT` always writes. The source tells these values apart, the
+     oracle does too, so an apply that leaves the old one in place is a wrong result.
+  2. **`GROUP BY`, `PARTITION BY`, `DISTINCT` and `=` merge values that are different in the source**: `-0` and
+     `0`, NaN and −NaN, `1 mon` / `30 days` / `720 hours`. There may be more types like this (time with zone,
+     strings under a collation, structs and lists that contain such values): find the full list for the
+     destination types of C3 and write it down.
 - `docs/wal_hazards.md` H-003 and the hazards on key changes and keyless tables.
 
 ## Resources
@@ -84,6 +96,13 @@ the order of the change set, to the destination table as it was before:
 - SPEC 2.6: an unchanged value is never written to the destination and never read into the client; no statement
   per row; the number of statement shapes depends on the table's columns only, not on the data or on which
   columns are unchanged in which row. Write the shapes down and count them in a test.
+- Every value that a record changes is really written (finding 1 above). Design 6.2 applies partial images with
+  `UPDATE … FROM net`: that statement, as it stands, loses a change from `-0` to `0`, or between two equal
+  intervals. Find the shape that always writes and still does not rewrite the unchanged columns — or show that
+  there is none on MotherDuck and say what the cheapest correct shape costs (for example: rewriting the row on
+  the server from the old row and the record, only for rows where a changed column has one of the affected
+  types). Test it for every affected type, as a complete image and as a partial image, in both modes, on
+  MotherDuck.
 
 **Tables without a key** (design 6.3). Every record carries the old image (`b<i>`) and the new one (`a<i>`);
 where `u<i>` is set, the new value equals the old one. The table is a multiset: the result holds each distinct
@@ -93,10 +112,13 @@ row image as many times as the old count plus new images minus old images.
   identical rows — and prove it on MotherDuck, also when the same transaction inserted or deleted rows of that
   image just before).
 - Fewer rows than must be removed: `ApplyInvariantError`, nothing ignored; the caller rolls back.
-- Equality of images is exact and total: NULL equals NULL, NaN equals NaN, −0 and +0 as the oracle's canonical
-  form says, values of UNION columns compare by member and value, nested lists and structs compare element by
-  element. No value is compared through a lossy cast. State which destination types cannot be compared exactly,
-  if any, and what you do for them.
+- Equality of images is exact and total, and it is the oracle's: NULL equals NULL, NaN equals NaN, −0 and +0
+  are different, `1 mon` and `30 days` are different, values of UNION columns compare by member and value, nested
+  lists and structs compare element by element. Plain `GROUP BY` / `PARTITION BY` over the columns does **not**
+  give this (finding 2 above): `delta` and the choice of rows to delete need a grouping key per column that keeps
+  these values apart and still treats NULL as equal to NULL. An image `-0` must never delete a row `0`, and a
+  record that changes `-0` to `0` must not net to nothing. No value is compared through a lossy cast. State which
+  destination types cannot be compared exactly, if any, and what you do for them.
 
 **Both.**
 
@@ -123,9 +145,12 @@ row image as many times as the old count plus new images minus old images.
   examples, a few seconds) and on MotherDuck under the marker `md` with more examples; a long opt-in campaign
   writes a ledger (seed, counts, outcome) to your evidence.
 - Named regression cases for every item in the lists above, and one for each failure the property tests find.
-- Type coverage: at least integers, `DECIMAL`, `DOUBLE` with NaN and ±infinity and −0, `VARCHAR` (empty, zero
-  byte if the destination holds it, long), `BLOB`, `DATE`/`TIMESTAMP`/`TIMESTAMPTZ` with infinity, `UUID`, `JSON`,
-  lists, structs, and a `UNION` column — as key columns where the destination allows it, and as values.
+- Type coverage: at least integers, `DECIMAL`, `FLOAT` and `DOUBLE` with NaN, −NaN, ±infinity and −0,
+  `INTERVAL` with equal values of different form, `VARCHAR` (empty, zero byte if the destination holds it,
+  long), `BLOB`, `DATE`/`TIMESTAMP`/`TIMESTAMPTZ` with infinity, `TIME` and time with zone, `UUID`, `JSON`,
+  lists, structs, and a `UNION` column (also with a NULL member value and as a real NULL) — as key columns where
+  the destination allows it, and as values. The model of the property tests compares with the oracle's rules
+  (`cdc_v2.oracle.canonical`), not with Python's `==`.
 - Statement shapes and round trips counted and asserted.
 - Indications of speed on MotherDuck (short): a small change set (1–100 rows; the spike's number is 0.066 s for the
   whole transaction), 100K and 1M rows, keyed and keyless, with and without unchanged columns; compare with the
