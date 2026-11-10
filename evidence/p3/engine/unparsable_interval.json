@@ -1,0 +1,144 @@
+{
+  "runs": [
+    {
+      "fatal_causes": [
+        [
+          "org.apache.kafka.connect.errors.ConnectException",
+          "Error while processing event at offset {transaction_id=338626, lsn_proc=1650618688, lsn_events_processed=1, messageType=INSERT, lsn_commit=1650618688, lsn=1650618688, txId=338626, ts_usec=1794300214155023}"
+        ],
+        [
+          "org.apache.kafka.connect.errors.ConnectException",
+          ""
+        ],
+        [
+          "org.postgresql.util.PSQLException",
+          "SQLState 42820"
+        ],
+        [
+          "java.lang.NumberFormatException",
+          ""
+        ]
+      ],
+      "fatal_class": "org.apache.kafka.connect.errors.ConnectException",
+      "fatal_message": "An exception occurred in the change event producer. This connector will be stopped.",
+      "fatal_positions": {
+        "lsn": 1650618408,
+        "lsn_proc": 1650618352,
+        "messageType": "BEGIN",
+        "transaction_id": "338625",
+        "ts_usec": 1794300214148975,
+        "txId": 338625
+      },
+      "fatal_table": ".",
+      "frames_before_fatal": [
+        [
+          "Hello",
+          ""
+        ],
+        [
+          "Begin",
+          ""
+        ]
+      ],
+      "seconds_to_fatal": 1.3
+    },
+    {
+      "fatal_causes": [
+        [
+          "org.apache.kafka.connect.errors.ConnectException",
+          "Error while processing event at offset {transaction_id=338626, lsn_proc=1650618688, lsn_events_processed=1, messageType=INSERT, lsn_commit=1650618688, lsn=1650618688, txId=338626, ts_usec=1794300214155023}"
+        ],
+        [
+          "org.apache.kafka.connect.errors.ConnectException",
+          ""
+        ],
+        [
+          "org.postgresql.util.PSQLException",
+          "SQLState 42820"
+        ],
+        [
+          "java.lang.NumberFormatException",
+          ""
+        ]
+      ],
+      "fatal_class": "org.apache.kafka.connect.errors.ConnectException",
+      "fatal_message": "An exception occurred in the change event producer. This connector will be stopped.",
+      "fatal_positions": {
+        "lsn": 1650618408,
+        "lsn_proc": 1650618352,
+        "messageType": "BEGIN",
+        "transaction_id": "338625",
+        "ts_usec": 1794300214148975,
+        "txId": 338625
+      },
+      "fatal_table": ".",
+      "frames_before_fatal": [
+        [
+          "Hello",
+          ""
+        ],
+        [
+          "Begin",
+          ""
+        ]
+      ],
+      "seconds_to_fatal": 1.35
+    },
+    {
+      "fatal_causes": [
+        [
+          "org.apache.kafka.connect.errors.ConnectException",
+          "Error while processing event at offset {transaction_id=338626, lsn_proc=1650618688, lsn_events_processed=1, messageType=INSERT, lsn_commit=1650618688, lsn=1650618688, txId=338626, ts_usec=1794300214155023}"
+        ],
+        [
+          "org.apache.kafka.connect.errors.ConnectException",
+          ""
+        ],
+        [
+          "org.postgresql.util.PSQLException",
+          "SQLState 42820"
+        ],
+        [
+          "java.lang.NumberFormatException",
+          ""
+        ]
+      ],
+      "fatal_class": "org.apache.kafka.connect.errors.ConnectException",
+      "fatal_message": "An exception occurred in the change event producer. This connector will be stopped.",
+      "fatal_positions": {
+        "lsn": 1650618408,
+        "lsn_proc": 1650618352,
+        "messageType": "BEGIN",
+        "transaction_id": "338625",
+        "ts_usec": 1794300214148975,
+        "txId": 338625
+      },
+      "fatal_table": ".",
+      "frames_before_fatal": [
+        [
+          "Hello",
+          ""
+        ],
+        [
+          "Begin",
+          ""
+        ]
+      ],
+      "seconds_to_fatal": 1.35
+    }
+  ],
+  "test": "tests/engine/test_engine_values.py::test_unparsable_interval_ends_in_fatal_without_the_value",
+  "value": "interval '2562047788 hours' (hour part above 2^31)",
+  "value_or_marker_in_fatal_or_logs": false,
+  "with_table_excluded": {
+    "end_counts": [
+      1,
+      0,
+      1
+    ],
+    "rows_after": [
+      "before",
+      "after"
+    ]
+  }
+}

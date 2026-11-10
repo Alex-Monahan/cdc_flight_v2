@@ -75,8 +75,10 @@ def test_frames_hello_first_and_secret_never_in_argv_or_env(fake):
     first = notes()[0]
     assert PASSWORD not in json.dumps(first["argv"]) and PASSWORD not in json.dumps(first["env"])
     assert notes()[1]["password_ok"]
-    assert any("noise on stdout" in l for l in e.log_lines)     # stdout is a log, never the frame stream
+    # stdout is a log, never the frame stream; a line that is not ours or Debezium's is counted, not copied
+    assert not any("noise on stdout" in l for l in e.log_lines)
     assert e.stop(Deadline.after(10)) == 0
+    assert any("not copied" in l for l in e.log_lines)     # counted when the stream ends or a kept line follows
     assert not e.alive
 
 
@@ -203,3 +205,14 @@ def test_extra_may_set_an_unprotected_key():
 def test_heartbeat_interval_bounds(ms):
     with pytest.raises(ValueError, match="heartbeat"):
         EngineSettings(host="h", port=55621, dbname="d", user="u", password="p", heartbeat_interval_ms=ms)
+
+
+def test_log_filter_never_passes_a_stack_trace_or_quoted_text():
+    from cdc_v2.stream.engine import log_filter
+    assert log_filter("CDCV2 STAT 1 rows=3") == "CDCV2 STAT 1 rows=3"
+    assert log_filter("12 [main] INFO io.debezium.X - Starting 'a.b'") == "12 [main] INFO io.debezium.X - Starting 'a.b'"
+    assert log_filter("12 [t] ERROR io.debezium.X - bad value 'SECRET' and \"S2\"") == \
+        "12 [t] ERROR io.debezium.X - bad value '…' and '…'"
+    for line in ("java.lang.NumberFormatException: For input string: \"2562047788\"", "\tat a.b.C.d(C.java:1)",
+                 "Caused by: x.Y: z", "\t... 12 more", "random text"):
+        assert log_filter(line) is None

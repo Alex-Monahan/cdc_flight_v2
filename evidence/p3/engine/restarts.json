@@ -1,131 +1,149 @@
 {
-  "runs": [
+  "lag_transactions": 3,
+  "lives": [
     {
-      "applied_rows": 1203,
-      "cf_at_start": "0/4D6A8170",
-      "first_after_cf": true,
-      "first_txn_ack": "0/4D6A8380",
+      "cf_at_start": "0/63ED7A18",
+      "crash": null,
+      "first_txn_ack": "0/63ED7B60",
       "how": "killed",
-      "step": {
-        "kill_after": 5.3810286691055245
-      }
+      "kill_after": 5.3810286691055245,
+      "rows_applied": 1179
     },
     {
-      "applied_rows": 1959,
-      "cf_at_start": "0/4D6D2928",
-      "first_after_cf": true,
-      "first_txn_ack": "0/4D6D2AD8",
+      "cf_at_start": "0/63F0A730",
+      "crash": null,
+      "first_txn_ack": "0/63F0A7E0",
       "how": "killed",
-      "step": {
-        "kill_after": 3.370621756411413
-      }
+      "kill_after": 3.370621756411413,
+      "rows_applied": 1949
     },
     {
-      "applied_rows": 2376,
-      "cf_at_start": "0/4D6ED990",
-      "first_after_cf": true,
-      "first_txn_ack": "0/4D6EDB40",
+      "cf_at_start": "0/63F2C178",
+      "crash": null,
+      "first_txn_ack": "0/63F2C228",
       "how": "killed",
-      "step": {
-        "kill_after": 1.6280310770469595
-      }
+      "kill_after": 1.6280310770469595,
+      "rows_applied": 2320
     },
     {
-      "applied_rows": 2442,
-      "cf_at_start": "0/4D6FBF50",
-      "first_after_cf": true,
-      "first_txn_ack": "0/4D6FC118",
+      "cf_at_start": "0/63F3C2E0",
+      "crash": {
+        "action": "kill",
+        "hit": "seed:1:5",
+        "point": "engine.ack_marking"
+      },
+      "first_txn_ack": "0/63F3C390",
       "how": "EngineExited -9",
-      "step": {
-        "crash": {
-          "action": "kill",
-          "hit": "seed:1:5",
-          "point": "engine.ack_marking"
-        }
-      }
+      "kill_after": null,
+      "rows_applied": 2501
     },
     {
-      "applied_rows": 2805,
-      "cf_at_start": "0/4D6FBF50",
-      "first_after_cf": true,
-      "first_txn_ack": "0/4D6FC118",
+      "cf_at_start": "0/63F3C2E0",
+      "crash": {
+        "action": "kill",
+        "hit": "seed:2:5",
+        "point": "engine.ack_marking"
+      },
+      "first_txn_ack": "0/63F3C390",
       "how": "EngineExited -9",
-      "step": {
-        "crash": {
-          "action": "kill",
-          "hit": "seed:2:5",
-          "point": "engine.ack_marking"
-        }
-      }
+      "kill_after": null,
+      "rows_applied": 2515
     },
     {
-      "applied_rows": 3141,
-      "cf_at_start": "0/4D6FBF50",
-      "first_after_cf": true,
-      "first_txn_ack": "0/4D6FC118",
+      "cf_at_start": "0/63F3C2E0",
+      "crash": {
+        "action": "kill",
+        "hit": "seed:3:5",
+        "point": "engine.ack_marking"
+      },
+      "first_txn_ack": "0/63F3C390",
       "how": "EngineExited -9",
-      "step": {
-        "crash": {
-          "action": "kill",
-          "hit": "seed:3:5",
-          "point": "engine.ack_marking"
-        }
-      }
+      "kill_after": null,
+      "rows_applied": 2993
     },
     {
-      "applied_rows": 3174,
-      "cf_at_start": "0/4D72ABE0",
-      "first_after_cf": true,
-      "first_txn_ack": "0/4D72AD90",
+      "cf_at_start": "0/63F59610",
+      "crash": {
+        "action": "kill",
+        "hit": "seed:1:5",
+        "point": "engine.acked"
+      },
+      "first_txn_ack": "0/63F596C0",
       "how": "EngineExited -9",
-      "step": {
-        "crash": {
-          "action": "kill",
-          "hit": "seed:1:5",
-          "point": "engine.acked"
-        }
-      }
+      "kill_after": null,
+      "rows_applied": 3144
     },
     {
-      "applied_rows": 3219,
-      "cf_at_start": "0/4D72ABE0",
-      "first_after_cf": true,
-      "first_txn_ack": "0/4D72AD90",
+      "cf_at_start": "0/63F59610",
+      "crash": {
+        "action": "kill",
+        "hit": "seed:2:5",
+        "point": "engine.acked"
+      },
+      "first_txn_ack": "0/63F596C0",
       "how": "EngineExited -9",
-      "step": {
-        "crash": {
-          "action": "kill",
-          "hit": "seed:2:5",
-          "point": "engine.acked"
-        }
-      }
+      "kill_after": null,
+      "rows_applied": 3218
     },
     {
-      "applied_rows": 3897,
-      "cf_at_start": "0/4D72ABE0",
-      "first_after_cf": true,
-      "first_txn_ack": "0/4D72AD90",
+      "cf_at_start": "0/63F59610",
+      "crash": {
+        "action": "kill",
+        "hit": "seed:3:5",
+        "point": "engine.acked"
+      },
+      "first_txn_ack": "0/63F596C0",
       "how": "EngineExited -9",
-      "step": {
-        "crash": {
-          "action": "kill",
-          "hit": "seed:3:5",
-          "point": "engine.acked"
-        }
-      }
+      "kill_after": null,
+      "rows_applied": 3692
     },
     {
-      "applied_rows": 3921,
-      "cf_at_start": "0/4D745DF8",
-      "first_after_cf": true,
-      "first_txn_ack": "0/4D745FA8",
+      "cf_at_start": "0/63F77EA8",
+      "crash": {
+        "action": "kill",
+        "hit": "seed:1:5",
+        "point": "engine.flush_sent"
+      },
+      "first_txn_ack": "0/63F77F58",
+      "how": "EngineExited -9",
+      "kill_after": null,
+      "rows_applied": 3917
+    },
+    {
+      "cf_at_start": "0/63F80408",
+      "crash": {
+        "action": "kill",
+        "hit": "seed:2:5",
+        "point": "engine.flush_sent"
+      },
+      "first_txn_ack": "0/63F804B8",
+      "how": "EngineExited -9",
+      "kill_after": null,
+      "rows_applied": 4129
+    },
+    {
+      "cf_at_start": "0/63F84378",
+      "crash": {
+        "action": "kill",
+        "hit": "seed:3:5",
+        "point": "engine.flush_sent"
+      },
+      "first_txn_ack": "0/63F84428",
+      "how": "EngineExited -9",
+      "kill_after": null,
+      "rows_applied": 4430
+    },
+    {
+      "cf_at_start": "0/63F982F0",
+      "crash": null,
+      "first_txn_ack": "0/63F983A0",
       "how": "stopped",
-      "step": {
-        "timeout": 300,
-        "until_done": true
-      }
+      "kill_after": null,
+      "rows_applied": 4454
     }
   ],
+  "rows": 4454,
   "seed": 4242,
-  "test": "tests/engine/test_engine_ack.py::test_restart_after_random_kills_and_java_crash_points"
+  "test": "tests/engine/test_engine_ack.py::test_restart_after_random_kills_and_java_crash_points",
+  "violations": 0
 }

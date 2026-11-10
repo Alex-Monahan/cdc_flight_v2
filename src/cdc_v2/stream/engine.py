@@ -17,6 +17,7 @@ import collections
 import json
 import logging
 import os
+import re
 import signal
 import subprocess
 import threading
@@ -208,10 +209,29 @@ def jvm_command(artifacts, s: EngineSettings):
            "-XX:+ExitOnOutOfMemoryError", "-XX:MaxDirectMemorySize=64m", "-Xss1m",
            "-Dcdc_v2.frames=/dev/fd/3", "-Dfile.encoding=UTF-8", "-Duser.timezone=UTC",
            "-Dorg.slf4j.simpleLogger.defaultLogLevel=info", "-Dorg.slf4j.simpleLogger.logFile=System.err",
-           "-Dorg.slf4j.simpleLogger.showDateTime=true"]
+           "-Dorg.slf4j.simpleLogger.showDateTime=true",
+           # this logger prints the text of a value it cannot parse (AbstractColumnValue: "Failed to parse ...")
+           "-Dorg.slf4j.simpleLogger.log.io.debezium.connector.postgresql.connection.AbstractColumnValue=off",
+           "-Dorg.slf4j.simpleLogger.log.io.debezium.connector.postgresql.connection.DateTimeFormat=off"]
     if s.active_processors:
         cmd.append("-XX:ActiveProcessorCount=%d" % s.active_processors)
     return cmd + ["-cp", artifacts.classpath, "cdc_v2.engine.CdcEngine"]
+
+
+_SLF4J = re.compile(r"^\d+ \[[^\]]*\] (TRACE|DEBUG|INFO|WARN|ERROR) \S+ - ")
+_QUOTED = re.compile(r"'[^']*'|\"[^\"]*\"")
+
+
+def log_filter(line):
+    """A JVM output line as it may be logged, or None when it must not be (see Engine._drain)."""
+    if line.startswith("CDCV2 "):
+        return line
+    m = _SLF4J.match(line)
+    if not m:
+        return None                         # stack trace, exception header, "Caused by", "... n more", other text
+    if m.group(1) in ("WARN", "ERROR"):
+        return line[:m.end()] + _QUOTED.sub("'…'", line[m.end():])
+    return line
 
 
 def java_crash_points(artifacts, timeout=60):
@@ -287,13 +307,29 @@ class Engine:
         return text
 
     def _drain(self, stream, which):
+        """JVM output into the log, filtered so that no source value can pass (plan C0): our own lines and
+        Debezium's log lines are kept (quoted text removed from WARN and ERROR lines); stack traces and exception
+        lines, which can quote a value (for example `For input string: "…"`), are counted, not copied."""
+        dropped = 0
         try:
             for raw in iter(stream.readline, b""):
                 text = self._scrub(raw.decode("utf-8", "replace").rstrip("\n"))
-                self.log_lines.append(text)
-                jvm_log.info("%s", text)
+                safe = log_filter(text)
+                if safe is None:
+                    dropped += 1
+                    continue
+                if dropped:
+                    self._log("[%d line(s) of a stack trace not copied]" % dropped)
+                    dropped = 0
+                self._log(safe)
         except (OSError, ValueError):
             pass
+        if dropped:
+            self._log("[%d line(s) of a stack trace not copied]" % dropped)
+
+    def _log(self, text):
+        self.log_lines.append(text)
+        jvm_log.info("%s", text)
 
     def _write_commands(self):
         while True:
