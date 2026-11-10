@@ -1,0 +1,66 @@
+{
+ "utc": "2026-11-10T03:55:02Z",
+ "load_avg": [
+  5.22,
+  6.79,
+  6.23
+ ],
+ "prepare": {
+  "jars": 73,
+  "jar_bytes": 40204549,
+  "fetch_s": 0.04,
+  "reused": 73,
+  "javac_s": 0.6,
+  "java_version": "openjdk version \"23.0.2\" 2025-01-21"
+ },
+ "replica_settings": {
+  "hot_standby_feedback": "on",
+  "logical_decoding_work_mem": "65536",
+  "max_standby_streaming_delay": "30000",
+  "wal_level": "logical",
+  "wal_sender_timeout": "60000"
+ },
+ "admin_can_log_standby_snapshot": "permission denied for function pg_log_standby_snapshot",
+ "slot_unaided_right_after_writes": {
+  "node": "replica",
+  "help_standby": false,
+  "ok": true,
+  "seconds": 4.83,
+  "consistent_point": "6/B94D6580",
+  "pg_log_standby_snapshot_calls": 0
+ },
+ "slot_unaided_idle_primary_20s": {
+  "node": "replica",
+  "help_standby": false,
+  "ok": true,
+  "seconds": 8.11,
+  "consistent_point": "6/B94D6610",
+  "pg_log_standby_snapshot_calls": 0
+ },
+ "slot_unaided_idle_then_one_write": {
+  "node": "replica",
+  "help_standby": false,
+  "ok": true,
+  "seconds": 0.95,
+  "consistent_point": "6/B94E5EA0",
+  "pg_log_standby_snapshot_calls": 0,
+  "write_at_s": 2.0,
+  "wall_s": 2.04
+ },
+ "slot_with_pg_log_standby_snapshot": {
+  "node": "replica",
+  "help_standby": true,
+  "ok": true,
+  "seconds": 0.93,
+  "consistent_point": "6/B94E6038",
+  "pg_log_standby_snapshot_calls": 1
+ },
+ "smoke": {
+  "polling_started": true,
+  "polling_s": 0.71,
+  "events_ok": true,
+  "commit_to_last_event_s": 0.475,
+  "errors": [],
+  "stop_s": 0.72
+ }
+}
