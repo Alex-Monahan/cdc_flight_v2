@@ -1,0 +1,10 @@
+#!/bin/sh
+# tools/localpg on this spike's private cluster (home ~/.cache/cdc_flight_v2/pg-spike-tp, ports 55500-55507:
+# primary 55500, replica 55501). Never the shared development cluster, never port 5432.
+#   spikes/local_throughput/localpg up|down|status|conninfo --json|sql replica -c '...'
+set -eu
+here="$(cd "$(dirname "$0")" && pwd)"
+CDC_V2_PG_HOME="${CDC_V2_SPIKE_TP_PG_HOME:-$HOME/.cache/cdc_flight_v2/pg-spike-tp}"
+CDC_V2_PG_PORT_BASE=55500
+export CDC_V2_PG_HOME CDC_V2_PG_PORT_BASE
+exec "$here/../../tools/with-env" "$here/../../tools/localpg" "$@"

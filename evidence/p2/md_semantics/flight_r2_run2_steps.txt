@@ -1,0 +1,9 @@
+BOOT fetched commit ef01cc2d738b in 0.3 s; 3 step(s)
+STEP 0 clock.py  start
+STEP 0 clock.py exit 0 after 19.4 s
+STEP 1 txn_size.py --only 3 --tiny-seconds 20 start
+STEP 1 txn_size.py exit 0 after 91.5 s
+STEP 2 apply_txn.py  start
+STEP 2 apply_txn.py exit 0 after 206.1 s
+BOOT done in 317.3 s, failed steps: 0
+run 2: status=SUCCEEDED, exit_code=0, started_at=2026-11-10T03:14:31.275+00:00, ended_at=2026-11-10T03:19:53.562+00:00

@@ -1,0 +1,274 @@
+{
+ "boot": {
+  "child_exit": "34.778",
+  "clone": "0.351",
+  "commit": "8800e869b22bf8ce22d3d67c99446403d5bc525b",
+  "exit": "0",
+  "first_line": "1794278339.324"
+ },
+ "derived": {
+  "container_and_requirements_s": 2.467,
+  "cost_usd_at_0.60_per_h": 0.0062,
+  "run_wall_s": 37.292
+ },
+ "marks": [
+  "T 0.946 driver_start",
+  "T 0.947 phase_e2e",
+  "T 1.664 jdk_begin",
+  "T 5.882 jdk_done",
+  "T 6.527 jars_done",
+  "T 8.926 compile_done",
+  "T 8.926 pg_install_begin",
+  "T 22.906 pg_installed",
+  "T 26.273 pg_ready",
+  "T 26.425 backlog_written",
+  "T 32.492 e2e_events_received",
+  "T 34.677 driver_end"
+ ],
+ "raw_log": [
+  "Using CPython 3.12.15",
+  "Creating virtual environment at: .venv",
+  "Resolved 3 packages in 876ms",
+  "Downloading psycopg-binary (5.0MiB)",
+  " Downloaded psycopg-binary",
+  "Prepared 3 packages in 624ms",
+  "Installed 3 packages in 31ms",
+  " + psycopg==3.3.8",
+  " + psycopg-binary==3.3.8",
+  " + typing-extensions==4.16.0",
+  "BOOT first_line 1794278339.324",
+  "BOOT clone 0.351",
+  "BOOT commit 8800e869b22bf8ce22d3d67c99446403d5bc525b",
+  "T 0.946 driver_start",
+  "RESULT {\"cpu_max\": \"200000 100000\", \"jdk\": \"temurin-21\", \"mem_max\": \"17179869184\", \"modes\": [\"e2e\"], \"os_cpu_count\": 8, \"phase\": \"driver\", \"t_run\": 0.947}",
+  "T 0.947 phase_e2e",
+  "T 1.664 jdk_begin",
+  "T 5.882 jdk_done",
+  "T 6.527 jars_done",
+  "T 8.926 compile_done",
+  "RESULT {\"jars_bytes\": 40204549, \"jars_count\": 73, \"jars_s\": 0.591, \"javac_s\": 2.398, \"jdk\": \"temurin-21\", \"jdk_download_s\": 0.79, \"jdk_unpack_s\": 3.417, \"phase\": \"prepare\", \"t_run\": 8.926}",
+  "T 8.926 pg_install_begin",
+  "T 22.906 pg_installed",
+  "T 26.273 pg_ready",
+  "RESULT {\"apt_install_s\": 10.881559610366821, \"apt_update_s\": 2.6884477138519287, \"bindir\": \"/usr/lib/postgresql/18/bin\", \"initdb_s\": 3.048459768295288, \"install_total_s\": 13.962651491165161, \"major\": \"18\", \"note\": \"SPIKE FIXTURE ONLY - the product never installs Postgres\", \"phase\": \"pg_fixture\", \"settings\": {\"checkpoint_timeout\": \"30min\", \"fsync\": \"off\", \"full_page_writes\": \"on\", \"listen_addresses\": \"'127.0.0.1'\", \"log_min_messages\": \"warning\", \"logical_decoding_work_mem\": \"64MB\", \"max_replication_slots\": \"10\", \"max_wal_senders\": \"10\", \"max_wal_size\": \"16GB\", \"port\": \"5432\", \"shared_buffers\": \"1GB\", \"synchronous_commit\": \"off\", \"unix_socket_directories\": \"'/tmp/cdc_v2_pgsock'\", \"wal_level\": \"logical\", \"wal_sender_timeout\": \"60s\"}, \"setup_s\": 0.19321370124816895, \"source\": \"apt.postgresql.org (PGDG)\", \"start_s\": 0.1256251335144043, \"t_run\": 26.273, \"version\": \"postgres (PostgreSQL) 18.6 (Debian 18.6-1.pgdg12+2)\"}",
+  "T 26.425 backlog_written",
+  "T 32.492 e2e_events_received",
+  "RESULT {\"batches\": 6, \"budget\": {\"all_backlog_s\": 5.971, \"connector_start_s\": 1.514, \"engine_built_s\": 0.356, \"first_event_s\": 1.614, \"jvm_start_s\": 0.122, \"spawn_to_first_event_s\": 3.251}, \"bytes\": 2140052, \"debezium_log\": [\"CDCV2 VERSION 1794278366106 debezium=3.7.1.Final format=struct ack=sync\", \"[pool-1-thread-1] INFO io.debezium.connector.common.BaseSourceTask - Starting PostgresConnectorTask with configuration:\"], \"events\": 10152, \"expected\": {\"c\": 10000, \"d\": 53, \"u\": 99}, \"marks\": {\"CONNECTOR_STARTED\": 27.748, \"CONNECTOR_STOPPED\": 34.192, \"ENGINE_BUILT\": 26.979, \"ENGINE_COMPLETED\": 34.192, \"FIRST_EVENT\": 29.737, \"MAIN\": 26.623, \"POLLING_STARTED\": 28.137, \"POLLING_STOPPED\": 34.004, \"SHUTDOWN_BEGIN\": 34.003, \"SHUTDOWN_DONE\": 34.192, \"TASK_STARTED\": 28.136, \"TASK_STOPPED\": 34.191, \"VERSION\": 26.782}, \"ok\": true, \"ops\": {\"c\": 10000, \"d\": 53, \"u\": 99}, \"orderkey_sum_expected\": \"12640988\", \"orderkey_sum_received\": 12640988, \"phase\": \"e2e\", \"rows_in_table\": 9947, \"sample\": [{\"lsn\": 28972872, \"op\": \"c\", \"row\": [1, 7920, 4730, 2, \"200:2\", \"90031:2\", \"1:2\", \"1:2\", \"N\", \"F\", 8036, 8066, 8050, \"COLLECT COD              \", \"AIR       \", \"c4ca4238a0b\"], \"table\": \"public.lineitem\", \"ts_ms\": 1794278365729, \"txId\": 757}, {\"lsn\": 28973208, \"op\": \"c\", \"row\": [1, 15839, 9459, 3, \"300:2\", \"90062:2\", \"2:2\", \"2:2\", \"R\", \"O\", 8037, 8067, 8051, \"NONE                     \", \"RAIL      \", \"c81e728d9d4c\"], \"table\": \"public.lineitem\", \"ts_ms\": 1794278365729, \"txId\": 757}], \"shutdown\": \"elapsed_ms=189\", \"sink_bytes\": 2140052, \"slot_after\": {\"active\": true, \"active_pid\": 2656, \"confirmed_flush_lsn\": \"0/1E226A0\", \"current_lsn\": \"0/1E239A8\", \"walsenders\": 1}, \"stop_s\": 0.565, \"t_run\": 34.57, \"version_marks\": {\"MAIN\": \"jvm_start_ms=1794278365860 cpus=2 max_heap=1073741824 java=21.0.13\", \"VERSION\": \"debezium=3.7.1.Final format=struct ack=sync\"}, \"warnings\": []}",
+  "T 34.677 driver_end",
+  "BOOT child_exit 34.778",
+  "BOOT exit 0"
+ ],
+ "results": [
+  {
+   "cpu_max": "200000 100000",
+   "jdk": "temurin-21",
+   "mem_max": "17179869184",
+   "modes": [
+    "e2e"
+   ],
+   "os_cpu_count": 8,
+   "phase": "driver",
+   "t_run": 0.947
+  },
+  {
+   "jars_bytes": 40204549,
+   "jars_count": 73,
+   "jars_s": 0.591,
+   "javac_s": 2.398,
+   "jdk": "temurin-21",
+   "jdk_download_s": 0.79,
+   "jdk_unpack_s": 3.417,
+   "phase": "prepare",
+   "t_run": 8.926
+  },
+  {
+   "apt_install_s": 10.881559610366821,
+   "apt_update_s": 2.6884477138519287,
+   "bindir": "/usr/lib/postgresql/18/bin",
+   "initdb_s": 3.048459768295288,
+   "install_total_s": 13.962651491165161,
+   "major": "18",
+   "note": "SPIKE FIXTURE ONLY - the product never installs Postgres",
+   "phase": "pg_fixture",
+   "settings": {
+    "checkpoint_timeout": "30min",
+    "fsync": "off",
+    "full_page_writes": "on",
+    "listen_addresses": "'127.0.0.1'",
+    "log_min_messages": "warning",
+    "logical_decoding_work_mem": "64MB",
+    "max_replication_slots": "10",
+    "max_wal_senders": "10",
+    "max_wal_size": "16GB",
+    "port": "5432",
+    "shared_buffers": "1GB",
+    "synchronous_commit": "off",
+    "unix_socket_directories": "'/tmp/cdc_v2_pgsock'",
+    "wal_level": "logical",
+    "wal_sender_timeout": "60s"
+   },
+   "setup_s": 0.19321370124816895,
+   "source": "apt.postgresql.org (PGDG)",
+   "start_s": 0.1256251335144043,
+   "t_run": 26.273,
+   "version": "postgres (PostgreSQL) 18.6 (Debian 18.6-1.pgdg12+2)"
+  },
+  {
+   "batches": 6,
+   "budget": {
+    "all_backlog_s": 5.971,
+    "connector_start_s": 1.514,
+    "engine_built_s": 0.356,
+    "first_event_s": 1.614,
+    "jvm_start_s": 0.122,
+    "spawn_to_first_event_s": 3.251
+   },
+   "bytes": 2140052,
+   "debezium_log": [
+    "CDCV2 VERSION 1794278366106 debezium=3.7.1.Final format=struct ack=sync",
+    "[pool-1-thread-1] INFO io.debezium.connector.common.BaseSourceTask - Starting PostgresConnectorTask with configuration:"
+   ],
+   "events": 10152,
+   "expected": {
+    "c": 10000,
+    "d": 53,
+    "u": 99
+   },
+   "marks": {
+    "CONNECTOR_STARTED": 27.748,
+    "CONNECTOR_STOPPED": 34.192,
+    "ENGINE_BUILT": 26.979,
+    "ENGINE_COMPLETED": 34.192,
+    "FIRST_EVENT": 29.737,
+    "MAIN": 26.623,
+    "POLLING_STARTED": 28.137,
+    "POLLING_STOPPED": 34.004,
+    "SHUTDOWN_BEGIN": 34.003,
+    "SHUTDOWN_DONE": 34.192,
+    "TASK_STARTED": 28.136,
+    "TASK_STOPPED": 34.191,
+    "VERSION": 26.782
+   },
+   "ok": true,
+   "ops": {
+    "c": 10000,
+    "d": 53,
+    "u": 99
+   },
+   "orderkey_sum_expected": "12640988",
+   "orderkey_sum_received": 12640988,
+   "phase": "e2e",
+   "rows_in_table": 9947,
+   "sample": [
+    {
+     "lsn": 28972872,
+     "op": "c",
+     "row": [
+      1,
+      7920,
+      4730,
+      2,
+      "200:2",
+      "90031:2",
+      "1:2",
+      "1:2",
+      "N",
+      "F",
+      8036,
+      8066,
+      8050,
+      "COLLECT COD              ",
+      "AIR       ",
+      "c4ca4238a0b"
+     ],
+     "table": "public.lineitem",
+     "ts_ms": 1794278365729,
+     "txId": 757
+    },
+    {
+     "lsn": 28973208,
+     "op": "c",
+     "row": [
+      1,
+      15839,
+      9459,
+      3,
+      "300:2",
+      "90062:2",
+      "2:2",
+      "2:2",
+      "R",
+      "O",
+      8037,
+      8067,
+      8051,
+      "NONE                     ",
+      "RAIL      ",
+      "c81e728d9d4c"
+     ],
+     "table": "public.lineitem",
+     "ts_ms": 1794278365729,
+     "txId": 757
+    }
+   ],
+   "shutdown": "elapsed_ms=189",
+   "sink_bytes": 2140052,
+   "slot_after": {
+    "active": true,
+    "active_pid": 2656,
+    "confirmed_flush_lsn": "0/1E226A0",
+    "current_lsn": "0/1E239A8",
+    "walsenders": 1
+   },
+   "stop_s": 0.565,
+   "t_run": 34.57,
+   "version_marks": {
+    "MAIN": "jvm_start_ms=1794278365860 cpus=2 max_heap=1073741824 java=21.0.13",
+    "VERSION": "debezium=3.7.1.Final format=struct ack=sync"
+   },
+   "warnings": []
+  }
+ ],
+ "run": {
+  "cancelled_at": null,
+  "config": {
+   "CDC_V2_BIG_ROWS": "10000000",
+   "CDC_V2_COMMIT": "8800e869b22bf8ce22d3d67c99446403d5bc525b",
+   "CDC_V2_DEADLINE": "2300",
+   "CDC_V2_JDK": "temurin-21",
+   "CDC_V2_SMALL_TX": "100000",
+   "CDC_V2_SPIKE_MODE": "e2e",
+   "CDC_V2_TPUT_ONLY": "all",
+   "CDC_V2_TPUT_ROWS": "1000000"
+  },
+  "created_at": "2026-11-10T02:38:56.137+00:00",
+  "ended_at": "2026-11-10T02:39:34.149+00:00",
+  "exit_code": 0,
+  "flight_id": "ff81b6f6-8cea-4f5d-b6f6-7de4f01d4d61",
+  "flight_name": "cdc_v2_spike_jvm",
+  "flight_version": 1,
+  "is_scheduled": false,
+  "observed_states": [
+   {
+    "observed_at": "2026-11-10T02:38:56.761224+00:00",
+    "state": "PENDING"
+   },
+   {
+    "observed_at": "2026-11-10T02:38:59.019473+00:00",
+    "state": "RUNNING"
+   },
+   {
+    "observed_at": "2026-11-10T02:39:35.569116+00:00",
+    "state": "SUCCEEDED"
+   }
+  ],
+  "run_id": "01a1c352-a649-7c94-b793-83379c8cecd3",
+  "run_number": 2,
+  "scheduled_at": "2026-11-10T02:38:56.073+00:00",
+  "started_at": "2026-11-10T02:38:56.857+00:00",
+  "started_by_id": "<redacted>",
+  "started_by_name": "<redacted>",
+  "state": "SUCCEEDED",
+  "status": "SUCCEEDED"
+ }
+}

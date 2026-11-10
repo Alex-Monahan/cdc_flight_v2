@@ -1,0 +1,541 @@
+{
+ "boot": {
+  "child_exit": "154.095",
+  "clone": "0.362",
+  "commit": "bcdfa209eb6d810613caf8a77cd7372454df97fd",
+  "exit": "0",
+  "first_line": "1794281223.386"
+ },
+ "derived": {
+  "container_and_requirements_s": 1.693,
+  "cost_usd_at_0.60_per_h": 0.026,
+  "run_wall_s": 155.881
+ },
+ "marks": [
+  "T 0.931 driver_start",
+  "T 0.931 phase_profile",
+  "T 1.607 pg_install_begin",
+  "T 16.656 pg_installed",
+  "T 20.162 pg_ready",
+  "T 20.162 jdk_begin",
+  "T 24.132 jdk_done",
+  "T 24.763 jars_done",
+  "T 26.935 compile_done",
+  "T 154.024 driver_end"
+ ],
+ "raw_log": [
+  "Using CPython 3.12.15",
+  "Creating virtual environment at: .venv",
+  "Resolved 3 packages in 385ms",
+  "Downloading psycopg-binary (5.0MiB)",
+  " Downloaded psycopg-binary",
+  "Prepared 3 packages in 284ms",
+  "Installed 3 packages in 30ms",
+  " + psycopg==3.3.8",
+  " + psycopg-binary==3.3.8",
+  " + typing-extensions==4.16.0",
+  "BOOT first_line 1794281223.386",
+  "BOOT clone 0.362",
+  "BOOT commit bcdfa209eb6d810613caf8a77cd7372454df97fd",
+  "T 0.931 driver_start",
+  "RESULT {\"cpu_max\": \"200000 100000\", \"jdk\": \"temurin-21\", \"mem_max\": \"17179869184\", \"modes\": [\"profile\"], \"os_cpu_count\": 8, \"phase\": \"driver\", \"t_run\": 0.931}",
+  "T 0.931 phase_profile",
+  "T 1.607 pg_install_begin",
+  "T 16.656 pg_installed",
+  "T 20.162 pg_ready",
+  "T 20.162 jdk_begin",
+  "T 24.132 jdk_done",
+  "T 24.763 jars_done",
+  "T 26.935 compile_done",
+  "RESULT {\"batches\": 491, \"bytes\": 212292339, \"cgroup\": {\"memory.current\": \"2057314304\", \"memory.max\": \"17179869184\", \"memory.peak\": \"2323083264\"}, \"commit_to_last_event_s\": 46.027, \"complete\": true, \"consumer_rss_hwm_mib\": 17.9, \"consumer_rss_idle_mib\": 17.5, \"cpu_commit_to_last\": {\"consumer_cpu_pct\": 0.9, \"consumer_cpu_s\": 0.4, \"jvm_cpu_pct\": 145.6, \"jvm_cpu_s\": 67.04, \"postgres_all_cpu_pct\": 23.4, \"postgres_all_cpu_s\": 10.78, \"wall_s\": 46.047, \"walsender_cpu_pct\": 23.4, \"walsender_cpu_s\": 10.78}, \"cpu_insert_start_to_last\": {\"consumer_cpu_pct\": 0.8, \"consumer_cpu_s\": 0.44, \"jvm_cpu_pct\": 115.3, \"jvm_cpu_s\": 67.29, \"postgres_all_cpu_pct\": 28.6, \"postgres_all_cpu_s\": 16.71, \"wall_s\": 58.344, \"walsender_cpu_pct\": 28.5, \"walsender_cpu_s\": 16.61}, \"events\": 1000000, \"heap\": \"1g\", \"insert_s\": 12.291, \"jfr\": {\"inclusive_pct\": [[\"io.debezium.embedded.async.AsyncEmbeddedEngine$PollRecords.doCall()\", 49.8], [\"io.debezium.embedded.async.RetryingCallable.call()\", 49.8], [\"io.debezium.embedded.async.ParallelSmtAndConvertBatchProcessor.processRecords(List)\", 46.9], [\"cdc_v2.engine.EngineMain.handleStruct(List, DebeziumEngine$RecordCommitter)\", 44.9], [\"io.debezium.embedded.async.AbstractRecordProcessor$BatchProcessor$DirectProcessor.process(List)\", 44.9], [\"io.debezium.util.Threads$3.lambda$newThread$0(Optional, Runnable)\", 44.6], [\"io.debezium.pipeline.ChangeEventSourceCoordinator.lambda$start$0(CdcSourceTaskContext)\", 44.0], [\"io.debezium.pipeline.ChangeEventSourceCoordinator.streamEvents(ChangeEventSource$ChangeEventSourceContext, Partition, OffsetContext)\", 43.9], [\"io.debezium.pipeline.ChangeEventSourceCoordinator.executeChangeEventSources(CdcSourceTaskContext, SnapshotChangeEventSource, Offsets, AtomicReference, ChangeEve\", 43.9], [\"io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.execute(ChangeEventSource$ChangeEventSourceContext, PostgresPartition, PostgresOffsetContext\", 43.7], [\"io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.execute(ChangeEventSource$ChangeEventSourceContext, Partition, OffsetContext)\", 43.7], [\"io.debezium.connector.postgresql.connection.pgoutput.PgOutputMessageDecoder.decodeInsert(ByteBuffer, TypeRegistry, ReplicationStream$ReplicationMessageProcessor\", 43.4], [\"io.debezium.connector.postgresql.connection.PostgresReplicationConnection$1.deserializeMessages(ByteBuffer, ReplicationStream$ReplicationMessageProcessor)\", 43.4], [\"io.debezium.connector.postgresql.connection.AbstractMessageDecoder.processMessage(ByteBuffer, ReplicationStream$ReplicationMessageProcessor, TypeRegistry)\", 43.4], [\"io.debezium.connector.postgresql.connection.PostgresReplicationConnection$1.readPending(ReplicationStream$ReplicationMessageProcessor)\", 43.4], [\"io.debezium.connector.postgresql.connection.pgoutput.PgOutputMessageDecoder.processNotEmptyMessage(ByteBuffer, ReplicationStream$ReplicationMessageProcessor, Ty\", 43.4], [\"io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.processMessages(ChangeEventSource$ChangeEventSourceContext, PostgresPartition, PostgresOffse\", 43.4], [\"io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.processReplicationMessages(PostgresPartition, PostgresOffsetContext, ReplicationStream, Repl\", 41.4], [\"io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.lambda$processMessages$0(PostgresPartition, PostgresOffsetContext, ReplicationStream, Replic\", 41.4], [\"io.debezium.pipeline.EventDispatcher.dispatchDataChangeEvent(Partition, DataCollectionId, ChangeRecordEmitter)\", 40.3], [\"io.debezium.relational.RelationalChangeRecordEmitter.emitCreateRecord(ChangeRecordEmitter$Receiver, TableSchema)\", 40.1], [\"io.debezium.relational.RelationalChangeRecordEmitter.emitChangeRecords(DataCollectionSchema, ChangeRecordEmitter$Receiver)\", 40.1], [\"io.debezium.connector.postgresql.PostgresChangeRecordEmitter.emitChangeRecords(DataCollectionSchema, ChangeRecordEmitter$Receiver)\", 40.1], [\"cdc_v2.engine.EngineMain.writeStructEvent(SourceRecord)\", 38.1], [\"cdc_v2.engine.EngineMain.writeValue(Schema, Object)\", 24.3], [\"io.debezium.connector.postgresql.PostgresChangeRecordEmitter.columnValues(List, TableId, boolean, boolean, boolean)\", 14.7], [\"io.debezium.connector.postgresql.PostgresChangeRecordEmitter.getNewColumnValues()\", 14.7], [\"io.debezium.connector.postgresql.PostgresSourceInfoStructMaker.struct(SourceInfo)\", 14.1], [\"io.debezium.pipeline.CommonOffsetContext.getSourceInfo()\", 14.1], [\"io.debezium.connector.AbstractSourceInfo.struct()\", 14.1], [\"io.debezium.connector.postgresql.PostgresSourceInfoStructMaker.struct(AbstractSourceInfo)\", 14.1], [\"org.apache.kafka.connect.data.Struct.put(Field, Object)\", 12.2], [\"org.apache.kafka.connect.data.ConnectSchema.validateValue(String, Schema, Object)\", 12.2], [\"io.debezium.connector.AbstractSourceInfoStructMaker.commonStruct(AbstractSourceInfo)\", 11.3], [\"io.debezium.connector.postgresql.connection.pgoutput.PgOutputReplicationMessage.getValue(String, PostgresType, String, String, PostgresStreamingChangeEventSourc\", 9.7], [\"io.debezium.connector.postgresql.connection.pgoutput.PgOutputMessageDecoder$1.getValue(PostgresStreamingChangeEventSource$PgConnectionSupplier, boolean)\", 9.7], [\"io.debezium.connector.postgresql.connection.ReplicationMessageColumnValueResolver.resolveValue(String, PostgresType, String, ReplicationMessage$ColumnValue, Pos\", 9.4], [\"io.debezium.relational.TableSchema.valueFromColumnData(Object[])\", 8.4], [\"io.debezium.relational.TableSchemaBuilder.lambda$createValueGenerator$5(Schema, int, TableId, int[], Field[], ValueConverter[], List, Object[])\", 8.2], [\"io.debezium.connector.postgresql.connection.DateTimeFormat$ISODateTimeFormat.date(String)\", 7.3]], \"samples\": 838, \"self_pct\": [[\"java.math.BigInteger.smallToString(int, StringBuilder, int)\", 18.1], [\"java.lang.StringConcatHelper.prepend(long, byte[], String)\", 7.0], [\"org.apache.kafka.connect.data.ConnectSchema.validateValue(String, Schema, Object)\", 6.7], [\"java.io.ByteArrayOutputStream.ensureCapacity(int)\", 5.8], [\"org.apache.kafka.connect.data.ConnectSchema.validateValue(Schema, Object, String)\", 5.0], [\"cdc_v2.engine.EngineMain.writeStructEvent(SourceRecord)\", 3.3], [\"java.util.HashMap.putVal(int, Object, Object, boolean, boolean)\", 3.2], [\"cdc_v2.engine.EngineMain.handleStruct(List, DebeziumEngine$RecordCommitter)\", 2.6], [\"java.lang.StringLatin1.compareToCI(byte[], byte[])\", 2.5], [\"java.util.stream.ReduceOps$ReduceOp.evaluateSequential(PipelineHelper, Spliterator)\", 1.8], [\"java.util.HashMap.getNode(Object)\", 1.7], [\"com.fasterxml.jackson.databind.ser.DefaultSerializerProvider.serializeValue(JsonGenerator, Object)\", 1.4], [\"java.lang.Long.getChars(long, int, byte[])\", 1.3], [\"java.util.HashMap$HashIterator.nextNode()\", 1.3], [\"java.util.ImmutableCollections$List12.get(int)\", 1.3], [\"java.util.ArrayDeque.elementAt(Object[], int)\", 1.3], [\"com.fasterxml.jackson.databind.ObjectMapper.writeValueAsString(Object)\", 1.2], [\"io.debezium.connector.AbstractSourceInfoStructMaker.commonStruct(AbstractSourceInfo)\", 1.1], [\"com.fasterxml.jackson.core.util.BufferRecycler.releaseCharBuffer(int, char[])\", 1.0], [\"io.debezium.relational.TableSchemaBuilder.lambda$createValueGenerator$5(Schema, int, TableId, int[], Field[], ValueConverter[], List, Object[])\", 1.0], [\"io.debezium.embedded.async.AsyncEmbeddedEngine$ConvertingRecordCommitter.markProcessed(Object)\", 0.8], [\"io.debezium.connector.postgresql.connection.ReplicationMessageColumnValueResolver.resolveValue(String, PostgresType, String, ReplicationMessage$ColumnValue, Pos\", 0.8], [\"java.util.TreeMap.getEntryUsingComparator(Object)\", 0.8], [\"java.util.concurrent.ThreadPoolExecutor.execute(Runnable)\", 0.8], [\"java.util.HashMap.putMapEntries(Map, boolean)\", 0.7], [\"java.lang.String.hashCode()\", 0.7], [\"java.util.stream.ReferencePipeline$3$1.accept(Object)\", 0.7], [\"com.fasterxml.jackson.databind.ser.impl.IndexedListSerializer.serializeContents(List, JsonGenerator, SerializerProvider)\", 0.7], [\"java.lang.AbstractStringBuilder.ensureCapacityInternal(int)\", 0.7], [\"com.fasterxml.jackson.core.json.WriterBasedJsonGenerator._writeString2(int)\", 0.7]], \"threads\": {\"cdc_v2-engine\": 0.2, \"cdc_v2-stdin\": 0.1, \"debezium-postgresconnector-cdc_v2_spike-change-event-source-coordinator\": 44.0, \"debezium-postgresconnector-cdc_v2_spike-connection-validation\": 0.6, \"main\": 0.2, \"pool-1-thread\": 49.9, \"pool-2-thread\": 4.9}}, \"jvm_opts\": [\"-XX:StartFlightRecording=filename=/tmp/cdc_v2_spike/profile_default.jfr,settings=profile,dumponexit=true\", \"-XX:FlightRecorderOptions=stackdepth=96\"], \"jvm_threads_cpu_s_commit_to_last\": {\"C1 CompilerThre\": 0.75, \"C2 CompilerThre\": 7.47, \"GC Thread\": 2.09, \"JFR Periodic Ta\": 0.07, \"JFR Thread Samp\": 0.48, \"Thread\": 9.95, \"VM Thread\": 0.08, \"debezium-postgr\": 39.18, \"pool-1-thread\": 5.5, \"pool-2-thread\": 1.24}, \"phase\": \"tx_test\", \"rows\": 1000000, \"rows_per_s_after_commit\": 21726, \"rows_per_s_insert_start_to_last\": 17147, \"rss_hwm_mib\": 423.9, \"rss_idle_mib\": 144.0, \"rss_peak_mib\": 423.9, \"settings\": {}, \"shutdown\": \"elapsed_ms=19\", \"started\": true, \"stop_s\": 0.465, \"t_run\": 92.766, \"test\": \"profile_default\", \"warnings\": []}",
+  "RESULT {\"batches\": 3094, \"bytes\": 212292339, \"cgroup\": {\"memory.current\": \"2193141760\", \"memory.max\": \"17179869184\", \"memory.peak\": \"2489872384\"}, \"commit_to_last_event_s\": 44.018, \"complete\": true, \"consumer_rss_hwm_mib\": 14.9, \"consumer_rss_idle_mib\": 14.4, \"cpu_commit_to_last\": {\"consumer_cpu_pct\": 1.3, \"consumer_cpu_s\": 0.58, \"jvm_cpu_pct\": 152.4, \"jvm_cpu_s\": 67.14, \"postgres_all_cpu_pct\": 24.3, \"postgres_all_cpu_s\": 10.71, \"wall_s\": 44.058, \"walsender_cpu_pct\": 24.3, \"walsender_cpu_s\": 10.7}, \"cpu_insert_start_to_last\": {\"consumer_cpu_pct\": 1.1, \"consumer_cpu_s\": 0.62, \"jvm_cpu_pct\": 122.1, \"jvm_cpu_s\": 68.62, \"postgres_all_cpu_pct\": 29.7, \"postgres_all_cpu_s\": 16.67, \"wall_s\": 56.202, \"walsender_cpu_pct\": 29.4, \"walsender_cpu_s\": 16.53}, \"events\": 1000000, \"heap\": \"1g\", \"insert_s\": 12.139, \"jvm_opts\": [], \"jvm_threads_cpu_s_commit_to_last\": {\"C1 CompilerThre\": 0.72, \"C2 CompilerThre\": 9.08, \"GC Thread\": 0.73, \"Thread\": 9.67, \"VM Thread\": 0.09, \"cdc_v2-stdin\": 0.2, \"debezium-postgr\": 37.83, \"pool-1-thread\": 7.23, \"pool-2-thread\": 1.36}, \"phase\": \"tx_test\", \"rows\": 1000000, \"rows_per_s_after_commit\": 22718, \"rows_per_s_insert_start_to_last\": 17807, \"rss_hwm_mib\": 287.0, \"rss_idle_mib\": 155.9, \"rss_peak_mib\": 287.7, \"settings\": {\"poll.interval.ms\": \"10\"}, \"shutdown\": \"elapsed_ms=18\", \"started\": true, \"stop_s\": 0.415, \"t_run\": 153.917, \"test\": \"poll10_retest\", \"warnings\": []}",
+  "T 154.024 driver_end",
+  "BOOT child_exit 154.095",
+  "BOOT exit 0"
+ ],
+ "results": [
+  {
+   "cpu_max": "200000 100000",
+   "jdk": "temurin-21",
+   "mem_max": "17179869184",
+   "modes": [
+    "profile"
+   ],
+   "os_cpu_count": 8,
+   "phase": "driver",
+   "t_run": 0.931
+  },
+  {
+   "batches": 491,
+   "bytes": 212292339,
+   "cgroup": {
+    "memory.current": "2057314304",
+    "memory.max": "17179869184",
+    "memory.peak": "2323083264"
+   },
+   "commit_to_last_event_s": 46.027,
+   "complete": true,
+   "consumer_rss_hwm_mib": 17.9,
+   "consumer_rss_idle_mib": 17.5,
+   "cpu_commit_to_last": {
+    "consumer_cpu_pct": 0.9,
+    "consumer_cpu_s": 0.4,
+    "jvm_cpu_pct": 145.6,
+    "jvm_cpu_s": 67.04,
+    "postgres_all_cpu_pct": 23.4,
+    "postgres_all_cpu_s": 10.78,
+    "wall_s": 46.047,
+    "walsender_cpu_pct": 23.4,
+    "walsender_cpu_s": 10.78
+   },
+   "cpu_insert_start_to_last": {
+    "consumer_cpu_pct": 0.8,
+    "consumer_cpu_s": 0.44,
+    "jvm_cpu_pct": 115.3,
+    "jvm_cpu_s": 67.29,
+    "postgres_all_cpu_pct": 28.6,
+    "postgres_all_cpu_s": 16.71,
+    "wall_s": 58.344,
+    "walsender_cpu_pct": 28.5,
+    "walsender_cpu_s": 16.61
+   },
+   "events": 1000000,
+   "heap": "1g",
+   "insert_s": 12.291,
+   "jfr": {
+    "inclusive_pct": [
+     [
+      "io.debezium.embedded.async.AsyncEmbeddedEngine$PollRecords.doCall()",
+      49.8
+     ],
+     [
+      "io.debezium.embedded.async.RetryingCallable.call()",
+      49.8
+     ],
+     [
+      "io.debezium.embedded.async.ParallelSmtAndConvertBatchProcessor.processRecords(List)",
+      46.9
+     ],
+     [
+      "cdc_v2.engine.EngineMain.handleStruct(List, DebeziumEngine$RecordCommitter)",
+      44.9
+     ],
+     [
+      "io.debezium.embedded.async.AbstractRecordProcessor$BatchProcessor$DirectProcessor.process(List)",
+      44.9
+     ],
+     [
+      "io.debezium.util.Threads$3.lambda$newThread$0(Optional, Runnable)",
+      44.6
+     ],
+     [
+      "io.debezium.pipeline.ChangeEventSourceCoordinator.lambda$start$0(CdcSourceTaskContext)",
+      44.0
+     ],
+     [
+      "io.debezium.pipeline.ChangeEventSourceCoordinator.streamEvents(ChangeEventSource$ChangeEventSourceContext, Partition, OffsetContext)",
+      43.9
+     ],
+     [
+      "io.debezium.pipeline.ChangeEventSourceCoordinator.executeChangeEventSources(CdcSourceTaskContext, SnapshotChangeEventSource, Offsets, AtomicReference, ChangeEve",
+      43.9
+     ],
+     [
+      "io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.execute(ChangeEventSource$ChangeEventSourceContext, PostgresPartition, PostgresOffsetContext",
+      43.7
+     ],
+     [
+      "io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.execute(ChangeEventSource$ChangeEventSourceContext, Partition, OffsetContext)",
+      43.7
+     ],
+     [
+      "io.debezium.connector.postgresql.connection.pgoutput.PgOutputMessageDecoder.decodeInsert(ByteBuffer, TypeRegistry, ReplicationStream$ReplicationMessageProcessor",
+      43.4
+     ],
+     [
+      "io.debezium.connector.postgresql.connection.PostgresReplicationConnection$1.deserializeMessages(ByteBuffer, ReplicationStream$ReplicationMessageProcessor)",
+      43.4
+     ],
+     [
+      "io.debezium.connector.postgresql.connection.AbstractMessageDecoder.processMessage(ByteBuffer, ReplicationStream$ReplicationMessageProcessor, TypeRegistry)",
+      43.4
+     ],
+     [
+      "io.debezium.connector.postgresql.connection.PostgresReplicationConnection$1.readPending(ReplicationStream$ReplicationMessageProcessor)",
+      43.4
+     ],
+     [
+      "io.debezium.connector.postgresql.connection.pgoutput.PgOutputMessageDecoder.processNotEmptyMessage(ByteBuffer, ReplicationStream$ReplicationMessageProcessor, Ty",
+      43.4
+     ],
+     [
+      "io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.processMessages(ChangeEventSource$ChangeEventSourceContext, PostgresPartition, PostgresOffse",
+      43.4
+     ],
+     [
+      "io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.processReplicationMessages(PostgresPartition, PostgresOffsetContext, ReplicationStream, Repl",
+      41.4
+     ],
+     [
+      "io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.lambda$processMessages$0(PostgresPartition, PostgresOffsetContext, ReplicationStream, Replic",
+      41.4
+     ],
+     [
+      "io.debezium.pipeline.EventDispatcher.dispatchDataChangeEvent(Partition, DataCollectionId, ChangeRecordEmitter)",
+      40.3
+     ],
+     [
+      "io.debezium.relational.RelationalChangeRecordEmitter.emitCreateRecord(ChangeRecordEmitter$Receiver, TableSchema)",
+      40.1
+     ],
+     [
+      "io.debezium.relational.RelationalChangeRecordEmitter.emitChangeRecords(DataCollectionSchema, ChangeRecordEmitter$Receiver)",
+      40.1
+     ],
+     [
+      "io.debezium.connector.postgresql.PostgresChangeRecordEmitter.emitChangeRecords(DataCollectionSchema, ChangeRecordEmitter$Receiver)",
+      40.1
+     ],
+     [
+      "cdc_v2.engine.EngineMain.writeStructEvent(SourceRecord)",
+      38.1
+     ],
+     [
+      "cdc_v2.engine.EngineMain.writeValue(Schema, Object)",
+      24.3
+     ],
+     [
+      "io.debezium.connector.postgresql.PostgresChangeRecordEmitter.columnValues(List, TableId, boolean, boolean, boolean)",
+      14.7
+     ],
+     [
+      "io.debezium.connector.postgresql.PostgresChangeRecordEmitter.getNewColumnValues()",
+      14.7
+     ],
+     [
+      "io.debezium.connector.postgresql.PostgresSourceInfoStructMaker.struct(SourceInfo)",
+      14.1
+     ],
+     [
+      "io.debezium.pipeline.CommonOffsetContext.getSourceInfo()",
+      14.1
+     ],
+     [
+      "io.debezium.connector.AbstractSourceInfo.struct()",
+      14.1
+     ],
+     [
+      "io.debezium.connector.postgresql.PostgresSourceInfoStructMaker.struct(AbstractSourceInfo)",
+      14.1
+     ],
+     [
+      "org.apache.kafka.connect.data.Struct.put(Field, Object)",
+      12.2
+     ],
+     [
+      "org.apache.kafka.connect.data.ConnectSchema.validateValue(String, Schema, Object)",
+      12.2
+     ],
+     [
+      "io.debezium.connector.AbstractSourceInfoStructMaker.commonStruct(AbstractSourceInfo)",
+      11.3
+     ],
+     [
+      "io.debezium.connector.postgresql.connection.pgoutput.PgOutputReplicationMessage.getValue(String, PostgresType, String, String, PostgresStreamingChangeEventSourc",
+      9.7
+     ],
+     [
+      "io.debezium.connector.postgresql.connection.pgoutput.PgOutputMessageDecoder$1.getValue(PostgresStreamingChangeEventSource$PgConnectionSupplier, boolean)",
+      9.7
+     ],
+     [
+      "io.debezium.connector.postgresql.connection.ReplicationMessageColumnValueResolver.resolveValue(String, PostgresType, String, ReplicationMessage$ColumnValue, Pos",
+      9.4
+     ],
+     [
+      "io.debezium.relational.TableSchema.valueFromColumnData(Object[])",
+      8.4
+     ],
+     [
+      "io.debezium.relational.TableSchemaBuilder.lambda$createValueGenerator$5(Schema, int, TableId, int[], Field[], ValueConverter[], List, Object[])",
+      8.2
+     ],
+     [
+      "io.debezium.connector.postgresql.connection.DateTimeFormat$ISODateTimeFormat.date(String)",
+      7.3
+     ]
+    ],
+    "samples": 838,
+    "self_pct": [
+     [
+      "java.math.BigInteger.smallToString(int, StringBuilder, int)",
+      18.1
+     ],
+     [
+      "java.lang.StringConcatHelper.prepend(long, byte[], String)",
+      7.0
+     ],
+     [
+      "org.apache.kafka.connect.data.ConnectSchema.validateValue(String, Schema, Object)",
+      6.7
+     ],
+     [
+      "java.io.ByteArrayOutputStream.ensureCapacity(int)",
+      5.8
+     ],
+     [
+      "org.apache.kafka.connect.data.ConnectSchema.validateValue(Schema, Object, String)",
+      5.0
+     ],
+     [
+      "cdc_v2.engine.EngineMain.writeStructEvent(SourceRecord)",
+      3.3
+     ],
+     [
+      "java.util.HashMap.putVal(int, Object, Object, boolean, boolean)",
+      3.2
+     ],
+     [
+      "cdc_v2.engine.EngineMain.handleStruct(List, DebeziumEngine$RecordCommitter)",
+      2.6
+     ],
+     [
+      "java.lang.StringLatin1.compareToCI(byte[], byte[])",
+      2.5
+     ],
+     [
+      "java.util.stream.ReduceOps$ReduceOp.evaluateSequential(PipelineHelper, Spliterator)",
+      1.8
+     ],
+     [
+      "java.util.HashMap.getNode(Object)",
+      1.7
+     ],
+     [
+      "com.fasterxml.jackson.databind.ser.DefaultSerializerProvider.serializeValue(JsonGenerator, Object)",
+      1.4
+     ],
+     [
+      "java.lang.Long.getChars(long, int, byte[])",
+      1.3
+     ],
+     [
+      "java.util.HashMap$HashIterator.nextNode()",
+      1.3
+     ],
+     [
+      "java.util.ImmutableCollections$List12.get(int)",
+      1.3
+     ],
+     [
+      "java.util.ArrayDeque.elementAt(Object[], int)",
+      1.3
+     ],
+     [
+      "com.fasterxml.jackson.databind.ObjectMapper.writeValueAsString(Object)",
+      1.2
+     ],
+     [
+      "io.debezium.connector.AbstractSourceInfoStructMaker.commonStruct(AbstractSourceInfo)",
+      1.1
+     ],
+     [
+      "com.fasterxml.jackson.core.util.BufferRecycler.releaseCharBuffer(int, char[])",
+      1.0
+     ],
+     [
+      "io.debezium.relational.TableSchemaBuilder.lambda$createValueGenerator$5(Schema, int, TableId, int[], Field[], ValueConverter[], List, Object[])",
+      1.0
+     ],
+     [
+      "io.debezium.embedded.async.AsyncEmbeddedEngine$ConvertingRecordCommitter.markProcessed(Object)",
+      0.8
+     ],
+     [
+      "io.debezium.connector.postgresql.connection.ReplicationMessageColumnValueResolver.resolveValue(String, PostgresType, String, ReplicationMessage$ColumnValue, Pos",
+      0.8
+     ],
+     [
+      "java.util.TreeMap.getEntryUsingComparator(Object)",
+      0.8
+     ],
+     [
+      "java.util.concurrent.ThreadPoolExecutor.execute(Runnable)",
+      0.8
+     ],
+     [
+      "java.util.HashMap.putMapEntries(Map, boolean)",
+      0.7
+     ],
+     [
+      "java.lang.String.hashCode()",
+      0.7
+     ],
+     [
+      "java.util.stream.ReferencePipeline$3$1.accept(Object)",
+      0.7
+     ],
+     [
+      "com.fasterxml.jackson.databind.ser.impl.IndexedListSerializer.serializeContents(List, JsonGenerator, SerializerProvider)",
+      0.7
+     ],
+     [
+      "java.lang.AbstractStringBuilder.ensureCapacityInternal(int)",
+      0.7
+     ],
+     [
+      "com.fasterxml.jackson.core.json.WriterBasedJsonGenerator._writeString2(int)",
+      0.7
+     ]
+    ],
+    "threads": {
+     "cdc_v2-engine": 0.2,
+     "cdc_v2-stdin": 0.1,
+     "debezium-postgresconnector-cdc_v2_spike-change-event-source-coordinator": 44.0,
+     "debezium-postgresconnector-cdc_v2_spike-connection-validation": 0.6,
+     "main": 0.2,
+     "pool-1-thread": 49.9,
+     "pool-2-thread": 4.9
+    }
+   },
+   "jvm_opts": [
+    "-XX:StartFlightRecording=filename=/tmp/cdc_v2_spike/profile_default.jfr,settings=profile,dumponexit=true",
+    "-XX:FlightRecorderOptions=stackdepth=96"
+   ],
+   "jvm_threads_cpu_s_commit_to_last": {
+    "C1 CompilerThre": 0.75,
+    "C2 CompilerThre": 7.47,
+    "GC Thread": 2.09,
+    "JFR Periodic Ta": 0.07,
+    "JFR Thread Samp": 0.48,
+    "Thread": 9.95,
+    "VM Thread": 0.08,
+    "debezium-postgr": 39.18,
+    "pool-1-thread": 5.5,
+    "pool-2-thread": 1.24
+   },
+   "phase": "tx_test",
+   "rows": 1000000,
+   "rows_per_s_after_commit": 21726,
+   "rows_per_s_insert_start_to_last": 17147,
+   "rss_hwm_mib": 423.9,
+   "rss_idle_mib": 144.0,
+   "rss_peak_mib": 423.9,
+   "settings": {},
+   "shutdown": "elapsed_ms=19",
+   "started": true,
+   "stop_s": 0.465,
+   "t_run": 92.766,
+   "test": "profile_default",
+   "warnings": []
+  },
+  {
+   "batches": 3094,
+   "bytes": 212292339,
+   "cgroup": {
+    "memory.current": "2193141760",
+    "memory.max": "17179869184",
+    "memory.peak": "2489872384"
+   },
+   "commit_to_last_event_s": 44.018,
+   "complete": true,
+   "consumer_rss_hwm_mib": 14.9,
+   "consumer_rss_idle_mib": 14.4,
+   "cpu_commit_to_last": {
+    "consumer_cpu_pct": 1.3,
+    "consumer_cpu_s": 0.58,
+    "jvm_cpu_pct": 152.4,
+    "jvm_cpu_s": 67.14,
+    "postgres_all_cpu_pct": 24.3,
+    "postgres_all_cpu_s": 10.71,
+    "wall_s": 44.058,
+    "walsender_cpu_pct": 24.3,
+    "walsender_cpu_s": 10.7
+   },
+   "cpu_insert_start_to_last": {
+    "consumer_cpu_pct": 1.1,
+    "consumer_cpu_s": 0.62,
+    "jvm_cpu_pct": 122.1,
+    "jvm_cpu_s": 68.62,
+    "postgres_all_cpu_pct": 29.7,
+    "postgres_all_cpu_s": 16.67,
+    "wall_s": 56.202,
+    "walsender_cpu_pct": 29.4,
+    "walsender_cpu_s": 16.53
+   },
+   "events": 1000000,
+   "heap": "1g",
+   "insert_s": 12.139,
+   "jvm_opts": [],
+   "jvm_threads_cpu_s_commit_to_last": {
+    "C1 CompilerThre": 0.72,
+    "C2 CompilerThre": 9.08,
+    "GC Thread": 0.73,
+    "Thread": 9.67,
+    "VM Thread": 0.09,
+    "cdc_v2-stdin": 0.2,
+    "debezium-postgr": 37.83,
+    "pool-1-thread": 7.23,
+    "pool-2-thread": 1.36
+   },
+   "phase": "tx_test",
+   "rows": 1000000,
+   "rows_per_s_after_commit": 22718,
+   "rows_per_s_insert_start_to_last": 17807,
+   "rss_hwm_mib": 287.0,
+   "rss_idle_mib": 155.9,
+   "rss_peak_mib": 287.7,
+   "settings": {
+    "poll.interval.ms": "10"
+   },
+   "shutdown": "elapsed_ms=18",
+   "started": true,
+   "stop_s": 0.415,
+   "t_run": 153.917,
+   "test": "poll10_retest",
+   "warnings": []
+  }
+ ],
+ "run": {
+  "cancelled_at": null,
+  "config": {
+   "CDC_V2_BIG_ROWS": "10000000",
+   "CDC_V2_COMMIT": "bcdfa209eb6d810613caf8a77cd7372454df97fd",
+   "CDC_V2_DEADLINE": "2300",
+   "CDC_V2_JDK": "temurin-21",
+   "CDC_V2_SMALL_TX": "100000",
+   "CDC_V2_SPIKE_MODE": "profile",
+   "CDC_V2_TPUT_ONLY": "poll10_retest",
+   "CDC_V2_TPUT_ROWS": "1000000"
+  },
+  "created_at": "2026-11-10T03:27:00.015+00:00",
+  "ended_at": "2026-11-10T03:29:37.574+00:00",
+  "exit_code": 0,
+  "flight_id": "ff81b6f6-8cea-4f5d-b6f6-7de4f01d4d61",
+  "flight_name": "cdc_v2_spike_jvm",
+  "flight_version": 1,
+  "is_scheduled": false,
+  "observed_states": [
+   {
+    "observed_at": "2026-11-10T03:27:00.651083+00:00",
+    "state": "PENDING"
+   },
+   {
+    "observed_at": "2026-11-10T03:27:02.878526+00:00",
+    "state": "RUNNING"
+   },
+   {
+    "observed_at": "2026-11-10T03:29:38.728363+00:00",
+    "state": "SUCCEEDED"
+   }
+  ],
+  "run_id": "01a1c37e-a796-73d6-a0dd-b9249206e338",
+  "run_number": 7,
+  "scheduled_at": "2026-11-10T03:26:59.99+00:00",
+  "started_at": "2026-11-10T03:27:01.693+00:00",
+  "started_by_id": "<redacted>",
+  "started_by_name": "<redacted>",
+  "state": "SUCCEEDED",
+  "status": "SUCCEEDED"
+ }
+}

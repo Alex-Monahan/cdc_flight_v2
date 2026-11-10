@@ -1,0 +1,161 @@
+{
+  "spike": "bulk_load_tpch",
+  "duckdb_client": "1.5.6",
+  "started_utc": "2026-11-10T03:25:17Z",
+  "note": "measured from a laptop over the public internet; performance numbers are indications only",
+  "client_cpus_cgroup": 2,
+  "in_flight": true,
+  "results": {
+    "parquet_copy@1000000": {
+      "rows": 996090,
+      "seconds": 3.21,
+      "cpu_s": 0.91,
+      "peak_rss_mb": 460,
+      "rows_per_s": 310205,
+      "cpu_s_per_million_rows": 0.91,
+      "parquet_MB_per_s": 7.4
+    },
+    "parallel_arrow_1@1000000": {
+      "rows": 996090,
+      "seconds": 11.03,
+      "processes": 1,
+      "cpu_s": 1.73,
+      "peak_rss_mb": 522,
+      "peak_rss_note": "largest loader process",
+      "rows_per_s": 90343,
+      "cpu_s_per_million_rows": 1.74,
+      "parquet_MB_per_s": 2.2
+    },
+    "parallel_arrow_2@1000000": {
+      "rows": 996090,
+      "seconds": 7.59,
+      "processes": 2,
+      "cpu_s": 2.05,
+      "peak_rss_mb": 441,
+      "peak_rss_note": "largest loader process",
+      "rows_per_s": 131172,
+      "cpu_s_per_million_rows": 2.06,
+      "parquet_MB_per_s": 3.1
+    },
+    "parallel_arrow_4@1000000": {
+      "rows": 996090,
+      "seconds": 6.14,
+      "processes": 4,
+      "cpu_s": 2.75,
+      "peak_rss_mb": 355,
+      "peak_rss_note": "largest loader process",
+      "rows_per_s": 162258,
+      "cpu_s_per_million_rows": 2.76,
+      "parquet_MB_per_s": 3.9
+    },
+    "parallel_parquet_1@1000000": {
+      "rows": 996090,
+      "seconds": 10.5,
+      "processes": 1,
+      "cpu_s": 0.95,
+      "peak_rss_mb": 175,
+      "peak_rss_note": "largest loader process",
+      "rows_per_s": 94900,
+      "cpu_s_per_million_rows": 0.96,
+      "parquet_MB_per_s": 2.3
+    },
+    "parallel_parquet_2@1000000": {
+      "rows": 996090,
+      "seconds": 6.83,
+      "processes": 2,
+      "cpu_s": 1.07,
+      "peak_rss_mb": 167,
+      "peak_rss_note": "largest loader process",
+      "rows_per_s": 145872,
+      "cpu_s_per_million_rows": 1.08,
+      "parquet_MB_per_s": 3.5
+    },
+    "parallel_parquet_4@1000000": {
+      "rows": 996090,
+      "seconds": 7.11,
+      "processes": 4,
+      "cpu_s": 1.45,
+      "peak_rss_mb": 153,
+      "peak_rss_note": "largest loader process",
+      "rows_per_s": 140027,
+      "cpu_s_per_million_rows": 1.46,
+      "parquet_MB_per_s": 3.3
+    },
+    "parquet_copy@10000000": {
+      "rows": 6001215,
+      "seconds": 12.27,
+      "cpu_s": 4.94,
+      "peak_rss_mb": 519,
+      "rows_per_s": 489105,
+      "cpu_s_per_million_rows": 0.82,
+      "parquet_MB_per_s": 12.2
+    },
+    "parallel_arrow_1@10000000": {
+      "rows": 6001215,
+      "seconds": 36.49,
+      "processes": 1,
+      "cpu_s": 9.39,
+      "peak_rss_mb": 1238,
+      "peak_rss_note": "largest loader process",
+      "rows_per_s": 164480,
+      "cpu_s_per_million_rows": 1.57,
+      "parquet_MB_per_s": 4.1
+    },
+    "parallel_arrow_2@10000000": {
+      "rows": 6001215,
+      "seconds": 27.38,
+      "processes": 2,
+      "cpu_s": 9.92,
+      "peak_rss_mb": 787,
+      "peak_rss_note": "largest loader process",
+      "rows_per_s": 219218,
+      "cpu_s_per_million_rows": 1.65,
+      "parquet_MB_per_s": 5.5
+    },
+    "parallel_arrow_4@10000000": {
+      "rows": 6001215,
+      "seconds": 16.4,
+      "processes": 4,
+      "cpu_s": 11.53,
+      "peak_rss_mb": 563,
+      "peak_rss_note": "largest loader process",
+      "rows_per_s": 365917,
+      "cpu_s_per_million_rows": 1.92,
+      "parquet_MB_per_s": 9.1
+    },
+    "parallel_parquet_1@10000000": {
+      "rows": 6001215,
+      "seconds": 15.91,
+      "processes": 1,
+      "cpu_s": 5.07,
+      "peak_rss_mb": 216,
+      "peak_rss_note": "largest loader process",
+      "rows_per_s": 377174,
+      "cpu_s_per_million_rows": 0.84,
+      "parquet_MB_per_s": 9.4
+    },
+    "parallel_parquet_2@10000000": {
+      "rows": 6001215,
+      "seconds": 19.56,
+      "processes": 2,
+      "cpu_s": 5.56,
+      "peak_rss_mb": 239,
+      "peak_rss_note": "largest loader process",
+      "rows_per_s": 306849,
+      "cpu_s_per_million_rows": 0.93,
+      "parquet_MB_per_s": 7.6
+    },
+    "parallel_parquet_4@10000000": {
+      "rows": 6001215,
+      "seconds": 22.89,
+      "processes": 4,
+      "cpu_s": 7.26,
+      "peak_rss_mb": 204,
+      "peak_rss_note": "largest loader process",
+      "rows_per_s": 262196,
+      "cpu_s_per_million_rows": 1.21,
+      "parquet_MB_per_s": 6.5
+    }
+  },
+  "finished_utc": "2026-11-10T03:29:30Z"
+}

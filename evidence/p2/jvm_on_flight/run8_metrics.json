@@ -1,0 +1,245 @@
+{
+ "boot": {
+  "child_exit": "141.515",
+  "clone": "0.390",
+  "commit": "6b79494842b61184591c4d9418530f5a1cc7f81f",
+  "exit": "0",
+  "first_line": "1794281452.916"
+ },
+ "derived": {
+  "container_and_requirements_s": 1.619,
+  "cost_usd_at_0.60_per_h": 0.0239,
+  "run_wall_s": 143.221
+ },
+ "marks": [
+  "T 0.945 driver_start",
+  "T 0.946 phase_profile",
+  "T 1.601 pg_install_begin",
+  "T 17.119 pg_installed",
+  "T 20.511 pg_ready",
+  "T 20.511 jdk_begin",
+  "T 24.501 jdk_done",
+  "T 25.108 jars_done",
+  "T 27.089 compile_done",
+  "T 141.440 driver_end"
+ ],
+ "raw_log": [
+  "Using CPython 3.12.15",
+  "Creating virtual environment at: .venv",
+  "Resolved 3 packages in 600ms",
+  "Downloading psycopg-binary (5.0MiB)",
+  " Downloaded psycopg-binary",
+  "Prepared 3 packages in 73ms",
+  "Installed 3 packages in 28ms",
+  " + psycopg==3.3.8",
+  " + psycopg-binary==3.3.8",
+  " + typing-extensions==4.16.0",
+  "BOOT first_line 1794281452.916",
+  "BOOT clone 0.390",
+  "BOOT commit 6b79494842b61184591c4d9418530f5a1cc7f81f",
+  "T 0.945 driver_start",
+  "RESULT {\"cpu_max\": \"200000 100000\", \"jdk\": \"temurin-21\", \"mem_max\": \"17179869184\", \"modes\": [\"profile\"], \"os_cpu_count\": 8, \"phase\": \"driver\", \"t_run\": 0.945}",
+  "T 0.946 phase_profile",
+  "T 1.601 pg_install_begin",
+  "T 17.119 pg_installed",
+  "T 20.511 pg_ready",
+  "T 20.511 jdk_begin",
+  "T 24.501 jdk_done",
+  "T 25.108 jars_done",
+  "T 27.089 compile_done",
+  "RESULT {\"batches\": 491, \"bytes\": 212292339, \"cgroup\": {\"memory.current\": \"1842454528\", \"memory.max\": \"17179869184\", \"memory.peak\": \"2264383488\"}, \"commit_to_last_event_s\": 42.516, \"complete\": true, \"consumer_rss_hwm_mib\": 17.9, \"consumer_rss_idle_mib\": 17.4, \"cpu_commit_to_last\": {\"consumer_cpu_pct\": 0.9, \"consumer_cpu_s\": 0.38, \"jvm_cpu_pct\": 145.4, \"jvm_cpu_s\": 61.82, \"postgres_all_cpu_pct\": 23.6, \"postgres_all_cpu_s\": 10.04, \"wall_s\": 42.529, \"walsender_cpu_pct\": 23.6, \"walsender_cpu_s\": 10.02}, \"cpu_insert_start_to_last\": {\"consumer_cpu_pct\": 0.8, \"consumer_cpu_s\": 0.41, \"jvm_cpu_pct\": 115.3, \"jvm_cpu_s\": 61.95, \"postgres_all_cpu_pct\": 29.0, \"postgres_all_cpu_s\": 15.6, \"wall_s\": 53.733, \"walsender_cpu_pct\": 28.8, \"walsender_cpu_s\": 15.49}, \"events\": 1000000, \"heap\": \"1g\", \"insert_s\": 11.199, \"jvm_opts\": [], \"jvm_threads_cpu_s_commit_to_last\": {\"C1 CompilerThre\": 0.69, \"C2 CompilerThre\": 7.77, \"GC Thread\": 1.97, \"Thread\": 8.87, \"VM Thread\": 0.06, \"debezium-postgr\": 35.75, \"pool-1-thread\": 5.2, \"pool-2-thread\": 1.25}, \"phase\": \"tx_test\", \"rows\": 1000000, \"rows_per_s_after_commit\": 23520, \"rows_per_s_insert_start_to_last\": 18617, \"rss_hwm_mib\": 363.7, \"rss_idle_mib\": 157.1, \"rss_peak_mib\": 364.5, \"settings\": {\"statistics.metrics.enabled\": \"false\"}, \"shutdown\": \"elapsed_ms=27\", \"started\": true, \"stop_s\": 0.414, \"t_run\": 85.953, \"test\": \"no_statistics_metrics\", \"warnings\": []}",
+  "RESULT {\"batches\": 127, \"bytes\": 207500133, \"cgroup\": {\"memory.current\": \"2421473280\", \"memory.max\": \"17179869184\", \"memory.peak\": \"2694238208\"}, \"commit_to_last_event_s\": 38.616, \"complete\": true, \"consumer_rss_hwm_mib\": 20.0, \"consumer_rss_idle_mib\": 14.4, \"cpu_commit_to_last\": {\"consumer_cpu_pct\": 1.0, \"consumer_cpu_s\": 0.38, \"jvm_cpu_pct\": 144.8, \"jvm_cpu_s\": 55.93, \"postgres_all_cpu_pct\": 25.4, \"postgres_all_cpu_s\": 9.81, \"wall_s\": 38.629, \"walsender_cpu_pct\": 25.4, \"walsender_cpu_s\": 9.8}, \"cpu_insert_start_to_last\": {\"consumer_cpu_pct\": 0.8, \"consumer_cpu_s\": 0.41, \"jvm_cpu_pct\": 112.6, \"jvm_cpu_s\": 56.03, \"postgres_all_cpu_pct\": 31.0, \"postgres_all_cpu_s\": 15.41, \"wall_s\": 49.778, \"walsender_cpu_pct\": 30.7, \"walsender_cpu_s\": 15.29}, \"events\": 1000000, \"heap\": \"1g\", \"insert_s\": 11.145, \"jvm_opts\": [\"-XX:+UseParallelGC\"], \"jvm_threads_cpu_s_commit_to_last\": {\"C1 CompilerThre\": 0.6, \"C2 CompilerThre\": 6.46, \"GC Thread\": 3.77, \"Thread\": 8.5, \"debezium-postgr\": 31.68, \"pool-1-thread\": 3.74, \"pool-2-thread\": 1.03}, \"phase\": \"tx_test\", \"rows\": 1000000, \"rows_per_s_after_commit\": 25896, \"rows_per_s_insert_start_to_last\": 20096, \"rss_hwm_mib\": 512.8, \"rss_idle_mib\": 182.9, \"rss_peak_mib\": 513.5, \"settings\": {\"decimal.handling.mode\": \"double\", \"max.batch.size\": \"8192\", \"max.queue.size\": \"32768\", \"statistics.metrics.enabled\": \"false\"}, \"shutdown\": \"elapsed_ms=221\", \"started\": true, \"stop_s\": 0.665, \"t_run\": 141.333, \"test\": \"combined_best\", \"warnings\": []}",
+  "T 141.440 driver_end",
+  "BOOT child_exit 141.515",
+  "BOOT exit 0"
+ ],
+ "results": [
+  {
+   "cpu_max": "200000 100000",
+   "jdk": "temurin-21",
+   "mem_max": "17179869184",
+   "modes": [
+    "profile"
+   ],
+   "os_cpu_count": 8,
+   "phase": "driver",
+   "t_run": 0.945
+  },
+  {
+   "batches": 491,
+   "bytes": 212292339,
+   "cgroup": {
+    "memory.current": "1842454528",
+    "memory.max": "17179869184",
+    "memory.peak": "2264383488"
+   },
+   "commit_to_last_event_s": 42.516,
+   "complete": true,
+   "consumer_rss_hwm_mib": 17.9,
+   "consumer_rss_idle_mib": 17.4,
+   "cpu_commit_to_last": {
+    "consumer_cpu_pct": 0.9,
+    "consumer_cpu_s": 0.38,
+    "jvm_cpu_pct": 145.4,
+    "jvm_cpu_s": 61.82,
+    "postgres_all_cpu_pct": 23.6,
+    "postgres_all_cpu_s": 10.04,
+    "wall_s": 42.529,
+    "walsender_cpu_pct": 23.6,
+    "walsender_cpu_s": 10.02
+   },
+   "cpu_insert_start_to_last": {
+    "consumer_cpu_pct": 0.8,
+    "consumer_cpu_s": 0.41,
+    "jvm_cpu_pct": 115.3,
+    "jvm_cpu_s": 61.95,
+    "postgres_all_cpu_pct": 29.0,
+    "postgres_all_cpu_s": 15.6,
+    "wall_s": 53.733,
+    "walsender_cpu_pct": 28.8,
+    "walsender_cpu_s": 15.49
+   },
+   "events": 1000000,
+   "heap": "1g",
+   "insert_s": 11.199,
+   "jvm_opts": [],
+   "jvm_threads_cpu_s_commit_to_last": {
+    "C1 CompilerThre": 0.69,
+    "C2 CompilerThre": 7.77,
+    "GC Thread": 1.97,
+    "Thread": 8.87,
+    "VM Thread": 0.06,
+    "debezium-postgr": 35.75,
+    "pool-1-thread": 5.2,
+    "pool-2-thread": 1.25
+   },
+   "phase": "tx_test",
+   "rows": 1000000,
+   "rows_per_s_after_commit": 23520,
+   "rows_per_s_insert_start_to_last": 18617,
+   "rss_hwm_mib": 363.7,
+   "rss_idle_mib": 157.1,
+   "rss_peak_mib": 364.5,
+   "settings": {
+    "statistics.metrics.enabled": "false"
+   },
+   "shutdown": "elapsed_ms=27",
+   "started": true,
+   "stop_s": 0.414,
+   "t_run": 85.953,
+   "test": "no_statistics_metrics",
+   "warnings": []
+  },
+  {
+   "batches": 127,
+   "bytes": 207500133,
+   "cgroup": {
+    "memory.current": "2421473280",
+    "memory.max": "17179869184",
+    "memory.peak": "2694238208"
+   },
+   "commit_to_last_event_s": 38.616,
+   "complete": true,
+   "consumer_rss_hwm_mib": 20.0,
+   "consumer_rss_idle_mib": 14.4,
+   "cpu_commit_to_last": {
+    "consumer_cpu_pct": 1.0,
+    "consumer_cpu_s": 0.38,
+    "jvm_cpu_pct": 144.8,
+    "jvm_cpu_s": 55.93,
+    "postgres_all_cpu_pct": 25.4,
+    "postgres_all_cpu_s": 9.81,
+    "wall_s": 38.629,
+    "walsender_cpu_pct": 25.4,
+    "walsender_cpu_s": 9.8
+   },
+   "cpu_insert_start_to_last": {
+    "consumer_cpu_pct": 0.8,
+    "consumer_cpu_s": 0.41,
+    "jvm_cpu_pct": 112.6,
+    "jvm_cpu_s": 56.03,
+    "postgres_all_cpu_pct": 31.0,
+    "postgres_all_cpu_s": 15.41,
+    "wall_s": 49.778,
+    "walsender_cpu_pct": 30.7,
+    "walsender_cpu_s": 15.29
+   },
+   "events": 1000000,
+   "heap": "1g",
+   "insert_s": 11.145,
+   "jvm_opts": [
+    "-XX:+UseParallelGC"
+   ],
+   "jvm_threads_cpu_s_commit_to_last": {
+    "C1 CompilerThre": 0.6,
+    "C2 CompilerThre": 6.46,
+    "GC Thread": 3.77,
+    "Thread": 8.5,
+    "debezium-postgr": 31.68,
+    "pool-1-thread": 3.74,
+    "pool-2-thread": 1.03
+   },
+   "phase": "tx_test",
+   "rows": 1000000,
+   "rows_per_s_after_commit": 25896,
+   "rows_per_s_insert_start_to_last": 20096,
+   "rss_hwm_mib": 512.8,
+   "rss_idle_mib": 182.9,
+   "rss_peak_mib": 513.5,
+   "settings": {
+    "decimal.handling.mode": "double",
+    "max.batch.size": "8192",
+    "max.queue.size": "32768",
+    "statistics.metrics.enabled": "false"
+   },
+   "shutdown": "elapsed_ms=221",
+   "started": true,
+   "stop_s": 0.665,
+   "t_run": 141.333,
+   "test": "combined_best",
+   "warnings": []
+  }
+ ],
+ "run": {
+  "cancelled_at": null,
+  "config": {
+   "CDC_V2_BIG_ROWS": "10000000",
+   "CDC_V2_COMMIT": "6b79494842b61184591c4d9418530f5a1cc7f81f",
+   "CDC_V2_DEADLINE": "2300",
+   "CDC_V2_JDK": "temurin-21",
+   "CDC_V2_SMALL_TX": "100000",
+   "CDC_V2_SPIKE_MODE": "profile",
+   "CDC_V2_TPUT_ONLY": "skip_jfr,no_statistics_metrics,combined_best",
+   "CDC_V2_TPUT_ROWS": "1000000"
+  },
+  "created_at": "2026-11-10T03:30:50.401+00:00",
+  "ended_at": "2026-11-10T03:33:14.518+00:00",
+  "exit_code": 0,
+  "flight_id": "ff81b6f6-8cea-4f5d-b6f6-7de4f01d4d61",
+  "flight_name": "cdc_v2_spike_jvm",
+  "flight_version": 1,
+  "is_scheduled": false,
+  "observed_states": [
+   {
+    "observed_at": "2026-11-10T03:30:51.071329+00:00",
+    "state": "PENDING"
+   },
+   {
+    "observed_at": "2026-11-10T03:30:53.403596+00:00",
+    "state": "RUNNING"
+   },
+   {
+    "observed_at": "2026-11-10T03:33:16.808205+00:00",
+    "state": "SUCCEEDED"
+   }
+  ],
+  "run_id": "01a1c382-2b93-75ad-a372-0079f35cb7df",
+  "run_number": 8,
+  "scheduled_at": "2026-11-10T03:30:50.387+00:00",
+  "started_at": "2026-11-10T03:30:51.297+00:00",
+  "started_by_id": "<redacted>",
+  "started_by_name": "<redacted>",
+  "state": "SUCCEEDED",
+  "status": "SUCCEEDED"
+ }
+}

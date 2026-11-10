@@ -1,0 +1,11 @@
+BOOT fetched commit 4aedbabb2029 in 0.3 s; 4 step(s)
+STEP 0 clock.py  start
+STEP 0 clock.py exit 0 after 18.1 s
+STEP 1 txn_size.py --only 3 --tiny-seconds 20 start
+STEP 1 txn_size.py exit 0 after 89.5 s
+STEP 2 apply_txn.py  start
+STEP 2 apply_txn.py exit 0 after 79.4 s
+STEP 3 bulk_load.py  start
+STEP 3 bulk_load.py exit 0 after 221.8 s
+BOOT done in 409.1 s, failed steps: 0
+run 4: status=SUCCEEDED, exit_code=0, started_at=2026-11-10T03:31:40.09+00:00, ended_at=2026-11-10T03:38:31.954+00:00

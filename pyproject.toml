@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "duckdb==1.5.6",
     "psycopg[binary]>=3.2",
+    "pyarrow>=26.0.1",
 ]
 
 [dependency-groups]
@@ -13,6 +14,10 @@ dev = [
     "pytest-timeout>=2.3",
     "pytest>=8",
     "hypothesis>=6.100",
+]
+spike = [
+    "psutil>=7.2.2",
+    "pyarrow>=26.0.1",
 ]
 
 [build-system]
@@ -26,10 +31,12 @@ packages = ["src/cdc_v2"]
 testpaths = ["tests"]
 # The default run is hermetic and fast (tier T0). Suites that start local Postgres clusters or real Flights are
 # opt-in: select them with -m (the last -m on the command line wins over the one below).
-addopts = "-q -m 'not flight_integration and not localpg and not t1'"
+addopts = "-q -m 'not flight_integration and not localpg and not t1 and not md and not jvm'"
 markers = [
     "flight_integration: creates, runs and deletes a real MotherDuck Flight (opt-in: -m flight_integration)",
     "localpg: self-tests of tools/localpg; start local Postgres clusters on ports 55460-55467 (opt-in: -m localpg)",
-    "t1: needs local Postgres (tools/localpg) and MotherDuck; isolated per test (opt-in: tools/with-env uv run pytest -m t1)",
+    "md: needs MotherDuck through tools/with-env (opt-in: -m md)",
+    "jvm: needs a local JVM (opt-in: -m jvm)",
+    "t1: the tier-T1 harness: local Postgres (tools/localpg, home from CDC_V2_PG_HOME) and MotherDuck (opt-in: -m t1)",
 ]
 pythonpath = ["src"]

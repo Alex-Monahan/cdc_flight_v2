@@ -1,0 +1,367 @@
+{
+ "boot": {
+  "child_exit": "859.744",
+  "clone": "0.390",
+  "commit": "a262259ba8e87c0528d422de6182bbff2c11fc17",
+  "exit": "0",
+  "first_line": "1794280301.584"
+ },
+ "derived": {
+  "container_and_requirements_s": 1.826,
+  "cost_usd_at_0.60_per_h": 0.1436,
+  "run_wall_s": 861.644
+ },
+ "marks": [
+  "T 0.957 driver_start",
+  "T 0.957 phase_profile",
+  "T 1.636 pg_install_begin",
+  "T 16.154 pg_installed",
+  "T 19.490 pg_ready",
+  "T 19.490 jdk_begin",
+  "T 24.131 jdk_done",
+  "T 24.739 jars_done",
+  "T 26.733 compile_done",
+  "T 344.679 phase_small",
+  "T 403.719 phase_big",
+  "T 859.652 driver_end"
+ ],
+ "raw_log": [
+  "Using CPython 3.12.15",
+  "Creating virtual environment at: .venv",
+  "Resolved 3 packages in 669ms",
+  "Downloading psycopg-binary (5.0MiB)",
+  " Downloaded psycopg-binary",
+  "Prepared 3 packages in 174ms",
+  "Installed 3 packages in 28ms",
+  " + psycopg==3.3.8",
+  " + psycopg-binary==3.3.8",
+  " + typing-extensions==4.16.0",
+  "BOOT first_line 1794280301.584",
+  "BOOT clone 0.390",
+  "BOOT commit a262259ba8e87c0528d422de6182bbff2c11fc17",
+  "T 0.957 driver_start",
+  "RESULT {\"cpu_max\": \"200000 100000\", \"jdk\": \"temurin-21\", \"mem_max\": \"17179869184\", \"modes\": [\"profile\", \"small\", \"big\"], \"os_cpu_count\": 8, \"phase\": \"driver\", \"t_run\": 0.957}",
+  "T 0.957 phase_profile",
+  "T 1.636 pg_install_begin",
+  "T 16.154 pg_installed",
+  "T 19.490 pg_ready",
+  "T 19.490 jdk_begin",
+  "T 24.131 jdk_done",
+  "T 24.739 jars_done",
+  "T 26.733 compile_done",
+  "bad frame magic 5b302e38 after 0 batches",
+  "RESULT {\"consumer_rc\": 1, \"heap\": \"1g\", \"jvm_log_tail\": [], \"jvm_opts\": [\"-XX:StartFlightRecording=filename=/tmp/cdc_v2_spike/profile_default.jfr,settings=profile,dumponexit=true\", \"-XX:FlightRecorderOptions=stackdepth=96\"], \"phase\": \"tx_test\", \"rows\": 1000000, \"settings\": {}, \"started\": false, \"t_run\": 27.712, \"test\": \"profile_default\", \"warnings\": []}",
+  "RESULT {\"batches\": 3145, \"bytes\": 212126676, \"cgroup\": {\"memory.current\": \"1890148352\", \"memory.max\": \"17179869184\", \"memory.peak\": \"2191831040\"}, \"commit_to_last_event_s\": 43.88, \"complete\": false, \"consumer_rss_hwm_mib\": 14.7, \"consumer_rss_idle_mib\": 14.1, \"cpu_commit_to_last\": {\"consumer_cpu_pct\": 0.2, \"consumer_cpu_s\": 0.58, \"jvm_cpu_pct\": 30.9, \"jvm_cpu_s\": 92.6, \"postgres_all_cpu_pct\": 3.5, \"postgres_all_cpu_s\": 10.61, \"wall_s\": 300.01, \"walsender_cpu_pct\": 3.5, \"walsender_cpu_s\": 10.55}, \"cpu_insert_start_to_last\": {\"consumer_cpu_pct\": 0.2, \"consumer_cpu_s\": 0.58, \"jvm_cpu_pct\": 30.1, \"jvm_cpu_s\": 94.06, \"postgres_all_cpu_pct\": 5.2, \"postgres_all_cpu_s\": 16.33, \"wall_s\": 312.254, \"walsender_cpu_pct\": 5.2, \"walsender_cpu_s\": 16.17}, \"events\": 999220, \"heap\": \"1g\", \"insert_s\": 11.92, \"jvm_opts\": [], \"jvm_threads_cpu_s_commit_to_last\": {\"C1 CompilerThre\": 0.74, \"C2 CompilerThre\": 8.54, \"G1 Refine\": 0.21, \"GC Thread\": 0.72, \"Thread\": 9.72, \"VM Periodic Tas\": 0.13, \"VM Thread\": 0.1, \"cdc_v2-stdin\": 0.2, \"debezium-postgr\": 41.54, \"pool-1-thread\": 29.06}, \"phase\": \"tx_test\", \"rows\": 1000000, \"rows_per_s_after_commit\": null, \"rows_per_s_insert_start_to_last\": null, \"rss_hwm_mib\": 298.7, \"rss_idle_mib\": 155.7, \"rss_peak_mib\": 299.5, \"settings\": {\"poll.interval.ms\": \"10\"}, \"shutdown\": \"elapsed_ms=19\", \"stall_jvm_stat\": [\"CDCV2 STAT 1794280644962 events=1000001 bytes=212292339 batches=3147 heap_used=89143048 heap_committed=164626432\"], \"stall_slot\": {\"active\": true, \"active_pid\": 2683, \"confirmed_flush_lsn\": \"0/1BA2668\", \"current_lsn\": \"0/11431AA0\", \"walsenders\": 1}, \"stall_stats\": {\"batches\": 3145, \"bytes\": 212126676, \"consumer_pid\": 2643, \"decoded\": 0, \"eof_at\": null, \"events\": 999221, \"first_event_at\": 1794280331.5642216, \"jvm_pid\": 2644, \"jvm_rc\": null, \"last_event_at\": 1794280389.3930502, \"ops\": {}, \"orderkey_sum\": 0, \"sample\": [], \"spawn_at\": 1794280329.3754597, \"written_at\": 1794280389.3930776}, \"stall_thread_dump\": [\"\\\"main\\\" #1 [2645] prio=5 os_prio=0 cpu=403.06ms elapsed=316.43s tid=0x00007ff1bc02b9a0 nid=2645 waiting on condition  [0x00007ff1c2cf9000]\\n   java.lang.Thread.State: TIMED_WAITING (parking)\\n\\tat jdk.internal.misc.Unsafe.park(java.base@21.0.13/Native Method)\\n\\t- parking to wait for  <0x00000000c07b9280> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)\\n\\tat java.util.concurrent.locks.LockSupport.parkNanos(java.base@21.0.13/LockSupport.java:269)\\n\\tat java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.awaitNanos(java.base@21.0.13/AbstractQueuedSynchronizer.java:1797)\\n\\tat java.util.concurrent.ThreadPoolExecutor.awaitTermination(java.base@21.0.13/ThreadPoolExecutor.java:1475)\\n\\tat java.util.concurrent.Executors$DelegatedExecutorService.awaitTermination(java.base@21.0.13/Executors.java:780)\\n\\tat cdc_v2.engine.EngineMain.main(EngineMain.java:159)\", \"\\\"cdc_v2-stdin\\\" #18 [2662] daemon prio=5 os_prio=0 cpu=207.48ms elapsed=315.96s tid=0x00007ff1bc621a90 nid=2662 runnable  [0x00007ff1a46fe000]\\n   java.lang.Thread.State: RUNNABLE\\n\\tat java.io.FileInputStream.readBytes(java.base@21.0.13/Native Method)\\n\\tat java.io.FileInputStream.read(java.base@21.0.13/FileInputStream.java:287)\\n\\tat java.io.BufferedInputStream.read1(java.base@21.0.13/BufferedInputStream.java:345)\\n\\tat java.io.BufferedInputStream.implRead(java.base@21.0.13/BufferedInputStream.java:420)\\n\\tat java.io.BufferedInputStream.read(java.base@21.0.13/BufferedInputStream.java:399)\\n\\tat sun.nio.cs.StreamDecoder.readBytes(java.base@21.0.13/StreamDecoder.java:350)\\n\\tat sun.nio.cs.StreamDecoder.implRead(java.base@21.0.13/StreamDecoder.java:393)\\n\\tat sun.nio.cs.StreamDecoder.lockedRead(java.base@21.0.13/StreamDecoder.java:217)\\n\\tat sun.nio.cs.StreamDecoder.read(java.base@21.0.13/StreamDecoder.java:171)\\n\\tat java.io.InputStreamReader.read(java.base@21.0.13/InputStreamReader.java:188)\\n\\tat java.io.BufferedReader.fill(java.base@21.0.13/BufferedReader.java:160)\\n\\tat java.io.BufferedReader.implReadLine(java.base@21.0.13/BufferedReader.java:370)\\n\\tat java.io.BufferedReader.readLine(java.base@21.0.13/Bu\", \"\\\"cdc_v2-stats\\\" #19 [2663] daemon prio=5 os_prio=0 cpu=61.37ms elapsed=315.96s tid=0x00007ff1bc622cb0 nid=2663 waiting on condition  [0x00007ff1a4593000]\\n   java.lang.Thread.State: TIMED_WAITING (sleeping)\\n\\tat java.lang.Thread.sleep0(java.base@21.0.13/Native Method)\\n\\tat java.lang.Thread.sleep(java.base@21.0.13/Thread.java:509)\\n\\tat cdc_v2.engine.EngineMain.statsLoop(EngineMain.java:222)\\n\\tat cdc_v2.engine.EngineMain$$Lambda/0x00007ff148097798.run(Unknown Source)\\n\\tat java.lang.Thread.runWith(java.base@21.0.13/Thread.java:1596)\\n\\tat java.lang.Thread.run(java.base@21.0.13/Thread.java:1583)\", \"\\\"cdc_v2-engine\\\" #22 [2665] prio=5 os_prio=0 cpu=294.27ms elapsed=315.93s tid=0x00007ff1bc65d2b0 nid=2665 waiting on condition  [0x00007ff1a4392000]\\n   java.lang.Thread.State: WAITING (parking)\\n\\tat jdk.internal.misc.Unsafe.park(java.base@21.0.13/Native Method)\\n\\t- parking to wait for  <0x00000000c0a2ee00> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)\\n\\tat java.util.concurrent.locks.LockSupport.park(java.base@21.0.13/LockSupport.java:371)\\n\\tat java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionNode.block(java.base@21.0.13/AbstractQueuedSynchronizer.java:519)\\n\\tat java.util.concurrent.ForkJoinPool.unmanagedBlock(java.base@21.0.13/ForkJoinPool.java:3780)\\n\\tat java.util.concurrent.ForkJoinPool.managedBlock(java.base@21.0.13/ForkJoinPool.java:3725)\\n\\tat java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(java.base@21.0.13/AbstractQueuedSynchronizer.java:1746)\\n\\tat java.util.concurrent.LinkedBlockingQueue.take(java.base@21.0.13/LinkedBlockingQueue.java:435)\\n\\tat java.util.concurrent.ExecutorCompletionService.take(java.base@21.0.13/ExecutorCompletionService.java:202)\\n\\tat io.debezium.embedded.async.AsyncEmbeddedEngine.runTasksPolling(A\", \"\\\"pool-1-thread-1\\\" #28 [2671] prio=5 os_prio=0 cpu=30622.05ms elapsed=315.18s tid=0x00007ff10433d760 nid=2671 waiting on condition  [0x00007ff1a4292000]\\n   java.lang.Thread.State: TIMED_WAITING (parking)\\n\\tat jdk.internal.misc.Unsafe.park(java.base@21.0.13/Native Method)\\n\\t- parking to wait for  <0x00000000c0a2ef80> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)\\n\\tat java.util.concurrent.locks.LockSupport.parkNanos(java.base@21.0.13/LockSupport.java:269)\\n\\tat java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(java.base@21.0.13/AbstractQueuedSynchronizer.java:1886)\\n\\tat io.debezium.connector.base.ChangeEventQueue.poll(ChangeEventQueue.java:343)\\n\\tat io.debezium.connector.common.BaseSourceTask.pollRecords(BaseSourceTask.java:455)\\n\\tat io.debezium.connector.postgresql.PostgresConnectorTask.doPoll(PostgresConnectorTask.java:409)\\n\\tat io.debezium.connector.common.BaseSourceTask.poll(BaseSourceTask.java:371)\\n\\tat io.debezium.embedded.async.AsyncEmbeddedEngine$PollRecords.doCall(AsyncEmbeddedEngine.java:1309)\\n\\tat io.debezium.embedded.async.AsyncEmbeddedEngine$PollRecords.doCall(AsyncEmbeddedEngine.java:1288)\\n\\tat io.debezium.embedded.async.Retrying\", \"\\\"Thread-2\\\" #33 [2679] daemon prio=5 os_prio=0 cpu=9730.69ms elapsed=314.79s tid=0x00007ff1083eade0 nid=2679 waiting on condition  [0x00007ff195dfe000]\\n   java.lang.Thread.State: TIMED_WAITING (parking)\\n\\tat jdk.internal.misc.Unsafe.park(java.base@21.0.13/Native Method)\\n\\t- parking to wait for  <0x00000000c0a2f630> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)\\n\\tat java.util.concurrent.locks.LockSupport.parkNanos(java.base@21.0.13/LockSupport.java:269)\\n\\tat java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.awaitNanos(java.base@21.0.13/AbstractQueuedSynchronizer.java:1797)\\n\\tat java.util.concurrent.LinkedBlockingQueue.poll(java.base@21.0.13/LinkedBlockingQueue.java:460)\\n\\tat io.debezium.metrics.stats.MeasurementCollector$MeasurementPublisher.run(MeasurementCollector.java:89)\\n\\tat java.lang.Thread.runWith(java.base@21.0.13/Thread.java:1596)\\n\\tat java.lang.Thread.run(java.base@21.0.13/Thread.java:1583)\", \"\\\"debezium-postgresconnector-cdc_v2_spike-change-event-source-coordinator\\\" #34 [2680] prio=5 os_prio=0 cpu=42180.82ms elapsed=314.78s tid=0x00007ff1083f7410 nid=2680 waiting on condition  [0x00007ff195cfe000]\\n   java.lang.Thread.State: TIMED_WAITING (sleeping)\\n\\tat java.lang.Thread.sleep0(java.base@21.0.13/Native Method)\\n\\tat java.lang.Thread.sleep(java.base@21.0.13/Thread.java:509)\\n\\tat io.debezium.util.DelayStrategy.lambda$constant$1(DelayStrategy.java:61)\\n\\tat io.debezium.util.DelayStrategy$$Lambda/0x00007ff148223948.sleepWhen(Unknown Source)\\n\\tat io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.processMessages(PostgresStreamingChangeEventSource.java:281)\\n\\tat io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.execute(PostgresStreamingChangeEventSource.java:219)\\n\\tat io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.execute(PostgresStreamingChangeEventSource.java:54)\\n\\tat io.debezium.pipeline.ChangeEventSourceCoordinator.streamEvents(ChangeEventSourceCoordinator.java:347)\\n\\tat io.debezium.pipeline.ChangeEventSourceCoordinator.executeChangeEventSources(ChangeEventSourceCoordinator.java:227)\\n\\tat io.debezium.pipeline.ChangeEventSourceCoordinator.lambda$start$0(ChangeEventSourceCoordinator.java:151)\\n\\tat io.debezium.pipeline.ChangeEventSourceCoordinator$$Lambda/0x00007ff14821d268.run(Unknown Source)\\n\\tat java.util.concurrent.Executors$RunnableAdapter.call(java.base@21.0.13/Executors.java:572)\\n\\tat java.util.concurrent.FutureTask.run(java.base@21.0.13/FutureTask.java:317)\\n\\tat java.util.concurrent.ThreadPoolExecutor.runWorker(java.base@21.0.13/ThreadPoolExecutor.java:1144)\\n\\tat java.util.concurrent.ThreadPoolExecutor$Worker.run(java.base@21.0.13/ThreadPoolExecutor.java:642)\\n\\tat io.debezium.util.Threads$3.lambda$newThread$0(Threads.java:316)\\n\\tat io.debezium.util.Threads$3$$Lambda/0x00007ff1480c9710.run(Unknown Source)\\n\\tat java.lang.Thread.runWith(java.base@21.0.13/Thread.java:1596)\\n\\tat java.lang.Thread.run(java.base@21.0.13/Thread.java:1583)\", \"\\\"debezium-postgresconnector-cdc_v2_spike-SignalProcessor\\\" #35 [2682] prio=5 os_prio=0 cpu=8.92ms elapsed=314.37s tid=0x00007ff0ec1f05d0 nid=2682 waiting on condition  [0x00007ff195bfe000]\\n   java.lang.Thread.State: TIMED_WAITING (parking)\\n\\tat jdk.internal.misc.Unsafe.park(java.base@21.0.13/Native Method)\\n\\t- parking to wait for  <0x00000000c0a512e8> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)\\n\\tat java.util.concurrent.locks.LockSupport.parkNanos(java.base@21.0.13/LockSupport.java:269)\\n\\tat java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.awaitNanos(java.base@21.0.13/AbstractQueuedSynchronizer.java:1797)\\n\\tat java.util.concurrent.ScheduledThreadPoolExecutor$DelayedWorkQueue.take(java.base@21.0.13/ScheduledThreadPoolExecutor.java:1182)\\n\\tat java.util.concurrent.ScheduledThreadPoolExecutor$DelayedWorkQueue.take(java.base@21.0.13/ScheduledThreadPoolExecutor.java:899)\\n\\tat java.util.concurrent.ThreadPoolExecutor.getTask(java.base@21.0.13/ThreadPoolExecutor.java:1070)\\n\\tat java.util.concurrent.ThreadPoolExecutor.runWorker(java.base@21.0.13/ThreadPoolExecutor.java:1130)\\n\\tat java.util.concurrent.ThreadPoolExecutor$Worker.run(java.base@21.0.13/Thr\", \"\\\"debezium-postgresconnector-cdc_v2_spike-keep-alive\\\" #37 [2686] prio=5 os_prio=0 cpu=5.82ms elapsed=314.30s tid=0x00007ff0ec1fa720 nid=2686 waiting on condition  [0x00007ff195afe000]\\n   java.lang.Thread.State: TIMED_WAITING (sleeping)\\n\\tat java.lang.Thread.sleep0(java.base@21.0.13/Native Method)\\n\\tat java.lang.Thread.sleep(java.base@21.0.13/Thread.java:509)\\n\\tat io.debezium.util.Metronome$1.pause(Metronome.java:57)\\n\\tat io.debezium.connector.postgresql.connection.PostgresReplicationConnection$1.lambda$startKeepAlive$0(PostgresReplicationConnection.java:1064)\\n\\tat io.debezium.connector.postgresql.connection.PostgresReplicationConnection$1$$Lambda/0x00007ff148288e80.run(Unknown Source)\\n\\tat java.util.concurrent.Executors$RunnableAdapter.call(java.base@21.0.13/Executors.java:572)\\n\\tat java.util.concurrent.FutureTask.run(java.base@21.0.13/FutureTask.java:317)\\n\\tat java.util.concurrent.ThreadPoolExecutor.runWorker(java.base@21.0.13/ThreadPoolExecutor.java:1144)\\n\\tat java.util.concurrent.ThreadPoolExecutor$Worker.run(java.base@21.0.13/ThreadPoolExecutor.java:642)\\n\\tat io.debezium.util.Threads$3.lambda$newThread$0(Threads.java:316)\\n\\tat io.debezium.util.Threads$3$$Lambda/0x00007ff1480c9710.run(Unkno\", \"\\\"debezium-postgresstreamingchangeeventsource-cdc_v2_spike-lsn-flush\\\" #39 [2688] prio=5 os_prio=0 cpu=8.05ms elapsed=314.20s tid=0x00007ff108408100 nid=2688 waiting on condition  [0x00007ff1958fe000]\\n   java.lang.Thread.State: WAITING (parking)\\n\\tat jdk.internal.misc.Unsafe.park(java.base@21.0.13/Native Method)\\n\\t- parking to wait for  <0x00000000c0a31f58> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)\\n\\tat java.util.concurrent.locks.LockSupport.park(java.base@21.0.13/LockSupport.java:371)\\n\\tat java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionNode.block(java.base@21.0.13/AbstractQueuedSynchronizer.java:519)\\n\\tat java.util.concurrent.ForkJoinPool.unmanagedBlock(java.base@21.0.13/ForkJoinPool.java:3780)\\n\\tat java.util.concurrent.ForkJoinPool.managedBlock(java.base@21.0.13/ForkJoinPool.java:3725)\\n\\tat java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(java.base@21.0.13/AbstractQueuedSynchronizer.java:1746)\\n\\tat java.util.concurrent.LinkedBlockingQueue.take(java.base@21.0.13/LinkedBlockingQueue.java:435)\\n\\tat java.util.concurrent.ThreadPoolExecutor.getTask(java.base@21.0.13/ThreadPoolExecutor.java:1070)\\n\\tat java.util.concurrent.Th\"], \"started\": true, \"stop_s\": 0.414, \"t_run\": 344.678, \"test\": \"poll10_retest\", \"warnings\": []}",
+  "T 344.679 phase_small",
+  "RESULT {\"complete\": true, \"cpu\": {\"consumer_cpu_pct\": 0.5, \"consumer_cpu_s\": 0.05, \"jvm_cpu_pct\": 161.5, \"jvm_cpu_s\": 17.3, \"postgres_all_cpu_pct\": 19.7, \"postgres_all_cpu_s\": 2.11, \"wall_s\": 10.715}, \"events\": 100000, \"pgbench\": {\"rc\": 0, \"seconds\": 12.022, \"tail\": null, \"tps\": 8333.979217, \"transactions\": 100000}, \"phase\": \"small_backlog\", \"settings\": \"parallelgc_batch8k\", \"t_run\": 369.881, \"transactions\": 100000, \"tx_per_s_first_to_last\": 10150, \"warnings\": []}",
+  "RESULT {\"cpu_during_load\": {\"consumer_cpu_pct\": 0.3, \"consumer_cpu_s\": 0.08, \"jvm_cpu_pct\": 78.3, \"jvm_cpu_s\": 23.51, \"postgres_all_cpu_pct\": 11.6, \"postgres_all_cpu_s\": 3.48, \"wall_s\": 30.044, \"walsender_cpu_pct\": 11.4, \"walsender_cpu_s\": 3.44}, \"drain_after_load_s\": 0.939, \"drained\": true, \"events_during_load\": 116968, \"events_per_s_during_load\": 3894, \"pgbench\": {\"rc\": 0, \"seconds\": 30.041, \"tail\": null, \"tps\": 4002.02845, \"transactions\": 120050}, \"phase\": \"small_live\", \"settings\": \"parallelgc_batch8k\", \"t_run\": 403.719}",
+  "T 403.719 phase_big",
+  "RESULT {\"batches\": 1226, \"bytes\": 2123070489, \"cgroup\": {\"memory.current\": \"7775952896\", \"memory.max\": \"17179869184\", \"memory.peak\": \"10394820608\"}, \"commit_to_last_event_s\": 335.247, \"complete\": true, \"consumer_rss_hwm_mib\": 20.0, \"consumer_rss_idle_mib\": 14.2, \"cpu_commit_to_last\": {\"consumer_cpu_pct\": 0.9, \"consumer_cpu_s\": 2.94, \"jvm_cpu_pct\": 143.9, \"jvm_cpu_s\": 482.48, \"postgres_all_cpu_pct\": 28.6, \"postgres_all_cpu_s\": 95.82, \"wall_s\": 335.258, \"walsender_cpu_pct\": 28.3, \"walsender_cpu_s\": 94.98}, \"cpu_insert_start_to_last\": {\"consumer_cpu_pct\": 0.7, \"consumer_cpu_s\": 2.94, \"jvm_cpu_pct\": 107.2, \"jvm_cpu_s\": 483.25, \"postgres_all_cpu_pct\": 35.3, \"postgres_all_cpu_s\": 158.93, \"wall_s\": 450.715, \"walsender_cpu_pct\": 34.8, \"walsender_cpu_s\": 156.74}, \"events\": 10000000, \"heap\": \"1g\", \"insert_s\": 115.453, \"jvm_opts\": [\"-XX:+UseParallelGC\"], \"jvm_threads_cpu_s_commit_to_last\": {\"C1 CompilerThre\": 0.87, \"C2 CompilerThre\": 6.94, \"FileOffsetBacki\": 0.2, \"GC Thread\": 42.18, \"Thread\": 83.49, \"VM Periodic Tas\": 0.15, \"VM Thread\": 0.24, \"cdc_v2-stdin\": 0.09, \"debezium-postgr\": 296.39, \"pool-1-thread\": 43.05, \"pool-2-thread\": 8.69}, \"phase\": \"tx_test\", \"rows\": 10000000, \"rows_per_s_after_commit\": 29829, \"rows_per_s_insert_start_to_last\": 22188, \"rss_hwm_mib\": 802.5, \"rss_idle_mib\": 181.0, \"rss_peak_mib\": 802.5, \"settings\": {\"max.batch.size\": \"8192\", \"max.queue.size\": \"32768\"}, \"shutdown\": \"elapsed_ms=95\", \"started\": true, \"stop_s\": 0.565, \"t_run\": 859.244, \"test\": \"big_10m_parallelgc_batch8k\", \"warnings\": []}",
+  "T 859.652 driver_end",
+  "BOOT child_exit 859.744",
+  "BOOT exit 0"
+ ],
+ "results": [
+  {
+   "cpu_max": "200000 100000",
+   "jdk": "temurin-21",
+   "mem_max": "17179869184",
+   "modes": [
+    "profile",
+    "small",
+    "big"
+   ],
+   "os_cpu_count": 8,
+   "phase": "driver",
+   "t_run": 0.957
+  },
+  {
+   "consumer_rc": 1,
+   "heap": "1g",
+   "jvm_log_tail": [],
+   "jvm_opts": [
+    "-XX:StartFlightRecording=filename=/tmp/cdc_v2_spike/profile_default.jfr,settings=profile,dumponexit=true",
+    "-XX:FlightRecorderOptions=stackdepth=96"
+   ],
+   "phase": "tx_test",
+   "rows": 1000000,
+   "settings": {},
+   "started": false,
+   "t_run": 27.712,
+   "test": "profile_default",
+   "warnings": []
+  },
+  {
+   "batches": 3145,
+   "bytes": 212126676,
+   "cgroup": {
+    "memory.current": "1890148352",
+    "memory.max": "17179869184",
+    "memory.peak": "2191831040"
+   },
+   "commit_to_last_event_s": 43.88,
+   "complete": false,
+   "consumer_rss_hwm_mib": 14.7,
+   "consumer_rss_idle_mib": 14.1,
+   "cpu_commit_to_last": {
+    "consumer_cpu_pct": 0.2,
+    "consumer_cpu_s": 0.58,
+    "jvm_cpu_pct": 30.9,
+    "jvm_cpu_s": 92.6,
+    "postgres_all_cpu_pct": 3.5,
+    "postgres_all_cpu_s": 10.61,
+    "wall_s": 300.01,
+    "walsender_cpu_pct": 3.5,
+    "walsender_cpu_s": 10.55
+   },
+   "cpu_insert_start_to_last": {
+    "consumer_cpu_pct": 0.2,
+    "consumer_cpu_s": 0.58,
+    "jvm_cpu_pct": 30.1,
+    "jvm_cpu_s": 94.06,
+    "postgres_all_cpu_pct": 5.2,
+    "postgres_all_cpu_s": 16.33,
+    "wall_s": 312.254,
+    "walsender_cpu_pct": 5.2,
+    "walsender_cpu_s": 16.17
+   },
+   "events": 999220,
+   "heap": "1g",
+   "insert_s": 11.92,
+   "jvm_opts": [],
+   "jvm_threads_cpu_s_commit_to_last": {
+    "C1 CompilerThre": 0.74,
+    "C2 CompilerThre": 8.54,
+    "G1 Refine": 0.21,
+    "GC Thread": 0.72,
+    "Thread": 9.72,
+    "VM Periodic Tas": 0.13,
+    "VM Thread": 0.1,
+    "cdc_v2-stdin": 0.2,
+    "debezium-postgr": 41.54,
+    "pool-1-thread": 29.06
+   },
+   "phase": "tx_test",
+   "rows": 1000000,
+   "rows_per_s_after_commit": null,
+   "rows_per_s_insert_start_to_last": null,
+   "rss_hwm_mib": 298.7,
+   "rss_idle_mib": 155.7,
+   "rss_peak_mib": 299.5,
+   "settings": {
+    "poll.interval.ms": "10"
+   },
+   "shutdown": "elapsed_ms=19",
+   "stall_jvm_stat": [
+    "CDCV2 STAT 1794280644962 events=1000001 bytes=212292339 batches=3147 heap_used=89143048 heap_committed=164626432"
+   ],
+   "stall_slot": {
+    "active": true,
+    "active_pid": 2683,
+    "confirmed_flush_lsn": "0/1BA2668",
+    "current_lsn": "0/11431AA0",
+    "walsenders": 1
+   },
+   "stall_stats": {
+    "batches": 3145,
+    "bytes": 212126676,
+    "consumer_pid": 2643,
+    "decoded": 0,
+    "eof_at": null,
+    "events": 999221,
+    "first_event_at": 1794280331.5642216,
+    "jvm_pid": 2644,
+    "jvm_rc": null,
+    "last_event_at": 1794280389.3930502,
+    "ops": {},
+    "orderkey_sum": 0,
+    "sample": [],
+    "spawn_at": 1794280329.3754597,
+    "written_at": 1794280389.3930776
+   },
+   "stall_thread_dump": [
+    "\"main\" #1 [2645] prio=5 os_prio=0 cpu=403.06ms elapsed=316.43s tid=0x00007ff1bc02b9a0 nid=2645 waiting on condition  [0x00007ff1c2cf9000]\n   java.lang.Thread.State: TIMED_WAITING (parking)\n\tat jdk.internal.misc.Unsafe.park(java.base@21.0.13/Native Method)\n\t- parking to wait for  <0x00000000c07b9280> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)\n\tat java.util.concurrent.locks.LockSupport.parkNanos(java.base@21.0.13/LockSupport.java:269)\n\tat java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.awaitNanos(java.base@21.0.13/AbstractQueuedSynchronizer.java:1797)\n\tat java.util.concurrent.ThreadPoolExecutor.awaitTermination(java.base@21.0.13/ThreadPoolExecutor.java:1475)\n\tat java.util.concurrent.Executors$DelegatedExecutorService.awaitTermination(java.base@21.0.13/Executors.java:780)\n\tat cdc_v2.engine.EngineMain.main(EngineMain.java:159)",
+    "\"cdc_v2-stdin\" #18 [2662] daemon prio=5 os_prio=0 cpu=207.48ms elapsed=315.96s tid=0x00007ff1bc621a90 nid=2662 runnable  [0x00007ff1a46fe000]\n   java.lang.Thread.State: RUNNABLE\n\tat java.io.FileInputStream.readBytes(java.base@21.0.13/Native Method)\n\tat java.io.FileInputStream.read(java.base@21.0.13/FileInputStream.java:287)\n\tat java.io.BufferedInputStream.read1(java.base@21.0.13/BufferedInputStream.java:345)\n\tat java.io.BufferedInputStream.implRead(java.base@21.0.13/BufferedInputStream.java:420)\n\tat java.io.BufferedInputStream.read(java.base@21.0.13/BufferedInputStream.java:399)\n\tat sun.nio.cs.StreamDecoder.readBytes(java.base@21.0.13/StreamDecoder.java:350)\n\tat sun.nio.cs.StreamDecoder.implRead(java.base@21.0.13/StreamDecoder.java:393)\n\tat sun.nio.cs.StreamDecoder.lockedRead(java.base@21.0.13/StreamDecoder.java:217)\n\tat sun.nio.cs.StreamDecoder.read(java.base@21.0.13/StreamDecoder.java:171)\n\tat java.io.InputStreamReader.read(java.base@21.0.13/InputStreamReader.java:188)\n\tat java.io.BufferedReader.fill(java.base@21.0.13/BufferedReader.java:160)\n\tat java.io.BufferedReader.implReadLine(java.base@21.0.13/BufferedReader.java:370)\n\tat java.io.BufferedReader.readLine(java.base@21.0.13/Bu",
+    "\"cdc_v2-stats\" #19 [2663] daemon prio=5 os_prio=0 cpu=61.37ms elapsed=315.96s tid=0x00007ff1bc622cb0 nid=2663 waiting on condition  [0x00007ff1a4593000]\n   java.lang.Thread.State: TIMED_WAITING (sleeping)\n\tat java.lang.Thread.sleep0(java.base@21.0.13/Native Method)\n\tat java.lang.Thread.sleep(java.base@21.0.13/Thread.java:509)\n\tat cdc_v2.engine.EngineMain.statsLoop(EngineMain.java:222)\n\tat cdc_v2.engine.EngineMain$$Lambda/0x00007ff148097798.run(Unknown Source)\n\tat java.lang.Thread.runWith(java.base@21.0.13/Thread.java:1596)\n\tat java.lang.Thread.run(java.base@21.0.13/Thread.java:1583)",
+    "\"cdc_v2-engine\" #22 [2665] prio=5 os_prio=0 cpu=294.27ms elapsed=315.93s tid=0x00007ff1bc65d2b0 nid=2665 waiting on condition  [0x00007ff1a4392000]\n   java.lang.Thread.State: WAITING (parking)\n\tat jdk.internal.misc.Unsafe.park(java.base@21.0.13/Native Method)\n\t- parking to wait for  <0x00000000c0a2ee00> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)\n\tat java.util.concurrent.locks.LockSupport.park(java.base@21.0.13/LockSupport.java:371)\n\tat java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionNode.block(java.base@21.0.13/AbstractQueuedSynchronizer.java:519)\n\tat java.util.concurrent.ForkJoinPool.unmanagedBlock(java.base@21.0.13/ForkJoinPool.java:3780)\n\tat java.util.concurrent.ForkJoinPool.managedBlock(java.base@21.0.13/ForkJoinPool.java:3725)\n\tat java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(java.base@21.0.13/AbstractQueuedSynchronizer.java:1746)\n\tat java.util.concurrent.LinkedBlockingQueue.take(java.base@21.0.13/LinkedBlockingQueue.java:435)\n\tat java.util.concurrent.ExecutorCompletionService.take(java.base@21.0.13/ExecutorCompletionService.java:202)\n\tat io.debezium.embedded.async.AsyncEmbeddedEngine.runTasksPolling(A",
+    "\"pool-1-thread-1\" #28 [2671] prio=5 os_prio=0 cpu=30622.05ms elapsed=315.18s tid=0x00007ff10433d760 nid=2671 waiting on condition  [0x00007ff1a4292000]\n   java.lang.Thread.State: TIMED_WAITING (parking)\n\tat jdk.internal.misc.Unsafe.park(java.base@21.0.13/Native Method)\n\t- parking to wait for  <0x00000000c0a2ef80> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)\n\tat java.util.concurrent.locks.LockSupport.parkNanos(java.base@21.0.13/LockSupport.java:269)\n\tat java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(java.base@21.0.13/AbstractQueuedSynchronizer.java:1886)\n\tat io.debezium.connector.base.ChangeEventQueue.poll(ChangeEventQueue.java:343)\n\tat io.debezium.connector.common.BaseSourceTask.pollRecords(BaseSourceTask.java:455)\n\tat io.debezium.connector.postgresql.PostgresConnectorTask.doPoll(PostgresConnectorTask.java:409)\n\tat io.debezium.connector.common.BaseSourceTask.poll(BaseSourceTask.java:371)\n\tat io.debezium.embedded.async.AsyncEmbeddedEngine$PollRecords.doCall(AsyncEmbeddedEngine.java:1309)\n\tat io.debezium.embedded.async.AsyncEmbeddedEngine$PollRecords.doCall(AsyncEmbeddedEngine.java:1288)\n\tat io.debezium.embedded.async.Retrying",
+    "\"Thread-2\" #33 [2679] daemon prio=5 os_prio=0 cpu=9730.69ms elapsed=314.79s tid=0x00007ff1083eade0 nid=2679 waiting on condition  [0x00007ff195dfe000]\n   java.lang.Thread.State: TIMED_WAITING (parking)\n\tat jdk.internal.misc.Unsafe.park(java.base@21.0.13/Native Method)\n\t- parking to wait for  <0x00000000c0a2f630> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)\n\tat java.util.concurrent.locks.LockSupport.parkNanos(java.base@21.0.13/LockSupport.java:269)\n\tat java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.awaitNanos(java.base@21.0.13/AbstractQueuedSynchronizer.java:1797)\n\tat java.util.concurrent.LinkedBlockingQueue.poll(java.base@21.0.13/LinkedBlockingQueue.java:460)\n\tat io.debezium.metrics.stats.MeasurementCollector$MeasurementPublisher.run(MeasurementCollector.java:89)\n\tat java.lang.Thread.runWith(java.base@21.0.13/Thread.java:1596)\n\tat java.lang.Thread.run(java.base@21.0.13/Thread.java:1583)",
+    "\"debezium-postgresconnector-cdc_v2_spike-change-event-source-coordinator\" #34 [2680] prio=5 os_prio=0 cpu=42180.82ms elapsed=314.78s tid=0x00007ff1083f7410 nid=2680 waiting on condition  [0x00007ff195cfe000]\n   java.lang.Thread.State: TIMED_WAITING (sleeping)\n\tat java.lang.Thread.sleep0(java.base@21.0.13/Native Method)\n\tat java.lang.Thread.sleep(java.base@21.0.13/Thread.java:509)\n\tat io.debezium.util.DelayStrategy.lambda$constant$1(DelayStrategy.java:61)\n\tat io.debezium.util.DelayStrategy$$Lambda/0x00007ff148223948.sleepWhen(Unknown Source)\n\tat io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.processMessages(PostgresStreamingChangeEventSource.java:281)\n\tat io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.execute(PostgresStreamingChangeEventSource.java:219)\n\tat io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.execute(PostgresStreamingChangeEventSource.java:54)\n\tat io.debezium.pipeline.ChangeEventSourceCoordinator.streamEvents(ChangeEventSourceCoordinator.java:347)\n\tat io.debezium.pipeline.ChangeEventSourceCoordinator.executeChangeEventSources(ChangeEventSourceCoordinator.java:227)\n\tat io.debezium.pipeline.ChangeEventSourceCoordinator.lambda$start$0(ChangeEventSourceCoordinator.java:151)\n\tat io.debezium.pipeline.ChangeEventSourceCoordinator$$Lambda/0x00007ff14821d268.run(Unknown Source)\n\tat java.util.concurrent.Executors$RunnableAdapter.call(java.base@21.0.13/Executors.java:572)\n\tat java.util.concurrent.FutureTask.run(java.base@21.0.13/FutureTask.java:317)\n\tat java.util.concurrent.ThreadPoolExecutor.runWorker(java.base@21.0.13/ThreadPoolExecutor.java:1144)\n\tat java.util.concurrent.ThreadPoolExecutor$Worker.run(java.base@21.0.13/ThreadPoolExecutor.java:642)\n\tat io.debezium.util.Threads$3.lambda$newThread$0(Threads.java:316)\n\tat io.debezium.util.Threads$3$$Lambda/0x00007ff1480c9710.run(Unknown Source)\n\tat java.lang.Thread.runWith(java.base@21.0.13/Thread.java:1596)\n\tat java.lang.Thread.run(java.base@21.0.13/Thread.java:1583)",
+    "\"debezium-postgresconnector-cdc_v2_spike-SignalProcessor\" #35 [2682] prio=5 os_prio=0 cpu=8.92ms elapsed=314.37s tid=0x00007ff0ec1f05d0 nid=2682 waiting on condition  [0x00007ff195bfe000]\n   java.lang.Thread.State: TIMED_WAITING (parking)\n\tat jdk.internal.misc.Unsafe.park(java.base@21.0.13/Native Method)\n\t- parking to wait for  <0x00000000c0a512e8> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)\n\tat java.util.concurrent.locks.LockSupport.parkNanos(java.base@21.0.13/LockSupport.java:269)\n\tat java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.awaitNanos(java.base@21.0.13/AbstractQueuedSynchronizer.java:1797)\n\tat java.util.concurrent.ScheduledThreadPoolExecutor$DelayedWorkQueue.take(java.base@21.0.13/ScheduledThreadPoolExecutor.java:1182)\n\tat java.util.concurrent.ScheduledThreadPoolExecutor$DelayedWorkQueue.take(java.base@21.0.13/ScheduledThreadPoolExecutor.java:899)\n\tat java.util.concurrent.ThreadPoolExecutor.getTask(java.base@21.0.13/ThreadPoolExecutor.java:1070)\n\tat java.util.concurrent.ThreadPoolExecutor.runWorker(java.base@21.0.13/ThreadPoolExecutor.java:1130)\n\tat java.util.concurrent.ThreadPoolExecutor$Worker.run(java.base@21.0.13/Thr",
+    "\"debezium-postgresconnector-cdc_v2_spike-keep-alive\" #37 [2686] prio=5 os_prio=0 cpu=5.82ms elapsed=314.30s tid=0x00007ff0ec1fa720 nid=2686 waiting on condition  [0x00007ff195afe000]\n   java.lang.Thread.State: TIMED_WAITING (sleeping)\n\tat java.lang.Thread.sleep0(java.base@21.0.13/Native Method)\n\tat java.lang.Thread.sleep(java.base@21.0.13/Thread.java:509)\n\tat io.debezium.util.Metronome$1.pause(Metronome.java:57)\n\tat io.debezium.connector.postgresql.connection.PostgresReplicationConnection$1.lambda$startKeepAlive$0(PostgresReplicationConnection.java:1064)\n\tat io.debezium.connector.postgresql.connection.PostgresReplicationConnection$1$$Lambda/0x00007ff148288e80.run(Unknown Source)\n\tat java.util.concurrent.Executors$RunnableAdapter.call(java.base@21.0.13/Executors.java:572)\n\tat java.util.concurrent.FutureTask.run(java.base@21.0.13/FutureTask.java:317)\n\tat java.util.concurrent.ThreadPoolExecutor.runWorker(java.base@21.0.13/ThreadPoolExecutor.java:1144)\n\tat java.util.concurrent.ThreadPoolExecutor$Worker.run(java.base@21.0.13/ThreadPoolExecutor.java:642)\n\tat io.debezium.util.Threads$3.lambda$newThread$0(Threads.java:316)\n\tat io.debezium.util.Threads$3$$Lambda/0x00007ff1480c9710.run(Unkno",
+    "\"debezium-postgresstreamingchangeeventsource-cdc_v2_spike-lsn-flush\" #39 [2688] prio=5 os_prio=0 cpu=8.05ms elapsed=314.20s tid=0x00007ff108408100 nid=2688 waiting on condition  [0x00007ff1958fe000]\n   java.lang.Thread.State: WAITING (parking)\n\tat jdk.internal.misc.Unsafe.park(java.base@21.0.13/Native Method)\n\t- parking to wait for  <0x00000000c0a31f58> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)\n\tat java.util.concurrent.locks.LockSupport.park(java.base@21.0.13/LockSupport.java:371)\n\tat java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionNode.block(java.base@21.0.13/AbstractQueuedSynchronizer.java:519)\n\tat java.util.concurrent.ForkJoinPool.unmanagedBlock(java.base@21.0.13/ForkJoinPool.java:3780)\n\tat java.util.concurrent.ForkJoinPool.managedBlock(java.base@21.0.13/ForkJoinPool.java:3725)\n\tat java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(java.base@21.0.13/AbstractQueuedSynchronizer.java:1746)\n\tat java.util.concurrent.LinkedBlockingQueue.take(java.base@21.0.13/LinkedBlockingQueue.java:435)\n\tat java.util.concurrent.ThreadPoolExecutor.getTask(java.base@21.0.13/ThreadPoolExecutor.java:1070)\n\tat java.util.concurrent.Th"
+   ],
+   "started": true,
+   "stop_s": 0.414,
+   "t_run": 344.678,
+   "test": "poll10_retest",
+   "warnings": []
+  },
+  {
+   "complete": true,
+   "cpu": {
+    "consumer_cpu_pct": 0.5,
+    "consumer_cpu_s": 0.05,
+    "jvm_cpu_pct": 161.5,
+    "jvm_cpu_s": 17.3,
+    "postgres_all_cpu_pct": 19.7,
+    "postgres_all_cpu_s": 2.11,
+    "wall_s": 10.715
+   },
+   "events": 100000,
+   "pgbench": {
+    "rc": 0,
+    "seconds": 12.022,
+    "tail": null,
+    "tps": 8333.979217,
+    "transactions": 100000
+   },
+   "phase": "small_backlog",
+   "settings": "parallelgc_batch8k",
+   "t_run": 369.881,
+   "transactions": 100000,
+   "tx_per_s_first_to_last": 10150,
+   "warnings": []
+  },
+  {
+   "cpu_during_load": {
+    "consumer_cpu_pct": 0.3,
+    "consumer_cpu_s": 0.08,
+    "jvm_cpu_pct": 78.3,
+    "jvm_cpu_s": 23.51,
+    "postgres_all_cpu_pct": 11.6,
+    "postgres_all_cpu_s": 3.48,
+    "wall_s": 30.044,
+    "walsender_cpu_pct": 11.4,
+    "walsender_cpu_s": 3.44
+   },
+   "drain_after_load_s": 0.939,
+   "drained": true,
+   "events_during_load": 116968,
+   "events_per_s_during_load": 3894,
+   "pgbench": {
+    "rc": 0,
+    "seconds": 30.041,
+    "tail": null,
+    "tps": 4002.02845,
+    "transactions": 120050
+   },
+   "phase": "small_live",
+   "settings": "parallelgc_batch8k",
+   "t_run": 403.719
+  },
+  {
+   "batches": 1226,
+   "bytes": 2123070489,
+   "cgroup": {
+    "memory.current": "7775952896",
+    "memory.max": "17179869184",
+    "memory.peak": "10394820608"
+   },
+   "commit_to_last_event_s": 335.247,
+   "complete": true,
+   "consumer_rss_hwm_mib": 20.0,
+   "consumer_rss_idle_mib": 14.2,
+   "cpu_commit_to_last": {
+    "consumer_cpu_pct": 0.9,
+    "consumer_cpu_s": 2.94,
+    "jvm_cpu_pct": 143.9,
+    "jvm_cpu_s": 482.48,
+    "postgres_all_cpu_pct": 28.6,
+    "postgres_all_cpu_s": 95.82,
+    "wall_s": 335.258,
+    "walsender_cpu_pct": 28.3,
+    "walsender_cpu_s": 94.98
+   },
+   "cpu_insert_start_to_last": {
+    "consumer_cpu_pct": 0.7,
+    "consumer_cpu_s": 2.94,
+    "jvm_cpu_pct": 107.2,
+    "jvm_cpu_s": 483.25,
+    "postgres_all_cpu_pct": 35.3,
+    "postgres_all_cpu_s": 158.93,
+    "wall_s": 450.715,
+    "walsender_cpu_pct": 34.8,
+    "walsender_cpu_s": 156.74
+   },
+   "events": 10000000,
+   "heap": "1g",
+   "insert_s": 115.453,
+   "jvm_opts": [
+    "-XX:+UseParallelGC"
+   ],
+   "jvm_threads_cpu_s_commit_to_last": {
+    "C1 CompilerThre": 0.87,
+    "C2 CompilerThre": 6.94,
+    "FileOffsetBacki": 0.2,
+    "GC Thread": 42.18,
+    "Thread": 83.49,
+    "VM Periodic Tas": 0.15,
+    "VM Thread": 0.24,
+    "cdc_v2-stdin": 0.09,
+    "debezium-postgr": 296.39,
+    "pool-1-thread": 43.05,
+    "pool-2-thread": 8.69
+   },
+   "phase": "tx_test",
+   "rows": 10000000,
+   "rows_per_s_after_commit": 29829,
+   "rows_per_s_insert_start_to_last": 22188,
+   "rss_hwm_mib": 802.5,
+   "rss_idle_mib": 181.0,
+   "rss_peak_mib": 802.5,
+   "settings": {
+    "max.batch.size": "8192",
+    "max.queue.size": "32768"
+   },
+   "shutdown": "elapsed_ms=95",
+   "started": true,
+   "stop_s": 0.565,
+   "t_run": 859.244,
+   "test": "big_10m_parallelgc_batch8k",
+   "warnings": []
+  }
+ ],
+ "run": {
+  "cancelled_at": null,
+  "config": {
+   "CDC_V2_BIG_ROWS": "10000000",
+   "CDC_V2_COMMIT": "a262259ba8e87c0528d422de6182bbff2c11fc17",
+   "CDC_V2_DEADLINE": "2300",
+   "CDC_V2_JDK": "temurin-21",
+   "CDC_V2_SMALL_TX": "100000",
+   "CDC_V2_SPIKE_MODE": "profile,small,big",
+   "CDC_V2_TPUT_ONLY": "poll10_retest",
+   "CDC_V2_TPUT_ROWS": "1000000"
+  },
+  "created_at": "2026-11-10T03:11:38.637+00:00",
+  "ended_at": "2026-11-10T03:26:01.402+00:00",
+  "exit_code": 0,
+  "flight_id": "ff81b6f6-8cea-4f5d-b6f6-7de4f01d4d61",
+  "flight_name": "cdc_v2_spike_jvm",
+  "flight_version": 1,
+  "is_scheduled": false,
+  "observed_states": [
+   {
+    "observed_at": "2026-11-10T03:11:39.360977+00:00",
+    "state": "PENDING"
+   },
+   {
+    "observed_at": "2026-11-10T03:11:41.684943+00:00",
+    "state": "RUNNING"
+   },
+   {
+    "observed_at": "2026-11-10T03:26:04.286565+00:00",
+    "state": "SUCCEEDED"
+   }
+  ],
+  "run_id": "01a1c370-987f-7eda-9849-7a701b30fb4b",
+  "run_number": 5,
+  "scheduled_at": "2026-11-10T03:11:38.623+00:00",
+  "started_at": "2026-11-10T03:11:39.758+00:00",
+  "started_by_id": "<redacted>",
+  "started_by_name": "<redacted>",
+  "state": "SUCCEEDED",
+  "status": "SUCCEEDED"
+ }
+}
