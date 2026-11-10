@@ -231,6 +231,11 @@ block (fence, `COMMIT`: package D).
 - `backfill.on_group(tx, group_end, change_sets) -> routing changes` (C10) is called before the position step.
   Your stand-in enacts a request by setting the table's routing to `skip` and leaving the request row pending;
   package B replaces the stand-in.
+- `tables.confirm(group_end, tables, deadline) -> {table: same | changed}` (C10, the catalog gate) is called
+  for every group before it is applied, at a point where the answer can still take a table out of the group. It
+  runs beside the client-side work of the group, not after it, so that it adds one round trip to the source and
+  no more; it is a blocking call with a deadline like any other. Your stand-in answers `same`; package T builds
+  the real one.
 - A test helper (under `tests/`, importable by packages F, V, B and T) that starts the whole local path for a
   set of tables: publication, slot, destination tables built from the transform plans, routing `streaming`, the
   pipeline as a process group, and handles to crash it at a named point, freeze it, and wait for a position.

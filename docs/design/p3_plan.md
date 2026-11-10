@@ -449,6 +449,15 @@ As delivered by package X; its report defines the interface, and this section is
   sent through a backfill in P3: from the first transaction that carries the new version, its changes are not
   applied to the visible table, and a backfill request (after a gap) is enacted in that group. The schema wave of
   P4 replaces this by a change in place (design 6.5).
+- **Catalog gate.** Debezium's records name a table by schema and name only, and a drop and recreate, or a
+  dropped and added column of the same name and type, can leave the `SCHEMA` frame unchanged (H-007, H-008). So
+  before a group is applied, S calls `tables.confirm(group_end, tables, deadline) -> {table: same | changed}`.
+  Package T builds it on `catalog.observe` (C7): an observation whose lower bracket `b` is ≥ `group_end` must
+  show, for each table of the group, the identity that the destination table was built for (OID; per column
+  `attnum`, name, type). A table that is not `same` leaves the visible path in that group: its rows are not
+  applied. What follows (a drop, a fresh table, a backfill) is enacted by T in the first group whose end is ≥
+  the observation's upper bracket `a`. The cost is one catalog round trip per group. Until T is merged, S's
+  stand-in answers `same`.
 - S runs a group again after `Conflict`, a bounded number of times, building its statements again when the
   conflict came from a DDL (a swap changes the catalog).
 - A table that fails to apply `apply.max_table_attempts` times (default 3) leaves the stream: state `quarantined`,
