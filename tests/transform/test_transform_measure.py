@@ -66,7 +66,7 @@ def values(t, n, k):
         return pa.array([x - R.PG_EPOCH_US for x in u], pa.int64()), pa.array([R.ts_text(x, True) for x in u])
     if t == "interval":
         iv = [(i % 13, i % 31, (i * 1000003) % 86400000000) for i in range(n)]
-        return pa.array([R.interval_transport(*x) for x in iv]), pa.array([R.interval_iso(*x) for x in iv])
+        return pa.array([R.interval_transport(*x) for x in iv]), pa.array([R.interval_postgres(*x) for x in iv])
     if t == "bpchar":
         s = ["%-10s" % ("x%d" % ((i + k) % 1000)) for i in range(n)]
         return pa.array(s), pa.array(s)

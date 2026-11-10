@@ -163,19 +163,17 @@ FALLBACK = [
 
 # fallback columns whose stream text is not the Postgres text of the read sessions: findings for package E
 KNOWN_STREAM_DIFFERENCES = {
-    "aiv": "interval inside an array: the walsender session prints IntervalStyle=postgres, the read sessions "
-           "iso_8601",
-    "cp": "interval inside a composite: same cause as aiv",
     "pt": "geometric: Debezium passes pgjdbc's PGpoint, printed with Java's float formatting",
     "bx": "geometric: same cause as pt",
 }
+# Arrays and composites that hold intervals (f_aiv, f_cp) printed differently on the two paths until the fix round
+# of package Y; the read sessions now print IntervalStyle=postgres like the walsender session, and they are identical.
 
 # tables whose values the oracle (package O) cannot judge as delivered in P3: findings for package O
 ORACLE_CANNOT_JUDGE = {
     "f_ai": "array as text: the oracle's array rule wants a LIST destination",
     "f_at": "same", "f_af": "same", "f_an": "same", "f_atz": "same", "f_aby": "same", "f_aiv": "same",
     "f_da": "domain over an array: same",
-    "f_cp": "composite as text: the oracle reads the source under its own session (IntervalStyle not pinned)",
     "f_ine": "inet: the oracle's fallback uses inet::text ('::1/128'), not the output function ('::1')",
     "f_tmz": "timetz as TIMETZ: the oracle compares CAST(TIMETZ AS VARCHAR), and DuckDB prints -3630 s as '-01:30'",
 }
@@ -434,6 +432,59 @@ def make_oracle_copies(pair, schema, out, ex):
     return {t: t + "_o" for t in ex}
 
 
+def _set_bytes(arr, row, raw: bytes):
+    """A copy of a fixed-width array with the 8 bytes of one row replaced (validity kept, nothing else touched)."""
+    data = bytearray(arr.buffers()[1].to_pybytes())
+    i = (arr.offset + row) * 8
+    data[i:i + 8] = raw
+    return pa.Array.from_buffers(arr.type, len(arr), [arr.buffers()[0], pa.py_buffer(bytes(data))], offset=arr.offset)
+
+
+def negative_control(out):
+    """The identity check can fail: perturb the stream path of two tables (a -0 made +0 in f_f8, a timestamp moved
+    by 1 microsecond in f_ts) and require compare_paths to report exactly those tables, that column and those rows."""
+    import math
+    perturbed, want = {}, {}
+    for table in ("f_f8", "f_ts"):
+        d = out[table]
+        batches = list(d["stream"])
+        done = False
+        for k, b in enumerate(batches):
+            col = b.column(b.schema.names.index("a1"))
+            ids = b.column(b.schema.names.index("a0")).to_pylist()
+            for r in range(len(b)):
+                if table == "f_f8":
+                    v = col[r].as_py()
+                    if v == 0 and math.copysign(1.0, v) < 0:
+                        new = _set_bytes(col, r, struct.pack("<d", 0.0))
+                        done = True
+                else:
+                    if col.type_codes[r].as_py() != 0 or not col.field(0)[r].is_valid:
+                        continue
+                    us = col.field(0).view(pa.int64())[r].as_py()
+                    if abs(us) >= 2 ** 63 - 1:
+                        continue
+                    child = _set_bytes(col.field(0), r, struct.pack("<q", us + 1))
+                    new = pa.UnionArray.from_sparse(col.type_codes, [child, col.field(1)], ["n", "t"], [0, 1])
+                    done = True
+                if done:
+                    cols = [new if n == "a1" else c for n, c in zip(b.schema.names, b.columns)]
+                    batches[k] = pa.RecordBatch.from_arrays(cols, names=b.schema.names)
+                    want[table] = ids[r]
+                    break
+            if done:
+                break
+        assert done, table
+        perturbed[table] = dict(d, stream=batches)
+    diffs, detail = compare_paths(perturbed)
+    got = {t: [out[t]["backfill"].column(0)[r].as_py() for r in detail[(t, 1)]] for t in diffs}
+    assert diffs == {"f_f8": [1], "f_ts": [1]}, diffs
+    assert got == {t: [i] for t, i in want.items()}, (got, want)
+    return {"perturbed": {"f_f8": "column 1, one -0 made +0 (id %d)" % want["f_f8"],
+                          "f_ts": "column 1, one timestamp + 1 microsecond (id %d)" % want["f_ts"]},
+            "reported": {t: {"columns": diffs[t], "ids": got[t]} for t in diffs}}
+
+
 def load_duck(out, which, schema, ex=None):
     con = duckdb.connect()
     con.execute("SET TimeZone = 'UTC'")
@@ -493,6 +544,8 @@ def test_cross_path(pair, artifacts):
             assert gap_rows["f_iv"] == [100001, 100002]
         diffs.pop("f_ivhuge")                # read by the backfill only (the driver cannot parse it)
         assert set(diffs) == expected, diffs
+        assert {"f_aiv", "f_cp"} <= set(stream_tables) - set(diffs)       # intervals in text: identical now
+        control = negative_control(out)
         # 2. the mask marks exactly the infinity rows (and the real zeros), never on 16
         marked = []
         for fr, m in zip(out["f_iv"]["frames"], out["f_iv"]["masks"]):
@@ -518,9 +571,8 @@ def test_cross_path(pair, artifacts):
         con_s = load_duck(out, "stream", sc.schema, ex)
         rs = oracle(pair, con_s, sc.schema, [copies.get(t, t) for t in stream_tables], q, sc.slot)
         unequal = {t.source.split(".")[-1] for t in rs.tables if not t.equal}
-        # f_cp: the stream's composite text (IntervalStyle postgres) happens to match the oracle's own session;
         # the infinity rows of f_iv are left out of f_iv_o (the oracle has no rule for the text member)
-        want_unequal = (expected | set(ORACLE_CANNOT_JUDGE)) - {"f_cp"}
+        want_unequal = expected | set(ORACLE_CANNOT_JUDGE)
         assert unequal == want_unequal, rs.summary()
         forms = {t: {c.position: c.form for c in d["plan"].columns if c.form == "wide"} for t, d in out.items()}
         evidence = {
@@ -530,6 +582,7 @@ def test_cross_path(pair, artifacts):
             "values_compared": sum(d["backfill"].num_rows * len(d["plan"].columns) for d in out.values()),
             "identical_tables": sorted(set(stream_tables) - set(diffs) - {"f_iv"}),
             "stream_differences_fallback": {k: KNOWN_STREAM_DIFFERENCES[k] for k in KNOWN_STREAM_DIFFERENCES},
+            "plan_ambiguous_key": {t: list(d["plan"].ambiguous_key) for t, d in out.items() if d["plan"].ambiguous_key},
             "ambiguous_zero_interval_rows": gap_rows, "stream_marked_ids": sorted(marked),
             "stream_side_gap": {"f_ivhuge": "interval '2562047788 hours': the engine's driver cannot parse it; "
                                             "the backfill delivers it (wide form)"},
@@ -537,6 +590,7 @@ def test_cross_path(pair, artifacts):
             "oracle_backfill_unequal_tables": sorted(unequal_b), "oracle_cannot_judge": ORACLE_CANNOT_JUDGE,
             "oracle_rows_compared_backfill": rb.rows_compared,
             "oracle_cannot_judge_rows": ex, "oracle_stream_unequal_tables": sorted(unequal),
+            "negative_control": control,
             "seconds": round(time.monotonic() - t0, 1)}
         if EVIDENCE:
             write(name="crosspath_pg%d.json" % (version // 10000), obj=evidence)

@@ -219,3 +219,25 @@ def test_widening_expression_changes_no_value_under_the_oracle(typ, typmod):
     assert canon(c.wide_type) == before
     nulls = con.execute('SELECT id FROM x WHERE "c" IS NULL').fetchall()
     assert nulls == [(len(WIDEN_VALUES[(typ, typmod)]) - 1,)]                # a real NULL, not a NULL member
+
+
+def test_ambiguous_key_lists_exactly_the_key_columns_the_stream_cannot_deliver_injectively():
+    """Core design 6: a scalar interval key on a source of 17 or later (also a domain over interval) arrives as zero
+    for 0, infinity and -infinity. Not in the list: an interval array or a composite (text in which the engine keeps
+    'infinity'; identical on both paths, cross-path test), the wide forms of numeric and timestamp keys (exact fit
+    test, distinct members), text-fallback keys (Postgres's output), and non-key interval columns."""
+    from tables import composite
+    from cdc_v2.pg.catalog import TypeInfo
+    dom = TypeInfo(oid=90001, schema="public", name="span", kind="domain", base=pgtype("interval"), typlen=16)
+    cols = [col(1, "iv", "interval"), col(2, "ivd", dom, type_name="span"),
+            col(3, "ia", array("interval"), type_name="interval[]"), col(4, "cp", composite(), type_name="pair"),
+            col(5, "n", "numeric"), col(6, "ts", "timestamp"), col(7, "tz", "timestamptz"), col(8, "x", "inet"),
+            col(9, "other", "interval")]
+    t = table(cols, key=(1, 2, 3, 4, 5, 6, 7, 8))
+    p17, p18, p16 = (T.plan(t, server_version_num=v) for v in (170000, 180006, 160006))
+    assert [p.ambiguous_key for p in (p17, p18)] == [(0, 1), (0, 1)]
+    assert p18.ambiguous == (0, 1, 8)
+    assert p16.ambiguous_key == () and p16.ambiguous == ()
+    wide = p18.widened(4).widened(5).widened(6)
+    assert wide.ambiguous_key == (0, 1)
+    assert T.plan(table(cols[2:], key=(3, 4, 5)), server_version_num=V18).ambiguous_key == ()

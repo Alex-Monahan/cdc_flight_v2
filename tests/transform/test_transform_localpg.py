@@ -66,13 +66,34 @@ def gen(kind, rnd):
         us, off = rnd.randint(0, R.DAY_US), rnd.randint(-57599, 57599)
         return R.timetz_text(us, off), (us, off)
     if kind == "interval":
-        m, d, u = rnd.randint(-2 ** 31, 2 ** 31 - 1), rnd.randint(-2 ** 31, 2 ** 31 - 1), rnd.randint(
-            -9223372036854775, 9223372036854775)
-        return R.interval_transport(m, d, u).replace("months", "mons"), (m, d, u * 1000)
+        m, d = rnd.randint(-2 ** 31, 2 ** 31 - 1), rnd.randint(-2 ** 31, 2 ** 31 - 1)
+        u = rnd.choice([rnd.randint(-9223372036854775, 9223372036854775), rnd.randint(-(2 ** 63 - 1), 2 ** 63 - 1),
+                        rnd.randint(-10 ** 11, 10 ** 11)])
+        return R.interval_transport(m, d, u).replace("months", "mons"), interval_expect(m, d, u)
     if kind == "bytea":
         b = bytes(rnd.getrandbits(8) for _ in range(rnd.randint(0, 30)))
         return R.bytea_text(b), b
     raise AssertionError(kind)
+
+
+def interval_expect(m, d, u):
+    if abs(u) <= 9223372036854775:
+        return (0, (m, d, u * 1000))
+    return (1, R.interval_iso(m, d, u))      # the text member: ISO 8601 on both paths
+
+
+# extremes of the interval family, written as Postgres input
+INTERVAL_EXTREMES = [
+    ("-178956970 years -8 mons", (-2 ** 31, 0, 0)), ("178956970 years 7 mons", (2 ** 31 - 1, 0, 0)),
+    ("2147483647 days", (0, 2 ** 31 - 1, 0)), ("-2147483648 days", (0, -2 ** 31, 0)),
+    ("2562047788 hours 54.775807 seconds", (0, 0, 2 ** 63 - 1)),
+    ("-2562047788 hours -54.775808 seconds", (0, 0, -(2 ** 63))),
+    ("2562047 hours 47 minutes 16.854775 seconds", (0, 0, 9223372036854775)),
+    ("2562047 hours 47 minutes 16.854776 seconds", (0, 0, 9223372036854776)),
+    ("0", (0, 0, 0)), ("-0.000001 seconds", (0, 0, -1)), ("23:59:59.999999", (0, 0, 86399999999)),
+    ("-1 years -2 mons +3 days -04:05:06.789", (-14, 3, -14706789000)),
+    ("1 mon -1 day 00:00:00.000001", (1, -1, 1)),
+]
 
 
 def value_of(kind, arr, i):
@@ -88,9 +109,15 @@ def value_of(kind, arr, i):
     if kind == "timetz":
         bits = struct.unpack("<Q", arr.storage[i].as_py())[0]
         return (bits >> 24, 57599 - (bits & 0xFFFFFF))
-    if kind == "interval":
-        x = v.as_py()
-        return (x.months, x.days, x.nanoseconds)
+    if kind == "interval":                 # the plan is in the wide form: (0, (months, days, ns)) or (1, text)
+        tag = arr.type_codes[i].as_py()
+        child = arr.field(tag)[i]
+        if not child.is_valid:
+            return None
+        if tag == 1:
+            return (1, child.as_py())
+        x = child.as_py()
+        return (0, (x.months, x.days, x.nanoseconds))
     return v.as_py()
 
 
@@ -113,18 +140,24 @@ def test_postgres_prints_and_the_backfill_reads_it_back(pair):
             conn.close(Deadline.after(5))
         for kind in KINDS:
             vals = [gen(kind, rnd) for _ in range(N)]
+            if kind == "interval":
+                vals += [(t, interval_expect(*v)) for t, v in INTERVAL_EXTREMES]
+                if version >= 170000:
+                    vals += [("infinity", (1, "infinity")), ("-infinity", (1, "-infinity"))]
             with pair.connect(pair.primary_port) as c:
                 with c.cursor().copy("COPY %s.p_%s (id, v) FROM STDIN" % (sc.schema, kind)) as cp:
                     for i, (text, _w) in enumerate(vals):
                         cp.write_row((i, text))
-                    cp.write_row((N, None))
+                    cp.write_row((len(vals), None))
             pair.wait_replayed()
             batch = read_backfill(pair, sc.schema, "p_" + kind, 2)
             plan = T.plan(cat["p_" + kind], server_version_num=version)
+            if kind == "interval":
+                plan = plan.widened(1)
             out = T.backfill(plan, batch)
-            got = [value_of(kind, out.column(1), i) for i in range(N + 1)]
+            got = [value_of(kind, out.column(1), i) for i in range(len(vals) + 1)]
             assert got == [w for _t, w in vals] + [None], kind
-            report[kind] = {"values": N, "printed_by_postgres_differs_from_ours":
+            report[kind] = {"values": len(vals), "printed_by_postgres_differs_from_ours":
                             sum(1 for (t, _w), p in zip(vals, batch.column(1).to_pylist()) if t != p)}
     finally:
         sc.close()

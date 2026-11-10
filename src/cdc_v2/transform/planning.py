@@ -75,6 +75,7 @@ class TablePlan:
     key_positions: tuple             # in key order
     ambiguous: tuple                 # positions whose zero interval in the stream is ambiguous (plan C3)
     collisions: tuple                # groups of positions whose source names one DuckDB table cannot hold apart
+    ambiguous_key: tuple = ()        # key positions whose stream form is not injective (scalar interval, 17+)
     _hash: str = field(default="", compare=False, repr=False)
 
     @property
@@ -93,7 +94,7 @@ class TablePlan:
                                 list(c.stream_forms), list(c.numeric) if c.numeric else None, c.step]
                                for c in self.columns],
                    "key": list(self.key_positions), "ambiguous": list(self.ambiguous),
-                   "collisions": [list(g) for g in self.collisions]}
+                   "collisions": [list(g) for g in self.collisions], "ambiguous_key": list(self.ambiguous_key)}
             h = hashlib.sha256(json.dumps(obj, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
             object.__setattr__(self, "_hash", h)
         return self._hash
@@ -221,7 +222,11 @@ def plan(source_table, schema_frame=None, *, server_version_num: int) -> TablePl
     ambiguous = tuple(c.position for c in cols if c.family == "interval") if server_version_num >= 170000 else ()
     p = TablePlan(schema=source_table.schema, table=source_table.name, oid=source_table.oid,
                   server_version_num=server_version_num, columns=tuple(cols), has_key=bool(key_positions),
-                  key_positions=key_positions, ambiguous=ambiguous, collisions=collisions)
+                  key_positions=key_positions, ambiguous=ambiguous, collisions=collisions,
+                  # core design 6: two keys the source calls different must differ in the destination. A scalar
+                  # interval (also through a domain) on 17+ arrives as zero for 0, infinity and -infinity; every
+                  # other key type's stream form is injective (docs/design/transform.md, "Keys")
+                  ambiguous_key=tuple(pos for pos in key_positions if pos in ambiguous))
     if schema_frame is not None:
         check_frame(p, schema_frame)
     return p

@@ -83,7 +83,7 @@ def test_conninfo_carries_session_settings_and_keepalives():
     assert "-c idle_in_transaction_session_timeout=777" in opts
     assert ci["keepalives"] == "1" and ci["tcp_user_timeout"] == "120000"
     exp = node(statement_timeout_ms=1234).expected_settings()
-    assert exp["statement_timeout"] == "1234" and exp["TimeZone"] == "UTC" and exp["IntervalStyle"] == "iso_8601"
+    assert exp["statement_timeout"] == "1234" and exp["TimeZone"] == "UTC" and exp["IntervalStyle"] == "postgres"
 
 
 def test_source_settings():

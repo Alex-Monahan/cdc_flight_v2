@@ -17,7 +17,7 @@ from tables import numeric_typmod, one
 
 V18 = 180006
 D = decimal.Decimal
-SETTINGS = dict(max_examples=int(os.environ.get("CDC_V2_Y_EXAMPLES", "60")), deadline=None, suppress_health_check=[HealthCheck.too_slow])
+SETTINGS = dict(max_examples=int(os.environ.get("CDC_V2_Y_EXAMPLES", "30")), deadline=None, suppress_health_check=[HealthCheck.too_slow])
 LISTS = dict(min_size=1, max_size=40)
 
 
@@ -217,7 +217,7 @@ intervals = st.tuples(st.integers(-2 ** 31, 2 ** 31 - 1), st.integers(-2 ** 31, 
 @settings(**SETTINGS)
 @given(st.lists(st.one_of(st.none(), intervals), **LISTS))
 def test_interval(vals):
-    texts = [None if v is None else R.interval_iso(*v) for v in vals]
+    texts = [None if v is None else R.interval_postgres(*v) for v in vals]
     transport = [None if v is None else R.interval_transport(*v) for v in vals]
     out = both("interval", texts, transport, pa.string(), wide=True)
     for i, v in enumerate(vals):

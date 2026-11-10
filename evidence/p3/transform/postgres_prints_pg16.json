@@ -17,8 +17,8 @@
       "values": 3000
     },
     "interval": {
-      "printed_by_postgres_differs_from_ours": 3000,
-      "values": 3000
+      "printed_by_postgres_differs_from_ours": 3007,
+      "values": 3013
     },
     "numeric": {
       "printed_by_postgres_differs_from_ours": 1,

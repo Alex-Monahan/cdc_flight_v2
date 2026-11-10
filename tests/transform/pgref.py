@@ -111,6 +111,25 @@ def interval_iso(months: int, days: int, us: int) -> str:
     return out
 
 
+def interval_postgres(months: int, days: int, us: int) -> str:
+    """IntervalStyle postgres (EncodeInterval, INTSTYLE_POSTGRES): the read sessions' style."""
+    y, mo = _trunc_div(months, 12)
+    h, rem = _trunc_div(us, 3600000000)
+    mi, rem = _trunc_div(rem, 60000000)
+    s, f = _trunc_div(rem, 1000000)
+    parts, is_zero, is_before = [], True, False
+    for v, unit in ((y, "year"), (mo, "mon"), (days, "day")):
+        if v == 0:
+            continue
+        parts.append("%s%d %s%s" % ("+" if is_before and v > 0 else "", v, unit, "" if v == 1 else "s"))
+        is_before, is_zero = v < 0, False
+    if is_zero or h or mi or s or f:
+        minus = h < 0 or mi < 0 or s < 0 or f < 0
+        sign = "-" if minus else ("+" if is_before else "")
+        parts.append("%s%02d:%02d:%02d%s" % (sign, abs(h), abs(mi), abs(s), _frac(abs(f))))
+    return " ".join(parts)
+
+
 def interval_transport(months: int, days: int, us: int) -> str:
     return "%d months %d days %d microseconds" % (months, days, us)
 

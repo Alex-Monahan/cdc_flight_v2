@@ -621,17 +621,22 @@ def _interval_stream(spec: TypeSpec, form: str) -> Conv:
     return _interval_common(spec, form, layers, ok, None)
 
 
-ISO_INTERVAL = ("^P(?:(-?[0-9]+)Y)?(?:(-?[0-9]+)M)?(?:(-?[0-9]+)D)?"
-                "(?:T(?:(-?[0-9]+)H)?(?:(-?[0-9]+)M)?(?:(-?)([0-9]+)(?:\\.([0-9]{{1,6}}))?S)?)?$")
+#: IntervalStyle=postgres (EncodeInterval, INTSTYLE_POSTGRES): '[+-]N year[s]', 'N mon[s]', 'N day[s]', each with its
+#: own sign ('+' after a negative part), then '[+-]HH:MM:SS[.ffffff]' with one sign for the whole time part and the
+#: hours unbounded; the time part is printed when it is not zero or when nothing else is ('00:00:00').
+POSTGRES_INTERVAL = ("^(?:([+-]?[0-9]+) years?)?(?: ?([+-]?[0-9]+) mons?)?(?: ?([+-]?[0-9]+) days?)?"
+                     "(?: ?([+-]?)([0-9]+):([0-9]{{2}}):([0-9]{{2}})(?:\\.([0-9]{{1,6}}))?)?$")
 
 
 def _interval_backfill(spec: TypeSpec, form: str) -> Conv:
-    """Postgres IntervalStyle=iso_8601 text ('P1Y2M3DT4H5M6.5S', 'PT0S', 'P-1Y-2MT-4H-6.5S'), and 'infinity' /
-    '-infinity' (Postgres 17+), which only the wide form holds."""
-    g = "regexp_extract({x}, '%s', ['y', 'mo', 'd', 'h', 'mi', 'sg', 's', 'f'])" % ISO_INTERVAL
+    """Postgres IntervalStyle=postgres text ('1 year 2 mons 3 days 04:05:06.5', '-1 years -2 mons +3 days
+    -04:05:06.789', '2562047788:00:54.775807', '00:00:00'), and 'infinity' / '-infinity' (Postgres 17+), which only
+    the wide form holds. The read sessions print this style since the fix round of package Y (the walsender session
+    prints it too, so an array or a composite that holds intervals prints alike on both paths)."""
+    g = "regexp_extract({x}, '%s', ['y', 'mo', 'd', 'sg', 'h', 'mi', 's', 'f'])" % POSTGRES_INTERVAL
     layers = (
         (("g", g),),
-        (("ok", "({p}g['y'] || {p}g['mo'] || {p}g['d'] || {p}g['h'] || {p}g['mi'] || {p}g['s']) <> ''"),
+        (("ok", "(({p}g['y'] || {p}g['mo'] || {p}g['d'] || {p}g['h']) <> '' AND NOT starts_with({x}, ' '))"),
          ("y", "COALESCE(TRY_CAST(NULLIF({p}g['y'], '') AS HUGEINT), 0)"),
          ("mo", "COALESCE(TRY_CAST(NULLIF({p}g['mo'], '') AS HUGEINT), 0)"),
          ("d", "COALESCE(TRY_CAST(NULLIF({p}g['d'], '') AS HUGEINT), 0)"),
@@ -641,9 +646,10 @@ def _interval_backfill(spec: TypeSpec, form: str) -> Conv:
          ("f", "(CASE WHEN {p}g['f'] = '' THEN 0 ELSE TRY_CAST(rpad({p}g['f'], 6, '0') AS HUGEINT) END)"),
          ("sg", "(CASE WHEN {p}g['sg'] = '-' THEN -1 ELSE 1 END)")),
         (("m", "({p}y * 12 + {p}mo)"),
-         ("u", "({p}h * 3600000000 + {p}mi * 60000000 + {p}sg * ({p}s * 1000000 + {p}f))")),
+         ("u", "({p}sg * ({p}h * 3600000000 + {p}mi * 60000000 + {p}s * 1000000 + {p}f))"),
+         ("okt", "({p}mi <= 59 AND {p}s <= 59)")),
     )
-    return _interval_common(spec, form, layers, "{p}ok", ("{x} = 'infinity'", "{x} = '-infinity'"))
+    return _interval_common(spec, form, layers, "({p}ok AND {p}okt)", ("{x} = 'infinity'", "{x} = '-infinity'"))
 
 
 def _interval_common(spec: TypeSpec, form: str, layers: tuple, ok: str, infinities) -> Conv:
@@ -657,12 +663,10 @@ def _interval_common(spec: TypeSpec, form: str, layers: tuple, ok: str, infiniti
         misfit = "({x} IS NOT NULL AND (%s OR ((%s) AND NOT (%s))))" % (inf, ok, fits)
         return Conv("sql", pa.string(), arrow_type(spec.native_type), layers, final, misfit=misfit)
     w = spec.wide_type
-    if infinities:
-        text = "{x}"
-        all_layers = layers
-    else:
-        iso_layers, text = _interval_iso(m, d, u)
-        all_layers = layers + iso_layers
+    # the text member: 'infinity' / '-infinity' as printed, every other value in ISO 8601 (the same on both paths,
+    # whatever style the input has)
+    iso_layers, text = _interval_iso(m, d, u)
+    all_layers = layers + iso_layers
     final = _wrap_null("CASE WHEN %s THEN CAST(union_value(t := {x}) AS %s) WHEN NOT (%s) THEN %s "
                        "WHEN %s THEN CAST(union_value(n := %s) AS %s) ELSE CAST(union_value(t := %s) AS %s) END"
                        % (inf, w, ok, "CAST(%s AS %s)" % (BAD, w), fits, native, w, text, w))

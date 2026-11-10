@@ -194,23 +194,29 @@ def test_time_timetz_vectors():
 def test_interval_vectors():
     cases = [(0, 0, 0), (14, 3, 14706000078), (-14, 3, -14706500000), (1, -1, 1), (-2147483648, 2147483647, -1),
              (0, 0, R.ARROW_US if hasattr(R, "ARROW_US") else 9223372036854775)]
-    texts = [R.interval_iso(*c) for c in cases]
-    assert texts[:5] == ["PT0S", "P1Y2M3DT4H5M6.000078S", "P-1Y-2M3DT-4H-5M-6.5S", "P1M-1DT0.000001S",
-                         "P-178956970Y-8M2147483647DT-0.000001S"]
+    texts = [R.interval_postgres(*c) for c in cases]
+    # exactly what Postgres 18.6 prints for these values under IntervalStyle=postgres
+    assert texts[:5] == ["00:00:00", "1 year 2 mons 3 days 04:05:06.000078", "-1 years -2 mons +3 days -04:05:06.5",
+                         "1 mon -1 days +00:00:00.000001", "-178956970 years -8 mons +2147483647 days -00:00:00.000001"]
     want = [pa.MonthDayNano([m, d, u * 1000]) for m, d, u in cases]
     assert back("interval", texts).to_pylist() == want
     assert strm("interval", pa.array([R.interval_transport(*c) for c in cases])).to_pylist() == want
     big = (0, 0, 9223372036854775807)
-    for fn, arg in ((back, R.interval_iso(*big)), (back, "infinity"), (back, "-infinity"),
+    assert R.interval_postgres(*big) == "2562047788:00:54.775807"
+    for fn, arg in ((back, R.interval_postgres(*big)), (back, "infinity"), (back, "-infinity"),
                     (strm, pa.array([R.interval_transport(*big)]))):
         with pytest.raises(T.WideningNeeded):
             fn("interval", [arg] if fn is back else arg)
-    w = back("interval", ["infinity", R.interval_iso(*big), "P1D", None], wide=True)
+    # the text member is ISO 8601 on both paths, whatever style the input had ('infinity' as printed)
+    w = back("interval", ["infinity", R.interval_postgres(*big), "1 day", None], wide=True)
     assert union_values(w) == [(1, "infinity"), (1, "PT2562047788H54.775807S"), (0, pa.MonthDayNano([0, 1, 0])),
                                None]
     sw = strm("interval", pa.array([R.interval_transport(*big), "0 months 1 days 0 microseconds", None]), wide=True)
     assert union_values(sw) == union_values(w)[1:]
-    for bad in ["P", "1 day", "PT1.1234567S", "P1Y2Y"]:
+    neg = (0, 0, -9223372036854775807)
+    assert union_values(back("interval", [R.interval_postgres(*neg)], wide=True)) == [(1, "PT-2562047788H-54.775807S")]
+    for bad in ["P1D", "1 dayz", "00:00:00.1234567", "1 year 2 years", "00:60:00", "00:00:60", "", " 1 day",
+                "1 day 2 mons", "--1 days"]:
         with pytest.raises(T.ConversionError):
             back("interval", [bad])
 
@@ -304,7 +310,7 @@ def test_widening_needed_names_all_positions_and_carries_no_value():
     p = T.plan(t, server_version_num=V18)
     secret = "9" * 29 + "." + "123"
     rows = pa.record_batch({"a0": pa.array(["1", secret]), "a1": pa.array(["1", "2"]),
-                            "a2": pa.array(["294270-01-01 00:00:00", None]), "a3": pa.array(["PT1S", "PT2S"])})
+                            "a2": pa.array(["294270-01-01 00:00:00", None]), "a3": pa.array(["00:00:01", "00:00:02"])})
     with pytest.raises(T.WideningNeeded) as e:
         T.backfill(p, rows)
     assert e.value.positions == (0, 2) and secret not in _all_text(e.value)
@@ -367,7 +373,7 @@ def test_threads_give_the_same_results_as_one():
     rows = pa.record_batch({"a0": pa.array([str(i) + ".25" for i in range(n)]),
                             "a1": pa.array([R.date_text(i * 37 - 90000) for i in range(n)]),
                             "a2": pa.array([R.ts_text(i * 123456789011, tz=True) for i in range(n)]),
-                            "a3": pa.array([R.interval_iso(i, -i, i * 1000001) for i in range(n)])})
+                            "a3": pa.array([R.interval_postgres(i, -i, i * 1000001) for i in range(n)])})
     ref = T.Transformer().backfill(p, rows)
     results, errors = [None] * 6, []
 
@@ -436,7 +442,7 @@ def test_negative_zero_and_nan_kept_by_bits_on_both_paths_also_inside_arrays():
 
 UNION_FAMILIES = [("numeric", -1, "1.5"), ("numeric", numeric_typmod(15, 2), "1.50"),
                   ("timestamp", -1, "2020-01-01 00:00:00"), ("timestamptz", -1, "2020-01-01 00:00:00+00"),
-                  ("interval", -1, "P1D")]
+                  ("interval", -1, "1 day")]
 
 
 @pytest.mark.parametrize("typ,typmod,value", UNION_FAMILIES)

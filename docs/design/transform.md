@@ -33,7 +33,7 @@ t.stream(plan, rows); t.backfill(plan, rows); t.ambiguous(plan, rows); t.close()
 - `TablePlan` (frozen): `schema`, `table`, `oid`, `server_version_num`, `columns` (one `ColumnPlan` per position:
   `source_name`, `source_type` (format_type, with modifiers), `base_type`, `family`, `dest_name`, `native_type`,
   `wide_type`, `form` ('native' | 'wide'), `dest_type`, `key`, `unchanged_possible` (variable-length type, as the engine decides; not the column storage),
-  `stream_forms`, `numeric`, `step`), `has_key`, `key_positions`, `ambiguous`, `collisions`, `hash`;
+  `stream_forms`, `numeric`, `step`), `has_key`, `key_positions`, `ambiguous`, `ambiguous_key`, `collisions`, `hash`;
   `widened(position)`, `widen_sql(position, column_sql=None)`, `with_step(position, sql)`, `table_meta()`,
   `create_columns()`, `column_ddl()`, `arrow_schema()`.
 - `hash` is a SHA-256 over everything the destination table and the conversion depend on, including the server's
@@ -52,6 +52,15 @@ t.stream(plan, rows); t.backfill(plan, rows); t.ambiguous(plan, rows); t.close()
 area (`temp_directory`, `max_temp_directory_size`) given at construction: with external access off DuckDB refuses
 to change `temp_directory` later. Test: `test_connection_is_isolated_from_motherduck`,
 `test_spill_area_setting_and_nothing_left_behind`.
+
+**Keys** (core design 6: two keys that the source calls different must differ in the destination).
+`TablePlan.ambiguous_key` lists the key positions whose stream form is not injective: a scalar `interval` key, also
+through a domain over `interval`, on a source of Postgres 17 or later (0, `infinity` and `-infinity` all arrive as the
+zero interval). Package S does not stream such a table (plan 6.2). Every other key type is injective: an interval
+array or a composite with an interval field travels as text in which the engine keeps `infinity`, and since the fix
+round both paths print it alike (cross-path test: `f_aiv`, `f_cp` identical); the wide forms of numeric and
+timestamp keys use an exact fit test and distinct members; text-fallback keys are Postgres's output. Test:
+`test_ambiguous_key_lists_exactly_the_key_columns_the_stream_cannot_deliver_injectively`.
 
 ## 2. How a caller handles `WideningNeeded`
 
@@ -104,8 +113,10 @@ the message, `repr`, `args`, `vars`, the whole chain, the formatted traceback an
 and `__context__` are None.
 
 **Per family**: `src/cdc_v2/transform/families.py`; dates and timestamps are counted with H. Hinnant's
-days-from-civil algorithm (astronomical years, so `N BC` is year 1−N); intervals in ISO form are parsed with one
-regular expression; the stream's wide text (timestamps above DuckDB's range, intervals above Arrow's) is printed
+days-from-civil algorithm (astronomical years, so `N BC` is year 1−N); intervals in the backfill are read in
+IntervalStyle `postgres` (since the fix round; years and months, days and the time part each with its own sign,
+hours unbounded) with one regular expression; the text member of the interval's wide form is ISO 8601 on both
+paths (`PT2562047788H54.775807S`; `infinity` and `-infinity` as printed); the stream's wide text (timestamps above DuckDB's range, intervals above Arrow's) is printed
 exactly as Postgres's `EncodeDateTime`/`EncodeInterval` print it.
 
 ## 4. Speed and memory
@@ -185,25 +196,24 @@ value; 0.89 in the final run); a 100 MB text value (both paths) and a 100 MB `by
 ## 7. Findings
 
 **Values for which the two paths differed** (cross-path test, Postgres 18.6 and 16.6): no baseline family. Fallback
-columns: arrays of `interval` and composites with an `interval` field (IntervalStyle differs between the two
-sessions), geometric types (Java float formatting). On 18: `infinity`/`-infinity` in a scalar interval column (zero
+columns: geometric types (Java float formatting). Arrays of `interval` and composites with an `interval` field
+differed until the fix round (IntervalStyle of the two sessions); the read sessions now print `postgres` and they
+are identical. On 18: `infinity`/`-infinity` in a scalar interval column (zero
 through the stream, marked by `ambiguous`; true value through the backfill). An interval above 2^31 hours is a
 stream-side gap (the driver fails), delivered by the backfill. Bugs of this package that the tests found during
 development, all fixed and covered: the stream's wide timestamp text cut years of five or more digits (DuckDB's
 `lpad`); the fast path silently fell back for dates and timestamps (a type promotion), caught by
 `test_stream_fast_path_equals_the_sql_path`; a prepared statement returned a previous batch (no longer used).
 
-**For package E**: (1) a text value containing intervals (arrays, composites) is printed with
-`IntervalStyle=postgres` by the walsender session; the read sessions print `iso_8601`. Either the engine's session
-uses `iso_8601` (if pgjdbc's `PGInterval` parses it) or package P's read sessions use `postgres`. (2) Geometric
-values lose Postgres's float formatting (known, P4).
+**For package E**: geometric values lose Postgres's float formatting (known, P4). The IntervalStyle difference is
+resolved: the read sessions of package P print `postgres` like the walsender session (decided by the coordinator).
 
-**For package P**: (1) the IntervalStyle point above; (2) `TypeInfo` has no domain typmod.
+**For package P**: `TypeInfo` has no domain typmod.
 
 **For package O (oracle)**: the oracle cannot judge some values that P3 delivers: it has no VARCHAR member rule for
 timestamp and interval columns (the wide forms); its Postgres timestamp form overflows `bigint` above 294247 AD;
 arrays delivered as text never match (its array rule wants a LIST); composites as text are compared under the
-oracle's own, unpinned session (IntervalStyle); `inet::text` differs from inet's output (`::1/128` vs `::1`); and
+oracle's own session (resolved by the IntervalStyle change: they compare equal now); `inet::text` differs from inet's output (`::1/128` vs `::1`); and
 TIMETZ is compared through `CAST(TIMETZ AS VARCHAR)`, which DuckDB 1.5.6 prints wrongly for offsets with a zero
 minute and seconds (`-01:00:30` printed `-01:30`; the stored value is right). The cross-path test lists these
 tables and compares them by the identity of the two paths instead.
@@ -232,10 +242,20 @@ range: it now covers only Postgres's range; (3) "unchanged possible" came from t
 PLAIN` leaves out-of-line values in place: it now follows the type (variable length), as the engine does; (4) a step
 template with a lone `}` failed at compile time: refused when set.
 
+## 7b. Fix round after the coordinator's review
+
+(1) A negative control for the cross-path identity check: one `-0` made `+0` in `f_f8` and one timestamp moved by
+1 µs in `f_ts` on the stream path; `compare_paths` reports exactly those tables, column 1 and those ids (evidence key
+`negative_control`). (2) `TablePlan.ambiguous_key` (section 1, "Keys"). (3) One interval text style on both paths:
+`FIXED_SESSION_SETTINGS["IntervalStyle"]` is `postgres`; the backfill parses that style; Postgres-prints reads back
+3,015 interval values (with the extremes, and `infinity`/`-infinity` on 18) exactly on 18 and 16; the cross-path
+test finds arrays and composites with intervals identical. (4) Default run: 30 property examples per family
+(`CDC_V2_Y_EXAMPLES` for more).
+
 ## 8. Tests and how to run them
 
 ```sh
-uv run -q pytest -q tests/transform                                         # default run: hermetic, ~5 s
+uv run -q pytest -q tests/transform                                         # default run: hermetic, ~3 s
 CDC_V2_Y_EXAMPLES=1500 uv run pytest -q tests/transform/test_transform_property.py     # longer property run
 uv run pytest -m localpg tests/transform/test_transform_localpg.py           # Postgres prints; oracle negative controls
 uv run pytest -m "localpg and jvm" tests/transform/test_transform_crosspath.py          # engine + backfill, Postgres 18

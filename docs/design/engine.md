@@ -502,8 +502,9 @@ here (P9).
     `failing_position`, not `positions`, to recognise "the same place" across restarts. Its messages are filtered
     (section 7).
 12. **Two transport forms of text, on purpose.** The walsender session of the engine uses `IntervalStyle=postgres`
-    and `DateStyle=ISO` (`driver.options`, section 4); the read connections of the source package use `iso_8601`
-    and `ISO, YMD`. The stream form of every type is the table of section 3 of this document; the backfill form is
+    and `DateStyle=ISO` (`driver.options`, section 4); the read connections of the source package use `postgres`
+    too (since the fix round of package Y, so that arrays and composites that hold intervals print alike) and
+    `ISO, YMD`. The stream form of every type is the table of section 3 of this document; the backfill form is
     the source package's.
 13. The source package's nudge writes a logical message with the prefix `cdc_v2.nudge`, which lies outside the
     default `message.prefix.include.list` (`cdc_v2_.*`) on purpose: it never reaches the pipeline.

@@ -3,7 +3,7 @@
 The destination type of every source column, and how a value gets there on both paths. Built by package Y
 (`src/cdc_v2/transform/`); the design is `docs/design/transform.md`. "Stream form" is the engine's transport form
 (`docs/design/engine.md` section 3). "Backfill form" is the text that Postgres prints under the read sessions'
-settings (`docs/design/source.md` section 1: DateStyle `ISO, YMD`, IntervalStyle `iso_8601`, TimeZone `UTC`,
+settings (`docs/design/source.md` section 1: DateStyle `ISO, YMD`, IntervalStyle `postgres`, TimeZone `UTC`,
 `extra_float_digits = 3`, `bytea_output = hex`, `lc_monetary = C`). "Equal" is the oracle's rule
 (`docs/oracle.md` 1.2).
 
@@ -37,11 +37,14 @@ values per family). Evidence: `evidence/p3/transform/`.
 | `timestamptz` | `TIMESTAMP WITH TIME ZONE` (an instant, UTC) | `UNION(n TIMESTAMPTZ, t VARCHAR)` | `timestamptz_pg_us` | as `timestamp` with `+00` | as `timestamp`; `t` ends in `+00` | V, P, X, L |
 | `time` | `TIME` | – | `time_us` (reinterpreted, no copy) | `HH:MM:SS[.f]` | `24:00:00` fits (DuckDB and Arrow hold 86,400,000,000 µs) | V, P, X, L |
 | `timetz` | `TIME WITH TIME ZONE` | – | `text` (same text) | `HH:MM:SS[.f]±HH[:MM[:SS]]` | offsets ±15:59:59 (DuckDB's range = Postgres's), `24:00:00`; built from the parts, not by DuckDB's cast | V, P, X, L |
-| `interval` | `INTERVAL` | `UNION(n INTERVAL, t VARCHAR)` | `interval_text` | ISO 8601 (`P1Y2M3DT4H5M6.5S`) | months, days, µs kept apart, each with its own sign; \|µs\| > 9,223,372,036,854,775 (≈ 2,562,047 h; Arrow's nanoseconds overflow) → wide; `infinity`/`-infinity` (17+) → wide; `t` = ISO text | V, P, X, L |
+| `interval` | `INTERVAL` | `UNION(n INTERVAL, t VARCHAR)` | `interval_text` | IntervalStyle `postgres` (`-1 years -2 mons +3 days -04:05:06.789`, `2562047788:00:54.775807`, `00:00:00`) | months, days, µs kept apart, each with its own sign; \|µs\| > 9,223,372,036,854,775 (≈ 2,562,047 h; Arrow's nanoseconds overflow) → wide; `infinity`/`-infinity` (17+) → wide; `t` = ISO 8601 text on both paths (`PT2562047788H54.775807S`; `infinity` as printed) | V, P, X, L |
 | `uuid` | `UUID` | – | `text` | same text | – | V, P, X |
 | `json`, `jsonb` | `VARCHAR` | – | `text` (passed on) | passed on | the text as printed: duplicate keys, key order, huge numbers. Not DuckDB `JSON`: it refuses `"\ud800"`, which Postgres `json` holds (test `test_lossless_arrow_types_for_uuid_timetz_and_json_text`) | V, X |
 | enums | `VARCHAR` | – | `text` | label | **Point for the owner (H-033)**: a DuckDB `ENUM` cannot follow a label that is renamed or a reorder without rewriting the column, so labels are text | X |
 | domains | the base type's mapping | | | | a domain's own typmod is not in the catalog value; `numeric(10,2)` domains are planned as unconstrained numeric (lossless) | V, X |
+
+Keys: a scalar `interval` key (also through a domain) on a source of Postgres 17 or later is not injective in the
+stream (`TablePlan.ambiguous_key`); see `docs/design/transform.md`, "Keys".
 
 Every family: NULL is a real NULL on both paths (`test_source_null_is_a_real_null_in_a_union_column` for the wide
 forms); every family can be a key column (the transform does not treat keys differently; `k<i>` and `b<i>` are
@@ -64,14 +67,13 @@ all of them are in X; the stream form equals that text except where noted.
 
 | Source type | Stream form vs Postgres text | Note |
 |---|---|---|
-| arrays (any element type), domains over arrays | equal, except arrays of `interval` | interval elements: see below |
+| arrays (any element type), domains over arrays | equal (also arrays of `interval`) | |
 | `money` | `money_text` (plain decimal) → formatted as Postgres prints it (`$1,234.50`, `-$0.01`) | equal |
 | `bit(n)`, `varbit` | equal | `B'101'` ≠ `B'0101'` kept |
 | `hstore` | equal | |
-| composite types | equal, except with an `interval` field | |
+| composite types | equal (also with an `interval` field) | |
 | ranges, multiranges | equal | |
 | `inet`, `cidr`, `macaddr`, `macaddr8`, `xml`, `tsvector`, `tsquery`, `pg_lsn`, `ltree`, `oid` | equal (`oid`: int64 → decimal text) | |
-| **interval inside an array or a composite** | **differs**: the walsender session prints `IntervalStyle=postgres` (`1 day`), the read sessions `iso_8601` (`P1D`) | finding for packages E and P |
 | **geometric** (`point`, `box`, …) | **differs**: Debezium passes pgjdbc's objects, printed with Java's float formatting | finding for package E; not lossless in the stream yet |
 | a scalar `interval` above 2^31 hours | the stream cannot deliver it (the driver fails; `docs/design/engine.md` 10) | the backfill delivers it (wide form) |
 | a scalar `interval` `infinity` (Postgres 17+) | the stream delivers a zero interval, marked by `transform.ambiguous` | plan C3 "Ambiguous zero interval" (repair in P4) |
