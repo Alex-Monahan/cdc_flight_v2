@@ -218,17 +218,21 @@ stays in place behind every entry.
   `SQL_ASCII` or `LATIN1` database yields replacement characters or mojibake. Output of `money` depends on
   `lc_monetary`, of timestamps on `DateStyle`/`TimeZone`, of intervals on `IntervalStyle`, of floats on
   `extra_float_digits`, of `bytea` on `bytea_output` **[doc]** (<https://www.postgresql.org/docs/18/runtime-config-client.html>).
-  pgjdbc sets `DateStyle=ISO`, `extra_float_digits=3`, `client_encoding=UTF8` and `TimeZone` in its start-up packet
-  **[doc]** (pgjdbc docs), **[test]** for the replication connection; `lc_monetary`, `IntervalStyle` and `bytea_output`
-  are inherited from role/database/server settings.
+  pgjdbc sends `client_encoding=UTF8`, `DateStyle=ISO`, `TimeZone` (the JVM default) and, if configured, `options` as
+  start-up parameters, also on replication connections, and sets `extra_float_digits` with a `SET` after connecting
+  (`org/postgresql/core/v3/ConnectionFactoryImpl.java`, pgjdbc `REL42.7.13`) **[src]**; since PostgreSQL 12 any
+  `extra_float_digits > 0` (default 1) gives shortest-exact float output **[doc]**. `lc_monetary`, `IntervalStyle` and
+  `bytea_output` are inherited from role, database or server settings.
 - **Reproduction.** P: `ALTER ROLE <runtime role> SET intervalstyle = 'sql_standard';` then insert an interval; or
   `ALTER ROLE <runtime role> SET bytea_output = 'escape';` then insert bytea; observe Debezium's values.
 - **Prevention.** Guard at every connection: `SHOW server_encoding` must be `UTF8` (otherwise the database is refused
   for streaming *with an explanation*, and its tables use full-refresh mode, whose reads convert server-side) —
   **[test]** whether PlanetScale databases are always UTF8; pin session GUCs for the replication connection through
   pgjdbc's `options` property (`-c lc_monetary=C -c IntervalStyle=postgres -c bytea_output=hex -c DateStyle=ISO
-  -c extra_float_digits=3`), passed through Debezium's `driver.` pass-through prefix **[test]**; verify the effective
-  values on the replication connection (`SHOW` over a normal connection with the same options).
+  -c extra_float_digits=3`); Debezium passes every `database.*` and `driver.*` property to the JDBC driver with the
+  prefix stripped (`RelationalDatabaseConnectorConfig`, `config.subset(DATABASE_CONFIG_PREFIX, true).merge(
+  config.subset(DRIVER_CONFIG_PREFIX, true))`) **[src]**, so `driver.options=…` reaches the start-up packet; that the
+  walsender's output functions honour these settings is **[test]** (compare delivered values with and without them).
 - **Why prevention.** The text format is fixed before the first value is produced.
 - **Test.** `test_h013_session_gucs` (role-level overrides of every listed GUC must not change delivered values);
   `test_h013_non_utf8_database_refused`.

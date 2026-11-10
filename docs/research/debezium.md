@@ -24,7 +24,7 @@ their `DBZ-N` Jira key.
 
 | Line | Latest | Released | Status |
 |---|---|---|---|
-| 3.8 | 3.8.0.Alpha1 | 2026-11 | development, not for use |
+| 3.8 | 3.8.0.Alpha1 | (tag exists) | development, not for use |
 | **3.7** | **3.7.1.Final** | **2026-11-06** | **latest stable** |
 | 3.6 | 3.6.3.Final | 2026 | previous stable |
 
@@ -567,8 +567,8 @@ Rules for lossless delivery with stock Debezium 3.7.1 — every item is configur
 |---|---|---|---|
 | `numeric` (constrained) | `precise`: Decimal | not for NaN/±Inf (connector fails) | `decimal.handling.mode=string` |
 | `numeric` (unconstrained, precision > 38, NaN, ±Inf) | VariableScaleDecimal, trailing zeros stripped | no | `string` |
-| `money` | text parsed by `PostgresMoney.parse`: strips one leading currency symbol and `,` separators → BigDecimal | only if `lc_monetary` gives `.` decimals and a one-character prefix; otherwise `ConnectException` (refusal) | `lc_monetary=C` in the walsender session **[test]**, or a custom converter emitting text |
-| `float4`, `float8` incl. NaN, ±Inf, -0 | Java float/double from text | yes with `extra_float_digits ≥ 1` (shortest-exact output since 12) **[doc]**; pgjdbc sets 3 at connect **[test]** | — |
+| `money` | text parsed by `PostgresMoney.parse`: strips one leading currency symbol and `,` separators → BigDecimal | only if `lc_monetary` gives `.` decimals and a one-character prefix; otherwise `ConnectException` (refusal) | `driver.options=-c lc_monetary=C` (Debezium passes `driver.*` to pgjdbc, which sends `options` in the start-up packet **[src]**; effect on walsender output **[test]**), or a custom converter emitting text |
+| `float4`, `float8` incl. NaN, ±Inf, -0 | Java float/double from text | yes: any `extra_float_digits > 0` (server default 1) gives shortest-exact output since 12 **[doc]**; pgjdbc additionally sets it after connect **[src]** (pgjdbc `ConnectionFactoryImpl`, REL42.7.13) | — |
 | `date`, `timestamp` incl. ±infinity, BC, year > 9999 | epoch-based; infinity → sentinels; BC parse fixed in 3.7.0 (debezium/dbz#1340, #2664) | `structured`: yes **[doc]**; BC encoding to verify **[test]** | `time.precision.mode=structured` |
 | `timestamptz` extremes | OffsetDateTime at UTC | `structured` keeps components and offset **[doc]** | same |
 | `time` (incl. `24:00:00`), `timetz` | micro/nano time | `24:00:00` unverified **[test]** | `structured` |
@@ -679,6 +679,7 @@ database.user=${PG_USER}
 database.password=${PG_PASSWORD}
 database.sslmode=verify-full                             # PLAN 8
 database.tcpKeepAlive=true                               # default; OS-level only (8.2)
+driver.options=-c lc_monetary=C -c IntervalStyle=postgres -c bytea_output=hex -c DateStyle=ISO   # pin walsender text output (H-013)
 topic.prefix=cdc_v2                                      # required; names record topics
 # decoding
 plugin.name=pgoutput                                     # SPEC 7.1
