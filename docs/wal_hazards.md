@@ -98,7 +98,7 @@ stays in place behind every entry.
 
 ### H-049 Decoder spill on the decoding server
 
-*(Numbered with the replica group but placed here because it follows from H-001.)* See §E.
+*(Numbered with the replica group, §G, because the spill lands on the decoding server.)*
 
 ---
 
@@ -399,6 +399,12 @@ stays in place behind every entry.
   removes the table from the publication and switches it to `full_refresh`, alerting.
 - **Why prevention.** Our publication never contains a table for which the source's own writes would fail.
 - **Test.** `test_h014_keyless_discovery` (application UPDATE/DELETE keep working), `test_h014_identity_index_dropped`.
+- **Related source-side effects of publication membership** (same guard): a published table cannot be switched to
+  `UNLOGGED` ("cannot change table … to unlogged because it is part of a publication", `ATPrepChangePersistence`,
+  `pg:src/backend/commands/tablecmds.c`) and `ALTER TABLE … ALTER COLUMN … SET EXPRESSION` is refused for virtual
+  generated columns of published tables (same file) **[src]**. Adding a table to our publication can therefore make an
+  application's DDL fail; the operator documentation must say so, and `discovery.auto_replicate: false` (SPEC 2.3) is
+  the switch for databases where that is unacceptable.
 - **Residual.** A window between an index drop and our next poll in which the application's updates fail (seconds);
   only the operator's own DDL can open it. Finding F-7.
 
@@ -438,3 +444,375 @@ stays in place behind every entry.
 - **Test.** `test_h016_truncate_variants` (multi-table, CASCADE, RESTART IDENTITY, inside a transaction with
   inserts before and after, soft-delete mode SPEC 8.1).
 - **Residual.** None known.
+
+### H-017 Logical messages
+
+- **What.** `pg_logical_emit_message(transactional, prefix, content)` — transactional (inside a transaction, may roll
+  back) and non-transactional ("written immediately and decoded as soon as the logical decoder reads the record")
+  **[doc]** (<https://www.postgresql.org/docs/18/functions-admin.html>).
+- **Mechanism.** Debezium requests `messages=true` (14+) and emits `m` records; a transactional message sits between the
+  transaction's BEGIN and END; a non-transactional one is its own commit point (`commitMessage`) and is delivered even
+  if the emitting transaction later aborts **[src]**. Restart bugs exist when the stored offset points at a
+  transactional message (debezium/dbz#2058 fixed 3.6.0.Beta2, #2889 fixed 3.7.1, #2901 open) **[doc]**. Content can be
+  up to 1 GB (H-002). Messages with prefixes not in `message.prefix.include.list` are filtered but still advance the
+  stream (debezium/dbz#2733: no warning about WAL backlog for filtered messages) **[doc]**.
+- **Reproduction.** S0; P: `BEGIN; INSERT INTO cdc_v2_t VALUES (20,'m'); SELECT pg_logical_emit_message(true,
+  'app_evt', 'in-tx'); SELECT pg_logical_emit_message(false, 'app_evt', 'non-tx'); ROLLBACK;` — peek shows only the
+  non-transactional message.
+- **Prevention.** Memory offset store (no restart from a stored offset at a message, H-027); the applier writes
+  transactional messages in the same destination transaction as their source transaction and non-transactional ones
+  in stream order (SPEC 7.4); message content flows through the same size guard as values (H-002); document that a
+  non-transactional message of an aborted transaction is delivered (PostgreSQL semantics, not an error).
+- **Why prevention.** The restart path with the known bugs is never taken; atomicity follows from the transaction
+  grouping that the applier already does.
+- **Test.** `test_h017_messages` (transactional committed/rolled back, non-transactional inside aborted transaction,
+  prefix filter, 100 MB content, SIGKILL right after a message).
+- **Residual.** None known.
+
+### H-018 Origin messages
+
+- **What.** Transactions replayed by a logical-replication subscriber *on the source*, or sessions that set a
+  replication origin, carry an origin.
+- **Mechanism.** pgoutput sends an Origin message before such transactions when the client does not filter origins; the
+  `origin` option (`none`/`any`) is a subscriber-side filter that Debezium does not send, so the default `any` applies
+  and all transactions are delivered; Debezium records origin name/LSN in the source info **[src]**.
+- **Reproduction.** On P: `SELECT pg_replication_origin_create('cdc_v2_o'); SELECT pg_replication_origin_session_setup(
+  'cdc_v2_o'); INSERT INTO cdc_v2_t VALUES (30,'o');` (superuser on T1) — peek shows `O` before the INSERT.
+- **Prevention.** Configuration rule: never pass `origin=none` (`slot.stream.params` stays empty); start-up assertion of
+  the effective stream parameters.
+- **Why prevention.** Origin-tagged changes are never filtered out.
+- **Test.** `test_h018_origin_tagged_changes_delivered`.
+- **Residual.** None.
+
+### H-019 Two-phase (prepared) transactions
+
+- **What.** `PREPARE TRANSACTION` / `COMMIT PREPARED` / `ROLLBACK PREPARED` on the primary.
+- **Mechanism.** Without the `two_phase` option a prepared transaction is decoded at `COMMIT PREPARED` as a normal
+  transaction; `ROLLBACK PREPARED` produces nothing **[doc]**
+  (<https://www.postgresql.org/docs/18/logicaldecoding-two-phase-commits.html>). A prepared transaction that stays open
+  holds back the slot's `restart_lsn` and `catalog_xmin` like any running transaction (H-031) and blocks logical slot
+  creation (H-040) **[src]** (snapbuild.c).
+- **Reproduction.** P (`max_prepared_transactions > 0`): `BEGIN; INSERT INTO cdc_v2_t VALUES (40,'p'); PREPARE
+  TRANSACTION 'cdc_v2_gx';` — nothing in peek; `COMMIT PREPARED 'cdc_v2_gx';` — the transaction appears.
+- **Prevention.** Configuration: no `two_phase`; guard: the periodic check lists `pg_prepared_xacts` on the primary and
+  alerts on any prepared transaction older than 10 minutes (it pins WAL and blocks slot creation).
+- **Why prevention.** Prepared transactions are delivered exactly like ordinary ones; their side effects are detected
+  before WAL retention or slot creation suffers.
+- **Test.** `test_h019_prepared_commit_and_rollback`, `test_h019_prepared_blocks_slot_creation` (with H-040).
+- **Residual.** An abandoned prepared transaction is an operator problem we can only alert on.
+
+### H-020 Streamed in-progress transactions
+
+- **What.** Stream Start/Stop/Commit/Abort and Stream Prepare messages (protocol ≥ 2/4).
+- **Mechanism.** Sent only when the client requests `streaming` with a sufficient `proto_version`
+  (`pgoutput_startup`) **[src]**; Debezium 3.7.1 hard-codes protocol 1 **[src]**, so they never arrive; an unexpected
+  message type would throw in `MessageType.forType` **[src]**.
+- **Reproduction.** Not reachable with stock Debezium 3.7.1; with `pg_recvlogical -o proto_version=2 -o streaming=on` one
+  sees the messages a future version would receive.
+- **Prevention.** Version pin (debezium.md §1.2) and a pin-upgrade checklist item: any Debezium release that changes
+  `proto_version` or adds `streaming` is a correctness change (SPEC §4 counters restart).
+- **Why prevention.** The message classes cannot appear while the pin holds.
+- **Test.** `test_h020_stream_options_pinned` (asserts the options in `pg_stat_replication`/server log on connect).
+- **Residual.** None while pinned; the cost is H-001's head-of-line latency and H-049's spill.
+
+### H-021 Partitions: attach, detach, drop, `publish_via_partition_root`
+
+- **What.** Partitioned tables whose partitions are attached, detached or dropped while streaming.
+- **Mechanism.** With `publish_via_partition_root = true`, changes are published as the root, `TRUNCATE` on a partition
+  is not replicated, and attaching a table "does not result in the table's existing contents being replicated"; with
+  `false`, leaves are published under their own names **[doc]** (CREATE PUBLICATION). `ATTACH` of a populated table
+  emits no row changes; `DETACH` and `DROP` of a partition emit none either (DDL is not decoded).
+- **Reproduction.** P: `CREATE TABLE cdc_v2_p (id int, k int) PARTITION BY RANGE (k); CREATE TABLE cdc_v2_p1 PARTITION
+  OF cdc_v2_p FOR VALUES FROM (0) TO (10); ALTER PUBLICATION cdc_v2_pub ADD TABLE cdc_v2_p; CREATE TABLE cdc_v2_p2 (id
+  int, k int); INSERT INTO cdc_v2_p2 VALUES (1, 15); ALTER TABLE cdc_v2_p ATTACH PARTITION cdc_v2_p2 FOR VALUES FROM (10)
+  TO (20); ALTER TABLE cdc_v2_p DETACH PARTITION cdc_v2_p1;` — no row events for p2's existing row or p1's removal.
+- **Prevention.** Our publication uses `publish_via_partition_root = false` (leaf names; partition truncates are
+  delivered); the combined-table mode of SPEC 7.3 is implemented by the applier (leaf → root mapping), not by the
+  publication; the catalog fence tracks `pg_inherits` and `relispartition`: an attach schedules a per-partition snapshot
+  into the combined (or per-partition) destination table; a detach or drop removes that partition's rows from the
+  combined table at the fenced position (and, for detach, the detached table becomes an ordinary discovered table).
+- **Why prevention.** Every partition-membership change is applied at a known WAL position with an explicit snapshot,
+  instead of leaving silent gaps.
+- **Test.** `test_h021_attach_populated`, `…_detach`, `…_detach_concurrently`, `…_drop_partition`,
+  `…_truncate_partition`, `…_default_partition_split`.
+- **Residual.** Rows of a newly attached partition appear after its snapshot (SPEC 1.3 table-status rule).
+
+### H-022 Generated and identity columns
+
+- **What.** Stored and virtual generated columns; identity columns.
+- **Mechanism.** PostgreSQL 18 makes generated columns **virtual by default**; virtual ones are never published; stored
+  ones are published only with `publish_generated_columns = stored` or an explicit column list **[doc]** (18 release
+  notes, CREATE PUBLICATION); PostgreSQL 17 never publishes generated columns **[doc]** (17 docs). Their values exist
+  only in `SELECT` results, so a backfill sees them and the stream does not. Identity columns are ordinary values.
+- **Reproduction.** P: `ALTER TABLE cdc_v2_t ADD COLUMN g1 int GENERATED ALWAYS AS (length(v)) STORED, ADD COLUMN g2 int
+  GENERATED ALWAYS AS (id * 2) VIRTUAL; UPDATE cdc_v2_t SET v = 'abc' WHERE id = 1;` — peek shows neither column (default
+  publication options).
+- **Prevention.** Our publication sets `publish_generated_columns = stored` on 18 (stored values streamed); for virtual
+  columns and for stored ones on 17, the applier computes the column in the destination when the generation expression
+  is on a whitelist of translatable immutable expressions (catalog `pg_attrdef`, fenced), and otherwise the column is
+  refreshed by keyed re-reads from the replica after each applied batch, flagged in the table status (documented
+  exception to "no re-read" which SPEC 2.6 states only for TOAST). The choice is made at discovery, before the first row.
+- **Why prevention.** Every generated value has a defined source before the table goes live.
+- **Test.** `test_h022_stored_generated_pg18`, `…_virtual_generated_translatable`, `…_virtual_generated_reread`,
+  `test_h022_identity_columns`.
+- **Residual.** The re-read path is eventually consistent per row and can momentarily break cross-table invariants on
+  generated columns; finding F-8.
+
+### H-023 Publication column lists and row filters
+
+- **What.** `CREATE PUBLICATION … FOR TABLE t (a, b)` or `… WHERE (expr)`.
+- **Mechanism.** debezium/dbz#2375 (open): with a column list, after any schema refresh the decoder binds tuple values
+  positionally to the wrong columns until the replication session restarts — wrong values without an error **[doc]**.
+  Row filters publish an `UPDATE` that moves a row into the filter as INSERT and out of it as DELETE, and never publish
+  filtered rows **[doc]** (<https://www.postgresql.org/docs/18/logical-replication-row-filter.html>).
+- **Reproduction.** P: `CREATE PUBLICATION cdc_v2_pub_cl FOR TABLE cdc_v2_t (v, id);` and stream with it after a schema
+  refresh (debezium/dbz#2375 recipe).
+- **Prevention.** Design rule: our publication never uses column lists or row filters (PII exclusion and masking happen
+  in the Flight, SPEC 8.3); the catalog fence checks `pg_publication_rel.prattrs`/`prqual` and `pg_publication` options
+  of our publication on every poll and treats any change by a third party as a configuration fault (alert, stop
+  streaming before the next change, restore the definition, backfill affected tables).
+- **Why prevention.** The defective decoder path is never exercised.
+- **Test.** `test_h023_publication_tampering` (column list, row filter, `publish` option changes added externally).
+- **Residual.** None while the rule holds.
+
+---
+
+## E. Stream behaviour, restarts and Debezium itself
+
+### H-024 Keepalives and sender timeouts during long applies
+
+- **What.** The destination commit or apply takes minutes; or the walsender spends a long time decoding/skipping
+  without sending.
+- **Mechanism.** The walsender terminates clients that do not reply for `wal_sender_timeout` (60 s) **[doc]**. Debezium's
+  keepalive thread sends status updates every `status.update.interval.ms` independently of the consumer **[src]**, so a
+  slow applier does not trigger the timeout; JVM pauses longer than the timeout do. PostgreSQL itself sends keepalives
+  while processing large or skipped transactions (`WalSndUpdateProgress`/`update_progress_txn`) **[src]**.
+- **Reproduction.** Set `wal_sender_timeout = 10s` on R; make the applier sleep 5 min during a batch; observe no
+  disconnect. Then `kill -STOP` the JVM for 20 s; observe "terminating walsender process due to replication timeout".
+- **Prevention.** `status.update.interval.ms` ≤ `wal_sender_timeout` / 3 (checked against the server value at start);
+  JVM heap and GC settings capped so pauses stay far below the timeout (P9 measurement); supervisor deadlines (SPEC 4.5)
+  shorter than any server timeout so that our side restarts first, cleanly.
+- **Why prevention.** The configuration makes a timeout impossible while the process is alive.
+- **Test.** `test_h024_long_apply_no_timeout`, `test_h024_frozen_jvm_reconnects` (oracle after reconnect).
+- **Residual.** Network partitions longer than the timeout always disconnect (correct; H-025 covers the replay).
+
+### H-025 Redelivery after restart (and slot regression after a crash)
+
+- **What.** After any restart the server re-sends transactions we may already have applied.
+- **Mechanism.** The server starts at `confirmed_flush_lsn`, which trails our applied position by the acknowledgement
+  lag (debezium.md §3.3) and, after a crash of the server holding the slot, may regress to the last
+  checkpoint/restartpoint: "in the case of a crash the slot might return to an earlier LSN" **[doc]**. The 32-bit xid
+  wraps and is not a key **[src]**.
+- **Reproduction.** S0; stream and apply 1000 transactions; `tools/localpg kill` R (immediate shutdown) before its next
+  restartpoint; restart; the slot's `confirmed_flush_lsn` is older than what was acknowledged; peek shows already-applied
+  transactions.
+- **Prevention.** Design rule (SPEC 1.1): the destination stores the applied **commit LSN** in the same transaction as
+  the data; the applier discards every transaction whose commit LSN ≤ applied; whole-transaction delivery (protocol 1)
+  makes this exact.
+- **Why prevention.** Duplicates are recognised before they are applied.
+- **Test.** `test_h025_replica_crash_redelivery`, crash-point suite (SPEC 1.7) with ≥ 3 seeds per point.
+- **Residual.** None.
+
+### H-026 Empty-transaction floods and unpublished-traffic floods
+
+- **What.** Heavy write traffic on tables outside the publication (or many transactions that change nothing published)
+  while published tables are idle.
+- **Mechanism.** Since PostgreSQL 15 pgoutput sends nothing for transactions without published changes **[doc]** (15
+  release notes); Debezium flushes only LSNs of messages it receives (`lsn.flush.mode=connector`) and warns after
+  10 000 filtered events (`maybeWarnAboutGrowingWalBacklog`) **[src]**. The slot's position stalls while WAL grows, on
+  the server holding the slot, until the WAL cap invalidates it (H-036).
+- **Reproduction.** S0, heartbeat off; P: `CREATE TABLE cdc_v2_other (a int); INSERT INTO cdc_v2_other SELECT
+  generate_series(1, 5000000);` repeatedly; R: `SELECT pg_wal_lsn_diff(pg_last_wal_replay_lsn(), restart_lsn) FROM
+  pg_replication_slots;` grows.
+- **Prevention.** Heartbeat row in the publication, written every 10 s on the primary (SPEC 4.4, R8): every 10 s a
+  published transaction arrives, is applied and acknowledged, so the slot advances by construction.
+- **Why prevention.** Slot progress never depends on application traffic to published tables.
+- **Test.** `test_h026_unpublished_flood_wal_bounded` (SPEC 4.4: 30 minutes, both modes, retained WAL bounded).
+- **Residual.** Long-running transactions still pin `restart_lsn` (H-031).
+
+### H-027 Debezium restart-from-stored-offset defects
+
+- **What.** Data loss or OOM when Debezium resumes from a stored offset inside or near a transaction.
+- **Mechanism.** `WalPositionLocator`/`lsn_events_processed` defects: debezium/dbz#2889 (fixed 3.7.1), debezium/dbz#2901
+  (open, DML lost after restart from a transactional message following COPY), debezium/dbz#2905 (open, unbounded
+  `lsnSeen`, OOM on an 8M-row transaction); earlier silent-loss reports DBZ-8312, DBZ-9149 **[doc]**.
+- **Reproduction.** As in the issues (FileOffsetBackingStore, stop mid-transaction, restart).
+- **Prevention.** `offset.storage=…MemoryOffsetBackingStore`; the slot is the restart point and the destination holds
+  the applied position (debezium.md §3.4) **[src]**.
+- **Why prevention.** The defective code path is unreachable without a stored offset.
+- **Test.** `test_h027_kill_mid_copy_with_message` (the #2901 shape), `test_h027_kill_mid_10m_tx_memory` (the #2905
+  shape, heap capped at 512 MB).
+- **Residual.** None known.
+
+### H-028 Debezium acknowledging ahead of the durable position
+
+- **What.** The slot is confirmed beyond what the consumer has made durable.
+- **Mechanism.** debezium/dbz#2460 (open): `BaseSourceTask.performCommit()` acknowledges the newest in-memory offsets,
+  which can be ahead of the persisted offsets; `lsn.flush.mode=connector_and_driver` can flush keepalive LSNs **[doc]**.
+- **Reproduction.** As in debezium/dbz#2460 (SIGKILL between offset flush and acknowledgement).
+- **Prevention.** Our consumer marks records processed only after the destination commit (debezium.md §3.3);
+  `lsn.flush.mode=connector`; continuous invariant probe in tests (`confirmed_flush_lsn` ≤ destination applied commit
+  LSN).
+- **Why prevention.** `lastOffsets` can never contain a position the destination does not have.
+- **Test.** `test_h028_slot_never_ahead_probe` (runs inside every fault-fuzzer seed).
+- **Residual.** None.
+
+---
+
+## F. Failover, persistence, slots, publication and environment
+
+### H-029 Timeline change after failover (primary mode)
+
+- **What.** The primary fails over; a standby with a synchronised failover slot is promoted.
+- **Mechanism.** Without `synchronized_standby_slots` the consumer can receive transactions the promoted standby never
+  got; after promotion the old primary may still be reachable ("the logical subscribers may continue to receive data
+  from the old primary server even after promotion") **[doc]** (logicaldecoding-explanation). Only slots with `synced =
+  true`, persistent and valid before failover are usable **[doc]**.
+- **Reproduction.** T1 with a second standby: create the slot with `failover = true` on P, `sync_replication_slots = on`
+  on the standby, stream, `tools/localpg promote` the standby, keep P running.
+- **Prevention.** At every acquisition in primary mode: check `pg_is_in_recovery() = false` and the timeline
+  (`pg_control_checkpoint().timeline_id`) of the server; record the timeline with the applied position; after a timeline
+  change, read the new timeline's history (`TIMELINE_HISTORY` replication command) and continue without backfill only if
+  the applied commit LSN ≤ the switch point and the slot is `synced`, valid and not ahead; never write to or read from a
+  server whose timeline is older than the recorded one (fencing of the old primary); recommend `synchronized_standby_slots`
+  to the provider (PlanetScale: **[test]**).
+- **Why prevention.** Continuity is proven from timeline history before any change is applied.
+- **Test.** `test_h029_failover_slot_promotion` (with and without `synchronized_standby_slots`; old primary kept alive).
+- **Residual.** Without `synchronized_standby_slots` on the provider, a failover can force a backfill.
+
+### H-030 Unlogged and temporary tables, persistence changes
+
+- **What.** Unlogged tables, `ALTER TABLE … SET LOGGED/UNLOGGED`.
+- **Mechanism.** Unlogged and temporary tables write no WAL for data and cannot be added to a publication ("This
+  operation is not supported for unlogged tables", `pg:src/backend/catalog/pg_publication.c`); a published table cannot be
+  set unlogged (`ATPrepChangePersistence`) **[src]**; `SET LOGGED` rewrites the table without decodable row changes
+  (H-004 mechanism).
+- **Reproduction.** P: `CREATE UNLOGGED TABLE cdc_v2_u (id int PRIMARY KEY); ALTER PUBLICATION cdc_v2_pub ADD TABLE
+  cdc_v2_u;` → ERROR.
+- **Prevention.** Discovery guard: unlogged tables (`relpersistence = 'u'`) are never added to the publication and are
+  served in `full_refresh` mode only if the operator allows reads from the primary — on a standby they cannot be read
+  at all ("cannot access temporary or unlogged relations during recovery") **[test]** — otherwise reported as "not
+  replicable";
+  the fence detects `SET LOGGED` and moves the table to CDC with a snapshot.
+- **Why prevention.** No silent gap: such tables are either served by a reading mode or reported.
+- **Test.** `test_h030_unlogged_discovery`, `test_h030_set_logged_transition`.
+- **Residual.** Unlogged data cannot be read on a replica at all; a documented limitation (finding F-9).
+
+### H-031 Long-running transactions pin the slot
+
+- **What.** A transaction on the primary that stays open for hours (idle in transaction, a long batch, a forgotten
+  prepared transaction).
+- **Mechanism.** A logical slot's `restart_lsn` cannot pass the start of the oldest transaction still running when
+  decoding reaches it, and its `catalog_xmin` stays behind it; retained WAL grows on the server holding the slot even
+  though we are fully caught up **[doc]** (logicaldecoding-explanation, "Caution"), **[src]** (snapbuild.c candidate
+  restart LSN logic). Reaching the WAL cap invalidates the slot (H-036).
+- **Reproduction.** P: session 1 `BEGIN; SELECT txid_current();` (keep open); session 2 writes for an hour; R: retained WAL
+  (`pg_wal_lsn_diff(pg_last_wal_replay_lsn(), restart_lsn)`) grows despite `confirmed_flush_lsn` advancing.
+- **Prevention.** Guard: the periodic check compares `restart_lsn` with `confirmed_flush_lsn` and reports the oldest
+  `backend_xid`/`backend_xmin` on the primary (`pg_stat_activity`, `pg_prepared_xacts`) with an alert when retained WAL
+  exceeds 25 % of the cap; the size-lag trigger (SPEC 3.6) measures `restart_lsn`-based retention, not only apply lag.
+- **Why prevention.** The cause is reported long before the cap; we cannot end someone else's transaction.
+- **Test.** `test_h031_long_tx_retention_alert`.
+- **Residual.** If the operator ignores the alert, the cap invalidates the slot and the backfill path runs.
+
+### H-034 Publication missing or recreated at a WAL position
+
+- **What.** The slot decodes WAL from before the publication existed, or the publication is dropped and recreated.
+- **Mechanism.** PostgreSQL 18's pgoutput skips a publication that does not exist at the decoded position with only a
+  WARNING ("skipped loading publication … The publication does not exist at this point in the WAL") and then publishes
+  nothing for it; PostgreSQL 17 raises an error instead (`LoadPublications`, 18 vs 17) **[src]**. Debezium's
+  `all_tables` mode continues on a standby when the publication is missing (debezium.md §2.3) **[src]**. A drop and
+  recreate makes every change between the two DDLs invisible.
+- **Reproduction.** R: create the slot first; P: then `CREATE PUBLICATION cdc_v2_pub2 FOR TABLE cdc_v2_t; INSERT …`; R:
+  peek with `publication_names` = `cdc_v2_pub2` from the slot start: WARNING, no rows before the publication's LSN.
+  Recreate variant: `DROP PUBLICATION cdc_v2_pub; INSERT …; CREATE PUBLICATION cdc_v2_pub FOR TABLE cdc_v2_t;`.
+- **Prevention.** Order rule: our code creates the publication on the primary, waits until it is visible on the replica
+  (catalog query), and only then creates the slot, so every decodable position has the publication;
+  `publication.autocreate.mode=disabled`; the fence records `pg_publication.oid` of our publication and treats any change
+  (drop/recreate) as a stream discontinuity: stop, alert, backfill all tables, new slot.
+- **Why prevention.** The slot never starts before its publication; a replaced publication is detected by identity, not
+  by missing data.
+- **Test.** `test_h034_slot_before_publication_refused`, `test_h034_publication_recreated`.
+- **Residual.** Changes made between a third party's drop and recreate of our publication are absent from the stream;
+  the OID change triggers the backfill, so this gap is repaired, not prevented. Finding F-4.
+
+### H-035 Slot advanced, dropped, recreated or consumed externally (SPEC 1.8)
+
+- **What.** Another session calls `pg_replication_slot_advance`, `pg_logical_slot_get_changes`, drops and re-creates the
+  slot, or streams from it.
+- **Mechanism.** Any of these moves `confirmed_flush_lsn` past changes we never applied, or replaces the slot (new
+  `restart_lsn`, new catalog horizon); Debezium does not notice with `no_validation` **[src]**.
+- **Reproduction.** R: `SELECT pg_replication_slot_advance('cdc_v2_slot', pg_last_wal_replay_lsn());` while the pipeline
+  is stopped; or `SELECT pg_drop_replication_slot('cdc_v2_slot'); SELECT pg_create_logical_replication_slot('cdc_v2_slot',
+  'pgoutput');`.
+- **Prevention.** Slot check at every acquisition and every 30 s while streaming: slot exists, plugin `pgoutput`,
+  database ours, `confirmed_flush_lsn` ≤ applied commit LSN, and a **slot identity** recorded at creation (creation
+  consistent point plus `catalog_xmin` lower bound; on 17+ also `inactive_since` history) still plausible
+  (`restart_lsn` never decreases between our observations except after a server crash we observed); otherwise alert +
+  automatic backfill, no exit (SPEC 1.8). `active_pid` belonging to a session that is not ours ⇒ alert (contending
+  consumer).
+- **Why prevention.** No change is applied from a slot whose continuity is not proven.
+- **Test.** The four SPEC 1.8 tests (`pg_replication_slot_advance`, drop-and-recreate, changes consumed by another
+  session, invalidation by `max_slot_wal_keep_size`).
+- **Residual.** A drop-and-recreate between two checks while we are disconnected is detected at the next acquisition.
+
+### H-036 Slot invalidation by the WAL cap (`wal_removed`)
+
+- **What.** `max_slot_wal_keep_size` on the server holding the slot (or WAL removal for other reasons) removes WAL the
+  slot needs.
+- **Mechanism.** Checked at checkpoints and, on a standby, at restartpoints (`InvalidateObsoleteReplicationSlots` from
+  `CreateCheckPoint`/`CreateRestartPoint`, `pg:src/backend/access/transam/xlog.c`) **[src]**; the slot becomes `lost`
+  permanently **[doc]** (view docs). Debezium retries forever (debezium/dbz#2430) **[doc]**.
+- **Reproduction.** R: `ALTER SYSTEM SET max_slot_wal_keep_size = '64MB'; SELECT pg_reload_conf();` (T1 only), stop the
+  pipeline, write 500 MB on P, `CHECKPOINT` on P, wait for a restartpoint on R (`CHECKPOINT` on R).
+- **Prevention.** Size-lag trigger (SPEC 3.6) at 50 % of the cap with the cap read from the server holding the slot;
+  alert at `wal_status = 'extended'`/`'unreserved'`; slot check treats `invalidation_reason IS NOT NULL` as slot loss.
+- **Why prevention.** The backlog is abandoned (and re-backfilled) deliberately before the server invalidates the slot.
+- **Test.** SPEC 1.8 invalidation test; `test_h036_size_trigger_before_cap`.
+- **Residual.** A write burst faster than our check interval can still reach the cap; then the slot-loss path runs.
+
+### H-037 Idle-slot timeout invalidation (PostgreSQL 18)
+
+- **What.** `idle_replication_slot_timeout` invalidates slots inactive longer than the setting.
+- **Mechanism.** Applies to ordinary slots on primaries and standbys (not to synced slots on a standby), at the next
+  checkpoint/restartpoint (`CanInvalidateIdleSlot`, slot.c) **[src]**; default off **[doc]**. Our slot is inactive during
+  run hand-overs (R18) and outages.
+- **Reproduction.** R: `ALTER SYSTEM SET idle_replication_slot_timeout = '30s'`; stop the pipeline for 2 minutes;
+  `CHECKPOINT` on P and R.
+- **Prevention.** Read the setting at every acquisition; if non-zero and shorter than 10 × the worst measured hand-over
+  gap (R18, SPEC 4.2), alert and refuse to rely on that server for replica mode; on PlanetScale ask for it to stay 0
+  **[test]**.
+- **Why prevention.** The configuration that would invalidate the slot is rejected before it can act.
+- **Test.** `test_h037_idle_timeout_guard`.
+- **Residual.** A provider-side change while we run; detected on the next check.
+
+### H-038 Retained WAL grows billed storage or fills the disk
+
+- **What.** Slot lag makes WAL accumulate; on PlanetScale storage autoscaling is on by default.
+- **Mechanism.** "Storage autoscaling is enabled by default for network-attached storage clusters" **[doc]**
+  (<https://planetscale.com/docs/postgres/postgres-compatibility.md>); retained WAL counts as storage. PLAN §5 forbids
+  any action that changes what the instance costs.
+- **Reproduction.** Stage 2 only, read-only observation of the storage metric while the slot lags in a controlled test.
+- **Prevention.** Before stage 2 writes anything, record the cost baseline and the autoscaling threshold (PLAN §5); set
+  the size-lag trigger (SPEC 3.6) and our alert to fire well below the free space that would trigger autoscaling, and,
+  with the owner's approval, `max_slot_wal_keep_size` below that threshold; same limits for spill files (H-049).
+- **Why prevention.** The pipeline abandons a backlog before the provider would grow storage.
+- **Test.** `test_h038_lag_trigger_below_storage_headroom` (T1 with a simulated disk budget; stage 2 measurement).
+- **Residual.** Other tenants of the instance can still grow storage; not ours to prevent.
+
+### H-039 Row-level security and privileges silently filter backfill reads
+
+- **What.** The runtime role lacks `BYPASSRLS` (or `SELECT` on a column/table) and a table has row-level security.
+- **Mechanism.** Backfill and refresh queries are ordinary `SELECT`s and see only rows the policies allow; logical
+  decoding itself does not apply RLS to decoded changes **[doc]** (logical-replication-security: "If the role lacks
+  SUPERUSER and BYPASSRLS, publisher row security policies can execute"). A backfill would silently load a subset while
+  the stream delivers every change — destination divergence.
+- **Reproduction.** P: `ALTER TABLE cdc_v2_t ENABLE ROW LEVEL SECURITY; CREATE POLICY cdc_v2_pol ON cdc_v2_t USING (id <
+  10);` and backfill as a non-owner role without BYPASSRLS.
+- **Prevention.** Backfill and refresh sessions set `row_security = off`, which makes a query that would be filtered
+  fail with an error instead **[doc]** (<https://www.postgresql.org/docs/18/runtime-config-client.html#GUC-ROW-SECURITY>);
+  discovery checks `relrowsecurity` and the role's `rolbypassrls` and alerts; the runtime role is created with
+  `BYPASSRLS` where the provider allows it (PlanetScale default role has it **[doc]**).
+- **Why prevention.** A filtered read becomes impossible; it fails loudly.
+- **Test.** `test_h039_rls_backfill_fails_loudly`.
+- **Residual.** None.
