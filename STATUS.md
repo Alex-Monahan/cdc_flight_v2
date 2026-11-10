@@ -37,7 +37,8 @@ Last updated: 2026-11-09, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 - **MotherDuck account**: Flights and `cdc_v2_*` databases are created under the owner's own account (PLAN §9), not
   under the service account. Say so if the service account should be used instead.
 - `SLACK_WEBHOOK_URL` and the alert channel: not provided; alerts are tested against a local stub until then.
-- MotherDuck plan and region: unknown; the P2 spike measures the maximum run time.
+- MotherDuck plan and region: measured in P2 — Business plan, us-east-1, maximum run time 8 h
+  (`docs/spike/flight_platform.md`). No longer open.
 - Stage 2 values of PLAN §8 (PlanetScale service token, branch, hosts, admin role, TLS mode).
 
 ## To verify in stage 2
@@ -50,21 +51,32 @@ Last updated: 2026-11-09, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 
 ## Background jobs in flight
 
-All started 2026-11-09, each in its own worktree and branch (Opus, high effort); the orchestrator merges.
+Each in its own worktree and branch (Opus, high effort); the orchestrator merges.
 
-| Job | Phase | Delivers |
-|---|---|---|
-| Implementation worker: `tools/localpg` | P1 | the tool, `tests/localpg/`, `docs/localpg.md`, `evidence/p1/localpg.md` |
-| Spike worker: Flight tooling and platform facts | P2 (§2 A 4) | `tools/flightctl`, `docs/spike/flight_platform.md`, `evidence/p2/flight_platform/` |
-| Spike worker: MotherDuck semantics | P2 (§2 A 3) | `spikes/md_semantics/`, `docs/spike/md_semantics.md`, `evidence/p2/md_semantics/` |
-| Hazard researcher: Debezium facts, replica decoding, hazard catalog | P5 research, started early | `docs/research/debezium.md`, `docs/research/replica_decoding.md`, `docs/wal_hazards.md` |
+| Job | Phase | Started | Delivers |
+|---|---|---|---|
+| Implementation worker: `tools/localpg` | P1 | 2026-11-09 | the tool, `tests/localpg/`, `docs/localpg.md`, `evidence/p1/localpg.md` |
+| Spike worker: MotherDuck semantics | P2 (§2 A 3) | 2026-11-09 | `spikes/md_semantics/`, `docs/spike/md_semantics.md`, `evidence/p2/md_semantics/` |
+| Hazard researcher: Debezium facts, replica decoding, hazard catalog | P5 research, started early | 2026-11-09 | `docs/research/debezium.md`, `docs/research/replica_decoding.md`, `docs/wal_hazards.md` |
+| Spike worker: JVM and stock Debezium on a Flight | P2 (§2 A 1) | 2026-11-10 | `flights/spike_jvm/`, `docs/spike/jvm_on_flight.md`, `evidence/p2/jvm_on_flight/` |
+| Spike worker: run semantics | P2 (§2 A 2) | 2026-11-10 | `flights/spike_runs/`, `docs/spike/run_semantics.md`, `evidence/p2/run_semantics/` |
 
-Waiting for the Flight tooling: the spikes for JVM start-up on a Flight (§2 A 1) and run semantics (§2 A 2).
 Waiting for `tools/localpg`: the local throughput spike (§2 A 5).
+
+Finished and merged:
+
+- 2026-11-10 — Flight tooling and platform facts (§2 A 4): `tools/flightctl`, `src/cdc_v2/flightctl.py`,
+  `docs/spike/flight_platform.md`, `evidence/p2/flight_platform/`. All spike Flights and the spike secret deleted.
 
 ## Changes to the secret scanner, its tests or `.secretscan-allow` (for the owner's review)
 
-None.
+- 2026-11-10, `.secretscan-allow` created with one rule: `^cdc_v2_spike_secret(_CDC_V2_PROBE_SECRET)?$`. It is the
+  *name* of the spike's Flight secret and of the environment variable it produces (no value); the randomness rule
+  flagged the name. The scanner and its tests are unchanged.
+
+Also for the owner: commit `aa6a435` contains a pytest evidence file whose header shows a local path including the
+operating-system user name of this machine. It is not a credential, hostname, database user name or connection
+string; it was redacted in the next commit and stays in history.
 
 Note for the owner: the exact-value layer of the scanner reads the env file only. The token this session uses is not
 in that file, so it is covered by the pattern layer (JWT format), by `gitleaks` and by the harness redaction, not by
