@@ -55,6 +55,23 @@ Last updated: 2026-11-09, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 - MotherDuck plan and region: measured in P2 — Business plan, us-east-1, maximum run time 8 h
   (`docs/spike/flight_platform.md`). No longer open.
 - Stage 2 values of PLAN §8 (PlanetScale service token, branch, hosts, admin role, TLS mode).
+- **Latency and very large transactions (research finding F-3).** Stock Debezium speaks only version 1 of the
+  `pgoutput` protocol, which sends a transaction after its commit, in one piece. Everything committed after a
+  10M-row transaction therefore waits until that transaction is applied (at the target rate: 100 s or more). SPEC 5.2
+  measures latency when idle and under 2,000 small transactions per second, so the criterion as written is not
+  affected; but a very large transaction inside a latency window will exceed the 60 s maximum, and R19 does not
+  exclude it. Working rule until the owner rules: such windows are logged and reported separately, and they are
+  **not** removed from the 5.2 statistic.
+- **Tables without a key (F-7).** A table without a usable replica identity cannot be added to a publication that
+  publishes updates and deletes without breaking the application's own `UPDATE` and `DELETE`. Working rule: before
+  such a table joins the publication the pipeline sets `REPLICA IDENTITY FULL` on it (a configuration switch turns
+  this off; the table then replicates by scheduled full refresh and stays out of the publication). This is one more
+  action on the primary than SPEC R17 lists, and it increases the WAL volume of those tables. Say so if the default
+  should be the other way round.
+- **Generated columns, unlogged tables, column names that differ only in case (F-6, F-8, F-9).** They cannot be
+  streamed with stock Debezium. Proposed handling (decided in the P4 schema wave, reported at its gate): stored
+  generated columns are published (`publish_generated_columns`), tables that cannot be streamed replicate by
+  scheduled full refresh, with a warning in `_cdc`; nothing is refused silently.
 
 ## To verify in stage 2
 
@@ -63,6 +80,11 @@ Last updated: 2026-11-09, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 - Everything marked *(Flight)* in SPEC §3 with a real source: 3.1, 5.1, 5.2, 5.3, the 24 h soak.
 - Replica decoding on PlanetScale (PLAN §2 B 6), failover behaviour of both modes (4.1), privileges of the runtime
   role on a managed provider, TLS `verify-full`, client address restrictions.
+- The nine points of `docs/research/replica_decoding.md` §10 ("What stage 2 must test on PlanetScale"), first of
+  all: whether one replica can be addressed deterministically and accepts replication-protocol connections, and
+  whether WAL retained by a slot can trigger storage autoscaling (**a cost change — baseline first, PLAN §5**).
+- PlanetScale's documented slot policy (slots without `failover = true` are flagged and planned failovers held back
+  for 3 days): does a slot on a replica trigger it?
 
 ## Background jobs in flight
 
@@ -71,7 +93,6 @@ Each in its own worktree and branch (Opus, high effort); the orchestrator merges
 | Job | Phase | Started | Delivers |
 |---|---|---|---|
 | Spike worker: MotherDuck semantics | P2 (§2 A 3) | 2026-11-09 | `spikes/md_semantics/`, `docs/spike/md_semantics.md`, `evidence/p2/md_semantics/` |
-| Hazard researcher: Debezium facts, replica decoding, hazard catalog | P5 research, started early | 2026-11-09 | `docs/research/debezium.md`, `docs/research/replica_decoding.md`, `docs/wal_hazards.md` |
 | Spike worker: JVM and stock Debezium on a Flight | P2 (§2 A 1) | 2026-11-09 | `flights/spike_jvm/`, `docs/spike/jvm_on_flight.md`, `evidence/p2/jvm_on_flight/` |
 | Spike worker: run semantics | P2 (§2 A 2) | 2026-11-09 | `flights/spike_runs/`, `docs/spike/run_semantics.md`, `evidence/p2/run_semantics/` |
 | Spike worker: local read throughput (private cluster, home `pg-spike-tp`, ports 55500–55509; MotherDuck database `cdc_v2_spike_tp`) | P2 (§2 A 5, part 1) | 2026-11-09 | `spikes/local_throughput/`, `docs/spike/local_throughput.md`, `evidence/p2/local_throughput/` |
@@ -81,6 +102,10 @@ one 10M-row transaction). It reuses the JVM program of the JVM spike and the pri
 
 Finished and merged:
 
+- 2026-11-09 — Hazard research, first pass (P5, started early): `docs/research/debezium.md` (pin, delivery contract,
+  recommended configuration), `docs/research/replica_decoding.md` (standby decoding in Postgres 16–18, PlanetScale's
+  public documentation, what stage 2 must test first), `docs/wal_hazards.md` (H-001 to H-050, every prevention still
+  "proposed", findings F-1 to F-11). Items marked `[test]` in these files are claims that still need an experiment.
 - 2026-11-09 — `tools/localpg` (P1): the tool, `tests/localpg/`, `docs/localpg.md`, `evidence/p1/localpg.md`.
 - 2026-11-09 — Flight tooling and platform facts (§2 A 4): `tools/flightctl`, `src/cdc_v2/flightctl.py`,
   `docs/spike/flight_platform.md`, `evidence/p2/flight_platform/`. All spike Flights and the spike secret deleted.
