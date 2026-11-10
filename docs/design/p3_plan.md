@@ -2,7 +2,17 @@
 
 Status: written by the orchestrator at the P2 gate (2026-11-10). It splits `docs/design/core.md` into packages that
 can be built in parallel, and fixes the interfaces between them. Gate of the phase (PLAN §1): the tests of SPEC
-1.1–1.9 and 4.2 are green on T1.
+1.1–1.9 and 4.2 are green on T1. Revised after the coordinator's review of this plan (section 6).
+
+Parts of those items that need a feature of a P4 wave are not in the P3 gate; they are carried to the wave named
+here and listed in STATUS.md at the gate:
+
+| Part | Needs | Carried to |
+|---|---|---|
+| 1.4 "with history mode on" | history tables (SPEC 8.1) | P4, CDC features |
+| 1.7 crash points at every step of a schema change | schema changes (SPEC 2.x) | P4, schema and types |
+| 1.9 schema-change machine; the full quarantine machine (stored rows, slow retries; P3 has the exit to `quarantined` only) | SPEC 2.x, 4.0 | P4, schema and types; failure handling |
+| 1.7 soak of at least 1 h with at least 200 faults | all fuzzers and the whole pipeline | P3 runs a short soak at the gate; the full one is the P6 campaign |
 
 An interface below is a **contract**. A worker who needs a contract changed says so in its report or asks the
 orchestrator; it does not change it alone, because another worker is building against it.
@@ -18,18 +28,18 @@ table → chunk readers (B) → transform (Y) → load, pending log, swap (B, A)
 
 | # | Package | Design sections | Depends on | Worker |
 |---|---|---|---|---|
-| O | Oracle and T1 harness | SPEC §4 evidence, 1.6, 1.7 | — | running |
-| H | Crash-point and fault harness | SPEC 1.7 | — | running |
-| X | Cut: where a snapshot lies in the stream | 7.2, open points 1, 12 | — | running (Fable) |
+| O | Oracle and T1 harness | SPEC §4 evidence, 1.6, 1.7 | — | Opus |
+| H | Crash-point and fault harness | SPEC 1.7 | — | merged |
+| X | Cut: where a snapshot lies in the stream | 7.2, open points 1, 12 | — | Fable |
 | E | Engine: the JVM program, its frames, the Python side that starts it and turns frames into Arrow | 1, 3 steps 7–8, 6.1 | H (crash points in Java) | Opus |
 | D | Destination basics: connections, lanes, fence, clock, deadlines; `_cdc` schema; transition function; alert records | 3 (fence, unknown outcome), 4.1–4.2, 9 | H | Fable |
 | A | Apply: the statements of 6.2, 6.3 and 6.5 over a change set | 6.1–6.3, 6.5, open points 2, 3, 9 | O (canonical form) | Opus |
-| P | Source: connections with deadlines, catalog, publication, slot on a standby and on a primary, slot facts, timeline history, primary heartbeat | 8 (facts only), SPEC 4.4 | — | Opus |
+| P | Source: connections with deadlines, catalog and catalog observation (H-008), publication, slot on a standby and on a primary, slot facts, timeline history, primary heartbeat | 8 (facts only), SPEC 4.4 | — | Opus |
 | L | Leadership: guard, take-over, heartbeat, planned hand-over, release; bootstrap; platform interface and local simulator; the leader machine | 4, 5 | D, H | Fable |
 | Y | Transform: destination type per source type; conversion of the engine's transport form and of the backfill's text form into destination-typed Arrow, inside the process; baseline type families | 6.1, SPEC 2.4 (baseline), 8.3 (place only) | E, P | Opus |
 | S | Stream: transaction assembly, groups, the commit and acknowledge protocol with its crash points, unknown commit outcome, the oversized transaction, supervisor, pipeline process, configuration file | 2, 3, 6.4 | E, D, A; then Y, P, L | Fable |
-| V | Slot continuity: the decision at every slot acquisition and periodically; alert and automatic backfill request | 8, SPEC 1.8, 4.1 | P, D | Fable |
-| F | Fuzzers and the campaign ledger: workload, fault, stream, leadership (value fuzzer in the P4 type wave) | SPEC §4, PLAN §6 | O, H; attacks S and L as they appear | Opus |
+| V | Slot continuity: the attach step and its decision, the periodic check, the finding enacted (alert, position, backfill requests) | 8, SPEC 1.8, 4.1 | P, D, E; completes after B | Fable |
+| F | Fuzzers and the campaign ledger: workload, fault, stream, leadership (value fuzzer in the P4 type wave); the consumer loop of SPEC 1.3 and 3.2; hand-overs under load and the hung component of SPEC 4.2 | SPEC §4, PLAN §6 | O, H; attacks S and L as they appear | Opus |
 | B | Backfill and hand-off: chunk planning and readers, pending log, catch-up with repair reads, swap; table and backfill machines | 7, 9 | X, S, A, P, Y | Fable |
 | T | Truncate, drop, drop-and-recreate end to end; remaining machines and the enumeration tests of 1.9 | 6.5, 9, SPEC 1.5 | S, B | Opus |
 
@@ -58,6 +68,8 @@ inside the process before a value is buffered on disk or sent anywhere); the lon
 - Evidence files are written through `cdc_v2.testing.harness_evidence.write_evidence` only (it scrubs paths and
   the user name, then refuses what is left).
 - Logs go through `logging` with structured fields; no value of a source row is ever logged (SPEC 8.3).
+- Every persisted change row is ordered by (commit position, `seq`); `seq` alone orders rows only inside one
+  transaction (it starts at 0 again with every engine instance).
 
 ### C1 Crash points and fault sites (package H)
 
@@ -88,7 +100,7 @@ fuzzer).
 
 | Frame | Content |
 |---|---|
-| `HELLO` | protocol version, Debezium version, slot, the position the engine starts from |
+| `HELLO` | protocol version, Debezium version, slot, the position the engine starts from, and what identifies this engine's replication session among the server's backends (attach rule below) |
 | `SCHEMA` | table, schema version (counter per table), per column: position, source name, Debezium type and semantic name, source type name with length and scale, nullable, part of the key, whether its values can be sent as "unchanged" |
 | `ROWS` | table, schema version, row count, columns as buffers (below) |
 | `BEGIN` / `END` | transaction id, commit time, all position fields of the record's offset and its `ack_position` (below); `END` also the event count in total and per table |
@@ -130,18 +142,34 @@ Column sets of a `ROWS` frame, each column named by its position `i` in the sche
 `bytea` and arrays a mark that does not travel inside the value). The engine turns it into `u<i>`; after the
 engine, no code compares a value with a placeholder. The H-003 tests are part of package E.
 
+**Attach rule.** The pipeline decides slot continuity only while its own engine holds the slot (design section
+8), so it must know when that is the case and which backend it is. The engine therefore sends `HELLO` only after
+`START_REPLICATION` has succeeded, and its replication connection carries an application name that is unique to
+this engine instance and is repeated in `HELLO`. If Debezium offers no documented point at which "replication
+has started" can be observed, package E says so, `HELLO` is sent when the engine starts, and the pipeline relies
+on the application name and the slot's `active_pid` alone. The engine never attaches a second time by itself:
+Debezium's retries are off (including its own retry when the slot is still active), and any loss of the
+replication connection ends in `FATAL`.
+
+`END` and `HEARTBEAT` carry the exact position the engine flushes when that record is marked processed. The
+package document states which records Debezium's event counts include, proven by test for a key change, a
+TRUNCATE and a transactional message.
+
 Commands to the engine, one per line on standard input:
 
 - `CONFIG <json>` — the first line, once: the Debezium properties, with the source password. Secrets reach the JVM
   only this way: never in arguments, in the environment, in a file or in a log line.
 - `DURABLE <position>` — the destination commit at this position is durable. The engine marks as processed the
   newest `END` or `HEARTBEAT` record whose `ack_position` is at or below it, and then finishes the batch
-  bookkeeping. It acknowledges nothing else, ever.
+  bookkeeping. It acknowledges nothing else, ever. The pipeline sends `DURABLE p` only for p ≤ an applied
+  position it has seen committed.
 - `STOP` — stop reading the slot, close the engine, exit 0.
 - End of input means the parent is gone: the engine halts at once without acknowledging anything.
 
 Back-pressure: the pipeline stops reading file descriptor 3; the engine blocks in its write; Debezium's queue fills;
-the slot read stops. Nothing between the slot and the applier is unbounded.
+the slot read stops. Nothing between the slot and the applier is unbounded. The two pipes must not be able to
+block each other: the engine reads standard input on a dedicated thread at all times (also while a write to file
+descriptor 3 is blocked), and `Engine.durable()` never blocks its caller.
 
 Python side (`cdc_v2.stream.engine`):
 
@@ -178,33 +206,60 @@ connection (C7).
 
 ### C3a Change set (transform → stream → apply; pending log → apply)
 
-Per destination table and segment:
+Per destination table and segment, in one of two forms:
+
+**Local form** (a group in memory):
 
 - `rows`: an Arrow table with the columns of C2 `ROWS` in destination types (`seq`, `op`, `a<i>`, `b<i>`, `u<i>`,
-  `k<i>`) plus `txn` (index into `transactions`). It contains only whole source transactions, in `seq` order, and
-  it is **not reduced**: every change is there.
-- `transactions`: per `txn`: transaction id, commit position, commit time.
-- `meta`: `TableMeta` — per column position the destination name and type, the key flag and the "unchanged
-  possible" flag; whether the table has a key.
+  `k<i>`) plus `txn` (index into `transactions`, in commit order). It contains only whole source transactions,
+  its order is (`txn`, `seq`), and it is **not reduced**: every change is there.
+- `transactions`: per `txn`: `xid` (the transaction id as an integer), `commit_lsn`, `commit_ts`.
+
+**Relation form** (rows that are already in MotherDuck: the staging of an oversized transaction, a pending log):
+
+- a `SELECT` (text and parameters) over a table with the same row columns, in which `txn` is replaced by the
+  columns `commit_lsn UBIGINT`, `xid UBIGINT`, `commit_ts TIMESTAMPTZ`. Its order is (`commit_lsn`, `seq`).
+- A pending log may also hold rows with `op = 't'` (a truncate of the table at that place). They cut the log into
+  segments; the owner of the log gives apply one segment at a time and calls `truncate` between them. A `'t'` row
+  never reaches `apply_group`.
+
+Both forms carry `meta`: `TableMeta` — per column position the destination name and type, the key flag and the
+"unchanged possible" flag; whether the table has a key.
 
 The names of source columns never appear as Arrow or SQL identifiers on the way, so a source column name can never
 collide with a name of ours.
 
 ```python
-apply_group(tx, target: str, change_set) -> ApplyCounts
-truncate(tx, target: str)
+apply_group(tx, target, change_set, mode="stream") -> ApplyCounts      # mode: "stream" | "catch_up"
+truncate(tx, target)
 ```
 
-`tx` is an open lane transaction (C4). `change_set.rows` is local Arrow data, or the name of a relation in
-MotherDuck with the same columns (6.4, pending log). `apply_group` executes the statements of 6.2 or 6.3; it never
-commits. Applying the same change set twice to a table with a key gives the same table. It raises
-`ApplyInvariantError` when a delete or update on a table without a key finds fewer rows than it must remove.
+`tx` is an open lane transaction (C4). `apply_group` executes the statements of 6.2 or 6.3; it never commits.
+
+Unchanged values (tables with a key). A record that carries "unchanged" for a column needs the value from
+somewhere. The order is: (1) the nearest earlier record of the same row in the change set, following key changes;
+(2) the destination row that has the key the row had before the change set; (3) in mode `catch_up` only: the
+destination row with the row's new key, if no earlier record of the change set addressed that key. If none of
+them gives the value, the key is **unresolved**:
+
+- mode `stream`: `ApplyInvariantError` (the destination has diverged from the source); nothing is ignored and no
+  NULL is invented. The caller rolls back.
+- mode `catch_up` (a log replayed onto a table that was loaded separately, design 7.3): the records of unresolved
+  keys are not applied, everything else is, and the keys are returned in `ApplyCounts.unresolved` for the repair
+  read.
+
+Applying the same change set twice in mode `catch_up` gives the same table, except for keys returned as
+unresolved. Mode `stream` makes no such promise and needs none: a group is applied exactly once because of the
+position check of the run-again rule (C4).
+
+`ApplyInvariantError` is also raised, in both modes, when a delete or update on a table without a key finds fewer
+rows than it must remove.
 
 ### C4 Destination lanes (package D)
 
 ```python
-conn = md.connect(role)                       # session time zone UTC, marker, client connection id recorded
-lane = md.Lane(conn, name, epoch)             # name: 'stream' | 'backfill' | 'control'
+conn = md.connect(role)                       # session time zone UTC, marker, server connection id known
+lane = md.Lane(conn, name, epoch)             # name: 'stream' | 'control' | 'backfill.0' … 'backfill.15'
 with lane.transaction(deadline) as tx:
     tx.execute(sql, params, deadline=None)
     ...
@@ -240,6 +295,24 @@ Fault sites: `md.connect`, `md.execute`, `md.fence`, `md.commit`.
 Every call has a deadline; none can wait for ever (SPEC 4.5). No other module issues `BEGIN`, `COMMIT` or the fence
 statement.
 
+Lanes and their fence rows are a fixed set, created with the leader tables at initialisation (`stream`, `control`,
+`backfill.0` … `backfill.15`); no fence row is ever added later, because a row added during a take-over would
+keep the old epoch.
+
+Connections. Every connection of a lane appends (epoch, lane, server connection id) to `_cdc.connections` before
+its first transaction, in one autocommit statement that inserts only if `_cdc.leader` still holds that epoch (no
+row inserted ⇒ `FenceLost`). A take-over interrupts every listed connection of earlier epochs and gives up after
+its deadline (design 4.5). A lane that replaces a connection first interrupts the old server connection by id,
+so that an abandoned transaction cannot keep holding a fence row.
+
+Staging appends (design 6.1) are ordinary `stream`-lane transactions that move a staging progress row with
+`execute_one`.
+
+The three leader tables (`_cdc.leader`, `_cdc.fence`, `_cdc.heartbeat`) and `_cdc.connections` have a frozen
+shape: their statements are constants in `cdc_v2.md.schema`, and the bootstrap carries a copy that a T0 test
+compares (design section 4). Every other `_cdc` table is created by migration steps, one ordered list per
+package, run only by a leader after its take-over, in fenced `control`-lane transactions.
+
 `_cdc` schema: created and migrated by `cdc_v2.md.schema` only; every package adds its tables there.
 
 Alerts: `alerts.emit(tx, kind, severity, fields)` records an alert in `_cdc.alerts` inside the caller's transaction
@@ -258,6 +331,10 @@ not `from_state`, and appends to `_cdc.transitions`. No other code writes a stat
 the test helper that, for a declared machine, tries every pair of states and asserts that exactly the declared
 transitions are accepted (SPEC 1.9); every owning package calls it for its machines.
 
+One exception to "no other code": the leader machine is written by `main.py`, which cannot import the package
+before the clone. It carries its own copy of that machine (states `leading`, `released`; why a run ended is the
+cause of the transition), and a T0 test compares the copy with the declaration.
+
 ### C6 Platform (package L)
 
 What the leader code needs from the Flight platform, behind one interface with two implementations:
@@ -274,25 +351,66 @@ cancels as the real platform does (the record says cancelled first, the processe
 without a signal), enforces a maximum run time late, and ends a run when its main process exits. The leadership
 fuzzer drives it. Its behaviour follows `docs/spike/run_semantics.md`; each imitated behaviour cites the finding.
 
+- LocalPlatform kills every process a run started, in any session or process group (the real platform destroys
+  the container), and a test proves it for a pipeline that started its own session.
+- `main.py` accepts a local source path instead of the pinned clone.
+- Every leader timing is a setting, with the order heartbeat interval < stale age / 3 and stale age < hard-exit
+  age checked when the settings are built.
+
 ### C7 Source (package P)
 
 ```python
 pg.connect(target, deadline)                       # target: 'primary' | 'replica' | a configured name; TLS verify-full;
                                                    # fixed session settings (time zone, date, interval, float, bytea output)
 catalog.tables(conn) -> [SourceTable]              # columns, types, key, replica identity, publication membership
-publication.ensure(primary, tables) ; slot.create(node, name, deadline) ; slot.drop(...)
-slot.facts(node, name) -> SlotFacts                # everything section 8 compares, read in one statement
+catalog.observe(node) -> CatalogObservation        # the catalog facts of H-008 with the replay bracket (b, a)
+publication.ensure(primary, tables)                # only ever adds tables
+slot.create(node, name, deadline) ; slot.drop(...)
+slot.facts(node, name) -> SlotFacts                # everything section 8 compares, read in one statement, with the
+                                                   # holder: active_pid, that backend's start time and application
+                                                   # name, and pg_is_in_recovery()
 slot.timeline_history(node) -> [...]               # over a replication connection
 slot.terminate_holder(node, name)                  # our slot name only
 heartbeat.beat(primary)                            # the source-side heartbeat write of SPEC 4.4
 ```
 
 Every call has a deadline. A slot on a standby is created as `docs/localpg.md` describes (standby snapshot record
-requested on the primary).
+requested on the primary). Slot facts are used for a continuity decision only as the attach step of design
+section 8 says. Nothing on the source is fenced by the leader epoch, so every source-side write must be harmless
+when a deposed run repeats it: `publication.ensure` only adds, the heartbeat write is idempotent, and a slot is
+dropped only by an explicit operator action or by the enactment of a slot finding.
 
 ### C8 Oracle and T1 harness (package O), C9 Cut (package X)
 
 As delivered by those packages; their reports define the interfaces, and this section is completed when they merge.
+
+### C10 Stream and backfill (packages S, B, V, T)
+
+- S keeps a routing map: table → `streaming` | `backfilling(id)` with the flag "also apply to the visible table"
+  (design 7.1, a backfill without a gap) | `skip`. It is stored in `_cdc` and changed only by stream-lane
+  transactions.
+- Every backfill request (operator, V, discovery, T, a quarantine exit) is a row in a request table, written by
+  whoever asks, in any lane. It is enacted inside a stream-lane group; `P0` is that group's end.
+- Before the position step, S calls `backfill.on_group(tx, group_end, change_sets) -> routing changes`. It enacts
+  requests, appends to pending logs (relation form of C3a), and performs the swap, all in `tx`. S applies to
+  visible tables what the routing says, in the same `tx`.
+- The backfill lane moves `catching_up → swap_ready` and then stops writing that backfill's row and its new
+  table; the stream lane moves `swap_ready → done`, or back to `catching_up` when the rest of the log has an
+  unresolved key.
+- A slot finding (V) sets the applied position to the slot's `confirmed_flush_lsn` (or the new slot's consistent
+  point) and enacts a backfill of every CDC table, in one stream-lane transaction (design section 8).
+- S runs a group again after `Conflict`, a bounded number of times, building its statements again when the
+  conflict came from a DDL (a swap changes the catalog).
+- A table that fails to apply `apply.max_table_attempts` times (default 3) leaves the stream: state `quarantined`,
+  routing `skip`, alert, in a stream-lane transaction; the group is then applied without it (design section 3).
+
+### C11 Supervisor and heartbeat (packages S, L)
+
+- The heartbeat's only input is `supervisor.progress() -> (ok, phase, progress_at)`.
+- A component inside `with supervisor.waiting(component, reason, deadline):` counts as progressing until that
+  deadline, and not after it. Slot creation, the attach step after a take-over, a commit in flight and the wait
+  for a replica to reach `P0` are declared this way.
+- Until package S delivers the supervisor, package L builds against this interface with a stand-in of its own.
 
 ## 3. Test tiers used in P3
 
@@ -328,4 +446,70 @@ upper half of its own range.
 
 Every package is reviewed before it is merged: by the P3 coordinator (Opus, fresh context, did not write the code)
 against SPEC, PLAN, the core design and this plan; the packages D, L, S, V and B additionally by a second reviewer
-who attacks the protocol with cases of its own.
+who attacks the protocol with cases of its own, and so is the acknowledgement path of package E. The
+orchestrator starts the workers and merges; the coordinator reviews and does not write code.
+
+## 6. The coordinator's review of this plan (2026-11-10)
+
+The coordinator reviewed the design and this plan before most packages started. What it found is folded into
+`docs/design/core.md` (sections 2–4, 6–9, open points 14–17) and into the contracts above. This section keeps
+what is not a contract yet, for the task files that are still to be written.
+
+### 6.1 Who owns which gate test
+
+| SPEC | Owner | With |
+|---|---|---|
+| 1.1 exactly-once | S | A, D |
+| 1.2 ordering and invariants | S | A (an `ApplyInvariantError` in the stream ends in the quarantine exit of C10) |
+| 1.3 one source transaction, one destination transaction | S | F: the consumer loop on cross-table invariants, on O's harness; B: the table-status log |
+| 1.4 key changes | A (T0, `md`) | S end to end; the history variant is P4 |
+| 1.5 truncate, drop, drop and recreate | T | P (`catalog.observe`) |
+| 1.6 snapshot and stream hand-off | B | X (the cut) |
+| 1.7 crash and fault suite | F (suite and ledger) | H (runner); every package declares and reaches its own points |
+| 1.8 slot continuity | V | B; plus drop-and-recreate between the first read and the attach |
+| 1.9 state machines | T (document and enumeration over all machines) | every owner, through D's helper |
+| 4.2 one leader | L | F: 100 hand-overs under load and the hung component, after S and L are merged |
+
+### 6.2 Carried into the task files of later packages
+
+**B (backfill).** The repair snapshot needs `R0 ≥ caught_up_lsn`. The last chunk is open-ended. The wait for
+`R0 ≥ P0` has a deadline and is a declared wait. `swap_ready` and who writes when (C10). Parallel loaders use
+lanes `backfill.<i>`. Open point 5 (appends by the stream lane and reads by a backfill lane on one pending log)
+is tested first. The swap group uses mode `catch_up`; an unresolved key sends the backfill back.
+
+**V and S (attach).** The attach step of design section 8, with its loop and a deadline of at least 75 s. The
+pipeline reads its fence row before every engine start. A restart of the stream component always starts a new
+engine. `slot.terminate_holder` belongs to the attach step, not to `main.py`. Open points 6 and 14. Whether a
+slot's identity can be read at all; if not, continuity is: same system identifier, applied position on the
+timeline history, a valid slot of our plugin and database, `confirmed_flush_lsn` ≤ applied — and a recreated
+slot that is not ahead gets an alert where it can be seen, and no backfill.
+
+**S (stream).** A mismatch of the `END` count at the same position: bounded restarts, then the skip-and-backfill
+path of SPEC 4.3. The quarantine exit of C10. The spill area: DuckDB's temporary directory of the local
+transform connection under `max_temp_directory_size`, with a fault site for "no space left"; the stream waits
+and alerts, it never crashes on it (SPEC 5.4, 1.7). The batch commit/ack machine as one row per slot (design
+section 9). Staging is fenced, with a progress row, in one schema, truncated at every start of the stream
+component. After `CommitUnknown`: read the position in a new transaction and continue from it. A heartbeat's
+`ack_position` becomes the applied position only in a committed group that contains every transaction framed
+before it.
+
+**L (leadership).** Two states. Take-over deadline (default 45 s), then exit non-zero. A take-over whose commit
+outcome is unknown: read again after more than 2 s and decide by `run_id`. A planned hand-over abandons an
+oversized transaction that is still arriving. Leader tables created by simultaneous first runs (open point 16).
+Clean-up of `_cdc.connections`. The measurement point of "a newcomer exits within 10 s" (open point 17).
+
+**T (truncate and drop).** With `catalog.observe` and its bracket (b, a): a drop is enacted in the first group
+whose end is ≥ a; a table whose OID changed is a fresh table and goes through B; changes that arrive inside the
+bracket for a table whose identity is in doubt are held, never applied to the wrong incarnation (H-007).
+
+**X (cut), as input only.** A proposal for the primary: after `pg_current_snapshot()`, read `pg_xact_status` for
+every transaction id in the in-progress list; if one is already `committed`, take a new snapshot. A transaction
+is inside iff the snapshot sees it by its 64-bit id. "The stream has passed" = applied position >
+`pg_current_wal_insert_lsn()` read after the snapshot. To be proven with a stopped synchronous standby and a
+negative control.
+
+### 6.3 Simplifications taken
+
+Two-state leader machine; one fenced staging schema; a TRUNCATE or schema change cuts segments and does not close
+the group; the batch/ack machine is one row per slot. The slot identity is dropped only if package V finds that
+Postgres does not expose one (6.2).

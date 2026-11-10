@@ -23,6 +23,9 @@ main.py (bootstrap, standard library only until the guard has decided)
 - The **pipeline** owns every MotherDuck connection that writes data, every state machine and the supervisor.
 - The **engine** reads the slot and writes change records to the pipeline over a pipe. It never talks to MotherDuck.
   It acknowledges the slot only when the pipeline tells it a commit position is durable (section 3).
+- The engine and every other child of the pipeline stay in the pipeline's process group, so that one signal to
+  the group (the bootstrap's kill in section 5, a freeze of the whole tree in a test) reaches all of them. The
+  pipeline kills a single child by its process id.
 - An out-of-memory kill in any child ends the whole run (`docs/spike/run_semantics.md`, question 6). Memory limits are
   therefore set for the sum of all processes, and nothing relies on restarting a child after an out-of-memory kill.
 
@@ -32,12 +35,19 @@ them are treated as a crash: correctness never depends on a shutdown handler hav
 ## 2. Position
 
 - The **applied position** is the commit end LSN (`lsn_commit` of the END record) of the last source transaction
-  whose effects are committed in MotherDuck. It is always a transaction boundary.
+  whose effects are committed in MotherDuck. It is always a transaction boundary, with one exception: when the
+  tables are idle, a group may move it to the `ack_position` of a heartbeat record (plan C2) that arrived after
+  every transaction applied so far. Both kinds are positions that the source may be told are confirmed, and the
+  position only ever moves in a committed group that contains every transaction framed before it.
 - Debezium re-sends whole transactions in commit order after a restart. A transaction whose commit LSN is ≤ the
   applied position is discarded as a whole; one whose commit LSN is greater is applied as a whole. No row-level
   position is needed for the stream, and the 32-bit transaction id is never used as a key.
-- The END record's `event_count` is compared with the number of change records received for that transaction. A
-  mismatch is a protocol error: the batch is not committed and the stream component restarts.
+- The END record's `event_count` is compared with the number of change records received for that transaction
+  (which records Debezium counts is established by test in package E). A mismatch is a protocol error: the batch
+  is not committed and the stream component restarts. A mismatch at the same position after the configured number
+  of restarts takes the skip-and-backfill path of SPEC 4.3; it never restarts for ever.
+- A change row that is stored (pending log, staging) is ordered by (commit position, `seq`). `seq` alone orders
+  rows only inside one engine instance: it starts at 0 again with every engine start.
 - The applied position is stored in `_cdc.stream_state` (one row per slot) and is written in the same MotherDuck
   transaction as the data it describes.
 - Invariant, checked by the oracle and at every slot acquisition: slot `confirmed_flush_lsn` ≤ applied position.
@@ -45,8 +55,9 @@ them are treated as a crash: correctness never depends on a shutdown handler hav
 ## 3. Commit and acknowledge
 
 One destination commit applies a **group** of one or more whole source transactions. The group closes on the first
-of: `apply.max_group_delay` (default 1 s) since its first record, `apply.max_group_bytes`, a transaction that
-exceeds the byte limit on its own (section 6.4), or a record that must start a new segment (TRUNCATE, schema change).
+of: `apply.max_group_delay` (default 1 s) since its first record, `apply.max_group_bytes`, or a transaction that
+exceeds the byte limit on its own (section 6.4). A TRUNCATE or a schema change does not close the group; it cuts
+the group into segments (6.5), so there is one code path for it.
 
 Steps, each with a named crash point (`crashpoints.py`):
 
@@ -55,28 +66,38 @@ Steps, each with a named crash point (`crashpoints.py`):
 | 1 | Records of the group are staged (section 6.1) | `stream.staged` |
 | 2 | `BEGIN` on the stream connection | `stream.begun` |
 | 3 | Apply statements for every segment of the group, in commit order | `stream.applied` |
-| 4 | `UPDATE _cdc.stream_state SET applied_lsn = :group_end, …` | `stream.position_written` |
+| 4 | `UPDATE _cdc.stream_state SET applied_lsn = :group_end, … WHERE applied_lsn = :prev`; must change exactly one row (`:prev` was read in this transaction or is the position this process committed last) | `stream.position_written` |
 | 5 | Fence statement for lane `stream` (section 4.2); must change exactly one row | `stream.fenced` |
 | 6 | `COMMIT` | `stream.commit_sent`, `stream.committed` |
 | 7 | Tell the engine "durable up to `:group_end`" | `stream.ack_sent` |
-| 8 | Engine: `markProcessed(endRecord)` for the newest END ≤ `:group_end`, then `markBatchFinished()` | `engine.acked` |
+| 8 | Engine: `markProcessed(record)` for the newest END or heartbeat record whose `ack_position` ≤ `:group_end`, then `markBatchFinished()` | `engine.acked` |
 
 Rules:
 
 - A crash before the commit is durable leaves the destination at the previous position; the group is re-sent and
   applied. A crash after it leaves the slot behind the destination; the re-sent transactions are discarded by
   position. Step 6 has two crash points because a commit can become durable after the client has died
-  (`docs/spike/md_semantics.md`: up to 1.95 s later).
+  (`docs/spike/md_semantics.md`: up to 1.95 s later). `stream.commit_sent` lies immediately before the blocking
+  `COMMIT`; the crash tests run it with the action `kill_later` (`docs/testing/harness.md`), which kills the
+  process while the `COMMIT` is in flight. With a plain kill that point would only repeat "nothing sent".
+- Every other step of the design that changes durable state has crash points by the same rule
+  (`docs/design/p3_plan.md` C1): take-over, release, heartbeat, backfill chunk, pending log, swap, schema change,
+  slot creation. The package that builds the step names and declares them.
 - **Unknown commit outcome** (connection lost during `COMMIT`): the stream component reconnects, reads
   `applied_lsn` and the fence, and continues from what it finds. It never assumes either outcome.
 - The engine acknowledges nothing on its own: `offset.flush.interval.ms=0`, memory offset store, and the consumer
-  calls `markProcessed` only for END records at or below the durable position.
+  calls `markProcessed` only for END or heartbeat records at or below the durable position. The pipeline says
+  "durable" only for a position whose commit it has seen return, or has read back as the stored applied position.
 - The commit deadline scales with the size of the group: `apply.commit_timeout_base` plus
   `apply.commit_timeout_per_million_rows` × rows. A commit has no progress signal, so the supervisor uses this
   deadline instead of the 120 s silence rule while a commit is in flight.
-- Staging rows of a large transaction (section 6.4) are deleted after its commit, by the next group's transaction
-  or by a truncate of the staging table between groups, never in a way that can lose rows of a transaction that
-  is not committed.
+- Staging rows of a large transaction (section 6.4) are written by fenced stream-lane transactions and are
+  removed by the transaction that applies them, or by the truncate of the staging tables that every start of the
+  stream component performs (a restart always starts the engine again, and the slot re-sends the transaction).
+- A table whose apply fails for a reason that a retry cannot cure (`ApplyInvariantError`, a value the destination
+  refuses) must not stop the stream: after the configured number of attempts the table leaves the stream (state
+  `quarantined`, routing `skip`, alert) in a stream-lane transaction, and the group is applied without it. The
+  full quarantine of SPEC 4.0 (stored rows, slow retries) is built on this in P4.
 
 ## 4. Leader, fence, heartbeat
 
@@ -87,12 +108,21 @@ rows 38 s). The view `_cdc.leader_record` joins them into the record that SPEC 4
 
 | Table | Rows | Written by | Content |
 |---|---|---|---|
-| `_cdc.leader` | 1 | take-over and release only | `epoch`, `flight_id`, `run_number`, `run_id`, `state` (`leading`, `released`), `taken_at`, connection ids of the run's MotherDuck connections |
+| `_cdc.leader` | 1 | take-over and release only | `epoch`, `flight_id`, `run_number`, `run_id`, `state` (`leading`, `released`), `taken_at` |
 | `_cdc.fence` | 1 per lane | every data transaction of that lane | `lane`, `epoch`, `n` |
 | `_cdc.heartbeat` | 1 | heartbeat connection | `epoch`, `beat_at`, `progress_at`, `phase` |
 
-All three are created once, and rows are only ever updated, never deleted and inserted again (a delete next to an
-update is not detected as a conflict).
+All three are created once, with all their rows, and rows are only ever updated, never deleted and inserted again
+(a delete next to an update is not detected as a conflict; a row inserted later would miss a concurrent
+take-over). They are created by the bootstrap, in a way that leaves exactly one row set when several first runs
+start at once (table and rows in one statement, or a key; proven on MotherDuck with simultaneous starters). Their
+shape is frozen: the bootstrap cannot import the package before the clone, so it carries a copy of the statements
+that `cdc_v2.md.schema` holds, and a T0 test compares the two.
+
+`_cdc.connections` lists the server connection ids of every run: `epoch`, `lane`, connection id, time. A
+connection adds its row before its first transaction, in one statement that inserts only if `_cdc.leader` still
+holds the connection's epoch (so the epoch is checked there too, without holding a row). A take-over interrupts
+the connections of earlier epochs from this list; the leader removes rows of epochs before the previous one.
 
 ### 4.1 Time
 
@@ -102,8 +132,9 @@ client is the container's clock and is never used for the leader protocol.
 
 ### 4.2 Fence
 
-Lanes: `stream`, `backfill`, `control`. A lane is one connection that commits data or state. The last statement
-before every `COMMIT` in a lane is
+Lanes: `stream`, `control`, and `backfill.0` … `backfill.15` (one per parallel loader; the set is fixed so that no
+fence row is ever added later). A lane is one connection that commits data or state. The last statement before
+every `COMMIT` in a lane is
 
 ```sql
 UPDATE _cdc.fence SET n = n + 1 WHERE lane = :lane AND epoch = :my_epoch;
@@ -123,10 +154,17 @@ UPDATE _cdc.heartbeat SET beat_at = <md clock>, progress_at = :p, phase = :phase
 
 - The supervisor sends the heartbeat only while it sees progress (SPEC 4.2, 4.5): the stream component has reported
   within its deadline, and no component is past its restart limit. A commit in flight counts as progress until its
-  size-scaled deadline (section 3).
+  size-scaled deadline (section 3). So does every other wait that a component declares with a reason and a
+  deadline (slot creation on a standby can wait for a long transaction on the primary; a take-over can wait for
+  the old engine to let go of the slot): without this rule a slow start-up would stop the heartbeat, the next
+  minute's run would take over, and no run would ever finish starting. The heartbeat's only input is the
+  supervisor's progress report (plan C11).
 - Zero rows changed means another run has taken over: the pipeline stops all lanes and exits non-zero.
 - After each successful heartbeat the pipeline sends a tick to the bootstrap (section 5).
 - Healthy = `state = 'leading'` and `beat_at` newer than 30 s by MotherDuck's clock.
+- The interval (10 s), the stale age (30 s), the hard-exit age of section 5 (60 s) and the start-up deadline are
+  settings, so that tests can run the protocol in seconds. Their order is checked when the settings are built:
+  interval < stale age / 3, and stale age < hard-exit age.
 
 ### 4.4 Guard decision
 
@@ -154,11 +192,19 @@ COMMIT;
 - Exactly one of several simultaneous starters commits; the others see zero rows changed or a write conflict,
   re-read the record and exit by rule 2 of 4.4.
 - If the statement conflicts with an open transaction of the previous leader (a hung commit holds a fence row), the
-  newcomer calls `md_interrupt_server_connection` for the connection ids stored in `_cdc.leader` and retries, until
-  it wins or a healthy heartbeat appears. It only ever interrupts ids read from the record.
-- After winning, in this order: cancel the stored `run_number` through the MotherDuck API if `MD_GET_FLIGHT_RUN`
-  shows it running (never "all other runs"); terminate the replication session that holds the slot
-  (`pg_terminate_backend(active_pid)` for our slot name only); read the applied position; continue with start-up.
+  newcomer calls `md_interrupt_server_connection` for the connection ids of earlier epochs in `_cdc.connections`
+  and retries, until it wins, a healthy heartbeat appears, or `leader.takeover_timeout` (default 45 s) has passed;
+  then it exits non-zero and the next minute's run tries again. It only ever interrupts ids read from that table.
+  A lane that replaces its connection interrupts the old server connection first, so that no transaction of its
+  own is left holding a fence row.
+- A take-over whose commit outcome is unknown is not repeated blindly: the newcomer reads the record again after
+  more than 2 s (a commit can land that late) and decides by `run_id` whether it leads.
+- After winning: cancel the stored `run_number` through the MotherDuck API if `MD_GET_FLIGHT_RUN` shows it running
+  (never "all other runs"); continue with start-up. The replication session that holds the slot is terminated
+  later, by the pipeline's attach step (section 8), because the bootstrap has no Postgres client before the
+  clone: `pg_terminate_backend(active_pid)` for our slot name only, repeated together with the engine start until
+  our engine holds the slot or a deadline of at least 75 s has passed (the old run can re-take the slot until its
+  hard exit, up to 60 s after it froze).
 - A cancelled run keeps running for up to 2.5 s after the cancel. The fence, not the cancel, is what makes its late
   commits fail.
 - The alert `takeover` records the previous run, the age of its heartbeat and the reason.
@@ -167,7 +213,8 @@ COMMIT;
 
 At `run.max_runtime` (default 7 h 30 min) the leader finishes the group in flight, commits, sets
 `state = 'released'` in a fenced transaction, closes the slot connection and exits 0, timed to finish about 5 s
-before a minute boundary. The next scheduled run takes over by 4.5 without interrupting or cancelling anything.
+before a minute boundary. A transaction larger than a group that is still arriving is not waited for: it is
+abandoned, and the slot sends it again to the next run. The next scheduled run takes over by 4.5 without interrupting or cancelling anything.
 `max_runtime_sec` of the Flight is set above `run.max_runtime` as a coarse backstop only.
 
 ## 5. Bootstrap (`main.py`)
@@ -181,6 +228,10 @@ before a minute boundary. The next scheduled run takes over by 4.5 without inter
 5. Watch: the bootstrap reads ticks and uses no network and no MotherDuck connection. No tick for 60 s ⇒
    `SIGKILL` to the pipeline's process group, then `os._exit(1)`. Pipeline exit ⇒ exit with its status.
 
+For local tiers the bootstrap takes a local source path in place of the pinned clone, and the local platform
+(plan C6) does what the real one does at the end of a run: it kills every process the run started, in any
+session or process group.
+
 The run ends when `main.py` exits, and the platform then destroys everything in it; measured, a frozen pipeline's
 run ended 65 s after the freeze. A frozen bootstrap is bounded by the next run's guard (30 s stale heartbeat, then
 take-over and cancel).
@@ -189,7 +240,8 @@ take-over and cancel).
 
 ### 6.1 Staging
 
-The engine sends change records as Arrow record batches, one stream per table. Each row carries:
+The engine sends change records as Arrow record batches, one stream per table. The names and exact column sets
+are fixed in the plan (`docs/design/p3_plan.md` C2, C3a); in meaning, each row carries:
 
 | Column | Meaning |
 |---|---|
@@ -217,10 +269,12 @@ Rules that follow from the measurements:
   full the pipeline stops reading the engine's pipe, which stops the engine's queue and then the slot read
   (back-pressure, SPEC 5.4).
 
-Staging tables for 6.4 live in a schema that is private to the leader epoch (`_cdc_stage_<epoch>`; schemas of
-older epochs are dropped during start-up). Appends to them are committed on their own and are not fenced: they
-are invisible to consumers, and a stale leader can only write into its own epoch's schema. The statements of
-6.2–6.3 are the same for both inputs; only the name of the input relation differs.
+Staging tables for 6.4 live in one schema, `_cdc_stage`. Every append is a stream-lane transaction like any
+other: it ends with the fence, and it moves a staging progress row (engine instance, source transaction, number
+of chunks) with a condition on the value it read, so that an append whose commit outcome was unknown is never
+added twice, and a deposed leader meets the fence at its next chunk instead of writing for minutes. The staging
+tables are truncated by every start of the stream component and by the transaction that applies them. The
+statements of 6.2–6.3 are the same for both inputs; only the input relation differs.
 
 ### 6.2 Tables with a key
 
@@ -239,6 +293,14 @@ record (Debezium links the two records with the headers `__debezium.oldkey` and 
 and the applier resolves a chain of key changes inside a group back to the key the row had before the group, and
 takes the unchanged values from that row before it deletes it. The destination has no keys or indexes, so no intermediate
 state can violate a constraint.
+
+An unchanged value is never lost silently (H-003). It is resolved in this order: from an earlier record of the
+same row in the change set; from the destination row that has the key the row had before the change set; and,
+only when a log is replayed onto a table that was loaded separately (catch-up, 7.3), from the destination row
+with the new key if no earlier record of the set addressed that key. A value that is still unresolved is an
+invariant violation in the stream (`ApplyInvariantError`: the destination has diverged), and a key for a repair
+read in catch-up (7.3). Applying a change set a second time gives the same table, except for keys reported as
+unresolved.
 
 The number of statement shapes per table depends on the table's columns, not on the data (SPEC 2.6).
 
@@ -262,8 +324,8 @@ type fuzzer checks this for every type, because a keyless delete can only find a
 
 ### 6.4 A transaction larger than a group
 
-Its records are appended to staging tables in MotherDuck (6.1) in committed chunks while they arrive, so memory and
-local disk stay bounded, and the upload is finished before the END record arrives. At its END record one
+Its records are appended to staging tables in MotherDuck (6.1) in fenced, committed chunks while they arrive, so
+memory and local disk stay bounded, and the upload is finished before the END record arrives. At its END record one
 destination transaction runs the statements of 6.2–6.3 over all of its staged rows, writes the position, fences
 and commits. The applied position does not move, and no later source transaction
 becomes visible, until that commit. Nothing is ever applied from an unfinished source transaction.
@@ -282,14 +344,23 @@ re-backfill and a resumed backfill (SPEC 3.3). The stream never stops for it.
 
 ### 7.1 Life of one backfill
 
-1. **Enter.** A stream-lane group commits the table's transition to `backfilling` at stream position `P0`. From
-   that commit on, the table's changes are not applied to the visible table; they are appended to the table's
-   **pending log** in the same group transaction that moves the position. Consumers keep the old version.
+1. **Enter.** Every request for a backfill (first start, discovery, operator, slot finding, lag, drop and
+   recreate) is a row in a request table; the stream lane enacts it inside a group: that group commits the
+   table's transition to `backfilling` at stream position `P0` = the group's end. From that commit on, the
+   table's changes are appended to the table's **pending log** in the same group transaction that moves the
+   position. What happens to the visible table depends on why the backfill runs (the table's **routing**, kept
+   by the stream lane, plan C10):
+   - *after a gap* (first backfill, slot finding, lag-triggered re-backfill, quarantine, drop and recreate): the
+     changes go to the pending log only. Consumers keep the last complete version, or no table yet (SPEC 3.6);
+   - *without a gap* (operator re-backfill of a table that is streaming, change of mode): the changes are still
+     applied to the visible table as well, in the same group as every other table, until the swap. The table
+     never leaves the guarantee of SPEC 1.3, whose only exception is a table that has not reached streaming.
 2. **Read.** The backfill lane reads chunks from the source into the **new table** (same schema as the target, a
    reserved name, so that the swap can be a rename). Chunks are `ctid` ranges, read with `COPY` by parallel
    readers (2 on F16); R3: Debezium takes no snapshot. A load transaction covers one or more chunks; it is fenced
-   in lane `backfill` and records its chunks as done in the same transaction (crash point
-   `backfill.chunk_committed`). Rules for the source side, from `docs/spike/local_throughput.md` section 8:
+   in the loader's own lane `backfill.<i>` and records its chunks as done in the same transaction (crash point
+   `backfill.chunk_committed`). The last chunk of a table has no upper bound: the table can have grown between
+   planning and the chunk's snapshot. Rules for the source side, from `docs/spike/local_throughput.md` section 8:
    - every chunk is read in its own short transaction, far shorter than `max_standby_streaming_delay`. A long
      read transaction on a standby is cancelled by any `ACCESS EXCLUSIVE` lock taken on the primary (also by a
      vacuum that truncates the table's tail) and stalls replay, and with it the stream, until then;
@@ -301,12 +372,18 @@ re-backfill and a resumed backfill (SPEC 3.3). The stream never stops for it.
      `SET TRANSACTION SNAPSHOT`. While it lives it holds back cleanup on the primary through
      `hot_standby_feedback`; its age is reported and has an alert threshold;
    - a chunk that fails with a recovery conflict (SQLSTATE 40001) is read again.
-3. **Catch up.** The backfill lane applies pending changes to the new table in rounds (statements of section 6),
-   recording `caught_up_lsn` each time, until the rest is small.
+3. **Catch up.** The backfill lane applies pending changes to the new table in rounds (statements of section 6,
+   mode `catch_up`), recording `caught_up_lsn` each time, until the rest is small. Then it moves the backfill to
+   `swap_ready` and writes nothing more for this table: from here on only the stream lane touches the new table
+   and the backfill's row, so the two lanes never write the same row at the same time.
 4. **Swap.** A stream-lane group applies the rest of the pending log, drops the old table, renames the new one,
    and moves the table to `streaming`, in the same transaction as the group's position and fence (R7, SPEC 3.2).
-   From the next group on, the table's changes are applied directly. This is also the moment a table "reaches
-   streaming" for SPEC 1.3.
+   If the rest holds a key that cannot be resolved (6.2), nothing is swapped: the backfill goes back to
+   `catching_up` for a repair read (7.3). From the next group on, the table's changes are applied directly. This
+   is also the moment a table "reaches streaming" for SPEC 1.3.
+
+The stream component calls one function of the backfill package inside every group, before the position step
+(plan C10); enter, the pending-log appends and the swap all happen there.
 
 A crash anywhere leaves either the old version with a resumable backfill, or the new version in `streaming`.
 
@@ -338,7 +415,9 @@ The stream **has passed** a snapshot when its applied position is greater than `
 then applied. The heartbeat write guarantees that such a transaction arrives.
 
 A snapshot is used only if `R0 ≥ P0`: everything the stream applied before the table entered `backfilling` is then
-inside. This matters when backfill reads use a different replica than the slot.
+inside. This matters when backfill reads use a different replica than the slot. The wait for it has a deadline
+(the replica may be stalled); past it the backfill reports and keeps waiting as a declared wait (4.3), it does
+not spin and does not read.
 
 `pg_current_snapshot()` cannot give the answer on a standby: its in-progress list is empty there. Its `xmin` and
 `xmax` can still turn `unknown` into an answer (transaction id below `xmin` ⇒ `inside`, at or above `xmax` ⇒
@@ -371,7 +450,8 @@ therefore treats the keys of the log like this, before the statements of 6.2 run
    looking at the earlier records of the key in the log, the value is taken from the row in the new table. If the
    new table has no row for the key, the key goes to a **repair read**: one statement per round reads the missing
    rows by key from the source under a new snapshot (`WHERE key = ANY(…)`; no temporary table, the standby is
-   read-only), and they are loaded like a chunk. This is a backfill read, not a re-read of an unchanged value in
+   read-only), and they are loaded like a chunk. The repair snapshot must have `R0 ≥ caught_up_lsn`, so that a
+   repaired row is never older than what catch-up has already applied to the new table. This is a backfill read, not a re-read of an unchanged value in
    the stream (SPEC 2.6); it counts towards the row bound of SPEC 3.7.
 3. Then every key of the log ends as exactly one row, or none after a delete.
 
@@ -403,10 +483,29 @@ is `inside`. **[test]** in the discovery work of P4, including a transaction tha
 
 ## 8. Slot continuity
 
-Checked at every slot acquisition and every `slot.verify_interval` (default 30 s) while streaming, before the
-engine may read (SPEC 1.8, 4.1). `_cdc.stream_state` stores, next to the applied position: slot name, the server's
-system identifier, the timeline, and the slot's creation identity (**[test]** which catalog values identify a
-recreated slot of the same name on Postgres 17 and 18).
+Checked at every slot acquisition and every `slot.verify_interval` (default 30 s) while streaming (SPEC 1.8,
+4.1). `_cdc.stream_state` stores, next to the applied position: slot name, the server's system identifier, the
+timeline, and what identifies the slot (**[test]** which catalog values identify a recreated slot of the same
+name on Postgres 17 and 18; if there is none, a recreated slot is recognised by its positions only).
+
+A check that reads the slot and then starts the engine proves nothing: the slot can be advanced, dropped or
+recreated in between. The **attach step** therefore is:
+
+1. Read the fence row (a deposed run must not touch the slot). Read the slot facts. If another session holds the
+   slot (the previous run's engine), terminate that backend (our slot name only) and read again.
+2. Start the engine at the applied position. The engine reports that it holds the slot only when replication has
+   really started (plan C2), and never attaches a second time by itself.
+3. Read the slot facts again. They must show our engine's backend as the holder and must agree with step 1 in
+   everything the decision uses. If not, kill the engine and start at 1. The whole loop has a deadline of at least
+   75 s after a take-over (the previous run can take the slot back until its hard exit) and counts as a declared
+   wait (4.3).
+4. Decide by the table below on the facts of step 1, now known to describe the slot that our engine holds. No
+   frame is applied before the decision. While our engine holds the slot, nobody else can advance or drop it; if
+   the engine loses it, the stream component restarts and attaches again.
+
+A restart of the stream component always kills the engine and starts a new one. **[test]** whether a status
+update that carries a lower flush position can move `confirmed_flush_lsn` backwards on Postgres 16, 17 and 18:
+if it can, comparing only after the attach would hide a slot that was ahead, which is why step 1 reads first.
 
 | Finding | Meaning | Action |
 |---|---|---|
@@ -414,6 +513,12 @@ recreated slot of the same name on Postgres 17 and 18).
 | slot ahead of the applied position | changes were consumed elsewhere or the slot was advanced | alert, automatic backfill of all CDC tables, stream from the slot's position |
 | slot missing, recreated, or `wal_status = 'lost'` / invalidated | history is gone | alert, new slot, automatic backfill |
 | different system identifier, or applied position not on the timeline history | different server or diverged history (failover) | as the replica rules of SPEC 4.1 decide: continue if the position is proven to be on the new history, else alert and backfill |
+
+A finding other than "continuous" is enacted in **one** stream-lane transaction: the alert, the applied position
+set to the slot's `confirmed_flush_lsn` (for a new slot: its consistent point), and a backfill request enacted
+for every CDC table with `P0` = that position (7.1, after a gap). After that commit the same check finds
+"continuous", so a finding cannot repeat for ever. A slot that was recreated but is not ahead of the applied
+position has lost nothing; it needs an alert where the recreation can be seen, and no backfill.
 
 The Flight never exits because of a slot finding. The timeline history is read over a replication connection
 (`TIMELINE_HISTORY`); **[test]** that the role and the PlanetScale endpoint allow it, otherwise a failover is
@@ -428,12 +533,12 @@ stored state is not `from` or the pair is not in the table, and appends a row to
 
 | Machine | Key | States |
 |---|---|---|
-| leader / run | epoch | `starting` → `leading` → `releasing` → `released`; `superseded`; `failed` |
+| leader | the one leader row | `released` → `leading`; `leading` → `leading` (take-over, epoch + 1); `leading` → `released`. Why a run ended (superseded, failed, released) is the cause in `_cdc.transitions`. Written by the bootstrap with its own copy of the machine (section 4) |
 | slot and stream | slot | `unverified` → `verified` → `streaming` ⇄ `stalled`; `broken` → `rebuilding` → `verified` |
 | table replication | table | `discovered` → `awaiting_approval` / `backfilling` → `streaming`; `streaming` → `backfilling`; `refresh_only`; `quarantined`; `retained`; `dropped` |
-| backfill progress | table, backfill id | `planned` → `reading` → `catching_up` → `swapping` → `done`; `abandoned` |
+| backfill progress | table, backfill id | `planned` → `reading` → `catching_up` ⇄ `swap_ready` → `done`; `abandoned` |
 | schema change | table, change id | `detected` → `applying` → `applied`; `failed` |
-| batch commit / ack | group | `staged` → `committed` → `acknowledged`; `discarded` |
+| batch commit / ack | slot | one row per slot in `_cdc.stream_state`: the applied position and the last position sent as durable; "acknowledged" is read from the slot's `confirmed_flush_lsn`. Legal moves: applied position forward only (or set by a slot finding, section 8); durable ≤ applied |
 | quarantine | table | `healthy` → `retrying(n)` → `quarantined` → `healthy` |
 
 The tables above are the starting point; the worker who builds a machine fixes its final transition table in code
@@ -474,3 +579,7 @@ src/cdc_v2/oracle/          source/destination comparison used by every test tie
 | 11 | A schema change of a table during its own backfill | P4 schema wave; first rule: the table's backfill starts again |
 | 12 | Cut on a primary: a transaction decoded before `P0` that a later snapshot does not see yet (7.2) | P3 cut stress test proposes and proves the rule |
 | 13 | Catch-up that never converges (changes with unchanged values arrive faster than repair reads resolve them) | P4: bound the rounds, alert; P6 fuzzers |
+| 14 | Can a status update with a lower flush position move `confirmed_flush_lsn` backwards (8)? | P3, packages E and V, Postgres 16–18 |
+| 15 | SPEC 1.3 during a re-backfill: a table that streams stays in the guarantee (7.1, "without a gap"); after a gap each table swaps on its own (SPEC 3.6) and is outside the guarantee until then, like a first backfill | decided here; reported to the owner |
+| 16 | Leader tables created by several first runs at once end as one row set (4) | P3, package L, on MotherDuck |
+| 17 | SPEC 4.2 "a newcomer exits within 10 s": measured from the first line of `main.py`; the platform's own start time varies (p95 7 s, max 21 s in the spike) and is outside our control | reported to the owner |
