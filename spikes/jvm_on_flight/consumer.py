@@ -13,6 +13,7 @@ import signal
 import struct
 import subprocess
 import sys
+import threading
 import time
 
 MAGIC = 0x43444331
@@ -26,17 +27,31 @@ class Stats:
                   "last_event_at": None, "eof_at": None, "jvm_rc": None, "ops": {}, "orderkey_sum": 0,
                   "decoded": 0, "sample": []}
         self.last_write = 0.0
+        self.lock = threading.Lock()
 
     def write(self, force=False):
         now = time.time()
         if not force and now - self.last_write < 0.1:
             return
-        self.last_write = now
-        self.d["written_at"] = now
-        tmp = self.path + ".tmp"
-        with open(tmp, "w") as f:
-            json.dump(self.d, f)
-        os.replace(tmp, self.path)
+        with self.lock:
+            self.last_write = now
+            self.d["written_at"] = now
+            text = json.dumps(self.d)
+            tmp = self.path + ".tmp"
+            with open(tmp, "w") as f:
+                f.write(text)
+            os.replace(tmp, self.path)
+
+    def start_flusher(self):
+        """Rewrite the file every 0.2 s, so the last batches are visible even when no further batch arrives."""
+        def loop():
+            while True:
+                time.sleep(0.2)
+                try:
+                    self.write(force=True)
+                except RuntimeError:  # a dict changed size while being serialised: try again next tick
+                    pass
+        threading.Thread(target=loop, daemon=True).start()
 
 
 def read_exact(f, n):
@@ -143,6 +158,7 @@ def main():
     os.close(wfd)
     st.d["jvm_pid"] = p.pid
     st.write(force=True)
+    st.start_flusher()
     signal.signal(signal.SIGTERM, lambda *_: p.send_signal(signal.SIGTERM))
     sink = open(a.sink, "ab") if a.sink else None
     out = os.fdopen(rfd, "rb", buffering=1 << 20)
