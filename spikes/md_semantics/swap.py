@@ -215,8 +215,9 @@ def long_scan_test(ev: Evidence, swaps: int, rows: int, start_v: int) -> None:
         t0 = time.time()
         try:
             r = con.execute("SELECT count(*), sum(id), min(ver), max(ver), "
-                            "count(DISTINCT md5(pad || id::VARCHAR)) FROM t").fetchone()
-            ok = r[0] == rows and r[1] == rows * (rows - 1) // 2 and r[2] == r[3] and r[4] == rows
+                            "count(DISTINCT md5(pad || id::VARCHAR || m::VARCHAR)) FROM t, range(8) mm(m)").fetchone()
+            ok = (r[0] == 8 * rows and r[1] == 8 * (rows * (rows - 1) // 2) and r[2] == r[3]
+                  and r[4] == 8 * rows)
             k = "consistent" if ok else f"INCONSISTENT {r}"
         except Exception as e:
             k = "error: " + err_class(e)
@@ -315,7 +316,7 @@ def main() -> None:
     ap.add_argument("--long-swaps", type=int, default=15)
     ap.add_argument("--only", default="")
     a = ap.parse_args()
-    ev = Evidence("swap")
+    ev = Evidence("swap" + ("_" + a.only.replace(",", "_") if a.only else ""))
     create_db(DB)
     try:
         v = 10

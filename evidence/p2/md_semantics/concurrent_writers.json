@@ -1,0 +1,2662 @@
+{
+  "spike": "concurrent_writers",
+  "duckdb_client": "1.5.6",
+  "started_utc": "2026-11-10T02:36:24Z",
+  "note": "measured from a laptop over the public internet; performance numbers are indications only",
+  "cases": {
+    "different tables, insert/insert [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "INSERT INTO t1 VALUES (5000, 1)",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "INSERT INTO t2 VALUES (5000, 2)",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            1001,
+            1,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1001,
+            2,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "different tables, insert/insert [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "INSERT INTO t1 VALUES (5000, 1)",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "INSERT INTO t2 VALUES (5000, 2)",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            1001,
+            1,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1001,
+            2,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "same table, append/append [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "INSERT INTO t1 VALUES (5000, 1)",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "INSERT INTO t1 VALUES (5001, 2)",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            1002,
+            3,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "same table, append/append [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "INSERT INTO t1 VALUES (5000, 1)",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "INSERT INTO t1 VALUES (5001, 2)",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            1002,
+            3,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "same table, update/update different rows [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "UPDATE t1 SET v = 1 WHERE id = 10",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "UPDATE t1 SET v = 2 WHERE id = 11",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            1000,
+            3,
+            1,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "same table, update/update different rows [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "UPDATE t1 SET v = 1 WHERE id = 10",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "UPDATE t1 SET v = 2 WHERE id = 11",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            1000,
+            3,
+            1,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "same table, update/update same row [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "UPDATE t1 SET v = 1 WHERE id = 10",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "UPDATE t1 SET v = 2 WHERE id = 10",
+          "TransactionException: TransactionContext Error: Conflict on update!"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "ROLLBACK (after error)",
+          "OK"
+        ]
+      ],
+      "conflict": true,
+      "loser": "B",
+      "retry": "retry OK",
+      "final_after_retry": {
+        "t1": [
+          [
+            1000,
+            2,
+            2,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "same table, update/update same row [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "UPDATE t1 SET v = 1 WHERE id = 10",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "UPDATE t1 SET v = 2 WHERE id = 10",
+          "TransactionException: TransactionContext Error: Conflict on update!"
+        ],
+        [
+          "B",
+          "ROLLBACK (after error)",
+          "OK"
+        ]
+      ],
+      "conflict": true,
+      "loser": "B",
+      "retry": "retry OK",
+      "final_after_retry": {
+        "t1": [
+          [
+            1000,
+            2,
+            2,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "same table, delete/update same row [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "DELETE FROM t1 WHERE id = 10",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "UPDATE t1 SET v = 2 WHERE id = 10",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            999,
+            0,
+            null,
+            0
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "same table, delete/update same row [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "DELETE FROM t1 WHERE id = 10",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "UPDATE t1 SET v = 2 WHERE id = 10",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            999,
+            0,
+            null,
+            0
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "same table, delete/delete same row [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "DELETE FROM t1 WHERE id = 10",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "DELETE FROM t1 WHERE id = 10",
+          "TransactionException: TransactionContext Error: Conflict on tuple deletion!"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "ROLLBACK (after error)",
+          "OK"
+        ]
+      ],
+      "conflict": true,
+      "loser": "B",
+      "retry": "retry OK",
+      "final_after_retry": {
+        "t1": [
+          [
+            999,
+            0,
+            null,
+            0
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "same table, delete/delete same row [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "DELETE FROM t1 WHERE id = 10",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "DELETE FROM t1 WHERE id = 10",
+          "TransactionException: TransactionContext Error: Conflict on tuple deletion!"
+        ],
+        [
+          "B",
+          "ROLLBACK (after error)",
+          "OK"
+        ]
+      ],
+      "conflict": true,
+      "loser": "B",
+      "retry": "retry OK",
+      "final_after_retry": {
+        "t1": [
+          [
+            999,
+            0,
+            null,
+            0
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "same table, update/append [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "UPDATE t1 SET v = 1 WHERE id = 10",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "INSERT INTO t1 VALUES (5001, 2)",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            1001,
+            3,
+            1,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "same table, update/append [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "UPDATE t1 SET v = 1 WHERE id = 10",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "INSERT INTO t1 VALUES (5001, 2)",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            1001,
+            3,
+            1,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "same table, set-based update/update disjoint halves [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "UPDATE t1 SET v = 1 WHERE id < 500",
+          "OK rows=500"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "UPDATE t1 SET v = 2 WHERE id >= 500",
+          "OK rows=500"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            1000,
+            1500,
+            1,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "same table, set-based update/update disjoint halves [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "UPDATE t1 SET v = 1 WHERE id < 500",
+          "OK rows=500"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "UPDATE t1 SET v = 2 WHERE id >= 500",
+          "OK rows=500"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            1000,
+            1500,
+            1,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "different tables, each also updates its own state row [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "INSERT INTO t1 VALUES (5000, 1)",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "UPDATE state SET pos = pos + 1 WHERE stream = 's1'",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "INSERT INTO t2 VALUES (5000, 2)",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "UPDATE state SET pos = pos + 1 WHERE stream = 's2'",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            1001,
+            1,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1001,
+            2,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          1,
+          1
+        ]
+      }
+    },
+    "different tables, each also updates its own state row [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "INSERT INTO t1 VALUES (5000, 1)",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "UPDATE state SET pos = pos + 1 WHERE stream = 's1'",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "INSERT INTO t2 VALUES (5000, 2)",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "UPDATE state SET pos = pos + 1 WHERE stream = 's2'",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            1001,
+            1,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1001,
+            2,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          1,
+          1
+        ]
+      }
+    },
+    "different tables, both update ONE shared state row [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "INSERT INTO t1 VALUES (5000, 1)",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "UPDATE state SET pos = pos + 1 WHERE stream = 's1'",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "INSERT INTO t2 VALUES (5000, 2)",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "UPDATE state SET pos = pos + 1 WHERE stream = 's1'",
+          "TransactionException: TransactionContext Error: Conflict on update!"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "ROLLBACK (after error)",
+          "OK"
+        ]
+      ],
+      "conflict": true,
+      "loser": "B",
+      "retry": "retry OK",
+      "final_after_retry": {
+        "t1": [
+          [
+            1001,
+            1,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1001,
+            2,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          2,
+          0
+        ]
+      }
+    },
+    "different tables, both update ONE shared state row [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "INSERT INTO t1 VALUES (5000, 1)",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "UPDATE state SET pos = pos + 1 WHERE stream = 's1'",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "INSERT INTO t2 VALUES (5000, 2)",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "UPDATE state SET pos = pos + 1 WHERE stream = 's1'",
+          "TransactionException: TransactionContext Error: Conflict on update!"
+        ],
+        [
+          "B",
+          "ROLLBACK (after error)",
+          "OK"
+        ]
+      ],
+      "conflict": true,
+      "loser": "B",
+      "retry": "retry OK",
+      "final_after_retry": {
+        "t1": [
+          [
+            1001,
+            1,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1001,
+            2,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          2,
+          0
+        ]
+      }
+    },
+    "DDL vs DML: ALTER ADD COLUMN t1 / INSERT t1 [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "ALTER TABLE t1 ADD COLUMN extra VARCHAR",
+          "OK rows=[]"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "INSERT INTO t1 VALUES (5001, 2)",
+          "TransactionException: TransactionContext Error: Transaction conflict: attempting to insert into table \"t1\" but it has been altered by a different transaction"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "ROLLBACK (after error)",
+          "OK"
+        ]
+      ],
+      "conflict": true,
+      "loser": "B",
+      "retry": "retry failed: BinderException: Binder Error: table t1 has 3 columns but 2 values were supplied",
+      "final_after_retry": {
+        "t1": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "DDL vs DML: ALTER ADD COLUMN t1 / INSERT t1 [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "ALTER TABLE t1 ADD COLUMN extra VARCHAR",
+          "OK rows=[]"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "INSERT INTO t1 VALUES (5001, 2)",
+          "TransactionException: TransactionContext Error: Transaction conflict: attempting to insert into table \"t1\" but it has been altered by a different transaction"
+        ],
+        [
+          "B",
+          "ROLLBACK (after error)",
+          "OK"
+        ]
+      ],
+      "conflict": true,
+      "loser": "B",
+      "retry": "retry failed: BinderException: Binder Error: table t1 has 3 columns but 2 values were supplied",
+      "final_after_retry": {
+        "t1": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "DDL vs DML: ALTER ADD COLUMN t1 / UPDATE t1 [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "ALTER TABLE t1 ADD COLUMN extra VARCHAR",
+          "OK rows=[]"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "UPDATE t1 SET v = 2 WHERE id = 11",
+          "TransactionException: TransactionContext Error: Transaction conflict: attempting to update table \"t1\" but it has been altered by a different transaction"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "ROLLBACK (after error)",
+          "OK"
+        ]
+      ],
+      "conflict": true,
+      "loser": "B",
+      "retry": "retry OK",
+      "final_after_retry": {
+        "t1": [
+          [
+            1000,
+            2,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "DDL vs DML: ALTER ADD COLUMN t1 / UPDATE t1 [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "ALTER TABLE t1 ADD COLUMN extra VARCHAR",
+          "OK rows=[]"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "UPDATE t1 SET v = 2 WHERE id = 11",
+          "TransactionException: TransactionContext Error: Transaction conflict: attempting to update table \"t1\" but it has been altered by a different transaction"
+        ],
+        [
+          "B",
+          "ROLLBACK (after error)",
+          "OK"
+        ]
+      ],
+      "conflict": true,
+      "loser": "B",
+      "retry": "retry OK",
+      "final_after_retry": {
+        "t1": [
+          [
+            1000,
+            2,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "DML vs DDL: INSERT t1 / ALTER ADD COLUMN t1 [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "INSERT INTO t1 VALUES (5001, 2)",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "ALTER TABLE t1 ADD COLUMN extra VARCHAR",
+          "OK rows=[]"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "TransactionException: TransactionContext Error: Failed to commit: MotherDuck transaction statement failed: TransactionContext Error: Failed to commit: Transaction conflict: attempting to insert into table \"t1\" but it has been altered by a different transaction"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": true,
+      "loser": "A",
+      "retry": "retry failed: BinderException: Binder Error: table t1 has 3 columns but 2 values were supplied",
+      "final_after_retry": {
+        "t1": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "DML vs DDL: INSERT t1 / ALTER ADD COLUMN t1 [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "INSERT INTO t1 VALUES (5001, 2)",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "ALTER TABLE t1 ADD COLUMN extra VARCHAR",
+          "OK rows=[]"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            1001,
+            2,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "DDL vs DML on another table: ALTER t1 / INSERT t2 [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "ALTER TABLE t1 ADD COLUMN extra VARCHAR",
+          "OK rows=[]"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "INSERT INTO t2 VALUES (5001, 2)",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1001,
+            2,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "DDL vs DML on another table: ALTER t1 / INSERT t2 [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "ALTER TABLE t1 ADD COLUMN extra VARCHAR",
+          "OK rows=[]"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "INSERT INTO t2 VALUES (5001, 2)",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1001,
+            2,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "DDL vs DDL, different tables [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "ALTER TABLE t1 ADD COLUMN extra VARCHAR",
+          "OK rows=[]"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "ALTER TABLE t2 ADD COLUMN extra VARCHAR",
+          "OK rows=[]"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "DDL vs DDL, different tables [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "ALTER TABLE t1 ADD COLUMN extra VARCHAR",
+          "OK rows=[]"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "ALTER TABLE t2 ADD COLUMN extra VARCHAR",
+          "OK rows=[]"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "DDL vs DDL, same table [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "ALTER TABLE t1 ADD COLUMN extra VARCHAR",
+          "OK rows=[]"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "ALTER TABLE t1 ADD COLUMN extra2 VARCHAR",
+          "TransactionException: TransactionContext Error: Catalog write-write conflict on alter with \"t1\""
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "ROLLBACK (after error)",
+          "OK"
+        ]
+      ],
+      "conflict": true,
+      "loser": "B",
+      "retry": "retry OK",
+      "final_after_retry": {
+        "t1": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "DDL vs DDL, same table [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "ALTER TABLE t1 ADD COLUMN extra VARCHAR",
+          "OK rows=[]"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "ALTER TABLE t1 ADD COLUMN extra2 VARCHAR",
+          "TransactionException: TransactionContext Error: Catalog write-write conflict on alter with \"t1\""
+        ],
+        [
+          "B",
+          "ROLLBACK (after error)",
+          "OK"
+        ]
+      ],
+      "conflict": true,
+      "loser": "B",
+      "retry": "retry OK",
+      "final_after_retry": {
+        "t1": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "CREATE TABLE vs CREATE TABLE, different names [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "CREATE TABLE t3 (a INT)",
+          "OK rows=[]"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "CREATE TABLE t4 (a INT)",
+          "OK rows=[]"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "CREATE TABLE vs CREATE TABLE, different names [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "CREATE TABLE t3 (a INT)",
+          "OK rows=[]"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "CREATE TABLE t4 (a INT)",
+          "OK rows=[]"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "ALTER TYPE vs INSERT same table [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "ALTER TABLE t1 ALTER COLUMN v TYPE HUGEINT",
+          "OK rows=[]"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "INSERT INTO t1 VALUES (5001, 2)",
+          "TransactionException: TransactionContext Error: Transaction conflict: attempting to insert into table \"t1\" but it has been altered by a different transaction"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "ROLLBACK (after error)",
+          "OK"
+        ]
+      ],
+      "conflict": true,
+      "loser": "B",
+      "retry": "retry OK",
+      "final_after_retry": {
+        "t1": [
+          [
+            1001,
+            2,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "ALTER TYPE vs INSERT same table [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "ALTER TABLE t1 ALTER COLUMN v TYPE HUGEINT",
+          "OK rows=[]"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "INSERT INTO t1 VALUES (5001, 2)",
+          "TransactionException: TransactionContext Error: Transaction conflict: attempting to insert into table \"t1\" but it has been altered by a different transaction"
+        ],
+        [
+          "B",
+          "ROLLBACK (after error)",
+          "OK"
+        ]
+      ],
+      "conflict": true,
+      "loser": "B",
+      "retry": "retry OK",
+      "final_after_retry": {
+        "t1": [
+          [
+            1001,
+            2,
+            0,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "swap (DROP t1 + RENAME staging) vs INSERT t1 [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "DROP TABLE t1",
+          "OK rows=[]"
+        ],
+        [
+          "A",
+          "ALTER TABLE t1_staging RENAME TO t1",
+          "OK rows=[]"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "INSERT INTO t1 VALUES (5001, 2)",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "TransactionException: TransactionContext Error: Failed to commit: MotherDuck transaction statement failed: TransactionContext Error: Failed to commit: Transaction conflict: attempting to insert into table \"t1\" but it has been dropped by a different transaction"
+        ]
+      ],
+      "conflict": true,
+      "loser": "B",
+      "retry": "retry OK",
+      "final_after_retry": {
+        "t1": [
+          [
+            2001,
+            14002,
+            7,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "swap (DROP t1 + RENAME staging) vs INSERT t1 [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "DROP TABLE t1",
+          "OK rows=[]"
+        ],
+        [
+          "A",
+          "ALTER TABLE t1_staging RENAME TO t1",
+          "OK rows=[]"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "INSERT INTO t1 VALUES (5001, 2)",
+          "TransactionException: TransactionContext Error: Transaction conflict: attempting to insert into table \"t1\" but it has been dropped by a different transaction"
+        ],
+        [
+          "B",
+          "ROLLBACK (after error)",
+          "OK"
+        ]
+      ],
+      "conflict": true,
+      "loser": "B",
+      "retry": "retry OK",
+      "final_after_retry": {
+        "t1": [
+          [
+            2001,
+            14002,
+            7,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "INSERT t1 vs swap (DROP t1 + RENAME staging) [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "INSERT INTO t1 VALUES (5001, 2)",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "DROP TABLE t1",
+          "OK rows=[]"
+        ],
+        [
+          "B",
+          "ALTER TABLE t1_staging RENAME TO t1",
+          "OK rows=[]"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            2000,
+            14000,
+            7,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "INSERT t1 vs swap (DROP t1 + RENAME staging) [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "INSERT INTO t1 VALUES (5001, 2)",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "DROP TABLE t1",
+          "OK rows=[]"
+        ],
+        [
+          "B",
+          "ALTER TABLE t1_staging RENAME TO t1",
+          "OK rows=[]"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            2000,
+            14000,
+            7,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1000,
+            0,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "swap of t1 vs INSERT into a different table t2 [overlap]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "A",
+          "DROP TABLE t1",
+          "OK rows=[]"
+        ],
+        [
+          "A",
+          "ALTER TABLE t1_staging RENAME TO t1",
+          "OK rows=[]"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "INSERT INTO t2 VALUES (5001, 2)",
+          "OK rows=1"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            2000,
+            14000,
+            7,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1001,
+            2,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    },
+    "swap of t1 vs INSERT into a different table t2 [stale]": {
+      "steps": [
+        [
+          "A",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "BEGIN",
+          "OK"
+        ],
+        [
+          "B",
+          "SELECT count(*) FROM t2",
+          "OK rows=1000"
+        ],
+        [
+          "A",
+          "DROP TABLE t1",
+          "OK rows=[]"
+        ],
+        [
+          "A",
+          "ALTER TABLE t1_staging RENAME TO t1",
+          "OK rows=[]"
+        ],
+        [
+          "A",
+          "COMMIT",
+          "OK"
+        ],
+        [
+          "B",
+          "INSERT INTO t2 VALUES (5001, 2)",
+          "OK rows=1"
+        ],
+        [
+          "B",
+          "COMMIT",
+          "OK"
+        ]
+      ],
+      "conflict": false,
+      "loser": null,
+      "retry": null,
+      "final_after_retry": {
+        "t1": [
+          [
+            2000,
+            14000,
+            7,
+            1
+          ]
+        ],
+        "t2": [
+          [
+            1001,
+            2,
+            0,
+            1
+          ]
+        ],
+        "state": [
+          0,
+          0
+        ]
+      }
+    }
+  },
+  "finished_utc": "2026-11-10T02:37:56Z"
+}

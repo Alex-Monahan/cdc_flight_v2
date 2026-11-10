@@ -1,0 +1,520 @@
+{
+  "spike": "types",
+  "duckdb_client": "1.5.6",
+  "started_utc": "2026-11-10T02:33:47Z",
+  "note": "measured from a laptop over the public internet; performance numbers are indications only",
+  "checks": {
+    "int_to_bigint: ALTER ... TYPE BIGINT + INSERT + UPDATE in one transaction, committed": {
+      "status": "OK",
+      "result": [
+        [
+          2,
+          "9223372036854775807",
+          "BIGINT"
+        ],
+        [
+          11,
+          "2147483647",
+          "BIGINT"
+        ]
+      ]
+    },
+    "float_to_double: ALTER ... TYPE DOUBLE + INSERT + UPDATE in one transaction, committed": {
+      "status": "OK",
+      "result": [
+        [
+          2,
+          "1.0000000000000002",
+          "DOUBLE"
+        ],
+        [
+          11,
+          "1.5",
+          "DOUBLE"
+        ]
+      ]
+    },
+    "decimal_10_2_to_38_2: ALTER ... TYPE DECIMAL(38,2) + INSERT + UPDATE in one transaction, committed": {
+      "status": "OK",
+      "result": [
+        [
+          2,
+          "123456789012345678901234567890.12",
+          "DECIMAL(38,2)"
+        ],
+        [
+          11,
+          "12345678.91",
+          "DECIMAL(38,2)"
+        ]
+      ]
+    },
+    "decimal_18_4_to_38_10: ALTER ... TYPE DECIMAL(38,10) + INSERT + UPDATE in one transaction, committed": {
+      "status": "OK",
+      "result": [
+        [
+          2,
+          "1234567890123456789012345678.0123456789",
+          "DECIMAL(38,10)"
+        ],
+        [
+          11,
+          "12345678901234.5678000000",
+          "DECIMAL(38,10)"
+        ]
+      ]
+    },
+    "varchar_n_to_varchar: ALTER ... TYPE VARCHAR + INSERT + UPDATE in one transaction, committed": {
+      "status": "OK",
+      "result": [
+        [
+          2,
+          "abcdefghij",
+          "VARCHAR"
+        ],
+        [
+          11,
+          "abcde",
+          "VARCHAR"
+        ]
+      ]
+    },
+    "smallint_to_integer: ALTER ... TYPE INTEGER + INSERT + UPDATE in one transaction, committed": {
+      "status": "OK",
+      "result": [
+        [
+          2,
+          "2147483647",
+          "INTEGER"
+        ],
+        [
+          11,
+          "32767",
+          "INTEGER"
+        ]
+      ]
+    },
+    "timestamp_to_timestamptz: ALTER ... TYPE TIMESTAMPTZ + INSERT + UPDATE in one transaction, committed": {
+      "status": "OK",
+      "result": [
+        [
+          2,
+          "2020-12-31 17:00:00-07",
+          "TIMESTAMP WITH TIME ZONE"
+        ],
+        [
+          11,
+          "2020-01-01 00:00:00-07",
+          "TIMESTAMP WITH TIME ZONE"
+        ]
+      ]
+    },
+    "int_to_bigint on a PRIMARY KEY column": {
+      "status": "ERROR",
+      "error": "BinderException: Binder Error: Cannot change the type of a column that has a UNIQUE or PRIMARY KEY constraint specified"
+    },
+    "int_to_bigint on a column used by a non-PK index (CREATE INDEX)": {
+      "status": "ERROR",
+      "error": "CatalogException: Catalog Error: Cannot change the type of this column: an index depends on it!"
+    },
+    "rollback of ALTER TYPE restores the old type": {
+      "status": "OK",
+      "result": [
+        [
+          1,
+          "INTEGER"
+        ]
+      ]
+    },
+    "bigint -> UNION(i BIGINT, f DOUBLE), implicit cast, then insert a DOUBLE, committed": {
+      "status": "OK",
+      "result": [
+        [
+          1,
+          "42",
+          "i"
+        ],
+        [
+          2,
+          "1e+300",
+          "f"
+        ],
+        [
+          3,
+          "2.5",
+          "f"
+        ]
+      ]
+    },
+    "bigint -> UNION with explicit USING union_value(i := v)": {
+      "status": "OK",
+      "result": [
+        [
+          "42",
+          "i"
+        ]
+      ]
+    },
+    "double -> UNION(f DOUBLE, i BIGINT) (float column receives a bigint)": {
+      "status": "OK",
+      "result": [
+        [
+          1,
+          "0.1",
+          "f"
+        ],
+        [
+          2,
+          "9007199254740993",
+          "i"
+        ]
+      ]
+    },
+    "text -> UNION(s VARCHAR, i INTEGER)": {
+      "status": "OK",
+      "result": [
+        [
+          1,
+          "abc",
+          "s"
+        ],
+        [
+          2,
+          "17",
+          "s"
+        ],
+        [
+          3,
+          "17",
+          "i"
+        ]
+      ]
+    },
+    "DECIMAL(38,10) -> UNION(n DECIMAL(38,10), s VARCHAR) and a NaN / huge numeric as text": {
+      "status": "OK",
+      "result": [
+        [
+          1,
+          "3.1415926535",
+          "n"
+        ],
+        [
+          2,
+          "NaN",
+          "s"
+        ],
+        [
+          3,
+          "1e400",
+          "s"
+        ],
+        [
+          4,
+          "12.5000000000",
+          "n"
+        ]
+      ]
+    },
+    "second change: add a member to an existing union (UNION(i,f) -> UNION(i,f,s))": {
+      "status": "OK",
+      "result": [
+        [
+          1,
+          "42",
+          "i"
+        ],
+        [
+          2,
+          "1e+300",
+          "f"
+        ],
+        [
+          3,
+          "2.5",
+          "f"
+        ],
+        [
+          4,
+          "text",
+          "s"
+        ]
+      ]
+    },
+    "rollback of ALTER ... TYPE UNION restores the old type and rows": {
+      "status": "OK",
+      "result": [
+        [
+          1,
+          "BIGINT"
+        ]
+      ]
+    },
+    "INSERT ... SELECT from a DOUBLE staging column into the UNION column": {
+      "status": "OK",
+      "result": [
+        [
+          "7.25",
+          "f"
+        ]
+      ]
+    },
+    "INSERT ... SELECT from a BIGINT staging column into the UNION column": {
+      "status": "OK",
+      "result": [
+        [
+          "8",
+          "i"
+        ]
+      ]
+    },
+    "UPDATE sets a value of the other member": {
+      "status": "OK",
+      "result": [
+        [
+          "99",
+          "i"
+        ]
+      ]
+    },
+    "WHERE k = 1 (plain integer literal) matches which rows": {
+      "status": "OK",
+      "result": [
+        [
+          "int one"
+        ]
+      ]
+    },
+    "WHERE k = 1::BIGINT matches which rows": {
+      "status": "OK",
+      "result": [
+        [
+          "int one"
+        ]
+      ]
+    },
+    "WHERE k = 1.0::DOUBLE matches which rows": {
+      "status": "OK",
+      "result": [
+        [
+          "double one"
+        ]
+      ]
+    },
+    "k = union_value(i := 1) equality (union vs union, same tag)": {
+      "status": "OK",
+      "result": [
+        [
+          "int one"
+        ]
+      ]
+    },
+    "ORDER BY a union column (across members)": {
+      "status": "OK",
+      "result": [
+        [
+          "1"
+        ],
+        [
+          "8"
+        ],
+        [
+          "99"
+        ],
+        [
+          "1.0"
+        ],
+        [
+          "7.25"
+        ],
+        [
+          null
+        ]
+      ]
+    },
+    "GROUP BY / DISTINCT a union column: is int 1 the same group as double 1.0?": {
+      "status": "OK",
+      "result": [
+        [
+          2
+        ]
+      ]
+    },
+    "hash(): union BIGINT 1 vs plain BIGINT 1 vs union DOUBLE 1.0": {
+      "status": "OK",
+      "result": [
+        [
+          false,
+          false
+        ]
+      ]
+    },
+    "hash() stable across server and client (same value hashed remotely and locally)": {
+      "status": "OK",
+      "result": [
+        [
+          17970267147294058266
+        ]
+      ]
+    },
+    "join on union columns": {
+      "status": "OK",
+      "result": [
+        [
+          "double one",
+          "j-dbl"
+        ],
+        [
+          "int one",
+          "j-int"
+        ]
+      ]
+    },
+    "PRIMARY KEY on a UNION column": {
+      "status": "ERROR",
+      "error": "InvalidTypeException: Invalid type Error: Invalid Type [UNION(i BIGINT, f DOUBLE)]: Invalid type for index key."
+    },
+    "ALTER a PRIMARY KEY column to UNION": {
+      "status": "ERROR",
+      "error": "BinderException: Binder Error: Cannot change the type of a column that has a UNIQUE or PRIMARY KEY constraint specified"
+    },
+    "MERGE keyed on a union column": {
+      "status": "OK",
+      "result": [
+        [
+          "2.5",
+          "ins"
+        ],
+        [
+          "1",
+          "new"
+        ]
+      ]
+    },
+    "DELETE ... USING keyed on a union column": {
+      "status": "OK",
+      "result": [
+        [
+          1
+        ]
+      ]
+    },
+    "canonical text for an oracle: k::VARCHAR per member": {
+      "status": "OK",
+      "result": [
+        [
+          "i",
+          "99"
+        ],
+        [
+          "f",
+          "1.0"
+        ],
+        [
+          "i",
+          "1"
+        ],
+        [
+          null,
+          null
+        ],
+        [
+          "i",
+          "8"
+        ],
+        [
+          "f",
+          "7.25"
+        ]
+      ]
+    },
+    "arrow_fetch": {
+      "status": "OK",
+      "type": "sparse_union<i: int64=0, f: double=1, s: string=2>"
+    },
+    "INSERT INTO <md table> SELECT * FROM <arrow table with a union column>": {
+      "status": "OK",
+      "result": [
+        [
+          1,
+          "1",
+          "i"
+        ],
+        [
+          2,
+          "2.5",
+          "f"
+        ],
+        [
+          3,
+          "x",
+          "s"
+        ],
+        [
+          4,
+          null,
+          null
+        ]
+      ]
+    },
+    "COPY (SELECT ... union column) TO local Parquet, read back": {
+      "status": "OK",
+      "result": [
+        [
+          1,
+          "(0, 1, NULL, NULL)",
+          "STRUCT(UTINYINT, BIGINT, DOUBLE, VARCHAR)"
+        ],
+        [
+          2,
+          "(1, NULL, 2.5, NULL)",
+          "STRUCT(UTINYINT, BIGINT, DOUBLE, VARCHAR)"
+        ],
+        [
+          3,
+          "(2, NULL, NULL, x)",
+          "STRUCT(UTINYINT, BIGINT, DOUBLE, VARCHAR)"
+        ],
+        [
+          4,
+          null,
+          "STRUCT(UTINYINT, BIGINT, DOUBLE, VARCHAR)"
+        ]
+      ]
+    },
+    "INSERT INTO union table SELECT FROM that Parquet file": {
+      "status": "OK",
+      "result": [
+        [
+          1,
+          "1",
+          "i"
+        ],
+        [
+          2,
+          "2.5",
+          "f"
+        ],
+        [
+          3,
+          "x",
+          "s"
+        ],
+        [
+          4,
+          null,
+          null
+        ]
+      ]
+    },
+    "timing_s": {
+      "INTEGER -> BIGINT": 0.38,
+      "FLOAT -> DOUBLE": 0.54,
+      "DECIMAL(18,4) -> DECIMAL(38,10)": 0.68,
+      "DECIMAL(38,10) -> UNION(n DECIMAL(38,10), s VARCHAR)": 0.59,
+      "BIGINT -> UNION(i BIGINT, f DOUBLE)": 0.63,
+      "UNION(i,f) -> UNION(i,f,s) (add a member)": 0.72,
+      "VARCHAR -> UNION(s VARCHAR, i INTEGER)": 1.46
+    }
+  },
+  "finished_utc": "2026-11-10T02:34:26Z"
+}

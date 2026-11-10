@@ -166,7 +166,8 @@ def dist(values) -> dict:
 
 
 def err_class(e: BaseException) -> str:
-    return f"{type(e).__name__}: {redact(str(e)).splitlines()[0][:300]}"
+    lines = redact(str(e)).splitlines() or [""]
+    return f"{type(e).__name__}: {lines[0][:300]}"
 
 
 def changed(cur) -> int:
