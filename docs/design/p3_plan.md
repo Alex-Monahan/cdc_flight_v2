@@ -37,14 +37,16 @@ table → chunk readers (B) → transform (Y) → load, pending log, swap (B, A)
 | P | Source: connections with deadlines, catalog and catalog observation (H-008), publication, slot on a standby and on a primary, slot facts, timeline history, primary heartbeat | 8 (facts only), SPEC 4.4 | — | Opus |
 | L | Leadership: guard, take-over, heartbeat, planned hand-over, release; bootstrap; platform interface and local simulator; the leader machine | 4, 5 | D, H | Fable |
 | Y | Transform: destination type per source type; conversion of the engine's transport form and of the backfill's text form into destination-typed Arrow, inside the process; baseline type families | 6.1, SPEC 2.4 (baseline), 8.3 (place only) | E, P | Opus |
-| S | Stream: transaction assembly, groups, the commit and acknowledge protocol with its crash points, unknown commit outcome, the oversized transaction, supervisor, pipeline process, configuration file | 2, 3, 6.4 | E, D, A; then Y, P, L | Fable |
+| S | Stream: transaction assembly, groups, the commit and acknowledge protocol with its crash points, unknown commit outcome, the oversized transaction, supervisor, pipeline process, configuration file | 2, 3, 6.4 | E, D, A, K; then Y, P, L | Fable |
 | V | Slot continuity: the attach step and its decision, the periodic check, the finding enacted (alert, position, backfill requests) | 8, SPEC 1.8, 4.1 | P, D, E; completes after B | Fable |
 | F | Fuzzers and the campaign ledger: workload, fault, stream, leadership (value fuzzer in the P4 type wave); the consumer loop of SPEC 1.3 and 3.2; hand-overs under load and the hung component of SPEC 4.2 | SPEC §4, PLAN §6 | O, H; attacks S and L as they appear | Opus |
 | B | Backfill and hand-off: chunk planning and readers, pending log, catch-up with repair reads, swap; table and backfill machines | 7, 9 | X, S, A, P, Y | Fable |
 | T | Truncate, drop, drop-and-recreate end to end; remaining machines and the enumeration tests of 1.9 | 6.5, 9, SPEC 1.5 | S, B | Opus |
+| K | Key rule: the catalog reads deferrability, the engine is told which tables are without a key, what Debezium calls a key is measured (added 2026-11-10 after the second review of A) | 6 (rule K), H-015 | E, P | Opus |
 
 Order: E, D, A and P start as writer slots become free (at most four writers at once). Then L (after D), Y (after
-E and P), S (after E, D and A), V (after P and D), F (after O and H), B (after X and S), T last. The gate tests of
+E and P), S (after E, D, A and K), V (after P and D), F (after O and H), B (after X and S), T last. K (after E and P)
+is small and runs when a writer slot is free. The gate tests of
 1.1–1.9 and 4.2 are written by the package that owns the behaviour and run by the T1 harness of package O.
 
 Not in P3, but the contracts leave room for it: history tables and soft deletes (SPEC 8.1, 8.2: P4 builds them
@@ -112,18 +114,34 @@ fuzzer).
 | `BEGIN` / `END` | transaction id, commit time, all position fields of the record's offset and its `ack_position` (below); `END` also the event count in total and per table |
 | `TRUNCATE` | one table and its `seq`; a truncate of several tables arrives as consecutive frames |
 | `MESSAGE` | a logical decoding message: prefix, transactional or not, content bytes, `seq`, position fields (SPEC 7.4 consumes it in P4; the frame exists from the start) |
-| `HEARTBEAT` | position fields of a heartbeat record and its `ack_position` (the position moved without data) |
+| `HEARTBEAT` | position fields of a heartbeat record, for information only: the frame shows that the engine is alive; it has no `ack_position` and is never acknowledged |
 | `BATCH_END` | end of one engine batch |
-| `FATAL` | the engine stops: class, message and cause chain of the error |
+| `FATAL` | the engine stops: class, message and cause chain of the error (filtered: never a source value), the position fields of the last record handed over, plus `failing_position` (the `lsn` and `txId` of the event Debezium names when a record fails to decode; absent otherwise); schema and table only when the failure is in our handler |
 
 Every record gets a sequence number `seq` in arrival order: commit order, then order inside the transaction. Rows of
 several tables travel in separate `ROWS` frames; `seq` restores their order.
 
-`ack_position` of an `END` or `HEARTBEAT` frame is exactly the position that the source will be told is confirmed
-if that record is the newest one acknowledged (`docs/research/debezium.md` 3.1: the commit position of the offset
-if it has one, else the processed position). For an `END` it is the transaction's commit end position, which is
-the applied position of the core design, section 2. Over the life of one engine it never decreases; the engine
-checks that and stops with `FATAL` if it would.
+`ack_position` of an `END` frame is exactly the position that the source will be told is confirmed if that record is
+the newest one acknowledged: the transaction's commit end position, which is the applied position of the core
+design, section 2. Over the life of one engine it never decreases; the engine checks that and stops with `FATAL` if
+it would.
+
+**Only `END` records are acknowledged.** A heartbeat record is not: Debezium dispatches a heartbeat that already
+carries a transaction's commit position before it creates that transaction's END record, and one that carries the
+position of a non-transactional message before that message. A pipeline that adopted such a position lost
+transactions (second review of package E: 80 of 20,000 in one run). The engine therefore never holds or marks a
+heartbeat record, a `HEARTBEAT` frame may arrive anywhere (also between `BEGIN` and `END`) and never moves the
+applied position, and the pipeline sends `DURABLE` only for the commit end of an `END` it has applied. On an idle
+source the position moves with the transaction of the source-side heartbeat write (package P, every 10 s, in a
+published table). A non-transactional `MESSAGE` is not acknowledged either; SPEC 7.4 (P4) decides its rule: the
+server sends such a message again after every restart, from the last confirmed `END` on, so P4 needs a position of
+its own (the position of the last applied message) to discard repeats. An `END` whose offset has no `lsn_commit`
+stops the engine with `FATAL`; the engine never falls back to another field for an `END`.
+
+The engine holds a bounded number of unacknowledged `END` records. When it must drop some, a `DURABLE` confirms a
+position at or below the durable one, never above it, and the distance stays within a bound that
+`docs/design/engine.md` states and a test shows (the first version could stop following altogether while the
+pipeline was more than about 24,000 transactions behind).
 
 `ROWS` columns are column-oriented buffers in little-endian Arrow layout, written by our own Java code (no Arrow
 library in the JVM), so that Python wraps them with `pyarrow.Array.from_buffers` without touching single values:
@@ -163,7 +181,7 @@ among others `skipped.operations`, the offset storage and flush interval, `lsn.f
 transaction metadata, the snapshot mode, the publication mode, the converter, tombstones and a heartbeat interval
 outside 0 < interval ≤ 10 s. Nothing that reaches the engine as "extra" properties can override them.
 
-`END` and `HEARTBEAT` carry the exact position the engine flushes when that record is marked processed. The
+`END` carries the exact position the engine flushes when that record is marked processed. The
 package document states which records Debezium's event counts include, proven by test for a key change, a
 TRUNCATE and a transactional message.
 
@@ -172,9 +190,11 @@ Commands to the engine, one per line on standard input:
 - `CONFIG <json>` — the first line, once: the Debezium properties, with the source password. Secrets reach the JVM
   only this way: never in arguments, in the environment, in a file or in a log line.
 - `DURABLE <position>` — the destination commit at this position is durable. The engine marks as processed the
-  newest `END` or `HEARTBEAT` record whose `ack_position` is at or below it, and then finishes the batch
+  newest `END` record that it holds whose `ack_position` is at or below it, and then finishes the batch
   bookkeeping. It acknowledges nothing else, ever. The pipeline sends `DURABLE p` only for p ≤ an applied
-  position it has seen committed.
+  position it has seen committed, none before the attach decision (design 8), and none below the applied position
+  of that decision. The engine sends the server no flush position before its first `DURABLE`, so it never moves
+  the slot backwards, also on a server that would allow it (design 8, open point 14).
 - `STOP` — stop reading the slot, close the engine, exit 0.
 - End of input means the parent is gone: the engine halts at once without acknowledging anything.
 
@@ -200,9 +220,11 @@ child of its own.
 ### C3 Transform (package Y)
 
 ```python
-plan = transform.plan(source_table, schema_frame=None) -> TablePlan     # per column position: destination name and type
+plan = transform.plan(source_table, schema_frame=None, *, server_version_num) -> TablePlan
+                                        # per column position: destination name and type; `plan.ambiguous` (below)
 transform.stream(plan, rows: pyarrow.RecordBatch) -> pyarrow.RecordBatch      # engine transport form → destination types
 transform.backfill(plan, rows: pyarrow.RecordBatch) -> pyarrow.RecordBatch    # text as Postgres prints it → destination types
+transform.ambiguous(plan, rows: pyarrow.RecordBatch) -> mask or None          # rows whose zero interval is ambiguous
 ```
 
 The transform is row-local and keeps the column names (`a<i>`, `b<i>`, `k<i>`; `seq`, `op` and `u<i>` pass through).
@@ -214,7 +236,38 @@ cannot be converted raises `ConversionError` with table, column position and `se
 turned into NULL silently.
 
 The backfill's text form is what Postgres prints under the session settings that package P fixes for every read
-connection (C7).
+connection (C7; `docs/design/source.md` section 1). The stream's form of every type is the table in section 3 of
+`docs/design/engine.md`; the engine's walsender session has settings of its own (`IntervalStyle=postgres`,
+`DateStyle=ISO`). These are two transport forms on purpose, and the transform is the only code that knows either.
+
+**Ambiguous zero interval.** On a source of Postgres 17 or later, `interval 'infinity'` and `'-infinity'` in a
+scalar `interval` column reach the engine as a zero interval: the Postgres driver parses them into nothing, before
+any converter of ours runs (`docs/design/engine.md` section 10; no configuration of stock Debezium changes it). An
+interval array keeps them, and the backfill reads the true value. So on such a source a zero in a scalar interval
+column of the stream is *ambiguous*: it is a real zero, `infinity` or `-infinity`.
+
+- `TablePlan.ambiguous` lists those column positions (empty on a source below 17), and
+  `transform.ambiguous(plan, rows) -> mask` marks the rows of a stream batch whose new image holds one. The change
+  set (C3a) is unchanged.
+- The rule (built in the type wave of P4, on the seam that package S leaves): before a group with marked rows is
+  applied, the stream closes it on a cut (C9) — it takes a cut at or after the group's end and reads on until the
+  stream has passed it, so that the group holds exactly the transactions that the cut's snapshot contains. For
+  each key whose last change in the group is marked it reads the row in that snapshot (one statement per table:
+  key and ambiguous columns, `WHERE key = ANY(…)`) and takes the value found. The group is then applied in one
+  destination transaction as always. The value is the source's value at the group's end, so the destination never
+  shows a row that the source did not have (SPEC 1.3), and no value is refused (SPEC 2.4).
+- A shortcut that stays exact: under any snapshot at or after the group's end, a row whose `xmin` equals the
+  transaction id of the key's last change in the group is that very version. (A row written in a subtransaction
+  has another `xmin` and takes the full way.)
+- Not taken: "apply whatever the row holds now, and count it when a later transaction has changed it". It shows,
+  for one group, a row that mixes two source transactions.
+- A table without a key that has a scalar interval column on such a source is not streamed: mode `full_refresh`
+  with an alert (SPEC 3.5), until P4 decides more.
+- An infinite value puts the column into its wide form, `UNION(INTERVAL, VARCHAR)` (R9, SPEC 2.4), on both paths.
+- P3: the transform gives the list and the mask; the stream counts marked rows per table (`interval_ambiguous`),
+  alerts once per table, and applies the delivered zero. Until the repair exists, an infinite interval in a
+  streamed scalar column of a source ≥ 17 arrives as zero — a known gap with an alert, on the list of parts
+  carried to P4. No P3 gate workload holds an interval.
 
 ### C3a Change set (transform → stream → apply; pending log → apply)
 
@@ -390,8 +443,21 @@ slot.terminate_holder(node, name)                  # our slot name only
 heartbeat.beat(primary)                            # the source-side heartbeat write of SPEC 4.4
 ```
 
+As delivered, `docs/design/source.md` is the full account (signatures, the role split, measurements); where it
+differs from the sketch above, the document holds. The differences that other packages build on:
+`heartbeat.beat(primary, deadline, slot=…)` returns the position after its own commit, and an `END` with
+`ack_position ≥` that position proves that the beat was decoded; `heartbeat.ensure` (setup role) creates the
+published table `cdc_v2.heartbeat` and `heartbeat.check` (runtime role) verifies it before streaming;
+`slot.terminate_holder(node, name, deadline, expect=…)` takes the holder pair of C2; `SlotFacts.invalid` is true
+when `wal_status = 'lost'`, or `invalidation_reason` is set, or `conflicting` is true (Postgres 16 has no
+`invalidation_reason` and shows a slot invalidated by the WAL cap as `conflicting`); a standby's timeline comes
+from `slot.timeline_history` (`IDENTIFY_SYSTEM`), never from `pg_control_checkpoint()`, which can lag behind a
+switch; no fact identifies one incarnation of a slot; `pg.connect` puts the session settings into the startup
+packet and reads them back.
+
 Every call has a deadline. A slot on a standby is created as `docs/localpg.md` describes (standby snapshot record
-requested on the primary). Slot facts are used for a continuity decision only as the attach step of design
+requested on the primary; without that grant the runtime role's own write, and a running-transactions record
+within about 25 s). Slot facts are used for a continuity decision only as the attach step of design
 section 8 says. Nothing on the source is fenced by the leader epoch, so every source-side write must be harmless
 when a deposed run repeats it: `publication.ensure` only adds, the heartbeat write is idempotent, and a slot is
 dropped only by an explicit operator action or by the enactment of a slot finding.
@@ -407,7 +473,11 @@ Details in `docs/oracle.md`. What binds every package that writes a gate test:
 - A gate test passes only if `result.equal` holds and every table's `fallback_columns` is empty or declared by
   the test.
 - The compared tables are listed explicitly (`OracleConfig.tables`, `table_map`). Heartbeat, canary and `_cdc*`
-  objects are never compared.
+  objects are never compared. The oracle does not enforce the list: without one it compares every table of the
+  source, the heartbeat table too, which changes every 10 s and gives a false difference.
+- A comparison that reads the source from a standby can lose its connection to a recovery conflict. The oracle
+  starts again only on SQLSTATE 40001; a connection that the standby ends while it is idle in its transaction
+  can surface as a bare connection loss, which is not retried. Such a test retries the comparison itself.
 - The applied-position lookup that `wait_for_applied` and `compare` use is provided by package S (by slot name);
   until then the `_cdc.stream_state` reader of the oracle is a stand-in.
 - Waiting takes a `cdc_v2.deadline.Deadline`; evidence is written only through
@@ -445,7 +515,10 @@ As delivered by package X; its report defines the interface, and this section is
   `stream.reposition(tx, position, tables, cause)` — the position set (in any direction), a backfill request
   enacted for each table with `P0` = that position (after a gap), the alert, all in `tx`. V calls it for a
   finding; S calls it for a message that fails again and again at one position (SPEC 4.3, last line); P4 calls it
-  for the lag rule of SPEC 3.6.
+  for the lag rule of SPEC 3.6. Every `stream.reposition` is followed by a new engine: an engine keeps the highest
+  `DURABLE` of its life, so one that outlived a move backwards would still confirm the old, higher position.
+  Restarts that look for the table behind a repeated `FATAL` (engine started with candidate tables left out of
+  its include list) apply nothing and send no `DURABLE`.
 - The stream component starts its engine only through the attach step (design section 8):
   `attach(ctx, deadline) -> Attached(engine, facts, finding)`. V builds it. Until V is merged, S ships a
   minimal one behind the same signature: fence row read, slot facts read, a holder of our slot terminated,
@@ -528,6 +601,7 @@ never touched; every command names its port.
 | F | `pg-f<n>`, from 55700 in steps of 8, up to 55795 | `cdc_v2_t_f_*` |
 | B | `pg-b`, 55800 (`pg-b2`, 55808) | `cdc_v2_t_b_*` |
 | T | `pg-t`, 55816 | `cdc_v2_t_t_*` |
+| K | the homes of E (`pg-e`, 55620) and P (`pg-p`, 55640; `pg-p2`, 55648), whose workers have finished | none |
 
 TCP fault proxies listen on 55440–55459 (package H); a worker that needs proxies of its own takes ports from the
 upper half of its own range.
@@ -600,9 +674,9 @@ path of SPEC 4.3. The quarantine exit of C10. The spill area: DuckDB's temporary
 transform connection under `max_temp_directory_size`, with a fault site for "no space left"; the stream waits
 and alerts, it never crashes on it (SPEC 5.4, 1.7). The batch commit/ack machine as one row per slot (design
 section 9). Staging is fenced, with a progress row, in one schema, truncated at every start of the stream
-component. After `CommitUnknown`: read the position in a new transaction and continue from it. A heartbeat's
-`ack_position` becomes the applied position only in a committed group that contains every transaction framed
-before it.
+component. After `CommitUnknown`: read the position in a new transaction and continue from it. Only an `END`'s
+`ack_position` becomes the applied position, in a committed group that contains every transaction framed before
+it; a `HEARTBEAT` frame never moves it.
 
 **L (leadership).** Two states. Take-over deadline (default 45 s), then exit non-zero. A take-over whose commit
 outcome is unknown: read again after more than 2 s and decide by `run_id`. A planned hand-over abandons an
@@ -618,6 +692,16 @@ every transaction id in the in-progress list; if one is already `committed`, tak
 is inside iff the snapshot sees it by its 64-bit id. "The stream has passed" = applied position >
 `pg_current_wal_insert_lsn()` read after the snapshot. To be proven with a stopped synchronous standby and a
 negative control.
+
+**Rule K (core design section 6), for S, Y, B, T and the P4 waves.** S: at every `SCHEMA` frame the key flag and
+the key positions must equal the catalog's (Y's `plan` makes the comparison); a difference is a typed error, the
+stream reads the catalog again and restarts the engine with a fresh list of tables without a key; it never applies
+by a key the catalog does not confirm. S and B: a T1 case for a key that changes only its form (`float8` `-0` to
+`0`: the engine sends a key change). T and the schema wave of P4: a change of the key facts of a table (key
+columns, deferrability, replica identity) is a schema change; they are part of the table's shape. Type wave and
+PII rules of P4: the mapping of a key column is injective up to the source's equality; a rule that masks or
+truncates a key column is refused. History of P4: a table with a deferrable primary key gets the plain changelog
+of a table without a key.
 
 ### 6.3 Simplifications taken
 

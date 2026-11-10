@@ -11,8 +11,8 @@ import uuid
 import psycopg
 import pytest
 
-from conftest import (LOCALPG, TEST_BASE, TEST_HOME, Cluster, alive, child_pids, lp, lp_env, port_open,
-                      wait_for)
+from localpg_support import (LOCALPG, PG_BIN, PG_MAJOR, TEST_BASE, TEST_HOME, Cluster, alive, child_pids, lp, lp_env,
+                             needs_17, port_open, wait_for)
 
 pytestmark = [pytest.mark.localpg, pytest.mark.timeout(300)]
 
@@ -181,7 +181,9 @@ def test_status_reports_nodes_and_slots(cluster):
     assert (prim["name"], prim["port"], prim["role"]) == ("primary", TEST_BASE, "primary")
     assert (rep["name"], rep["port"], rep["role"]) == ("replica", TEST_BASE + 1, "standby")
     for n in (prim, rep):
-        assert n["server_version"].startswith("18") and n["timeline"] == 1
+        assert n["server_version"].startswith(str(PG_MAJOR)) and n["timeline"] == 1
+        assert n["pg_major"] == PG_MAJOR and n["server_version_num"] // 10000 == PG_MAJOR
+    assert s["pg_major"] == PG_MAJOR and s["bin_major"] == PG_MAJOR
     assert prim["current_lsn"] and rep["replay_lsn"] and "replay_lag_bytes" in rep
     assert rep["replication_state"] == "streaming"
     slot = next(x for x in prim["slots"] if x["slot_name"] == "cdc_v2_phys_replica")
@@ -206,7 +208,11 @@ def test_settings_on_replica(cluster):
                           (["hot_standby_feedback", "wal_level", "sync_replication_slots", "primary_slot_name",
                             "shared_buffers", "listen_addresses", "ssl", "password_encryption"],)))
     assert rows["hot_standby_feedback"] == "on" and rows["wal_level"] == "logical"
-    assert rows["sync_replication_slots"] == "on" and rows["primary_slot_name"] == "cdc_v2_phys_replica"
+    if PG_MAJOR >= 17:
+        assert rows["sync_replication_slots"] == "on"
+    else:       # the setting does not exist before 17, and localpg does not write it
+        assert "sync_replication_slots" not in rows
+    assert rows["primary_slot_name"] == "cdc_v2_phys_replica"
     assert rows["shared_buffers"] == "16384"        # 8 kB pages = 128 MB
     assert rows["listen_addresses"] == "localhost" and rows["ssl"] == "on"
     assert rows["password_encryption"] == "scram-sha-256"
@@ -234,6 +240,7 @@ def test_logical_slot_with_pgoutput_on_replica_delivers_changes(cluster):
         cluster.q("primary", "drop publication if exists %s" % pub, role="admin")
 
 
+@needs_17
 def test_failover_slot_is_synchronised_to_standby(cluster):
     t, pub, slot = uniq("t_failover"), uniq("cdc_v2_pub"), uniq("cdc_v2_fslot")
     admin_table(cluster, t)
@@ -371,6 +378,54 @@ def test_kill_replica_then_up_catches_up(cluster):
     assert replica_has(cluster, t, 1) == [("while replica down",)]
 
 
+def test_version_dependent_settings_are_refused_with_a_message(cluster):
+    """A setting that the node's major version does not have is refused by localpg itself, not by the server."""
+    for node, name, value, since in (("replica", "sync_replication_slots", "on", 17),
+                                     ("primary", "synchronized_standby_slots", "cdc_v2_phys_replica", 17),
+                                     ("primary", "idle_replication_slot_timeout", "1min", 18)):
+        p = lp("set", node, "%s=%s" % (name, value), check=False)
+        if PG_MAJOR < since:
+            assert p.returncode == 2 and "needs Postgres %d" % since in p.stderr, p.stderr
+        else:
+            assert p.returncode == 0, p.stderr
+            lp("unset", node, name)
+    assert cluster.node("replica")["overrides"] == {} and cluster.node("primary")["overrides"] == {}
+
+
+def test_restart_settings_unset_and_inherited_by_a_new_standby(cluster):
+    """`unset` of a restart-only setting restarts the nodes (it failed with a configuration error before), in an
+    order a standby accepts; `add-standby` inherits the upstream's standby-matched settings."""
+    lp("set", "all", "max_prepared_transactions=5")
+    p = lp("add-standby")
+    assert "standby2" in p.stdout
+    c = cluster.refresh()
+    assert c.q("standby2", "show max_prepared_transactions") == [("5",)]
+    assert c.node("standby2")["overrides"] == {"max_prepared_transactions": "5"}
+    p = lp("unset", "all", "max_prepared_transactions")
+    assert p.stdout.index("unset: primary") < p.stdout.index("unset: replica")      # lowering: primary first
+    for n in ("primary", "replica", "standby2"):
+        assert c.q(n, "show max_prepared_transactions") == [("0",)]
+    s = c.status()
+    assert s["all_running"] and all(n.get("replay_pause_state") in (None, "not paused") for n in s["nodes"])
+    p = lp("set", "all", "max_prepared_transactions=3")
+    assert p.stdout.index("set: replica") < p.stdout.index("set: primary")            # raising: standbys first
+    lp("reset")
+
+
+OTHER_BIN = {16: "/opt/homebrew/opt/postgresql@18/bin", 18: "/opt/homebrew/opt/postgresql@16/bin"}.get(PG_MAJOR)
+
+
+@pytest.mark.skipif(not OTHER_BIN or not os.access(os.path.join(OTHER_BIN or "", "postgres"), os.X_OK),
+                    reason="needs the binaries of a second major version")
+def test_binaries_of_another_major_version_are_refused(cluster):
+    lp("down")
+    p = lp("up", check=False, env=lp_env(CDC_V2_PG_BIN=OTHER_BIN))
+    assert p.returncode == 2 and "data directory" in p.stderr and "Postgres %d" % PG_MAJOR in p.stderr, p.stderr
+    assert not cluster.status()["all_running"]
+    lp("up")
+    assert cluster.status()["all_running"]
+
+
 def test_set_reloads_or_restarts_a_node(cluster):
     p = lp("set", "primary", "max_slot_wal_keep_size=64MB")
     assert "reloaded" in p.stdout
@@ -433,6 +488,7 @@ def test_add_standby_failover_promote_and_follow(cluster):
     lp("reset")                                                  # back to the canonical topology
 
 
+@needs_17
 def test_promote_failover_slot_survives_on_promoted_standby(cluster):
     """Primary mode (SPEC 4.1): a failover slot synced to the standby is usable after the standby is promoted."""
     t, pub, slot = uniq("t_fpromote"), uniq("cdc_v2_pub"), uniq("cdc_v2_fslot")

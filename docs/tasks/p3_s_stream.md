@@ -41,8 +41,12 @@ says elsewhere, these points and that document hold.
   it differs on `BEGIN`, on every row and on `END`. `positions.txId` is the 32-bit xid and is used only by the cut
   on a primary.
 - `seq` numbers every record, `BEGIN`, `END` and `HEARTBEAT` included, from 0 for every engine life.
-- `HEARTBEAT` frames may arrive inside a transaction; they are not boundaries. A `HEARTBEAT` without `ack_position`
-  acknowledges nothing.
+- `HEARTBEAT` frames may arrive anywhere, also inside a transaction; they are not boundaries and they never move the
+  applied position (plan C2, design section 2: a heartbeat can carry the commit position of a transaction whose
+  `END` is not framed yet; a pipeline that adopted heartbeat positions lost transactions in the second review of
+  package E). The applied position is always the `ack_position` of an `END` you have applied, and `DURABLE` is sent
+  only for such a position. Show it by test: a stream whose `HEARTBEAT` carries a position above the last `END`
+  changes nothing.
 - `END.event_count` = rows in `ROWS` frames + `TRUNCATE` frames + transactional `MESSAGE` frames between `BEGIN` and
   `END`. A key change counts two (a delete and a create). The per-collection counts name a message collection by a
   text with an unstable ending; match those by prefix. An `END` with count 0 is a legal empty transaction (for
@@ -56,28 +60,63 @@ says elsewhere, these points and that document hold.
 - After a restart the server may decode an unconfirmed large transaction again for minutes before the first row
   arrives (36 s for 10M rows locally, `docs/spike/local_streaming.md` section 5). That is a declared wait, not a
   fault, and no silence rule may end the engine for it.
-- Frames prove that the engine is alive, not that its connection is: Debezium's timer keeps producing `HEARTBEAT`
-  frames on a dead connection, and neither Debezium nor the driver noticed a black-holed replication connection
-  within 150 s. Source liveness therefore comes from two rules. Package V's periodic check finds a holder that is
-  gone (the server ends a silent walsender after `wal_sender_timeout`). Yours is the marker rule of SPEC 4.6, and it
-  counts **only while no transaction is open and after the first `BEGIN` or the first marker of an engine life**: a
-  marker committed behind a 10M-row transaction cannot arrive within 60 s, and tearing the connection down there
-  would force the same decode again, for ever. State the detection bound for each case (idle; inside a transaction)
-  and test both with package H's proxy.
+- Frames prove that the engine is alive, and for a short while that its connection is: in the black-hole test
+  `HEARTBEAT` frames kept arriving for 8.2 s after the hole opened and then stopped; neither Debezium nor the driver
+  ended within 150 s; the server ended the walsender after `wal_sender_timeout` (59.8 s). Three rules:
+  1. While you are reading and no commit or declared wait is in progress, no frame for `stream.frame_silence`
+     (default 30 s) tears the engine down. This is an early signal only, since the 8 s depend on socket buffers.
+     During a re-decode after a restart `HEARTBEAT` frames keep coming, so this rule does not fire there.
+  2. Package V's periodic check finds a holder that is not our `HELLO` pair, within `wal_sender_timeout` +
+     `slot.verify_interval`.
+  3. The marker rule of SPEC 4.6, counted **only while no transaction is open and after the first `BEGIN` or the
+     first marker of an engine life**: a marker committed behind a 10M-row transaction cannot arrive within 60 s,
+     and tearing the connection down there would force the same decode again, for ever.
+
+  State the bound of each case (idle; inside a transaction) and test with package H's proxy.
 - `frames(deadline)` ends at the deadline without an exception; `next_frame` raises `DeadlineExceeded`;
   `EngineExited` is an `EngineBroken`; `start_position` is only echoed in `HELLO` (Debezium always starts from the
   slot's confirmed position).
 - A 10M-row transaction arrives as about 1,200 `ROWS` frames of at most one Debezium batch each.
-- `FATAL` carries the position of the last record the engine handed over and, when it is known, the schema and
-  table, and never a source value. This is what "fails again and again at one position" (section 7) compares.
-- A value the engine cannot read (found so far: an infinite interval and an interval above 2^31 hours fail inside
-  the Postgres driver, before our converter) ends the engine with `FATAL` at the same place on every start. The way
-  out is yours, under C10 and SPEC 4.0 and 4.3. After `stream.max_attempts_at_position` failures at one position:
-  when `FATAL` names the table and `docs/design/engine.md` shows that the engine passes the transaction once that
-  table is left out of its include list, quarantine that table only (routing `skip`, engine restarted without it, a
-  backfill request after a gap, retries on the slow schedule of SPEC 4.0) and keep every other table streaming.
-  Otherwise the last line of defence of section 7 applies (move past the place, backfill every table, alert). Test
-  both with a real value on Postgres 18.
+- `FATAL` carries the position of the last record the engine handed over, never a source value, and, when Debezium
+  names the event that failed to decode, `failing_position`: the `lsn` and `txId` of that event, the same on every
+  attempt. It names a schema and table only when the failure is in our handler. "Fails again and again at one
+  position" (section 7) compares `failing_position` when it is there, else the position of the last record.
+- A value that the Postgres driver cannot parse never reaches our converter (`docs/design/engine.md`, section
+  10). An interval whose hour part exceeds 2^31 ends the engine with `FATAL` in Debezium's decoding thread, at the
+  same transaction on every start; nothing of that transaction beyond its `BEGIN` is framed. After
+  `stream.max_attempts_at_position` failures at one failing position: the candidates are the streamed tables with
+  a column of a type that section lists (now `interval`). Restart the engine with all candidates left out of
+  `table.include.list`; if the failing transaction then passes (`BEGIN`/`END` with count 0), halve the
+  candidate set with one restart per step. Probing restarts apply nothing and send no `DURABLE`, so no table loses
+  anything. Then run with only the culprit left out: quarantine it (routing `skip`, a backfill request after a gap,
+  the slow retries of SPEC 4.0). With no candidate, or if leaving them out does not help, take the last line of
+  section 7 (move past the place, backfill every table, alert). Test both with a real value on Postgres 18.
+- An infinite interval (`'infinity'`, `'-infinity'`; Postgres 17 and later) does not fail: in a scalar `interval`
+  column it arrives as a zero interval, with nothing that tells it from a real zero (an interval array keeps it).
+  The rule is in plan C3 ("Ambiguous zero interval"). Your part in P3: for every batch of a table whose plan has
+  ambiguous columns, count the rows that `transform.ambiguous(plan, rows)` marks (counter `interval_ambiguous` per
+  table in `_cdc.stream_state` or beside it), alert once per table and engine life, and apply the delivered value.
+  The repair is built in P4 on your group loop; what it needs from you now is in section 9 ("Seams for others").
+
+## From the source package as built — build on it
+
+Package P is built and reviewed. `docs/design/source.md` is the full account.
+
+- `heartbeat.beat(primary, deadline, slot=…)` returns the position after its own commit. A beat has been decoded
+  once an `END` with `ack_position ≥` that position has arrived. Run `heartbeat.check` (runtime role) before
+  streaming; `heartbeat.ensure` needs the setup role and belongs to deployment, like `publication.ensure`.
+- `cdc_v2.heartbeat` is a published source table. Route it to `skip`: it is never written to the destination, and
+  only the position of its transactions is used.
+- The slot holder that `slot.facts` reports and `slot.terminate_holder(node, name, expect=…)` takes is the same pair
+  (process id, backend start in microseconds) as the engine's `HELLO`.
+- The replication connection of the engine and the read connections of package P are two sessions with different
+  settings (the walsender session has `IntervalStyle=postgres` and `DateStyle=ISO`; read connections have the table
+  of `source.md` section 1). The transform takes the stream's form from the engine's document and the backfill's
+  form from the source's; you pass both through untouched.
+- The slot-creation nudge is a non-transactional logical message with prefix `cdc_v2.nudge`. It lies outside the
+  engine's default `message.prefix.include.list` (`cdc_v2_.*`) on purpose: it must never reach you.
+- In primary mode, hand the `GapMark` at `group_end` (C9) to `tables.confirm`: on a primary a catalog observation
+  is usable for a group only under the rule in package T's task.
 
 ## What may be missing when you start
 
@@ -165,12 +204,12 @@ every package (C0) and nothing else reads the file.
   The `END` count is compared with the records received, in total and per table as far as package E's frames
   allow; a mismatch is a protocol error (section 7). Records of one transaction stay in (`txn`, `seq`) order and
   are never reduced by you (C3a).
-- **Transform on arrival.** Every `ROWS` batch goes through `transform.stream(plan, rows)` when it arrives,
-  before it is buffered, staged or counted against a byte limit (C3; SPEC 8.3 depends on this place). A
-  `SCHEMA` frame gives a plan through `transform.plan(source_table, schema_frame)`; the source table comes from
-  package P's catalog. A plan whose hash differs from the one stored for the table is the schema change of C10:
-  the table leaves the visible path in that group, with a backfill request. `WideningNeeded` is treated the same
-  way in P3. `ConversionError` and `PlanMismatch` are failures of one table (section 7), never of the stream.
+- **Transform on arrival.** Every `ROWS` batch goes through `transform.stream(plan, rows)` when it arrives, before
+  it is buffered, staged or counted against a byte limit (C3; SPEC 8.3 depends on this place). A `SCHEMA` frame
+  gives a plan through `transform.plan(source_table, schema_frame, server_version_num=…)`; the source table comes
+  from package P's catalog. A plan whose hash differs from the one stored for the table is the schema change of C10:
+  the table leaves the visible path in that group, with a backfill request. `WideningNeeded` is treated the same way
+  in P3. `ConversionError` and `PlanMismatch` are failures of one table (section 7), never of the stream.
 - **Groups.** A group is one or more whole transactions. It closes on the first of `apply.max_group_delay`
   since its first record, `apply.max_group_bytes`, a transaction that is larger than a group on its own, a
   planned hand-over, or an idle position step (below). `TRUNCATE` cuts a table's rows into segments inside the
@@ -213,9 +252,15 @@ block (fence, `COMMIT`: package D).
   a stream-lane transaction (state `quarantined`, routing `skip`, alert) and the group is applied without it
   (C10). Healthy tables never wait for it longer than those attempts take (SPEC 4.0). The stored rows and the
   slow retries of the full quarantine are P4.
-- **Idle.** When no transaction arrives, a `HEARTBEAT` frame's `ack_position` becomes the applied position in a
-  group of its own, at most every `stream.idle_position_interval`, and only when every transaction framed before
-  it is committed (design section 2). The slot's `confirmed_flush_lsn` therefore moves on an idle source.
+- **Idle.** When the replicated tables are idle, the only transactions are those of the source-side heartbeat write
+  (package P: one row in a published table of ours on the primary, every 10 s). Each arrives as `BEGIN` … `END`; its
+  `END` moves the applied position in a group like any other, so the slot's `confirmed_flush_lsn` moves on an idle
+  source and the marker rule of SPEC 4.6 has its marker. Decide with package P's interface whether the heartbeat
+  table itself is written to the destination or only its position is used, and keep the cost of an idle hour small
+  (one small destination commit per `stream.idle_position_interval` is the bound; several heartbeat transactions may
+  share one group). Recognise the marker by position — an `END` whose `ack_position` is at or past the position
+  `heartbeat.beat` returned — so that it is seen even when the heartbeat table is outside `table.include.list` (its
+  transaction then arrives as an `END` with count 0).
 - **Planned hand-over.** `finish_current_group(deadline)`: the group in flight is committed and acknowledged, no
   new group starts, and a transaction larger than a group that is still arriving is abandoned (its staging is
   left to the truncate of the next start). Returns the applied position.
@@ -263,7 +308,11 @@ block (fence, `COMMIT`: package D).
   `stream.marker_timeout` (default 60 s, SPEC 4.6); if not, the stream connection is torn down and built again
   through the attach step, and the slot and stream machine shows `stalled` meanwhile. In replica mode a standby
   that has stopped replaying produces the same silence: say what your code does then, and what it tells the
-  operator.
+  operator. Two cases are findings with an alert and not a reason to reconnect: the heartbeat table is not in the
+  publication (checked at attach with package P's check; reconnecting every 60 s would never end), and the beat
+  itself cannot be written (privilege revoked, primary read-only or unreachable). In the second case only beats
+  that were written count for the marker rule, the stream goes on, and the alert says that the slot's position
+  stands still while the replicated tables are idle and that kept WAL grows with other traffic (SPEC 4.4).
 - **`python -m cdc_v2.pipeline <configuration file>`** (C12): reads the environment of C12, opens the lanes with
   the epoch, runs every package's migration list as leader in fenced `control`-lane transactions, makes sure
   the publication exists as package P's document says (it never changes which tables are in it), starts the
@@ -284,6 +333,14 @@ block (fence, `COMMIT`: package D).
   no more; it is a blocking call with a deadline like any other. Your stand-in answers `same`; package T builds
   the real one. `tables.on_group(tx, group_end)` (C10) is called in every group and every idle position step,
   immediately before `backfill.on_group`; your stand-in does nothing.
+- **Closing a group on a cut** (for the interval repair of plan C3, built in P4, and for nothing else yet): your
+  group loop can be asked to end the group in flight exactly at a cut of package X — it goes on reading until the
+  stream has passed the cut (it asks for a beat when the source is idle, so the wait is bounded by one beat and
+  the stream's delay), takes every transaction the cut contains into the group and keeps the others for the next
+  one — and to call a hook `values.on_group(group, cut) -> replaced values` before the apply. Build the loop so
+  that this is a small addition: say in `docs/design/stream.md` where the hook goes and what the loop must
+  already be able to do (read ahead of a group's end; split what it has read at a transaction boundary). You do
+  not build the hook in P3.
 - A test helper (under `tests/`, importable by packages F, V, B and T) that starts the whole local path for a
   set of tables: publication, slot, destination tables built from the transform plans, routing `streaming`, the
   pipeline as a process group, and handles to crash it at a named point, freeze it, and wait for a position.

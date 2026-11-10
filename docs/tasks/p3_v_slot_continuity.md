@@ -40,9 +40,42 @@ says elsewhere, these points and that document hold.
   connection inside a long transaction: the server ends a silent walsender after `wal_sender_timeout`, so the bound
   is `wal_sender_timeout` + `slot.verify_interval`. Refuse to stream from a server whose `wal_sender_timeout` is 0
   (an alert that names the setting; SPEC 4.7 retry), and test the bound with package H's proxy.
-- Open point 14 was tested by package E on Postgres 18.6: a status update with a lower flush position does not move
-  `confirmed_flush_lsn` back. Repeat it on Postgres 16 (`tools/localpg` runs the 16 binaries since package P's
-  repair) and keep the negative control this task asks for.
+- Open point 14 is measured (design section 8, `docs/design/engine.md` section 5,
+  `tests/engine/test_engine_attach.py::test_lower_flush_position_and_the_slot`): a status update with a lower flush
+  position moves `confirmed_flush_lsn` back on a server without the guard (16.6) and not on one with it (18.6; the
+  first minor release with the guard on each branch is in `CONFIRMED_FLUSH_GUARD` in that test file). Our engine
+  sends no flush position before its first `DURABLE`. Your attach step must not depend on the guard. The negative
+  control this task asks for can be shown only on a server without the guard: run it on the 16.6 binaries
+  (`CDC_V2_PG_BIN`) and skip it elsewhere.
+
+## From the source package as built — build on it
+
+Package P is built and reviewed. `docs/design/source.md` is the full account; where it differs from what this task
+or contract C7 says elsewhere, these points and that document hold.
+
+- `slot.facts` gives `SlotFacts` with `holder` (the pair of `HELLO`) and `invalid`: true when
+  `wal_status = 'lost'`, or `invalidation_reason` is set, or `conflicting` is true. On Postgres 16 a slot
+  invalidated by the WAL cap shows `conflicting = true` and nothing else (16 has no `invalidation_reason`); from
+  17 on `conflicting = false` and `invalidation_reason = 'wal_removed'`. Use `invalid`, not one column.
+- `slot.terminate_holder(node, name, deadline, expect=…)` ends the holder only when it is the expected pair. "Holder
+  unknown" means that another role holds the slot (the runtime role cannot see that backend's start time): an
+  alert that says so and the retry of SPEC 4.7, never a blind terminate.
+- No fact that SQL can read identifies one incarnation of a slot (measured on 16 and 18; `source.md` section 7).
+  Section 1 below stores what there is: name, system identifier, timeline, positions. A recreated slot is
+  recognised by its positions only; one that is not ahead gets an alert where it can be seen and no backfill
+  (its statistics starting again from 0 is a hint, not a proof).
+- A slot left behind by a creation that was abandoned (deadline, crash after `pg.slot_created`) is found at the
+  next attach as a slot that is "ahead" or has no stored identity: its position is taken by the rule of
+  section 4, it is never dropped and created again without a finding.
+- A standby's timeline comes from `slot.timeline_history` (`IDENTIFY_SYSTEM` over a replication connection),
+  never from `pg_control_checkpoint()`, which can lag behind a switch until the next restartpoint. The runtime
+  role may read the history on local 16 and 18.
+- Slot creation on a standby: with the heartbeat running a running-transactions record comes within about 25 s
+  (the background writer logs one at most every 15 s after important WAL and wakes every 10 s while hibernating);
+  with `EXECUTE` on `pg_log_standby_snapshot()` granted, within 1 s. The creation deadline stays well above 25 s
+  (default 120 s).
+- Refuse to stream when `wal_sender_timeout` is 0 (`ServerFacts.wal_sender_timeout_ms`, read with the slot facts).
+- Your suite reaches the crash points `pg.slot_created` and `pg.holder_terminated` of package P.
 
 ## Resources
 
@@ -96,19 +129,28 @@ body and keep the callers. Design section 8, steps 1 to 4, exactly:
 4. After `HELLO`, read the facts again. The holder must be the pair (`active_pid`, `backend_start`) that `HELLO`
    names; the engine must not have sent `FATAL` or exited; and every fact the decision used must be unchanged: same
    incarnation, same `confirmed_flush_lsn`, same server. If not, kill the engine and start again at 1. No frame is
-   handed to the stream and no `DURABLE` is sent before this. Why this is enough: our engine acknowledges nothing
-   before the decision, and `confirmed_flush_lsn` never moves backwards (open point 14), so equal facts in steps 1
-   and 4 mean that our engine started at the position of step 1. The pair adds that nobody else can move the slot
-   from now on. A holder is never recognised by the process id alone.
+   handed to the stream and no `DURABLE` is sent before this. Why this is enough: once our engine holds the slot,
+   only it can move the slot, and it sends no flush position before its first `DURABLE` (measured on 16.6 and
+   18.6). So the `confirmed_flush_lsn` of step 4 is the one our engine found when it took the slot, and equal facts
+   in steps 1 and 4 mean that it started at the position of step 1. Do not argue with "`confirmed_flush_lsn` never
+   moves backwards": a server without the guard moves it back when a client sends a lower flush position (open
+   point 14). The pair adds that nobody else can move the slot from now on. A holder is never recognised by the
+   process id alone.
 
 - The loop has a deadline of at least 75 s after a take-over (`slot.attach_timeout`) and is a declared wait
   (C11) with a reason. When the deadline passes the stream component reports the failure to the supervisor; the
   supervisor's rules decide what follows. The attach step never gives up by exiting.
 - Fault sites between the steps (`slot.attach.after_read`, `slot.attach.after_start`), so that a test can change
   the slot exactly there.
-- Open point 14: prove on Postgres 16 and 18 whether a status update with a lower flush position can move
-  `confirmed_flush_lsn` backwards. If it can, show that step 1 (read before the engine starts) is what protects
-  the decision, with a negative control that reads only after the start and misses a slot that was ahead.
+- Open point 14: on a server without the guard (the 16.6 binaries) show that step 1 (read before the engine
+  starts) is what protects the decision. The negative control is a variant of the attach step, in the test only,
+  that reads the slot only after the client has attached, with the probe client of package E's test in place of
+  the engine (`repl_probe` in `tests/engine/test_engine_attach.py`: a pgjdbc replication client that confirms the
+  position it started from). On a slot that was ahead it finds `continuous`; the real attach step finds the slot
+  ahead. Skip the negative control on a server with the guard. Also assert the rule that keeps our own engine
+  harmless: no `DURABLE` before the decision, and none below the applied position of the decision.
+- The limit of design section 8 (on a server without the guard, a foreign client that confirms a higher position
+  and then a lower one) is stated, not detected. Do not build a detection for it.
 
 ### 4. A finding enacted
 
@@ -156,7 +198,8 @@ that passes; the enactment against a local DuckDB with crash points; the machine
 standby and on a primary: after `pg_replication_slot_advance`; after drop and recreate; after another session
 consumed changes (`pg_logical_slot_get_binary_changes`); after invalidation by `max_slot_wal_keep_size`; after
 a restart of the node; after a promotion of the standby that holds the slot (timeline history read through
-package P, the applied position before the switch point is `continuous`). Open point 14.
+package P, the applied position before the switch point is `continuous`). Open point 14: the negative control, on
+the 16.6 binaries only.
 
 **Marker `t1` — the gate test of SPEC 1.8.** The whole local path of package S's helper, a seeded workload that
 keeps writing through everything, the slot on the standby (the default) and once on the primary:

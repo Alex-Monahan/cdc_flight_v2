@@ -1,0 +1,7 @@
+{
+  "command": "CDC_V2_E_LONG=1 uv run pytest tests/engine/test_frames_detection.py -k long",
+  "detected": 999,
+  "faults_injected": 1759,
+  "seeds": 1000,
+  "undetected_output_identical_or_a_clean_shorter_stream": 1
+}
