@@ -6,7 +6,7 @@ from typing import List
 
 from .meta import Column, TableMeta, Target
 from .plan import key_join
-from .types import affected, exact, rewrites_row, sentinel
+from .types import affected, exact, join_wrap, rewrites_row, sentinel
 
 __all__ = ["Shapes"]
 
@@ -79,7 +79,8 @@ class Shapes:
     # -------------------------------------------------------------------------------------------- keyless
 
     def l1_delete(self, rel: str) -> str:
-        cond = " AND ".join("%s IS NOT DISTINCT FROM n.e%d" % (exact("t.%s" % c.qname, c.dtype), c.position)
+        cond = " AND ".join("%s IS NOT DISTINCT FROM %s" % (join_wrap(exact("t.%s" % c.qname, c.dtype), c.dtype),
+                                                             join_wrap("n.e%d" % c.position, c.dtype))
                             for c in self.meta.columns)
         return ("DELETE FROM {T} WHERE rowid IN (SELECT rid FROM (SELECT t.rowid AS rid, n.n AS need, "
                 "row_number() OVER (PARTITION BY n.gid ORDER BY t.rowid) AS rk FROM {T} AS t JOIN {rel} AS n ON {cond}) "

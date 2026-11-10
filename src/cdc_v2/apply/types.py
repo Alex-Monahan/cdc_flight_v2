@@ -231,6 +231,18 @@ def exact(expr: str, t: DType, depth: int = 0) -> str:
     raise ValueError("no exact form for %s" % t.sql())        # pragma: no cover - needs_exact covers the rest
 
 
+def join_wrap(expr: str, t: DType) -> str:
+    """SQL: what one side of an equality join on a value of type t compares. A hash join whose two sides are plain
+    DATE or TIMESTAMP values misses ±infinity in rows that the same transaction wrote (DuckDB 1.5.6, local and
+    MotherDuck: the join filter pushdown; `evidence/p3/apply/duckdb_semantics.json`). The join is right when both
+    sides are expressions, so both sides of every key join go through this function."""
+    if t.base == "DATE":
+        return "CAST(%s AS TIMESTAMP)" % expr
+    if t.base in ("TIMESTAMP", "TIMESTAMP WITH TIME ZONE"):
+        return "(%s + INTERVAL '0 microseconds')" % expr
+    return expr
+
+
 # ------------------------------------------------------------------------------------------------ writes
 
 

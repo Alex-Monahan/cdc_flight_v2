@@ -10,7 +10,9 @@
 """
 from __future__ import annotations
 
+import itertools
 import secrets
+import threading
 from typing import Iterator, Optional
 
 import duckdb
@@ -26,11 +28,34 @@ __all__ = ["LocalBackend", "RemoteBackend", "lookup_sql"]
 VIEW_PREFIX = "cdc_v2_apply_"
 
 
-def lookup_sql(meta: TableMeta, target: Target, cand: str) -> str:
-    """Per candidate exact key: how many destination rows hold it."""
+def lookup_sql(meta: TableMeta, target: Target, cand: str, by_index: bool = False) -> str:
+    """Per candidate exact key: how many destination rows hold it. `by_index`: return the candidate's number `ci`
+    instead of its key, so that no key travels back through an Arrow export of the lane connection (which turns
+    TIME WITH TIME ZONE into TIME unless that connection converts losslessly)."""
     first = meta.key_columns[0].qname
-    return ("SELECT c.*, count(t.%s) AS n FROM %s AS c LEFT JOIN %s AS t ON %s GROUP BY ALL"
-            % (first, cand, target.sql(), key_join(meta, "t", "c")))
+    sel = "c.ci" if by_index else "c.*"
+    return ("SELECT %s, count(t.%s) AS n FROM %s AS c LEFT JOIN %s AS t ON %s GROUP BY ALL"
+            % (sel, first, cand, target.sql(), key_join(meta, "t", "c")))
+
+
+#: Types that a plain Arrow export changes: they are fetched as text and cast back in the planning connection.
+_TEXT_FETCH = ("TIME WITH TIME ZONE", "UUID", "JSON")
+
+
+_local = threading.local()
+_calls = itertools.count()
+
+
+def _planning_db(threads: Optional[int]):
+    """One private in-memory DuckDB database per thread; each call works in a cursor and a schema of its own
+    (a new database costs about 5 ms, a cursor and a schema well under 1 ms)."""
+    db = getattr(_local, "db", None)
+    if db is None:
+        db = duckdb.connect(":memory:")
+        if threads:
+            db.execute("SET threads = %d" % int(threads))
+        _local.db = db
+    return db
 
 
 class LocalBackend:
@@ -38,35 +63,38 @@ class LocalBackend:
                  threads: Optional[int] = None):
         self.tx, self.target, self.meta = tx, target, meta
         self.statement_rows = max(1, int(statement_rows))
-        self.L = duckdb.connect(":memory:")
+        self.L = _planning_db(threads).cursor()
         self.L.execute("SET TimeZone = 'UTC'")
         # UUID, TIME WITH TIME ZONE and JSON leave as Arrow extension types; without this they would become
         # VARCHAR and TIME (the offset lost) on their way to the destination.
         self.L.execute("SET arrow_lossless_conversion = true")
-        if threads:
-            self.L.execute("SET threads = %d" % int(threads))
+        self.schema = "p_%d" % next(_calls)
+        self.L.execute("CREATE SCHEMA %s" % self.schema)
         self.L.register("src_rows", rows)
         self.src_sql = "src_rows"
         self.src_params = ()
 
     def rel(self, name: str) -> str:
-        return quote_ident("p_" + name)
+        return "%s.%s" % (self.schema, quote_ident(name))
 
     def run(self, step: Step) -> None:
         if step.kind == "sql":
             self.L.execute("CREATE TABLE %s AS %s" % (self.rel(step.name), step.sql), list(step.params) or None)
             return
-        cand = self.L.execute("SELECT * FROM %s" % self.rel(step.source)).to_arrow_table()
+        cand = self.L.execute("SELECT row_number() OVER () AS ci, * FROM %s" % self.rel(step.source)).to_arrow_table()
         if cand.num_rows == 0:
             self.L.execute("CREATE TABLE %s AS SELECT *, CAST(0 AS BIGINT) AS n FROM %s WHERE false"
                            % (self.rel(step.name), self.rel(step.source)))
             return
         view = VIEW_PREFIX + "cand"
         self.tx.register(view, cand)
-        found = self.tx.fetch_arrow(lookup_sql(self.meta, self.target, view))
+        found = self.tx.fetch_arrow(lookup_sql(self.meta, self.target, view, by_index=True))
+        self.L.register("lookup_cand", cand)
         self.L.register("lookup_result", found)
-        self.L.execute("CREATE TABLE %s AS SELECT * FROM lookup_result" % self.rel(step.name))
+        self.L.execute("CREATE TABLE %s AS SELECT c.* EXCLUDE (ci), CAST(coalesce(f.n, 0) AS BIGINT) AS n "
+                       "FROM lookup_cand AS c LEFT JOIN lookup_result AS f ON f.ci = c.ci" % self.rel(step.name))
         self.L.unregister("lookup_result")
+        self.L.unregister("lookup_cand")
 
     def query_one(self, sql: str):
         cur = self.L.execute(sql)
@@ -93,9 +121,10 @@ class LocalBackend:
 
     def close(self) -> None:
         try:
+            self.L.execute("DROP SCHEMA IF EXISTS %s CASCADE" % self.schema)
             self.L.close()
-        except Exception:                                    # noqa: BLE001 - closing a private connection
-            pass
+        except Exception:                                    # noqa: BLE001 - a private connection
+            _local.db = None                                 # start again with a fresh database
 
 
 class RemoteBackend:
@@ -123,7 +152,22 @@ class RemoteBackend:
         return rows[0]
 
     def fetch_arrow(self, name: str) -> pa.Table:
-        return self.tx.fetch_arrow("SELECT * FROM %s" % self.rel(name))
+        """A small relation of key columns a<i> (the unresolved keys), with their destination types: columns of
+        a type that a plain Arrow export changes travel as text and are cast back locally."""
+        keys = self.meta.key_columns
+        sel = ", ".join(("CAST(%s AS VARCHAR) AS %s" % (c.a, c.a)) if c.dtype.base in _TEXT_FETCH else c.a
+                        for c in keys)
+        data = self.tx.fetch_arrow("SELECT %s FROM %s" % (sel, self.rel(name)))
+        if not any(c.dtype.base in _TEXT_FETCH for c in keys):
+            return data
+        L = _planning_db(None).cursor()
+        try:
+            L.execute("SET arrow_lossless_conversion = true")
+            L.register("fetched", data)
+            return L.execute("SELECT %s FROM fetched" % ", ".join("CAST(%s AS %s) AS %s" % (c.a, c.dtype.sql(), c.a)
+                                                                 for c in keys)).to_arrow_table()
+        finally:
+            L.close()
 
     def statement_relations(self, name: str, chunked: bool) -> Iterator[str]:
         yield self.rel(name)

@@ -26,6 +26,16 @@ from cdc_v2.oracle import canonical as oc
 NZ = "CAST('-0' AS DOUBLE)"
 NZF = "CAST('-0' AS FLOAT)"
 
+_DB = duckdb.connect()
+
+
+def helper_conn():
+    """A cursor on one shared in-memory database (a new database costs about 5 ms)."""
+    c = _DB.cursor()
+    c.execute("SET TimeZone = 'UTC'")
+    c.execute("SET arrow_lossless_conversion = true")
+    return c
+
 
 # ------------------------------------------------------------------------------------------------ types
 
@@ -161,9 +171,7 @@ def canon_rows(conn, table_sql: str, cols: List[Column]) -> Counter:
 def values_table(cols: List[Column], rows: List[Dict[int, Optional[str]]]) -> pa.Table:
     """Rows given as literals, as an Arrow table with the destination column names and types. Values travel through
     Arrow as they do in the pipeline (a UNION whose member holds NULL arrives as NULL, the oracle's rule)."""
-    con = duckdb.connect()
-    con.execute("SET TimeZone = 'UTC'")
-    con.execute("SET arrow_lossless_conversion = true")
+    con = helper_conn()
     sel = lambda r: "SELECT %s" % ", ".join("%s AS %s" % (cast(r.get(c.position), c.type), quote_ident(c.name))
                                             for c in cols)
     if rows:
@@ -177,12 +185,9 @@ def values_table(cols: List[Column], rows: List[Dict[int, Optional[str]]]) -> pa
 
 def literal_rows_canon(cols: List[Column], rows: List[Dict[int, Optional[str]]]) -> Counter:
     """Canonical multiset of rows given as literals (computed in a private local DuckDB)."""
-    con = duckdb.connect()
-    con.execute("SET TimeZone = 'UTC'")
-    con.execute("CREATE TABLE e (%s)" % ", ".join("%s %s" % (quote_ident(c.name), c.type) for c in cols))
+    con = helper_conn()
     con.register("vals", values_table(cols, rows))
-    con.execute("INSERT INTO e SELECT * FROM vals")
-    out = canon_rows(con, "e", cols)
+    out = canon_rows(con, "vals", cols)
     con.close()
     return out
 
@@ -190,8 +195,7 @@ def literal_rows_canon(cols: List[Column], rows: List[Dict[int, Optional[str]]])
 def lit_canon(lit: Optional[str], typ: str, _cache={}) -> str:
     key = (lit, typ)
     if key not in _cache:
-        con = duckdb.connect()
-        con.execute("SET TimeZone = 'UTC'")
+        con = helper_conn()
         _cache[key] = con.execute("SELECT %s" % canon(cast(lit, typ), typ)).fetchone()[0]
         con.close()
     return _cache[key]
@@ -220,9 +224,7 @@ def change_set_table(meta: TableMeta, recs: List[Rec], txn_base: int = 0) -> pa.
         names += [c.k for c in meta.key_columns]
     else:
         names += [c.b for c in cols]
-    con = duckdb.connect()
-    con.execute("SET TimeZone = 'UTC'")
-    con.execute("SET arrow_lossless_conversion = true")
+    con = helper_conn()
     exprs = []
     for r in recs:
         vals = ["CAST(%d AS BIGINT)" % (r.txn - txn_base), "CAST(%d AS BIGINT)" % r.seq, "'%s'" % r.op]
@@ -280,6 +282,7 @@ class KeyedSource:
         self.vals = [c for c in meta.value_columns]
         self.toast_rate = toast_rate
         self.rows: List[_Row] = []
+        _Row._n = 0                              # row ids count from 1 for every simulated table
         self.seq = 0
         self.txn = 0
         self.key_pool = self._key_pool()
@@ -508,6 +511,7 @@ class KeylessSource:
         self.cols = list(meta.columns)
         self.toast_rate = toast_rate
         self.rows: List[_Row] = []
+        _Row._n = 0                              # row ids count from 1 for every simulated table
         self.seq = 0
         self.txn = 0
         # a small value pool per column, so that identical rows are common

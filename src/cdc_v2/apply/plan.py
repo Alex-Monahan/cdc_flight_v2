@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from typing import Callable, List
 
 from .meta import Column, TableMeta
-from .types import exact, needs_exact
+from .types import exact, join_wrap, needs_exact
 
 __all__ = ["Step", "keyed_steps", "keyless_steps", "key_join", "flat_x", "keyed_stats_sql", "keyless_stats_sql"]
 
@@ -50,9 +50,18 @@ def flat_x(meta: TableMeta, struct_expr: str, prefix: str = "x") -> str:
 
 def key_join(meta: TableMeta, t_alias: str, rel_alias: str, prefix: str = "x") -> str:
     """Join condition of a destination row with a relation's exact key columns: ex(t.k) = n.x<i> for every key
-    column. For a key type whose `=` is exact this is a plain column comparison (a hash join on the raw column)."""
-    return " AND ".join("%s = %s.%s%d" % (exact("%s.%s" % (t_alias, c.qname), c.dtype), rel_alias, prefix, c.position)
+    column. For a key type whose `=` is exact this is a plain column comparison (a hash join on the raw column);
+    DATE and TIMESTAMP keys are compared through `join_wrap` on both sides."""
+    return " AND ".join("%s = %s" % (join_wrap(exact("%s.%s" % (t_alias, c.qname), c.dtype), c.dtype),
+                                     join_wrap("%s.%s%d" % (rel_alias, prefix, c.position), c.dtype))
                         for c in meta.key_columns)
+
+
+def x_join(meta: TableMeta, left: str, right: str) -> str:
+    """Equality of exact keys held by two of apply's own relations (`left`.x<i>, `right`.x<i>; either may be a
+    struct expression such as `kb.kx`)."""
+    return " AND ".join("%s = %s" % (join_wrap("%s.x%d" % (left, c.position), c.dtype),
+                                     join_wrap("%s.x%d" % (right, c.position), c.dtype)) for c in meta.key_columns)
 
 
 def _ordered(src_sql: str, order_col: str, cols: str, params: tuple) -> List[Step]:
@@ -128,8 +137,7 @@ FROM {w} GROUP BY kx
         steps.append(Step("cand_p", "sql", "SELECT %s FROM %s WHERE lo < hi" % (flat_x(meta, "kx"), R("kb"))))
         steps.append(Step("present", "lookup", source="cand_p"))
         undet = "CASE WHEN pr.n > 0 THEN 1 ELSE 0 END"
-        pjoin = "LEFT JOIN %s AS pr ON %s" % (R("present"), " AND ".join("pr.x%d = kb.kx.x%d" % (c.position, c.position)
-                                                                       for c in keys))
+        pjoin = "LEFT JOIN %s AS pr ON %s" % (R("present"), x_join(meta, "pr", "kb.kx"))
     else:
         undet, pjoin = "NULL", ""
     steps.append(Step("kp", "sql", """
@@ -221,7 +229,7 @@ SELECT DISTINCT {fx} FROM (
 ) AS c
 """.format(fx=flat_x(meta, "kx"), dec=R("dec"))))
         steps.append(Step("rootcnt", "lookup", source="cand_r"))
-        rc = lambda alias, sx: " AND ".join("%s.x%d = %s.x%d" % (alias, c.position, sx, c.position) for c in keys)
+        rc = lambda alias, sx: x_join(meta, alias, sx)
         steps.append(Step("act0", "sql", """
 SELECT d.*,
   CASE WHEN d.how = 'complete' THEN 'ins'
@@ -256,14 +264,16 @@ LEFT JOIN {r} AS rf ON rf.rn = a.lrn
     steps.append(Step("act", "sql", act_sql))
 
     # outputs: values are read from the records by record number
-    # stream: only keys the source held when the change set started (p = 1) can have a destination row; catch-up:
-    # every key of the log, because the table was loaded under other snapshots.
+    # stream: only keys the source held when the change set started (p = 1) can have a destination row. Catch-up:
+    # every key of the log, because the table was loaded under other snapshots; the row of an unresolved key is
+    # removed as well: it is stale, a later call must not take values from it, and the repair read loads it again
+    # (docs/design/apply.md 2.6).
+    pfilter = " AND kp.p = 1" if mode == "stream" else ""
     steps.append(Step("del", "sql", """
 SELECT {fx} FROM {kp} AS kp
-WHERE kp.p IS NOT NULL{pfilter}
+WHERE true{pfilter}
   AND NOT EXISTS (SELECT 1 FROM {act} AS a WHERE a.action IN ('upd', 'copy') AND a.root = kp.kx)
-  AND NOT EXISTS (SELECT 1 FROM {act} AS a WHERE a.action = 'unres' AND a.kx = kp.kx)
-""".format(fx=flat_x(meta, "kp.kx"), kp=R("kp"), act=R("act"), pfilter=" AND kp.p = 1" if mode == "stream" else "")))
+""".format(fx=flat_x(meta, "kp.kx"), kp=R("kp"), act=R("act"), pfilter=pfilter)))
     vjoins = "JOIN {r} AS rl ON rl.rn = a.lrn".format(r=R("r")) + "".join(
         " LEFT JOIN {r} AS r{p} ON r{p}.rn = a.s{p}".format(r=R("r"), p=c.position) for c in ucols)
     vcols = (["rl.%s AS %s" % (c.a, c.a) for c in keys] + ["rl.%s AS %s" % (c.a, c.a) for c in nonu]

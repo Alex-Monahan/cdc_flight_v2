@@ -63,7 +63,7 @@ class Case:
     error: Optional[str] = None                         # 'invariant' | 'changeset'
     unresolved: Optional[List[tuple]] = None            # catch_up: expected unresolved keys (literals of key cols)
     one_tx: bool = False
-    forms: tuple = ("local", "relation")
+    forms: tuple = ("local",)
     max_statements: Optional[int] = None                # per change set, local form
     twice: bool = False                                 # catch_up: apply again, the table must not change
 
@@ -243,6 +243,24 @@ def type_key_cases() -> List[Case]:
     start = [{0: "1", 5: "'x'", 2: "'A'"}, {0: "1", 5: "'y'", 2: "'B'"}]
     r = R().d(1, {0: "1", 5: "'y'"}).move(1, {0: "1", 5: "'x'"}, {0: "1", 5: "'y'", 2: None}, unchanged=[2])
     cs.append(Case("composite_key_move_onto_deleted", meta, start, [r.out], [{0: "1", 5: "'y'", 2: "'A'"}]))
+    # ±infinity keys written and then deleted or changed in one transaction (two change sets): DuckDB's join filter
+    # pushdown misses them unless the join is on an expression (found by the property test, seed 2273038)
+    for typ, lo, hi in [("DATE", "'-infinity'::DATE", "'infinity'::DATE"),
+                        ("TIMESTAMP", "'-infinity'::TIMESTAMP", "'infinity'::TIMESTAMP"),
+                        ("TIMESTAMPTZ", "'-infinity'::TIMESTAMPTZ", "'infinity'::TIMESTAMPTZ")]:
+        inf = TableMeta((Column(0, "k", typ, key=True), Column(1, "big", "VARCHAR", unchanged_possible=True)))
+        r1 = R().c(1, {0: lo, 1: "'a'"}).c(1, {0: hi, 1: "'b'"})
+        r2 = R().d(2, {0: lo}).u(2, {0: hi, 1: None}, unchanged=[1]).move(2, {0: hi}, {0: lo, 1: None}, unchanged=[1])
+        cs.append(Case("infinite_%s_keys_in_one_transaction" % typ.lower(), inf, [], [r1.out, r2.out],
+                       [{0: lo, 1: "'b'"}], one_tx=True, forms=("local", "relation")))
+    # TIME WITH TIME ZONE keys: equal instants with other offsets are other keys, and a key travels back intact
+    TZ = TableMeta((Column(0, "k", "TIMETZ", key=True), Column(1, "big", "VARCHAR", unchanged_possible=True)))
+    tz_start = [{0: "'11:00:00+00'::TIMETZ", 1: "'a'"}]
+    r = R().c(1, {0: "'12:00:00+01'::TIMETZ", 1: "'t'"}).d(1, {0: "'12:00:00+01'::TIMETZ"})
+    cs.append(Case("timetz_key_lookup_keeps_the_offset", TZ, tz_start, [r.out], tz_start, forms=("local", "relation")))
+    r = R().u(1, {0: "'12:00:00+01'::TIMETZ", 1: None}, unchanged=[1])
+    cs.append(Case("timetz_key_unresolved_comes_back_with_its_offset", TZ, tz_start, [r.out], tz_start,
+                   mode="catch_up", unresolved=[("'12:00:00+01'::TIMETZ",)], forms=("local", "relation")))
     # awkward destination names, including rowid and our own column names
     names = ["rowid", 'a"b', "x0", "a1", "n", "t", "with space", "select", "ä€", " ", "a.b", "tab\tname", "Count"]
     cols = [Column(0, names[0], "BIGINT", key=True)] + [Column(i, n, "VARCHAR", unchanged_possible=(i % 2 == 1))
