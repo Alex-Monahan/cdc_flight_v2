@@ -20,6 +20,7 @@ system temp directory) and are deleted at the end.
   CDC_V2_BULK_METHODS     comma list of methods (default: all)
   CDC_V2_BULK_PARALLEL    processes for parallel_parquet (default 4)
   CDC_V2_BULK_DB          database name (default cdc_v2_spike_md_bulk)
+  CDC_V2_BULK_SOURCE      generator (default; synthetic lineitem-shaped rows) or tpch (dbgen lineitem, sf = rows/6M)
   CDC_V2_SPIKE_TMP, CDC_V2_SPIKE_EVIDENCE, CDC_V2_MEMORY_LIMIT  (see common.py)
 
 Run:  tools/with-env uv run --with pyarrow --with pandas python spikes/md_semantics/bulk_load.py
@@ -50,14 +51,22 @@ def generate(rows: int, d: Path, csv: bool) -> tuple[list[Path], list[Path], int
     local = duckdb.connect(config={"memory_limit": os.environ.get("CDC_V2_MEMORY_LIMIT", "4GB"),
                                    "temp_directory": str(tmp_dir() / "duckdb_tmp")})
     pq, cs = [], []
+    source = os.environ.get("CDC_V2_BULK_SOURCE", "generator")
+    if source == "tpch":  # real TPC-H lineitem from DuckDB's tpch extension; scale factor chosen from rows
+        local.execute("INSTALL tpch")
+        local.execute("LOAD tpch")
+        local.execute(f"CALL dbgen(sf = {max(rows / 6_000_000, 0.01)})")
+        rows = local.execute("SELECT count(*) FROM lineitem").fetchone()[0]
     for i, start in enumerate(range(0, rows, CHUNK)):
         n = min(CHUNK, rows - start)
         p = d / f"part_{i:04d}.parquet"
-        local.execute(f"COPY ({lineitem_select(start, n)}) TO '{p}' (FORMAT parquet, COMPRESSION zstd)")
+        q = (f"SELECT * FROM lineitem LIMIT {n} OFFSET {start}" if source == "tpch"
+             else lineitem_select(start, n))
+        local.execute(f"COPY ({q}) TO '{p}' (FORMAT parquet, COMPRESSION zstd)")
         pq.append(p)
         if csv:
             c = d / f"part_{i:04d}.csv"
-            local.execute(f"COPY ({lineitem_select(start, n)}) TO '{c}' (FORMAT csv, HEADER true)")
+            local.execute(f"COPY ({q}) TO '{c}' (FORMAT csv, HEADER true)")
             cs.append(c)
     local.close()
     size = sum(p.stat().st_size for p in pq)
@@ -111,9 +120,14 @@ def run_method(ev: Evidence, con, method: str, rows: int, pq: list[Path], cs: li
     elif method == "appender":
         import pyarrow.parquet as papq
         fresh(con, "t_load")
+        import pyarrow as pa
         for f in pq:
-            df = papq.read_table(f).to_pandas()
-            con.append("t_load", df)
+            tbl = papq.read_table(f)
+            # pandas holds DECIMAL as Python objects, which append() mis-infers; send them as float64 (DuckDB casts
+            # back to DECIMAL(15,2) on insert)
+            tbl = tbl.cast(pa.schema([pa.field(x.name, pa.float64()) if pa.types.is_decimal(x.type) else x
+                                      for x in tbl.schema]))
+            con.append("t_load", tbl.to_pandas())
     elif method == "csv_insert":
         fresh(con, "t_load")
         con.execute(f"INSERT INTO t_load SELECT * FROM read_csv({files_sql(cs)}, header = true, "
