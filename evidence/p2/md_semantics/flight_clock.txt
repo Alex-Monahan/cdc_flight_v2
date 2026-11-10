@@ -1,0 +1,36 @@
+client session TimeZone: Etc/Unknown
+== 1. EXPLAIN of SELECT <expr> FROM one (a MotherDuck table, so the projection runs remotely)
+   now()                                remote projection = "──────────────────── '2026-11-10 03:14:39 .422982+00'::TIMESTAMP WITH TIME ZONE  ~1 row" -> FOLDED ON CLIENT (client clock)
+   current_timestamp                    remote projection = "──────────────────── '2026-11-10 03:14:39 .434755+00'::TIMESTAMP WITH TIME ZONE  ~1 row" -> FOLDED ON CLIENT (client clock)
+   get_current_timestamp()              remote projection = "──────────────────── '2026-11-10 03:14:39 .447487+00'::TIMESTAMP WITH TIME ZONE  ~1 row" -> FOLDED ON CLIENT (client clock)
+   transaction_timestamp()              remote projection = "──────────────────── '2026-11-10 03:14:39 .459517+00'::TIMESTAMP WITH TIME ZONE  ~1 row" -> FOLDED ON CLIENT (client clock)
+   current_localtimestamp()             remote projection = "──────────────────── '2026-11-10 03:14:39 .471457'::TIMESTAMP  ~1 row" -> FOLDED ON CLIENT (client clock)
+   epoch_ms(now())                      remote projection = '──────────────────── 1794280479484  ~1 row'                 -> FOLDED ON CLIENT (client clock)
+   uuid_extract_timestamp(uuidv7())     remote projection = '──────────────────── uuid_extract_timestamp (uuidv7())  ~1 row' -> evaluated by the server
+   gen_random_uuid()                    remote projection = '──────────────────── gen_random_uuid()  ~1 row'             -> evaluated by the server
+   UPDATE ... SET hb = now()                            -> remote operators show '──────────────────── CAST(1794280479521 AS INTEGER) rowid  ~1 row'
+   UPDATE ... SET hb = uuid_extract_timestamp(uuidv7()) -> remote operators show '──────────────────── CAST(epoch_ms (uuid_extract_timestamp (uuidv7())) AS INTEGER) rowid  ~1 row'
+   INSERT ... SELECT now()                              -> remote operators show '──────────────────── CAST(1794280479546 AS INTEGER)  ~1 row'
+== 2. inside a client transaction opened 5 s earlier (values as epoch ms; client clock at query time shown for comparison)
+   client_begin_ms: 1794280479561
+   client_query_sent_ms: 1794280484571
+   now_minus_begin_ms: 0
+   current_timestamp_minus_begin_ms: 0
+   get_current_timestamp_minus_query_ms: -5010
+   server_uuidv7_minus_query_ms: 9
+   round_trip_ms: 11
+== 3. column DEFAULTs, inserted inside a transaction opened 5 s earlier
+   plan of INSERT INTO hb(id) VALUES (1), remote part: '──────────────────── #0 now() get_current_timestamp() uuidv7()  ~1 row'
+   default_now_minus_begin_ms: 0
+   default_get_current_timestamp_minus_insert_ms: -5008
+   default_uuidv7_minus_insert_ms: 11
+== 4. session TimeZone set to Asia/Kathmandu (+05:45): text rendering inside a remote projection
+   now()::VARCHAR = +05:45 (offset only); plan: :59:49 .691068+05:45'  ~1 row"
+   uuid_extract_timestamp(uuidv7())::VARCHAR offset = +05:45
+== 5. skew = server time (uuidv7 made on the server) - client time at the midpoint of the round trip
+   samples whose server timestamp lies OUTSIDE the client's [send, receive] window: 0 of 300 (impossible if one clock produced both)
+   all samples: rtt ms {'n': 300, 'min': 8.196115493774414, 'p50': 11.318206787109375, 'p90': 17.260074615478516, 'p99': 24.5668888092041, 'max': 25.027036666870117, 'mean': 12.26353089014689}
+   fastest 10%: rtt ms {'n': 30, 'min': 8.196115493774414, 'p50': 8.41069221496582, 'p90': 8.477210998535156, 'p99': 8.496761322021484, 'max': 8.496761322021484, 'mean': 8.384426434834799}
+   fastest 10%: skew ms {'n': 30, 'min': -0.306396484375, 'p50': 0.0205078125, 'p90': 0.66064453125, 'p99': 0.757080078125, 'max': 0.757080078125, 'mean': 0.11532389322916667} (uncertainty +/- rtt/2)
+   heartbeat written with the server clock, age read 2 s later with the server clock: 2018 ms
+database dropped

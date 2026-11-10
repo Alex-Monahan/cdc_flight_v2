@@ -1,0 +1,19 @@
+target of 10,000,000 lineitem rows created in 84.6 s; client CPUs (cgroup) 2
+round trip of a trivial remote query (s): {'n': 30, 'min': 0.008288383483886719, 'p50': 0.011986017227172852, 'p90': 0.0158541202545166, 'p99': 0.02117133140563965, 'max': 0.02117133140563965, 'mean': 0.012599047025044758}
+   temp   batch         1:   0.206 s/txn          5 rows/s | stage 0.003 delete 0.049 insert 0.018 state+fence 0.025 commit 0.065 | client CPU 0.020 s = 20200.0 s/M rows | count ok True
+   md     batch         1:   0.203 s/txn          5 rows/s | stage 0.020 delete 0.042 insert 0.010 state+fence 0.033 commit 0.093 | client CPU 0.023 s = 22700.0 s/M rows | count ok True
+   direct batch         1:   0.146 s/txn          7 rows/s | stage 0.000 delete 0.046 insert 0.018 state+fence 0.024 commit 0.059 | client CPU 0.022 s = 21800.0 s/M rows | count ok True
+   temp   batch       100:   0.121 s/txn        827 rows/s | stage 0.003 delete 0.041 insert 0.016 state+fence 0.019 commit 0.041 | client CPU 0.021 s = 214.0 s/M rows | count ok True
+   md     batch       100:   0.200 s/txn        500 rows/s | stage 0.020 delete 0.054 insert 0.010 state+fence 0.033 commit 0.070 | client CPU 0.023 s = 229.0 s/M rows | count ok True
+   direct batch       100:   0.156 s/txn        640 rows/s | stage 0.000 delete 0.065 insert 0.017 state+fence 0.022 commit 0.049 | client CPU 0.022 s = 225.0 s/M rows | count ok True
+   temp   batch    10,000:   0.334 s/txn     29,985 rows/s | stage 0.014 delete 0.063 insert 0.048 state+fence 0.024 commit 0.163 | client CPU 0.047 s = 4.73 s/M rows | count ok True
+   md     batch    10,000:   0.250 s/txn     40,064 rows/s | stage 0.059 delete 0.053 insert 0.035 state+fence 0.029 commit 0.095 | client CPU 0.037 s = 3.72 s/M rows | count ok True
+   direct batch    10,000:   0.296 s/txn     33,772 rows/s | stage 0.000 delete 0.081 insert 0.065 state+fence 0.026 commit 0.140 | client CPU 0.044 s = 4.43 s/M rows | count ok True
+   temp   batch   100,000:   0.974 s/txn    102,712 rows/s | stage 0.109 delete 0.095 insert 0.263 state+fence 0.025 commit 0.451 | client CPU 0.254 s = 2.54 s/M rows | count ok True
+   md     batch   100,000:   1.496 s/txn     66,827 rows/s | stage 0.419 delete 0.102 insert 0.298 state+fence 0.033 commit 0.627 | client CPU 0.120 s = 1.2 s/M rows | count ok True
+   direct batch   100,000:   1.283 s/txn     77,936 rows/s | stage 0.000 delete 0.458 insert 0.355 state+fence 0.026 commit 0.448 | client CPU 0.172 s = 1.72 s/M rows | count ok True
+   temp   batch 1,000,000:   7.959 s/txn    125,641 rows/s | stage 0.652 delete 1.757 insert 4.913 state+fence 0.027 commit 0.796 | client CPU 1.358 s = 1.36 s/M rows | count ok True
+   md     batch 1,000,000:  29.486 s/txn     33,915 rows/s | stage 19.508 delete 0.873 insert 8.957 state+fence 0.050 commit 4.996 | client CPU 1.276 s = 1.28 s/M rows | count ok True
+   direct batch 1,000,000:   5.533 s/txn    180,744 rows/s | stage 0.000 delete 1.868 insert 3.306 state+fence 0.032 commit 0.636 | client CPU 1.910 s = 1.91 s/M rows | count ok True
+client peak RSS MB: 815.7
+database dropped

@@ -12,6 +12,7 @@ into a 10M-row target, for batch sizes 1 .. 1M and three ways of staging the bat
     temp     CREATE TEMP TABLE chg AS SELECT * FROM <arrow>      (a temporary table)
     md       CREATE TABLE chg AS SELECT * FROM <arrow>           (a table in the MotherDuck database, dropped in the txn)
     direct   the DELETE and the INSERT scan the registered Arrow table themselves (no staging table)
+    md_pre   CREATE TABLE chg AS SELECT * FROM <arrow> committed before BEGIN, dropped inside the transaction
 Reported per transaction: wall seconds split into stage / delete / insert / state+fence / commit, rows per second,
 and the client's CPU seconds (user + system of this process, DuckDB threads included) per million rows.
 The batch is built locally before the clock starts. The target's row count is verified after every transaction.
@@ -58,6 +59,8 @@ def one_txn(con, mode: str, tbl) -> dict:
     t = {}
     c0 = cpu_seconds()
     t0 = time.time()
+    if mode == "md_pre":  # staging table committed BEFORE the apply transaction (one upload, own autocommit)
+        con.execute("CREATE TABLE chg AS SELECT * FROM chg_arrow")
     con.execute("BEGIN")
     if mode == "temp":
         con.execute("CREATE TEMP TABLE chg AS SELECT * FROM chg_arrow")
@@ -70,7 +73,7 @@ def one_txn(con, mode: str, tbl) -> dict:
     inserted = con.execute(f"INSERT INTO tgt SELECT {COLS} FROM {src} WHERE _op IN ('I', 'U')").fetchone()[0]
     t3 = time.time()
     con.execute("UPDATE state SET pos = pos + 1")
-    if mode in ("temp", "md"):
+    if mode in ("temp", "md", "md_pre"):
         con.execute("DROP TABLE chg")
     n = con.execute("UPDATE leader SET hb = uuid_extract_timestamp(uuidv7()) WHERE epoch = 1").fetchone()[0]
     assert n == 1

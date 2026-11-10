@@ -26,7 +26,12 @@ def main() -> int:
     ap.add_argument("--prefix", default="flight_")
     a = ap.parse_args()
     fc = FlightCtl()
-    rows = fc.logs(a.flight, a.run)
+    rows, page = [], 2000  # MD_GET_FLIGHT_LOGS returns only the last 100 lines unless LIMIT/OFFSET are given
+    while True:
+        got = fc.logs(a.flight, a.run, limit=page, offset=len(rows), order="asc")
+        rows += got
+        if len(got) < page:
+            break
     key = next(k for k in ("message", "line", "log", "text") if rows and k in rows[0])
     lines = [str(r[key]).rstrip("\n") for r in rows]
     out, cur, buf, steps = evidence_dir(), None, [], []
