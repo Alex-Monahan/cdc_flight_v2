@@ -53,7 +53,7 @@ table and by nothing else.
 |---|---|---|
 | `TimeZone` | `UTC` | `timestamptz` prints as `2026-01-02 03:04:05.678901+00` |
 | `DateStyle` | `ISO, YMD` | ISO output; unambiguous input order |
-| `IntervalStyle` | `iso_8601` | `P10M3DT4H5M6.5S`: months, days and time kept apart, each signed, no words |
+| `IntervalStyle` | `postgres` | `10 mons 3 days 04:05:06.5`: months, days and time kept apart, each signed; the same style as the engine's walsender session, so a text value that holds intervals (an array, a composite) prints alike on both paths (decided in the fix round of package Y) |
 | `extra_float_digits` | `3` | shortest exact round-trip text for `float4`/`float8` |
 | `bytea_output` | `hex` | `\x00ff` |
 | `client_encoding` | `UTF8` | |
@@ -502,7 +502,7 @@ Readings of C7 where it left something open (simplest reading taken):
   `heartbeat.check` before the stream starts; xids are compared on their low 32 bits.
 - T: `catalog.observe` on the standby gives the bracket; on a primary use `visible(xid)`; `TableFacts.identity`
   excludes `relfilenode`; `published` includes membership through a partition ancestor; `publication.has_table`.
-- Y: the session settings table of §1 (IntervalStyle `iso_8601`, DateStyle `ISO, YMD`, `extra_float_digits = 3`,
+- Y: the session settings table of §1 (IntervalStyle `postgres`, DateStyle `ISO, YMD`, `extra_float_digits = 3`,
   `bytea_output = hex`, TimeZone UTC, `lc_monetary = C`).
 
 ## 9. Crash points and fault sites

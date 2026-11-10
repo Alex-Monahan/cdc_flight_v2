@@ -1,0 +1,46 @@
+{
+  "measure": "growth of the maximum resident set size during one conversion, as a multiple of the batch's buffer bytes",
+  "results": [
+    {
+      "batch_bytes": 209715210,
+      "direction": "backfill",
+      "extra_over_batch": 0.89,
+      "kind": "bytea",
+      "peak_rss_mb": 1019,
+      "rss_before_mb": 833,
+      "seconds": 0.559,
+      "value_bytes": 104857600
+    },
+    {
+      "batch_bytes": 104857608,
+      "direction": "stream",
+      "extra_over_batch": 0.0,
+      "kind": "bytea",
+      "peak_rss_mb": 308,
+      "rss_before_mb": 308,
+      "seconds": 0.0,
+      "value_bytes": 104857600
+    },
+    {
+      "batch_bytes": 104857608,
+      "direction": "backfill",
+      "extra_over_batch": 0.0,
+      "kind": "text",
+      "peak_rss_mb": 299,
+      "rss_before_mb": 299,
+      "seconds": 0.0,
+      "value_bytes": 104857600
+    },
+    {
+      "batch_bytes": 104857608,
+      "direction": "stream",
+      "extra_over_batch": 0.0,
+      "kind": "text",
+      "peak_rss_mb": 299,
+      "rss_before_mb": 299,
+      "seconds": 0.0,
+      "value_bytes": 104857600
+    }
+  ],
+  "test": "tests/transform/test_transform_measure.py::test_memory_with_a_100mb_value"
+}
