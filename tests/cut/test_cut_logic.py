@@ -239,14 +239,31 @@ def test_take_standby_cut_own_statement_order():
 def test_take_standby_cut_exported_statement_order():
     replay = iter(["0/1000", "0/1100", "0/1200"])
     conn = FakeConn({
+        C.SQL_VERSION_NUM: (180007,),
         C.SQL_REPLAY_LSN: lambda: (next(replay),),
         C.SQL_EXPORT: lambda: ("00000003-0000001B-1", next(replay), True, "700:705:"),
         C.SQL_R1: lambda: (next(replay), True),
     })
     cut = C.take_standby_cut_exported(conn)
-    assert conn.log == [C.SQL_BEGIN_RC, C.SQL_REPLAY_LSN, C.SQL_EXPORT, C.SQL_R1]
+    assert conn.log == [C.SQL_VERSION_NUM, C.SQL_BEGIN_RC, C.SQL_REPLAY_LSN, C.SQL_EXPORT, C.SQL_R1]
     assert (cut.r0, cut.r_stmt, cut.r1) == (0x1000, 0x1100, 0x1200)
     assert cut.snapshot_id == "00000003-0000001B-1" and cut.way == "exported"
+
+
+def test_exported_cut_is_refused_on_a_server_with_the_export_defect():
+    """Releases up to 16.15, 17.11 and 18.6 export a wrong snapshot on a standby (docs/design/cut.md)."""
+    for version, bad in ((150010, True), (160015, True), (160016, False), (170011, True), (170012, False),
+                         (180000, True), (180006, True), (180007, False), (190000, False)):
+        assert C.export_defect(version) is bad, version
+    conn = FakeConn({C.SQL_VERSION_NUM: (180006,)})
+    with pytest.raises(C.CutError, match="74c9832ca610"):
+        C.take_standby_cut_exported(conn)
+    assert conn.log == [C.SQL_VERSION_NUM]                      # nothing was exported
+    replay = iter(["0/1000", "0/1100", "0/1200"])
+    conn = FakeConn({C.SQL_REPLAY_LSN: lambda: (next(replay),), C.SQL_R1: lambda: (next(replay), True),
+                     C.SQL_EXPORT: lambda: ("00000003-0000001B-1", next(replay), True, "700:705:")})
+    assert C.take_standby_cut_exported(conn, accept_export_defect=True).way == "exported"
+    assert C.SQL_VERSION_NUM not in conn.log
 
 
 def test_standby_cut_refused_after_promotion_and_rolled_back():

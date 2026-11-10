@@ -354,6 +354,7 @@ SQL_EXPORT = (
     "pg_current_snapshot()::text"
 )
 SQL_R1 = "SELECT pg_last_wal_replay_lsn()::text, pg_is_in_recovery()"
+SQL_VERSION_NUM = "SELECT current_setting('server_version_num')::int"
 SQL_IMPORT = "SET TRANSACTION SNAPSHOT {literal}"
 SQL_PRIMARY_FIRST = "SELECT pg_current_snapshot()::text, pg_is_in_recovery()"
 SQL_NEXT_XID = "SELECT pg_current_xact_id()::text, pg_is_in_recovery()"
@@ -412,15 +413,50 @@ def take_standby_cut_own(conn, *, block_size: int = WAL_BLOCK_SIZE_DEFAULT) -> S
         raise
 
 
-def take_standby_cut_exported(conn, *, block_size: int = WAL_BLOCK_SIZE_DEFAULT) -> StandbyCut:
+#: The server defect that makes an exported snapshot unsafe on a standby (docs/design/cut.md, "The exported
+#: snapshot on a standby").  The fix is on the stable branches since 2026-08-26 and in no release up to these.
+EXPORT_FIX = ("postgres commit 74c9832ca610, 'Export subxip[] for snapshots taken during recovery' "
+              "(REL_18_STABLE; back-patched through 14)")
+_LAST_MINOR_WITHOUT_EXPORT_FIX = {16: 15, 17: 11, 18: 6}
+
+
+def export_defect(server_version_num: int) -> bool:
+    """True if a standby of this version can hand out a wrong exported snapshot.
+
+    On such a server a snapshot exported on a standby loses its list of running transactions while the standby
+    marks its snapshots as overflowed.  With ``wal_level = logical`` one running transaction on the primary
+    whose first write happened inside a subtransaction (a savepoint, a PL/pgSQL exception block) is enough; so
+    is any transaction with more than 64 subtransactions.  A session that imports such a snapshot sees
+    transactions that were still running when the snapshot was exported, and can leave wrong hint bits that
+    mislead every other session of the standby.  Versions older than 16 were not examined and count as
+    affected.  The table assumes that the first minor release after those listed carries the fix; check it
+    when that release appears.
+    """
+    major, minor = divmod(int(server_version_num), 10000)
+    if major >= 19:
+        return False
+    last = _LAST_MINOR_WITHOUT_EXPORT_FIX.get(major)
+    return last is None or minor <= last
+
+
+def take_standby_cut_exported(conn, *, block_size: int = WAL_BLOCK_SIZE_DEFAULT,
+                              accept_export_defect: bool = False) -> StandbyCut:
     """Take a cut with an exported snapshot on a hot standby.
 
     One READ COMMITTED transaction with three statements: ``R0``; ``pg_export_snapshot()`` (its statement
     snapshot is the exported one); ``R1``.  The transaction is **left open**: the snapshot can be imported
     (:func:`import_snapshot`) only while it lives.  The connection touches no table, so it holds no relation
     lock.
+
+    Refused on a server with the export defect (:func:`export_defect`) unless ``accept_export_defect`` is set.
+    Set it only where no transaction on the primary uses a subtransaction (tests).
     """
     _require_autocommit(conn)
+    if not accept_export_defect:
+        version = int(_one(conn, SQL_VERSION_NUM)[0])
+        if export_defect(version):
+            raise CutError("exported snapshots are not safe on a standby of server version %d: it lacks %s; "
+                           "take the cut with take_standby_cut_own" % (version, EXPORT_FIX))
     conn.execute(SQL_BEGIN_RC)
     try:
         r0 = _replay(_one(conn, SQL_REPLAY_LSN)[0], "R0")
