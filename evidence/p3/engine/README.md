@@ -20,6 +20,12 @@ Debezium 3.7.1.Final (the 73 locked jars); Homebrew OpenJDK 23.0.2 (the JDK lock
 | `parent_death.json` | `test_engine_attach.py::test_parent_death_ends_the_jvm_and_frees_the_slot` | JVM and slot free after the parent's SIGKILL |
 | `position_mapping.json` | `test_engine_attach.py::test_positions_map_to_pgoutput_begin_and_commit` | END ack_position = pgoutput Commit end_lsn |
 | `slot_flush_backwards_pg18.json` | `test_engine_attach.py::test_lower_flush_position_does_not_move_the_slot_back` | core design open point 14 on 18.6 |
+| `end_only_heartbeat_storm.json` | `test_engine_ack.py::test_end_only_acknowledgement_under_a_heartbeat_storm` | 40,000 + 2,000 transactions, heartbeat 1 ms, kills: nothing lost or doubled, slot never above DURABLE |
+| `held_list_bound.json` | `test_engine_ack.py::test_held_list_keeps_following_far_behind` | 60,000 ENDs behind: DURABLE confirms within the stated bound |
+| `idle_ack_bound.json` | `test_engine_ack.py::test_idle_acknowledgement_bound` | idle delay against heartbeat interval + 1 s |
+| `negative_control.json` | `test_engine_ack.py::test_negative_control_one_end_ahead_is_caught` | a pipeline one END ahead is caught |
+| `unparsable_interval.json` | `test_engine_values.py::test_unparsable_interval_ends_in_fatal_without_the_value` | FATAL place, restarts, no value escapes, table excluded passes |
+| `infinite_interval.json` | `test_engine_values.py::test_infinite_interval_is_delivered_as_zero` | finding: infinite intervals arrive as zero |
 | `frames_detection.json` | `test_frames_detection.py -k long` (`CDC_V2_E_LONG=1`) | 1,000 pipefaults seeds |
 | `throughput.json` | `test_engine_measure.py` (`CDC_V2_E_MEASURE=1`) | rows/s and CPU split, indications only |
 

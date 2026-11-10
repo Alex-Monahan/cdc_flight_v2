@@ -74,9 +74,9 @@ value: kind 0 none, 1 i64, 2 `str`, 3 `flag`), keys sorted (Java `TreeMap<String
 | END | 5 | as BEGIN, then u64 event count, u32 n, n × (str data collection, u64 count) |
 | TRUNCATE | 6 | u64 seq, str schema, str table, posmap |
 | MESSAGE | 7 | u64 seq, str prefix, flag transactional, bin content, posmap |
-| HEARTBEAT | 8 | u64 seq, posmap, opt_u64 ack_position |
+| HEARTBEAT | 8 | u64 seq, posmap (information only: no ack_position; never acknowledged) |
 | BATCH_END | 9 | u32 records in the engine batch, opt_u64 newest ack_position handed to Debezium so far |
-| FATAL | 10 | str class, str message, u16 n, n × (str class, str message) of the cause chain |
+| FATAL | 10 | str class, str safe message, u16 n, n × (str class, str safe message) of the cause chain, posmap of the last record handed over, str schema and str table of the record being handled (empty when unknown) |
 
 A column **buffer** is u32 byte length, zero bytes up to a multiple of 8 counted from the payload start, the bytes,
 zero bytes up to the next multiple of 8. So every buffer starts 8-aligned inside the payload; Python reads each
@@ -172,7 +172,7 @@ Debezium. Differences from `docs/research/debezium.md` §8.4, with the reason:
 | `driver.options` | lc_monetary, IntervalStyle, bytea_output, DateStyle | + `extra_float_digits=3`, `TimeZone=UTC` | H-013: pin every text-output setting of the walsender session |
 | `converters` / `cdcv2.type` | "our converter" | `cdc_v2.engine.TransportConverter` | section 3 |
 | `time.precision.mode` | structured | structured (no effect on values) | our converter takes over every temporal column; the setting only shapes column defaults, which we drop |
-| `table.include.list` | — | optional (`EngineSettings.table_include`) | the publication decides by default |
+| `table.include.list` | — | optional (`EngineSettings.table_include`) | the publication decides by default; also the way to leave one table out (section 10) |
 | `database.sslrootcert` | — | when given | `verify-full` against a private CA |
 
 Everything else is as §8.4 (memory offset store, `offset.flush.interval.ms=0`, `provide.transaction.metadata=true`,
@@ -181,73 +181,117 @@ Everything else is as §8.4 (memory offset store, `offset.flush.interval.ms=0`, 
 `max.queue.size=32768`, `max.queue.size.in.bytes=268435456`, `poll.interval.ms=50`).
 `heartbeat.action.query` is not set.
 
+**Protected properties** (plan C2, hazard H-016). `EngineSettings.extra` may not set any key of
+`cdc_v2.stream.engine.PROTECTED_KEYS` (ValueError): `skipped.operations`, `offset.storage` and `offset.storage.*`,
+`offset.flush.interval.ms`, `offset.flush.timeout.ms`, `offset.commit.policy`, `lsn.flush.mode`, `errors.max.retries`,
+`slot.max.retries`, `slot.retry.delay.ms`, `provide.transaction.metadata`, `snapshot.mode`,
+`publication.autocreate.mode`, `publication.name`, `slot.name`, `plugin.name`, `converters`, `cdcv2.*`,
+`tombstones.on.delete`, `heartbeat.interval.ms`, `heartbeat.action.query`, `replica.identity.autoset.values`,
+`read.only`, `signal.*`, `offset.mismatch.strategy`, `unavailable.value.placeholder`, `decimal.handling.mode`,
+`binary.handling.mode`, `include.unknown.datatypes`, `record.processing.order`, the connection keys and `cdc_v2.*`.
+`EngineSettings` requires 0 < `heartbeat_interval_ms` ≤ 10,000 (with 0 HELLO never comes on an idle source and the
+last transaction before an idle period is never confirmed). The JVM checks the effective configuration again before
+anything else (`ProtectedConfig`): every guarantee-carrying key must have exactly our value (`skipped.operations=none`,
+memory offset store, `offset.flush.interval.ms=0`, `lsn.flush.mode=connector`, both retry settings 0,
+`provide.transaction.metadata=true`, `snapshot.mode=no_data`, `publication.autocreate.mode=disabled`, our converter,
+`tombstones.on.delete=false`, `offset.mismatch.strategy=no_validation`, `plugin.name=pgoutput`), the
+behaviour-adding keys must be absent, the heartbeat interval must be in 1..10,000 ms and the host and port must be
+present (no default host, never port 5432); otherwise FATAL naming the key, never a value (25 `jvm` cases in
+`test_java_refuses_a_weakened_configuration`, 25 hermetic cases in `test_extra_may_not_set_a_protected_key`).
+
 JVM: `-Xmx` from `EngineSettings.heap_mb` (512 MB default), `-XX:+UseParallelGC` (the spike measured +7 %),
 `-XX:+ExitOnOutOfMemoryError` (an OOM ends the JVM instead of leaving it half alive), `-XX:MaxDirectMemorySize=64m`,
 optional `-XX:ActiveProcessorCount`.
 
-Our settings (`cdc_v2.*`): `engine.id`, `start.position` (echoed in HELLO), `frame.max.rows` (65,536),
+Our settings (`cdc_v2.*`): `engine.id`, `start.position` (echoed in HELLO), `test.probe.slot` (test hook: the slot the
+HELLO probe reads; Python's `extra` cannot set it), `frame.max.rows` (65,536),
 `frame.target.bytes` (8 MiB), `frame.max.bytes` (1 GiB + 16 MiB), `max.value.bytes` (256 MiB), `ack.max.pending`
 (4,096), `stop.timeout.ms` (15,000), `stat.interval.ms` (10,000), `parent.poll.ms` (500).
 
 **JDK.** `jvm.prepare()` uses the Temurin 21 tarball of `jvm/jdk.lock.json` on Linux x86-64 (the Flight). The lock
-holds Linux tarballs only, so on the development machine it uses the local JDK (`java_home`, `$CDC_V2_JAVA_HOME`,
+holds Linux x86-64 tarballs only (no entry for macOS arm64), so the suites could not run on the locked Temurin 21 here; so on the development machine it uses the local JDK (`java_home`, `$CDC_V2_JAVA_HOME`,
 `$JAVA_HOME` or the PATH) and says so in `JvmArtifacts.jdk_source`; every number in this package was measured with
 Homebrew OpenJDK 23.0.2 on macOS arm64, classes compiled with `--release 17`. Jars: always the 73 locked jars,
 verified, nothing else on the classpath.
 
 ## 5. Acknowledgement
 
-The consumer keeps references only to END and HEARTBEAT records not yet acknowledged, with their `ack_position`
-(`lsn_commit` of the record's offset if present, else `lsn_proc`: exactly the value
-`PostgresStreamingChangeEventSource.commitOffset` sends). `ack_position` of END and HEARTBEAT records must not
-decrease over the engine's life; if it would, the engine stops with FATAL. On `DURABLE p` the consumer takes the
-newest held record with `ack_position ≤ p`, calls `markProcessed(record)` and `markBatchFinished()`, and drops it
-and every older entry. A `DURABLE` below every held record acknowledges nothing; the engine keeps the newest p it
-received, so records with `ack_position ≤ p` that arrive later (after a restart the pipeline may send p before
-the redelivered transactions arrive) are acknowledged when they come
-(`test_durable_sent_before_the_redelivery_still_acknowledges`). A `DURABLE` above all held records acknowledges
-the newest one. A malformed DURABLE line is logged (`BAD_COMMAND`) and ignored. The list
-is thinned when it exceeds `cdc_v2.ack.max.pending` (every second entry is dropped, the newest always kept);
-dropping is safe, a later DURABLE then acknowledges an older record.
+**Only END records are acknowledged** (plan C2). Debezium dispatches a heartbeat record that already carries a
+transaction's commit position *before* it creates that transaction's END record
+(`PostgresStreamingChangeEventSource.commitMessage`), and one with the position of a non-transactional message
+before that message; a pipeline that adopted heartbeat positions lost transactions (second review). So the engine
+never holds or marks a heartbeat record, a HEARTBEAT frame has no `ack_position` (an old-format frame with one is
+refused by the decoder: unused payload bytes), and a non-transactional MESSAGE is not held either. HEARTBEAT frames
+can arrive anywhere, also between BEGIN and END; they show that the engine is alive and they cause the batch calls in
+which a DURABLE takes effect on an idle source. Measured in `end_only_heartbeat_storm.json`
+(`heartbeat.interval.ms=1`): 96 of 1,052 HEARTBEAT frames carried the commit position of the END that followed them.
 
-DURABLE commands are applied at the start and at the end of every `handleBatch` call (Debezium's committer is not
-thread safe; it is used only on the engine's thread). After `markBatchFinished` the memory offset store flushes at
-once (`offset.flush.interval.ms=0`) and the task sets a commit flag; the next `poll()` (≤ `poll.interval.ms`, 50 ms)
-calls `commitOffset`, which flushes the LSN to the walsender. Delay from `Engine.durable(p)` to the slot's
-`confirmed_flush_lsn` showing p (`evidence/p3/engine/ack_invariant.json`):
+The `ack_position` of an END is `lsn_commit` of its offset, exactly the value
+`PostgresStreamingChangeEventSource.commitOffset` sends; an END whose offset has no `lsn_commit` stops the engine with
+FATAL, never a fallback to another field (`HeldEnds.endAck`, `test_java_held_list_bound_and_end_without_lsn_commit`).
+END `ack_position` values must not decrease over the engine's life (FATAL otherwise). BEGIN still carries an
+`ack_position` computed as before (the previous commit end, or `lsn_proc` in the first transaction): information
+only, never acknowledged.
 
-- busy (50 transactions/s): p50 0.062 s, max 0.151 s;
-- idle: 2.2 s; the bound is `heartbeat.interval.ms` (5 s) plus one poll, because when idle `handleBatch` is called
-  only for a heartbeat record.
+On `DURABLE p` the consumer takes the newest held END with `ack_position ≤ p`, calls `markProcessed(record)` and
+`markBatchFinished()`, and drops it and every older one. A `DURABLE` below every held END acknowledges nothing; the
+engine keeps the newest p it received, so ENDs with `ack_position ≤ p` that arrive later (after a restart the
+pipeline may send p before the redelivered transactions arrive) are acknowledged when they come
+(`test_durable_sent_before_the_redelivery_still_acknowledges`). A `DURABLE` above all held ENDs acknowledges the newest
+one. Malformed, backward and repeated DURABLE lines (`test_durable_edge_cases`: nine malformed forms, a backward raw
+line, three repeats, a value between two held ENDs) leave the slot as specified and the engine alive; a malformed
+line is logged as `BAD_COMMAND` and ignored.
 
-Invariant probe (same test, 704 samples every 50 ms, 842 transactions, 76 DURABLE): `confirmed_flush_lsn` was never
-beyond the newest DURABLE sent before the sample; with no DURABLE for 6 s under load it did not move at all.
+**The held list and its bound.** `HeldEnds` holds every k-th END plus always the newest one. When more than
+`cdc_v2.ack.max.pending` (4,096) samples are held, every second one is dropped (the oldest kept) and k doubles; when
+the list empties, k returns to 1. A `DURABLE p` confirms an END that lies at most **k − 1 END records below the newest
+END at or below p, with k ≤ max(1, 2 × lead / 4096)**, where lead is the number of ENDs the engine has received beyond
+the oldest one not yet confirmed; it never confirms above p. Example: 60,000 ENDs read with no DURABLE, then DURABLE
+for END #20,000, #36,000 and #60,000: the slot reached #19,985, #35,985 and #60,000 (15 behind; stated bound 28)
+within 0.7–0.8 s each and was never above (`held_list_bound.json`). The first version's thinning dropped the oldest
+entry at every thinning and stopped following while the pipeline was more than about 24,000 ENDs behind.
+
+**Timing.** DURABLE commands are applied at the start and at the end of every `handleBatch` call (Debezium's
+committer is not thread safe; it is used only on the engine's thread). After `markBatchFinished` the memory offset
+store flushes at once (`offset.flush.interval.ms=0`) and the task sets a commit flag; the next `poll()` calls
+`commitOffset`, which sends the flush position to the walsender. Bound on an idle source: **`heartbeat.interval.ms`
++ 1 s** (one heartbeat interval until the next batch call, one poll, the flush); measured max 0.31 s at 300 ms and
+0.25 s at 500 ms (`idle_ack_bound.json`, 5 runs each). Busy: within one batch and one poll.
+
+**Crash points.** `engine.ack_marking` (before `markProcessed`), `engine.acked` (after `markBatchFinished`: the
+flush is not sent yet) and `engine.flush_sent`: the first batch after an acknowledgement, which Debezium's `poll()`
+delivers only after `performCommit()` has sent the flush of the previous acknowledgement (`BaseSourceTask.poll`). The
+engine cannot observe the flush message itself (it is sent on Debezium's lsn-flush thread), so this is the earliest
+place where it is known to have gone out.
+
+**DURABLE after STOP** is not applied: STOP ends the engine without another batch call. That is safe: the
+transactions after the last applied DURABLE are delivered again at the next start and discarded by position.
+
+**Invariant and restarts.** `test_slot_never_ahead_of_durable_and_follows_it`: with no DURABLE for 6 s under load the
+slot did not move; then, with DURABLE lagging three ENDs, `confirmed_flush_lsn` was never above the newest DURABLE
+sent before the sample. With WAL for unpublished tables only, neither the slot nor the HEARTBEAT positions moved
+(asserted; research §2.6: an idle source moves only through the published heartbeat table of package P).
+`test_end_only_acknowledgement_under_a_heartbeat_storm`: 40,000 single-row and 2,000 message-only transactions,
+heartbeat interval 1 ms, a pipeline stand-in to the new contract (applied position = the `ack_position` of the last
+END applied, three transactions behind, DURABLE only for that, HEARTBEAT ignored, unapplied work and unread frames
+dropped at each kill), kills at random points: 0 samples above DURABLE, nothing missing, nothing doubled.
+`test_restart_after_random_kills_and_java_crash_points`: the same stand-in under continuous writes, 3 random kills
+and kills at the three Java crash points with 3 seeds each (all 9 reached): 4,454 rows, none missing or doubled, the
+first transaction of every life above the slot's position at start. Negative control
+(`test_negative_control_one_end_ahead_is_caught`): a stand-in that sends DURABLE one END ahead of what it applied is
+caught (49 samples with the slot above the applied position).
 
 `ack_position` mapped to the replication protocol (`test_positions_map_to_pgoutput_begin_and_commit`, against a
 second slot peeked with Debezium's options): END `ack_position` = `positions.lsn_commit` = `positions.lsn` = the
 `end_lsn` of pgoutput's Commit message (end of the commit record). BEGIN `positions.lsn` is below the Begin
-message's `final_lsn` (= Commit's `commit_lsn`, the start of the commit record); BEGIN's `ack_position` is the
-previous transaction's commit end. `positions.txId` is the 32-bit xid of the Begin message.
-
-Heartbeat records carry the current offset; with only unpublished tables written they do **not** advance
-(`heartbeat_moved_with_unpublished_wal: false`), confirming research §2.6: the slot follows idle periods only
-through a heartbeat table that is in the publication (package P).
-
-**Restart.** Without stored offsets Debezium starts at the slot's `confirmed_flush_lsn`. Test
-`test_restart_after_random_kills_and_java_crash_points`: a miniature pipeline applied 3,921 rows in 1,307
-transactions across 10 engine lives (3 SIGKILLs at random moments, 6 deaths at the Java crash points
-`engine.ack_marking` and `engine.acked` with 3 seeds each, a final clean run): after every restart the first
-transaction delivered had an END `ack_position` above the slot's position at start; no row was missing and none was
-applied twice.
+message's `final_lsn` (= Commit's `commit_lsn`, the start of the commit record). `positions.txId` is the 32-bit xid
+of the Begin message.
 
 **Slot regression (core design open point 14).** A standby status update with a flush position below the slot's
 `confirmed_flush_lsn` does **not** move it back on Postgres 18.6 (`evidence/p3/engine/slot_flush_backwards_pg18.json`:
 slot advanced with `pg_replication_slot_advance`, then a pgjdbc replication client started at the old position and
-sent flush = old for 3 s; and our engine streamed for 3 s). Postgres 16 and 17 were not tested: Homebrew has no
-17 on this machine, and `tools/localpg` cannot build a Postgres 16 pair (it writes `sync_replication_slots`, a
-Postgres 17 setting, and the server refuses to start). The Postgres 18 source has an explicit guard
-(`LogicalConfirmReceivedLocation`: "Prevent moving the confirmed_flush backwards"); stage 2 must repeat the test on
-the PlanetScale version.
+sent flush = old for 3 s; and our engine streamed for 3 s). The Postgres 18 source has an explicit guard
+(`LogicalConfirmReceivedLocation`: "Prevent moving the confirmed_flush backwards"). Postgres 16 and 17: section 13.
 
 ## 6. Attach rule
 
@@ -257,7 +301,9 @@ the PlanetScale version.
   the engine sends HELLO at the first `handleBatch` call, before any other frame. Heartbeat records guarantee that
   call within `heartbeat.interval.ms` of the start. At that moment the slot is held by this engine's walsender, and
   a one-time JDBC query (`SlotProbe`) reads the holder's `active_pid`, `backend_start` and `application_name` into
-  HELLO.
+  HELLO. If the probe fails, or finds no slot row or no holder, the engine sends FATAL "slot not held at probe",
+  never a HELLO with empty fields (`test_slot_not_held_at_probe_is_fatal`). The probe has no default host or port:
+  without them the engine refuses at start (FATAL).
 - **Application name.** Debezium overrides `ApplicationName` with the fixed string `Debezium Streaming` for every
   replication connection (`PostgresConnection.addDefaultSettings`), after the `database.*` and `driver.*` properties;
   a startup option `-c application_name=…` loses against the startup parameter (measured with psycopg: parameter
@@ -272,8 +318,10 @@ the PlanetScale version.
   … is active for PID …" and, with no retries, the engine ends with FATAL after 1.46 s without sending HELLO; the
   holder keeps the slot. The pipeline terminates the holder and starts a new engine.
 - **Black hole** (proxy drops everything both ways): the engine did **not** end within 150 s. The proxy's kernel
-  acknowledges TCP, so neither TCP keepalives nor any timeout of pgjdbc or Debezium fires; the walsender on the
-  server ended after `wal_sender_timeout`. A silent connection is found by SPEC 4.6's end-to-end heartbeat marker
+  acknowledges TCP, so neither TCP keepalives nor any timeout of pgjdbc or Debezium fires. HEARTBEAT frames (interval
+  1 s) kept arriving for 8.2 s after the hole opened and then stopped (`proxy_blackhole.json`), so the stream can
+  detect the hole by the absence of HEARTBEAT frames; the walsender on the server ended after 59.4 s
+  (`wal_sender_timeout` 60 s). A silent connection is found by SPEC 4.6's end-to-end heartbeat marker
   (and the supervisor's 120 s silence rule) in the pipeline, which kills the engine. pgjdbc exposes only
   `tcpKeepAlive` (on/off, OS default timers: 2 h on Linux); idle/interval/count can only be set through a custom
   `socketFactory` (a documented pgjdbc property) using `jdk.net.ExtendedSocketOptions` — not built; proposed for P4.
@@ -283,10 +331,18 @@ the PlanetScale version.
 - `STOP`: no more frames are written; `engine.close()` in a separate thread with `cdc_v2.stop.timeout.ms`; then halt
   with 0 (or 3 if Debezium did not close). Measured 4–66 ms. `Engine.stop()` discards frames while it waits and
   SIGKILLs the JVM at its deadline.
-- Any engine failure: FATAL with class, message and cause chain, scrubbed (configured password, host, user and
-  database name replaced, longest first; `password=…` and JDBC URLs removed; 2,000 characters at most); exit 1.
-  Python scrubs the password from FATAL messages again before it raises `EngineFatal`. Our own messages never
-  contain values (table, column position and `seq` only).
+- Any engine failure: FATAL with class, cause chain, the position fields of the last record handed over and, when
+  known, the schema and table of the record being handled (known for failures in our handler; not for failures in
+  Debezium's decoding thread, see section 10); exit 1. **Messages never carry a source value** (plan C0): a message is
+  kept only for our own exceptions (built without values) and for Debezium/Connect messages that start with a known
+  safe prefix (cut at the first `;`); a SQL exception becomes `SQLState <code>`; every other message is dropped (class
+  name only). Configured password, host, user and database name are scrubbed, longest first.
+- **Logs never carry a source value.** Debezium's two loggers that print a value they cannot parse
+  (`AbstractColumnValue`, `DateTimeFormat`) are switched off; the Python drain keeps only our `CDCV2` lines and
+  Debezium's log lines (quoted text removed from WARN and ERROR lines) and counts, without copying, every other line:
+  stack traces, exception headers (`For input string: "…"`), `Caused by`. Tested with a planted value
+  (`test_unparsable_interval_ends_in_fatal_without_the_value`: neither the value nor a marker column of the same row
+  appears in the FATAL frame, the JVM output or the Python log).
 - Parent killed with SIGKILL: the JVM was gone after 0.05 s and the slot inactive after 0.06 s
   (`parent_death.json`).
 - Frame pipe closed: halt with 5. `engine.kill()` from Python: SIGKILL, reap, close every pipe; after that every
@@ -325,8 +381,11 @@ every END that `event_count` = the records delivered in the transaction = the su
 - a transactional logical message counts 1; its data collection name is Debezium's object `toString`
   (`…LogicalDecodingMessageMonitor$LogicalDecodingMessageId@<hash>`), so match by prefix, not by name;
   non-transactional messages are outside every transaction and outside every count;
-- rows of a table outside `table.include.list` are neither delivered nor counted; a transaction that touches only
-  such tables arrives as BEGIN and END with `event_count` 0;
+- rows of a table outside `table.include.list` are neither delivered nor counted, also in a transaction that touches
+  included and excluded tables; a TRUNCATE of an excluded table in a mixed transaction is neither delivered nor
+  counted; a transaction that touches only excluded tables arrives as BEGIN and END with `event_count` 0;
+- a transactional message whose prefix is outside `message.prefix.include.list` is neither delivered nor counted; in
+  a transaction of its own it arrives as BEGIN and END with `event_count` 0;
 - an empty transaction and a transaction that touches only unpublished tables produce nothing (pgoutput skips them);
   rolled-back transactions and rolled-back savepoints produce nothing.
 
@@ -336,7 +395,34 @@ between BEGIN and END.
 Other observations from the same tests: BEGIN and END carry different transaction id strings
 (`xid:lsn` with different LSNs); identify a transaction by its END `ack_position` and `positions.txId`.
 
-## 10. Measurements
+## 10. Values the driver cannot parse
+
+Debezium resolves a column value through pgjdbc before our converter sees it (section 3), so a value pgjdbc cannot
+parse never reaches our code. Measured on the Postgres 18.6 pair (`test_engine_values.py`):
+
+- **`interval '2562047788 hours'`** (hour part above 2^31): pgjdbc's `PGInterval` fails (`NumberFormatException`
+  inside `PSQLException`, SQLState 42820) in Debezium's decoding thread, and the engine ends with FATAL after
+  1.4–1.6 s (`unparsable_interval.json`). Before FATAL: HELLO, and whatever of the queue the poll loop had handed
+  over, never anything of the failing transaction beyond its BEGIN (in three attempts: once only the BEGIN of the
+  transaction before it; twice that transaction complete and the BEGIN of the failing one). Never a partial ROWS of
+  the failing transaction. FATAL carries the position fields of the last record handed over; its cause message
+  `Error while processing event at offset {…}` names the failing event's offset (`txId`, `lsn`), the same in every
+  attempt. The table is not known to the engine (the failure is in Debezium's thread, before a record exists).
+  Neither the value nor a marker column of the row appears in the FATAL frame, the JVM output or the Python log. A
+  restart ends again at the same transaction, 1.4–1.6 s after the start. **With the table left out of
+  `table.include.list` the transaction passes**: it arrives as BEGIN and END with `event_count` 0 and the stream goes
+  on (the next transaction's row arrives). So package S can quarantine one table: find the candidate tables (those
+  with a column of a type in this class, here `interval`; or by elimination), restart the engine with them excluded,
+  and backfill them.
+- **`interval 'infinity'` and `interval '-infinity'`** (Postgres 17+): pgjdbc's `PGInterval` parses them **into the
+  zero interval, silently**; the engine delivers `0 months 0 days 0 microseconds`, the same as a real zero
+  (`infinite_interval.json`, `test_infinite_interval_is_delivered_as_zero`). Our converter receives only the parsed
+  object; the text is gone, so the engine cannot tell. **This is silent data loss with stock Debezium and must be
+  decided outside the engine** (a finding for the orchestrator): for example a guard in the transform that treats a
+  zero interval from the stream as "re-read this row from the source", or a refusal to stream interval columns of a
+  source ≥ 17 that may hold infinite values. Not a crash, so no restart loop.
+
+## 11. Measurements
 
 Indications only (`evidence/p3/engine/throughput.json`; shared 10-core laptop, load average 5–6 from other work;
 source, walsender, JVM and reader on one host; heap 512 MB, ParallelGC). A backlog of `lineitem`-shaped rows (the
@@ -368,7 +454,7 @@ Debezium's temporal structs); for one-row transactions it costs about 12 µs of 
 ROWS, END and BATCH_END frames and a flush per batch). The handler being a small part, no further tuning was done
 here (P9).
 
-## 11. Contract notes
+## 12. Contract notes
 
 1. `Engine.frames(deadline)` ends the iteration when the deadline passes (no exception), so a caller can interleave
    other work; `Engine.next_frame(deadline)` raises `DeadlineExceeded`. After STOP the iteration ends when the JVM
@@ -376,20 +462,20 @@ here (P9).
    `EngineBroken`: the JVM ended without FATAL and without STOP).
 2. `start_position` is echoed in HELLO and not used to position Debezium: with the memory offset store Debezium starts
    at the slot's `confirmed_flush_lsn`; the pipeline discards redelivered transactions by position.
-3. HELLO has three fields more than C2 names: JVM pid, engine id, and the slot holder's `active_pid`,
-   `backend_start` and `application_name`. **C2 should change**: the application name cannot be unique with stock
-   Debezium (section 6); the pipeline should identify its engine's backend by `active_pid` + `backend_start` from
-   HELLO, checked against slot facts while the JVM is alive.
+3. HELLO has fields beyond C2's list: JVM pid, engine id, and the slot holder's `active_pid`, `backend_start` and
+   `application_name` (C2 now names the holder pair; the name is always `Debezium Streaming`).
 4. `seq` is given to every record (BEGIN, END, HEARTBEAT too), one counter from 0 per engine life.
-5. BEGIN carries an `ack_position` too (informative; never acknowledged).
+5. BEGIN carries an `ack_position` too (informative; never acknowledged). HEARTBEAT has none (C2 as changed).
 6. MESSAGE `transactional` = the message arrived between BEGIN and END.
 7. `u<i>` columns exist for a conservative superset of the columns that can be unchanged (section 3).
 8. Temporal transport uses the Postgres epoch (2000-01-01), section 3.
 9. `posmap` integers are signed 64-bit in Python.
-10. The marker `jvm` is registered by `tests/engine/conftest.py`, which also skips `jvm` tests unless `-m` selects
-    them. `pyproject.toml` should list `jvm` in `markers` and in the default `addopts` exclusion (not edited here).
+10. The marker `jvm` is registered in `pyproject.toml` and excluded from the default run; `tests/engine/conftest.py`
+    also skips `jvm` tests unless `-m` selects them (the skip reason).
+11. FATAL has fields beyond C2's list: the position fields of the last record handed over, and schema and table of
+    the record being handled (empty when unknown). Its messages are filtered (section 7).
 
-## 12. Review
+## 13. Review
 
 A read-only reviewer with fresh context (Opus) found no problem in the acknowledgement path or the Java encoding and
 eight smaller ones, all fixed with tests where testable: a closed frame descriptor could be read after `kill()` or
@@ -398,7 +484,15 @@ section 5); secret scrubbing depended on map order; a corrupted length could rai
 without columns was accepted; `frame_target_bytes` was not checked against `frame_max_bytes`; a malformed DURABLE
 line halted the JVM as "parent gone".
 
-## 13. Tests and how to run them
+The coordinator's review and a second review of the acknowledgement path asked for: END-only acknowledgement and a
+HEARTBEAT frame without `ack_position` (section 5); a held list that keeps following with a stated bound (section 5);
+protected configuration in Python and Java (section 4); FATAL instead of a HELLO without a holder, no default host or
+port in the probe (section 6); FATAL with positions and without source values, and logs without them (section 7);
+values the driver cannot parse (section 10); a restart test that catches over-acknowledgement, with a negative
+control; DURABLE edge cases; a crash point after the flush; the black-hole HEARTBEAT record; more event-count cases.
+All done; the tests are named where each is described.
+
+## 14. Tests and how to run them
 
 ```sh
 uv run -q pytest -q tests/engine                                         # hermetic (default run): codec, detection, Engine with a fake JVM
@@ -411,4 +505,15 @@ CDC_V2_E_MEASURE=1 uv run -q pytest -q -m "jvm and localpg" tests/engine/test_en
 
 The `localpg` fixture runs `tools/localpg --home ~/.cache/cdc_flight_v2/pg-e --port-base 55620 up` and `down` at the
 end (`CDC_V2_E_KEEP_PG=1` keeps it running). Every scenario creates its own schema, publication and slot and drops
-them, also on failure.
+them, also on failure. TCP proxies of these tests lease ports 55624–55627 (`NetProxy(..., port_range=...)`).
+
+**Other Postgres versions.** The tests take the Postgres binaries from `CDC_V2_PG_BIN` (as `tools/localpg` does) and
+the home from `CDC_V2_E_PG_HOME`, for example
+`CDC_V2_PG_BIN=/opt/homebrew/opt/postgresql@16/bin CDC_V2_E_PG_HOME=~/.cache/cdc_flight_v2/pg-e16 uv run -q pytest
+-q -m "jvm and localpg" tests/engine`, once `tools/localpg` builds a 16 pair (package P). Expected differences on 16:
+infinite intervals do not exist (the infinite-interval test skips; the baseline type test has none); logical decoding
+on a standby exists since 16, so the attach tests should pass; `confirmed_flush_lsn` regression
+(`test_lower_flush_position_does_not_move_the_slot_back`) may differ, because the guard in
+`LogicalConfirmReceivedLocation` is recent and was back-patched only to some branches: the test then fails and
+reports it; pgoutput sends empty transactions differently before 15 only, so no difference is expected for event
+counts; slot creation on a 16 standby also needs `pg_log_standby_snapshot()` (present since 16).
