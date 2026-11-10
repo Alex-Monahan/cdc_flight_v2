@@ -256,12 +256,14 @@ LEFT JOIN {r} AS rf ON rf.rn = a.lrn
     steps.append(Step("act", "sql", act_sql))
 
     # outputs: values are read from the records by record number
+    # stream: only keys the source held when the change set started (p = 1) can have a destination row; catch-up:
+    # every key of the log, because the table was loaded under other snapshots.
     steps.append(Step("del", "sql", """
 SELECT {fx} FROM {kp} AS kp
-WHERE kp.p IS NOT NULL
+WHERE kp.p IS NOT NULL{pfilter}
   AND NOT EXISTS (SELECT 1 FROM {act} AS a WHERE a.action IN ('upd', 'copy') AND a.root = kp.kx)
   AND NOT EXISTS (SELECT 1 FROM {act} AS a WHERE a.action = 'unres' AND a.kx = kp.kx)
-""".format(fx=flat_x(meta, "kp.kx"), kp=R("kp"), act=R("act"))))
+""".format(fx=flat_x(meta, "kp.kx"), kp=R("kp"), act=R("act"), pfilter=" AND kp.p = 1" if mode == "stream" else "")))
     vjoins = "JOIN {r} AS rl ON rl.rn = a.lrn".format(r=R("r")) + "".join(
         " LEFT JOIN {r} AS r{p} ON r{p}.rn = a.s{p}".format(r=R("r"), p=c.position) for c in ucols)
     vcols = (["rl.%s AS %s" % (c.a, c.a) for c in keys] + ["rl.%s AS %s" % (c.a, c.a) for c in nonu]

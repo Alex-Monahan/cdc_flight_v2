@@ -73,3 +73,56 @@ def apply_sets(conn, target, meta, sets: List[List[Rec]], mode="stream", form="l
 
 def dest_canon(conn, target, meta):
     return canon_rows(conn, target.sql(), list(meta.columns))
+
+
+# ------------------------------------------------------------------------------------------------ named cases
+
+
+def key_canon(meta, table):
+    if table is None or table.num_rows == 0:
+        return set()
+    from apply_sim import canon
+    con = local_conn()
+    con.register("u", table)
+    out = {tuple(r) for r in con.execute("SELECT %s FROM u" % ", ".join(canon(c.a, c.type)
+                                                                         for c in meta.key_columns)).fetchall()}
+    con.close()
+    return out
+
+
+def run_case(case, conn, form="local", table="t"):
+    """Run a named case on `conn` (local DuckDB or MotherDuck). Returns a dict for the evidence; asserts."""
+    import pytest
+    from apply_sim import lit_canon
+    from cdc_v2.apply import ApplyInvariantError, ChangeSetError
+    target = Target(SCHEMA, table)
+    create_table(conn, SCHEMA, table, case.meta, case.start)
+    before = dest_canon(conn, target, case.meta)
+    info = {"case": case.name, "form": form, "mode": case.mode}
+    if case.error:
+        exc = {"invariant": ApplyInvariantError, "changeset": ChangeSetError}[case.error]
+        with pytest.raises(exc):
+            apply_sets(conn, target, case.meta, case.sets, mode=case.mode, form=form, one_tx=case.one_tx)
+        assert dest_canon(conn, target, case.meta) == before, "the caller's roll-back leaves the table as it was"
+        info["error"] = case.error
+        return info
+    counts = apply_sets(conn, target, case.meta, case.sets, mode=case.mode, form=form, one_tx=case.one_tx)
+    got = dest_canon(conn, target, case.meta)
+    want = literal_rows_canon(list(case.meta.columns), case.expect)
+    assert got == want, "%s/%s: destination differs:\n extra %s\n missing %s" % (case.name, form, got - want,
+                                                                                 want - got)
+    info["statements"] = [c.statements for c in counts]
+    info["shapes"] = [c.shapes for c in counts]
+    if case.max_statements is not None and form == "local":
+        assert all(c.statements <= case.max_statements for c in counts), info
+    if case.unresolved is not None:
+        got_u = set().union(*[key_canon(case.meta, c.unresolved) for c in counts])
+        want_u = {tuple(lit_canon(l, c.type) for l, c in zip(k, case.meta.key_columns)) for k in case.unresolved}
+        assert got_u == want_u, (got_u, want_u)
+        info["unresolved"] = len(got_u)
+    if case.twice:
+        apply_sets(conn, target, case.meta, case.sets, mode=case.mode, form=form, one_tx=case.one_tx)
+        again = dest_canon(conn, target, case.meta)
+        assert again == got, "%s/%s: a second catch-up changed the table" % (case.name, form)
+        info["idempotent"] = True
+    return info

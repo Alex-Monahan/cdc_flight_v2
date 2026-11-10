@@ -5,7 +5,7 @@
   something to look up). The relations the statements read are handed to the lane transaction as registered Arrow
   data, in slices of at most `statement_rows` rows for the statements whose rows are independent of each other.
 * `RemoteBackend` (relation form): the plan runs inside the caller's transaction, materialised as tables of a
-  schema of its own (`<prefix>_<random>`, dropped with everything in it before `apply_group` returns). No row
+  schema of its own (`<prefix>_<random>`; the tables and the schema are dropped before `apply_group` returns). No row
   comes to the client; only counts and unresolved keys do.
 """
 from __future__ import annotations
@@ -104,12 +104,14 @@ class RemoteBackend:
         self.schema = "%s_%s" % (prefix, secrets.token_hex(6))
         self.src_sql = "(%s) AS src" % src_sql
         self.src_params = tuple(src_params)
+        self.created = []
         self.tx.execute("CREATE SCHEMA %s" % quote_ident(self.schema))
 
     def rel(self, name: str) -> str:
         return "%s.%s" % (quote_ident(self.schema), quote_ident(name))
 
     def run(self, step: Step) -> None:
+        self.created.append(step.name)
         if step.kind == "sql":
             self.tx.execute("CREATE TABLE %s AS %s" % (self.rel(step.name), step.sql), list(step.params) or None)
             return
@@ -127,7 +129,11 @@ class RemoteBackend:
         yield self.rel(name)
 
     def finish(self) -> None:
-        self.tx.execute("DROP SCHEMA %s CASCADE" % quote_ident(self.schema))
+        # one DROP per table: DuckDB refuses at COMMIT a DROP SCHEMA ... CASCADE of tables created in the same
+        # transaction ("another transaction has dropped this table"; docs/design/apply.md 5)
+        for name in reversed(self.created):
+            self.tx.execute("DROP TABLE %s" % self.rel(name))
+        self.tx.execute("DROP SCHEMA %s" % quote_ident(self.schema))
 
     def close(self) -> None:
         pass

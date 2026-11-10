@@ -60,8 +60,7 @@ class TableMeta:
     is derived from the key flags.
 
     Refused: duplicate positions; two names that differ only by case (DuckDB compares identifiers without regard
-    to case); for a table without a key, a column named `rowid` in any case (it would hide DuckDB's row id, which
-    the keyless delete needs; docs/design/apply.md, contract notes)."""
+    to case). Any other string is a valid name."""
     columns: tuple
 
     def __post_init__(self):
@@ -78,8 +77,6 @@ class TableMeta:
         if len(set(folded)) != len(folded):
             raise ValueError("two destination column names differ only by case")
         object.__setattr__(self, "columns", cols)
-        if not self.has_key and "rowid" in folded:
-            raise ValueError("a table without a key cannot have a column named rowid: it hides DuckDB's row id")
 
     @property
     def has_key(self) -> bool:

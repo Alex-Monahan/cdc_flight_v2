@@ -147,13 +147,12 @@ def _keyed(ctx, backend, target, meta, ucols, mode, cs, counts):
         for rel in backend.statement_relations("del", chunked=True):
             counts.deleted += ctx.execute(sh.k1_delete(rel)) or 0
     if n_upd:
-        rels = list(backend.statement_relations("upd", chunked=False))
-        rel = rels[0]
+        upd_rel = list(backend.statement_relations("upd", chunked=False))[0]
         if sh.sentinel_mover:
             ctx.shape = "K2"
-            ctx.execute(sh.k2_sentinel_mover(rel))
+            ctx.execute(sh.k2_sentinel_mover(upd_rel))
         ctx.shape = "K3"
-        moved = ctx.execute(sh.k3_move(rel))
+        moved = ctx.execute(sh.k3_move(upd_rel))
         if moved != n_upd:
             raise ApplyInvariantError("%s: %d of %d rows to update found in the destination" % (target, moved or 0,
                                                                                               n_upd))
@@ -174,9 +173,9 @@ def _keyed(ctx, backend, target, meta, ucols, mode, cs, counts):
                 continue
             if c in sh.ucols and affected(c.dtype):
                 ctx.shape = "K4.%d" % c.position
-                ctx.execute(sh.k4_sentinel_column(c, rel))
+                ctx.execute(sh.k4_sentinel_column(c, upd_rel))
             ctx.shape = "K5.%d" % c.position
-            ctx.execute(sh.k5_set_column(c, rel))
+            ctx.execute(sh.k5_set_column(c, upd_rel))
     if stats["n_ins"]:
         ctx.shape = "K6"
         for rel in backend.statement_relations("ins", chunked=True):
@@ -197,6 +196,16 @@ def _keyless(ctx, backend, target, meta, ucols, cs, counts):
     counts.records = int(stats["n_records"])
     counts.by_op = {"c": int(stats["n_c"]), "u": int(stats["n_u"]), "d": int(stats["n_d"])}
     _check_shape(stats, target)
+    if stats["n_dupseq"]:
+        raise ChangeSetError("%s: two records with one (transaction, seq)" % target)
+    need = int(stats["n_neg_rows"])
+    if not need and not stats["n_pos_rows"]:
+        return
+    with _rowid_free(ctx, target, meta) as smeta:
+        _keyless_statements(ctx, backend, target, smeta, ucols, stats, counts)
+
+
+def _keyless_statements(ctx, backend, target, meta, ucols, stats, counts):
     sh = Shapes(meta, target, ucols)
     need = int(stats["n_neg_rows"])
     if need:
@@ -213,6 +222,41 @@ def _keyless(ctx, backend, target, meta, ucols, cs, counts):
             counts.inserted += ctx.execute(sh.l2_insert(rel)) or 0
 
 
+class _rowid_free:
+    """DuckDB's row id is hidden by a column named `rowid` (any case). The keyless delete and reduce_duplicates
+    need the row id, so such a column is renamed for the duration of the statements, inside the caller's
+    transaction, and renamed back; the statements use the temporary name (docs/design/apply.md 4.3)."""
+
+    def __init__(self, tx, target: Target, meta: TableMeta):
+        self.tx, self.target, self.meta = tx, target, meta
+        self.col = next((c for c in meta.columns if c.name.casefold() == "rowid"), None)
+
+    def __enter__(self) -> TableMeta:
+        if self.col is None:
+            return self.meta
+        import secrets
+        from .meta import Column
+        from .types import quote_ident
+        self.tmp = "rowid_cdc_v2_%s" % secrets.token_hex(6)
+        if hasattr(self.tx, "shape"):
+            self.tx.shape = "R1"
+        self.tx.execute("ALTER TABLE %s RENAME COLUMN %s TO %s" % (self.target.sql(), self.col.qname,
+                                                                    quote_ident(self.tmp)))
+        cols = [Column(c.position, self.tmp, c.type, c.key, c.unchanged_possible) if c is self.col else c
+                for c in self.meta.columns]
+        return TableMeta(tuple(cols))
+
+    def __exit__(self, et, ev, tb):
+        if self.col is None or et is not None:
+            return False                           # after an error the caller rolls back, which undoes the rename
+        from .types import quote_ident
+        if hasattr(self.tx, "shape"):
+            self.tx.shape = "R2"
+        self.tx.execute("ALTER TABLE %s RENAME COLUMN %s TO %s" % (self.target.sql(), quote_ident(self.tmp),
+                                                                    self.col.qname))
+        return False
+
+
 def truncate(tx, target: Target) -> int:
     """Empty the table inside the transaction (a TRUNCATE of the source at this place of the stream)."""
     if not isinstance(target, Target):
@@ -227,10 +271,7 @@ def reduce_duplicates(tx, target: Target, change_set: Union[LocalChangeSet, Rela
     meta = change_set.meta
     if not meta.has_key:
         raise ValueError("reduce_duplicates is for tables with a key")
-    if any(c.name.casefold() == "rowid" for c in meta.columns):
-        raise ValueError("%s has a column named rowid; it hides DuckDB's row id" % target)
     settings = settings or ApplySettings()
-    sh = Shapes(meta, target, [])
     keys = meta.key_columns
     from .types import exact
     xs = ", ".join("%s AS x%d" % (exact(c.a, c.dtype), c.position) for c in keys)
@@ -239,6 +280,7 @@ def reduce_duplicates(tx, target: Target, change_set: Union[LocalChangeSet, Rela
     if isinstance(change_set, LocalChangeSet):
         import duckdb
         L = duckdb.connect(":memory:")
+        L.execute("SET arrow_lossless_conversion = true")
         try:
             L.register("src_rows", change_set.rows)
             data = L.execute("SELECT DISTINCT * FROM (SELECT %s FROM src_rows UNION ALL SELECT %s FROM src_rows WHERE %s)"
@@ -248,8 +290,10 @@ def reduce_duplicates(tx, target: Target, change_set: Union[LocalChangeSet, Rela
         if data.num_rows == 0:
             return 0
         tx.register("cdc_v2_apply_keys", data)
-        return tx.execute(sh.reduce_duplicates("cdc_v2_apply_keys")) or 0
+        with _rowid_free(tx, target, meta) as smeta:
+            return tx.execute(Shapes(smeta, target, []).reduce_duplicates("cdc_v2_apply_keys")) or 0
     rel = ("(SELECT DISTINCT * FROM (SELECT %s FROM (%s) AS s UNION ALL SELECT %s FROM (%s) AS s WHERE %s))"
            % (xs, change_set.sql, ks, change_set.sql, nn))
     params = list(change_set.params) * 2 or None
-    return tx.execute(sh.reduce_duplicates(rel), params) or 0
+    with _rowid_free(tx, target, meta) as smeta:
+        return tx.execute(Shapes(smeta, target, []).reduce_duplicates(rel), params) or 0

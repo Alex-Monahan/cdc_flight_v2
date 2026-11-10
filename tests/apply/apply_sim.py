@@ -259,12 +259,13 @@ def create_table(conn, schema: str, table: str, meta: TableMeta, rows: List[Dict
 
 
 class _Row:
-    __slots__ = ("vals", "toasted", "rid")
+    __slots__ = ("vals", "toasted", "rid", "ver")
     _n = 0
 
     def __init__(self, vals, toasted):
         self.vals = dict(vals)
         self.toasted = set(toasted)
+        self.ver = 0
         _Row._n += 1
         self.rid = _Row._n
 
@@ -338,6 +339,7 @@ class KeyedSource:
         return a, u
 
     def _update_values(self, row):
+        row.ver += 1
         changed = set()
         for c in self.vals:
             if self.rng.random() < 0.5:
@@ -381,6 +383,7 @@ class KeyedSource:
             return
         old = {c.position: row.vals[c.position] for c in self.keys}
         changed = self._update_values(row) if self.rng.random() < 0.5 else set()
+        row.ver += 1
         for c, l in zip(self.keys, kt):
             row.vals[c.position] = l
             changed.add(c.position)
@@ -410,6 +413,7 @@ class KeyedSource:
             row = group[i]
             old = {c.position: row.vals[c.position] for c in self.keys}
             changed = self._update_values(row) if self.rng.random() < 0.3 else set()
+            row.ver += 1
             for c, l in zip(self.keys, perm[i]):
                 row.vals[c.position] = l
                 changed.add(c.position)
@@ -482,6 +486,11 @@ class KeyedSource:
 
     def snapshot(self) -> List[Dict[int, Optional[str]]]:
         return [dict(r.vals) for r in self.rows]
+
+    def snapshot_full(self):
+        """(row id, version, values) of every row: a row gets a new version, and so maybe another place in the
+        table, whenever a statement changes it."""
+        return [(r.rid, r.ver, dict(r.vals)) for r in self.rows]
 
     def seed_rows(self, n: int):
         for _ in range(n):
@@ -575,10 +584,6 @@ def random_meta(rng: random.Random, keyed: bool, n_values: int, value_kinds=None
                 names=None):
     """A table: key columns (if keyed) and value columns of random kinds, with awkward destination names."""
     names = list(names or WEIRD_NAMES)
-    if keyed:
-        pass
-    else:
-        names = [n for n in names if n.casefold() != "rowid"]
     rng.shuffle(names)
     kinds, cols, pos = {}, [], 0
     positions = rng.sample(range(0, 40), (n_keys or 0) + n_values + (1 if keyed and not n_keys else 0))
