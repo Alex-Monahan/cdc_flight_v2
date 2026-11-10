@@ -93,14 +93,13 @@ def test_statement_deadline_cancels_and_closes(cluster):
 
 
 @pytest.fixture
-def proxy(cluster, monkeypatch):
+def proxy(cluster):
     """A TCP fault proxy on the upper ports of this package's range (netproxy's own range is shared)."""
-    monkeypatch.setattr(npx, "PORT_FIRST", PROXY_PORTS[0])
-    monkeypatch.setattr(npx, "PORT_LAST", PROXY_PORTS[-1])
     made = []
 
     def make(node="primary"):
-        p = npx.NetProxy("localhost", cluster.ports[node], port=None).start()
+        p = npx.NetProxy("localhost", cluster.ports[node], port=None,
+                         port_range=(PROXY_PORTS[0], PROXY_PORTS[-1])).start()
         assert p.port in PROXY_PORTS
         made.append(p)
         return p

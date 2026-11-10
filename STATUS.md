@@ -7,10 +7,11 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 - **Stage 1 (local). P1 Environment: gate passed on 2026-11-09** (one item cannot be shown from this session, see
   the table). **P2 Platform spike: gate passed on 2026-11-10** — every spike is done and merged, the report
   (`docs/spike_report.md`) is complete and was sent to the owner; nothing found contradicts SPEC, so the build
-  continues without waiting. **P3 Core: in progress** (table below): the fault harness and the oracle are
-  merged; the engine's round of fixes is finished and the coordinator checks it again before the merge; the cut
-  is in its round of fixes; the source package is finished and waits for its review; the destination basics and
-  the apply package are being built; the task file of every package is written.
+  continues without waiting. **P3 Core: in progress** (table below): the fault harness, the oracle, the source
+  package and the engine are merged; the apply package is delivered and reviewed twice (one fix round is owed,
+  its list is final); the question the second review raised — which tables have a key — is measured and decided
+  (rule K, below) and has a small package of its own; the cut is in its round of fixes; the destination basics,
+  the transform and the fuzzers are being built; the task file of every package is written.
 - Stage 2 (PlanetScale) cannot start: of its names only `PLANETSCALE_ORG` and `PLANETSCALE_DATABASE` are in the env
   file (checked again at the P1 gate). The service token and the connection values are owed by the owner.
 
@@ -51,17 +52,18 @@ green on T1 (local primary and standby, real MotherDuck, local JVM).
 | H | Crash points, fault sites, process control, crash runner, TCP fault proxy, byte-stream relay | Opus | **merged** |
 | O | Oracle, T1 harness, evidence writer, workload generator and observer | Opus | **merged** (fix round included) |
 | X | The cut: where a snapshot lies in the stream | Fable | review: merge after fixes (below); **fix round running** |
-| E | Engine: the JVM program around stock Debezium, frames, the Python side | Opus | **fix round finished** (below); the coordinator checks it again, then it is merged |
+| E | Engine: the JVM program around stock Debezium, frames, the Python side | Opus | **merged** (two reviews, two fix rounds) |
 | D | Destination basics: lanes, fence, deadlines, errors, `_cdc` schema, transition function, alert records | Fable | running |
-| A | Apply: the statements over a change set, keyed and keyless | Opus | running |
-| P | Source: connections, catalog and its observation, publication, slot, slot facts, timeline, heartbeat | Opus | **finished** (with the repair of `tools/localpg` for Postgres 16); waits for the coordinator's review |
+| A | Apply: the statements over a change set, keyed and keyless | Opus | **delivered**; two reviews done (coordinator; a second reviewer, Fable, on the row-version model); one fix round owed, list final (below); it starts at the next free writer slot |
+| P | Source: connections, catalog and its observation, publication, slot, slot facts, timeline, heartbeat | Opus | **merged** (with the repair of `tools/localpg` for Postgres 16; one fix after the review) |
 | L | Leadership: guard, take-over, heartbeat, hand-over, bootstrap, platform interface | Fable | task written; after D |
-| Y | Transform: source types to destination types | Opus | task written; after E and P |
-| S | Stream: transactions, groups, commit and acknowledge, supervisor, pipeline process | Fable | task written; after E, D, A, P |
+| Y | Transform: source types to destination types | Opus | **running** |
+| S | Stream: transactions, groups, commit and acknowledge, supervisor, pipeline process | Fable | task written; after E, D, A, P, K |
 | V | Slot continuity | Fable | task written; after S |
-| F | Fuzzers (stream, workload, fault, leadership), the consumer loop of 1.3 and 3.2 | Opus | task written; starts as soon as E is merged (its stream fuzzer builds on the engine's frame codec) |
+| F | Fuzzers (stream, workload, fault, leadership), the consumer loop of 1.3 and 3.2 | Opus | **running** |
 | B | Backfill and hand-off | Fable | task written; after X, S, A, P, Y |
 | T | The catalog gate, truncate, drop and recreate, the document and the test over all state machines | Opus | task written; after S, B |
+| K | The key rule: the catalog reads whether a primary key is deferrable, the engine is told which tables are without a key, what Debezium calls a key is measured (added 2026-11-10) | Opus | task written (`docs/tasks/p3_k_key_rule.md`); starts at a free writer slot after A's fix round; S waits for it |
 
 At most four workers write at once (PLAN §3). The coordinator (Opus, xhigh) writes no code: it reviewed the plan
 and reviews every package branch before its merge; D, L, S, V, B and the acknowledgement path of E get a second
@@ -75,6 +77,7 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
 | 1.7 crash points at every step of a schema change | P4, schema and types |
 | 1.9 schema change applied in place (P3 has the life of a catalog finding, which ends in a drop or a backfill); the full quarantine machine (P3 has the exit to `quarantined` and the operator's re-backfill) | P4 |
 | 1.7 soak of at least 1 h with at least 200 faults | a short soak at the P3 gate; the full one in the P6 campaign |
+| 1.1/1.2 for one value: `interval 'infinity'` / `'-infinity'` in a scalar `interval` column of a source on Postgres 17 or later reaches the stream as a zero interval (the Postgres driver, before any code of ours). P3 marks and counts such rows and alerts; the repair read that makes the value exact is built on the stream's group loop (plan C3, "Ambiguous zero interval"). No P3 gate workload holds an interval column | P4, schema and types |
 
 ## Decisions
 
@@ -107,6 +110,13 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
 | 2026-11-10 | The engine refuses configuration that would weaken a guarantee (acknowledgement, offsets, retries, skipped operations, snapshot and publication modes, converter, heartbeat interval outside 0–10 s), on the Python side and again in the JVM against the effective configuration | orchestrator, from the coordinator's review |
 | 2026-11-10 | The apply design takes two findings of the oracle package: DuckDB does not write an `UPDATE` whose new value compares equal to the stored one (`-0`/`0`, `1 mon`/`30 days`), so changed columns of such types need a shape that always writes; and the keyless grouping key must be exact for such types, in the oracle's canonical form (design 6.2, 6.3; open point 3 settled) | orchestrator |
 | 2026-11-10 | Tables without a key on a standby whose Postgres has the exported-snapshot defect found by the cut package (every released version today; a session that imports a snapshot can see transactions the exporter does not see while a subtransaction is open): the backfill waits up to 60 s, as a declared wait, for a **quiet** exported snapshot (no transaction open), which is safe; if none comes it reads the table with one reader under its own snapshot; on a server that carries the fix it uses a plain exported snapshot. Reason: "quiet only" never completes while a write transaction stays open on the primary, and one reader for the whole table holds a lock that can stall replay (and the slot) when the primary takes an exclusive lock on that table | orchestrator, on the coordinator's recommendation |
+| 2026-11-10 | **Infinite intervals through the stream (source on Postgres 17 or later).** The Postgres driver inside stock Debezium turns `interval 'infinity'` and `'-infinity'` of a scalar `interval` column into a zero interval before any code of ours runs; no configuration changes that. Rule (plan C3, "Ambiguous zero interval"): on such a source a zero in such a column is ambiguous. Before a group that holds one is applied, the stream closes the group on a cut (a snapshot whose place in the stream is known), reads the affected rows in that snapshot and takes the value found; the group is still one destination transaction, and the value is the source's value at the group's end, so no state is shown that the source never had (SPEC 1.3) and no value is refused (SPEC 2.4). The column takes its wide form `UNION(INTERVAL, VARCHAR)` when an infinite value appears. A table without a key that has such a column on such a source is served by full refresh, with an alert. Not taken: applying whatever the row holds at the time of the read (it can mix two source transactions in one visible row). **Built in the type wave of P4**; in P3 the transform names the columns, the stream counts the marked rows, alerts once per table and applies the delivered zero, and leaves the place for the repair in its group loop. Until then such a value arrives as zero, with an alert | orchestrator (the coordinator's variant "take the newer value and count it" was not taken) |
+| 2026-11-10 | An interval whose hour part exceeds 2^31 stops the engine at the same transaction on every start (the driver cannot parse it). The stream finds the table by restarts that leave candidate tables out of the engine's table list (halving; such restarts apply nothing and confirm nothing), quarantines it (SPEC 4.0) and continues with the others. `FATAL` names the position of the failing event, never a value | orchestrator |
+| 2026-11-10 | A silent engine is found by three rules, not two: no frame at all for `stream.frame_silence` (default 30 s) while the stream reads and no commit or declared wait is in progress ends the engine; the slot-continuity check; and the marker rule of SPEC 4.6, counted only while no transaction is open. Measured: on a black-holed connection the engine's own frames stop after about 8 s | orchestrator, with the coordinator |
+| 2026-11-10 | From the review of the source package. (1) No fact that SQL can read identifies one incarnation of a replication slot; continuity rests on position alone, and a recreated slot that is not ahead gets an alert and no backfill (design section 8, open point 6 closed for identity). (2) A standby's timeline is read with `IDENTIFY_SYSTEM` over a replication connection; `pg_control_checkpoint()` can lag behind a switch. (3) A slot is invalid when `wal_status = 'lost'`, or `invalidation_reason` is set, or `conflicting` is true (Postgres 16 shows a slot invalidated by the WAL cap only as `conflicting`). (4) Slot creation on a standby without the snapshot grant completes within about 25 s; its deadline is 120 s. (5) Primary mode: a catalog observation is usable for a group only if it sees every transaction of the group; a transaction that holds only DDL carries no row, and one still waiting on a synchronous standby can be seen one group late — a stated limit of primary mode. (6) Publication membership is decided when a transaction is decoded: a transaction that wrote a table before it joined the publication and committed after is delivered with all its rows | orchestrator, from the coordinator's review |
+| 2026-11-10 | **A lower flush position and the slot (design open point 14), measured.** A status update with a flush position below the slot's `confirmed_flush_lsn` moves the slot back to that position on Postgres 16.6 and does nothing on 18.6. Postgres fixed it in 13.22, 14.19, 15.14, 16.10, 17.6 and 18.0 (16.10 read in its release notes; the others taken from the back-patch). The attach rule does not depend on the fix: the slot is read before the engine starts; our engine sends no flush position before its first `DURABLE`; the pipeline sends no `DURABLE` before the attach decision and none below the applied position of that decision. Stated limit, on a server without the fix only: a foreign replication client that streams from our slot, confirms a higher position and then a lower one is not found by the slot check (design section 8, hazard H-035). Carried: a preflight warning for such a server (P4), the runbook rule "nothing else streams from our slot" (P5), the provider's minor release (stage 2) | orchestrator |
+| 2026-11-10 | The engine's 14 version-dependent tests were repeated on Postgres 16.6: 13 give the same result as on 18.6; the fourteenth is the slot test of the row above, which now asserts the behaviour of the server it runs on (`docs/design/engine.md` section 13) | orchestrator |
+| 2026-11-10 | The database name of a source is treated like a credential in code: it is kept out of `repr` and out of every error text of the source package (found in the review of P; the stage 2 name must never reach a log or the repository) | orchestrator |
 
 ## Questions for the owner / owed by the owner
 
@@ -232,6 +242,19 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
   (reproduced three times; argued from the source; not reported upstream). The pipeline guards against both
   (Decisions, and the settle rule of the cut). **For the owner:** should the second be reported to the Postgres
   project, and by whom? Nothing is sent anywhere without the owner's word.
+- **Tables with a deferrable primary key (rule K).** Such a table is replicated as a table without a key: it
+  needs `REPLICA IDENTITY FULL` (more WAL for that table), its history is the plain changelog of SPEC 8.2 instead
+  of SCD2, and its backfill reads the whole table under one snapshot, so it cannot resume in the middle (SPEC
+  3.7 names resume for keyed tables). Its current-state copy is exact. The reason is measured (H-015): inside a
+  transaction two rows of such a table can hold one key, so a record that names only a key is ambiguous. If SCD2
+  history or a resumable backfill is wanted for such tables, say so: it is possible in P4 at the price of a
+  second apply path. A table whose primary key is immediate is not affected, also under `REPLICA IDENTITY FULL`.
+- **Infinite intervals (source on Postgres 17 or later).** Stock Debezium cannot deliver `interval 'infinity'`
+  through the stream: the value arrives as a zero interval (Decisions). The rule decided makes the value exact
+  by a read at a known place in the stream, built in P4; a table without a key that has an `interval` column on
+  such a source is served by scheduled full refresh instead of the stream. Until P4 the stream alerts and applies
+  the zero. Say so if such tables should rather be refused, or if the read is not wanted on the source (it is
+  one short statement per group that holds a zero interval, on the node the pipeline already reads).
 
 ## To verify in stage 2
 
@@ -251,12 +274,19 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
 - The engine reads the slot's holder over an SQL connection of its own. Behind a provider's proxy or pooler that
   connection must reach the same server as the replication connection (hazard H-047); show it on PlanetScale, in
   both modes.
-- The engine tests that depend on the server version (a lower flush position does not move the slot back; the holder
-  pair; infinite intervals) on the version the provider runs.
+- The engine tests that depend on the server version (a lower flush position and the slot; the holder pair;
+  infinite intervals) on the version the provider runs. First of these: whether the provider's minor release has
+  the guard that keeps `confirmed_flush_lsn` from moving backwards (13.22, 14.19, 15.14, 16.10, 17.6, 18.0).
 - PlanetScale's documented slot policy (slots without `failover = true` are flagged and planned failovers held back
   for 3 days): does a slot on a replica trigger it?
 - Whether the runtime role may call `pg_control_checkpoint()` on the provider's servers (the cut uses its `next_xid`
   to tell a standby that has just started; the pre-flight check tests it).
+- The engine's JVM tests on the locked Temurin 21 (the lock has an entry for Linux only, so the local runs used
+  the machine's OpenJDK 23).
+- The columns of `pg_replication_slots` that `slot.facts` reads on Postgres 17 (read from the documentation; 16 and
+  18 are tested), if the provider runs 17.
+- Whether the runtime role may read the timeline history over a replication connection on the provider
+  (`slot.timeline_history`; it may on local 16 and 18).
 
 ## Background jobs in flight
 
@@ -265,13 +295,57 @@ Each in its own worktree and branch; the orchestrator merges. The P3 packages ar
 | Job | Phase | Started | Delivers |
 |---|---|---|---|
 | Package D, destination basics (Fable, xhigh). MotherDuck databases `cdc_v2_t_d_*`. No Postgres | P3 | 2026-11-10 | `src/cdc_v2/md/`, `src/cdc_v2/state/`, `src/cdc_v2/alerts.py`, `docs/design/destination.md`, `docs/state_machines.md`, `evidence/p3/destination/` |
-| Package A, apply (Opus, high). MotherDuck databases `cdc_v2_t_a_*`. No Postgres, no JVM | P3 | 2026-11-10 | `apply_group`, `truncate`, the statement shapes for tables with and without a key, tests against the oracle's canonical form, cost numbers on MotherDuck |
+| Package A, apply (Opus, high): **delivered**, branch `worktree-agent-adbee9c1aec8e2051`, not merged. MotherDuck databases `cdc_v2_t_a_*` | P3 | 2026-11-10 | `apply_group`, `truncate`, `reduce_duplicates`, the statement shapes for tables with and without a key, `docs/design/apply.md`, tests against the oracle's canonical form, cost numbers on MotherDuck. Owed: the fix round below |
+| Second review of package A (Fable, reads only): **done**. It found counterexamples to the row-version model and the catch-up rules (below); it runs its campaigns again on the fixed branch | P3 | 2026-11-10 | findings in A's fix round |
+| Package F, fuzzers (Opus, high). Homes `pg-f<n>`, ports 55700 + 8·n; MotherDuck databases `cdc_v2_t_f_*` | P3 | 2026-11-10 | the four fuzzers with seeds and replay, the consumer loop of SPEC 1.3 and 3.2, their self-tests with planted defects |
 | Package X, fix round (Fable; the worker that built the cut). Home `pg-cut`, ports 55600–55607. No MotherDuck | P3 | 2026-11-10 | the items listed below; then the coordinator checks it again and it is merged |
+| Package Y, transform (Opus, high). Home `pg-y`, ports 55656–55663. No MotherDuck | P3 | 2026-11-10 | `src/cdc_v2/transform/`, `docs/design/transform.md`, the cross-path test (stream form against backfill form through a local Postgres), the list of ambiguous interval columns and their mask |
 
-Finished, not merged yet: **package E** (branch pushed; JVM program `jvm/src/cdc_v2/engine/`, the Python side
+**Package A, apply — delivered 2026-11-10; two reviews; one fix round owed.** The coordinator's verdict was
+"merge after a short fix round". The second reviewer (Fable) then tested the model the package is built on —
+"a key is a queue of row versions, because a deferred unique constraint lets a transaction hold two rows of one
+key" — and found sequences for which it gives a wrong table, silently, in both modes. That question was settled
+by measurement before anything was fixed:
+
+- **Measured** (`tests/pg_source/test_pg_keys.py`, Postgres 16.6 and 18.6, evidence
+  `evidence/p3/source/replica_identity_keys_pg*.json`, hazard H-015): a deferrable unique index cannot be a
+  replica identity; a table with a deferrable primary key and `DEFAULT` identity refuses its own `UPDATE` and
+  `DELETE` once published; an immediate key is checked row by row, also under `REPLICA IDENTITY FULL`. So the
+  only table that can hold two rows with one key inside a transaction is one with a deferrable primary key and
+  `REPLICA IDENTITY FULL`, and its decoded stream shows that state.
+- **Decided: rule K** (design 6, first paragraph; coordinator agreed, and preferred it to refusing such tables,
+  which would break R20 and the spirit of R16). A table has a key only if its primary key is immediate. A table
+  with a deferrable primary key is a table without a key: it needs `REPLICA IDENTITY FULL` and is applied by whole
+  row images, like a table with no primary key. With that, for every table with a key no two rows hold one key
+  after any record of the stream, the queue model is not needed, and every sequence the reviewer found is either
+  impossible at the source or detectable. Package K builds the rule (catalog, engine, measurements of what
+  Debezium calls a key).
+- **A's fix round** (one list from both reviews, `~/.cache/cdc_flight_v2/msgs/a_fix_round.md`, 13 items): the
+  model for tables with a key becomes "the first record of a key in a change set fixes whether the row existed;
+  every later record must leave at most one row; anything else is `ApplyInvariantError`", in both modes; stream
+  mode checks the start state where it costs nothing and with one count statement otherwise (cost measured on a
+  10 M-row table); a change set may end inside a source transaction but never between the two records of a key
+  change; the catch-up rules are derived again and their unresolved rate reported before and after; the test
+  simulator's source behaves like Postgres (keys unique after every record under the source's equality), and
+  the sequences only a deferrable key allows move to the tests of tables without a key; plus the coordinator's
+  five points: default run time of `tests/apply` (14 s), evidence size (3 MB), a bounded spill area for the
+  planning database (SPEC 5.4), negative controls against deliberately wrong planners, and no use of the
+  package's own type parser in the simulator.
+- After the fix round: the coordinator checks again, the second reviewer runs its campaigns again, then the
+  merge. After D merges: the MotherDuck tests once through D's real lane transaction.
+
+What changes in the design and the contracts at A's merge: design 6.2 (the queue paragraph is replaced by the
+rule above), plan C3a (a change set is a contiguous run of records in stream order and may end inside a source
+transaction; the precondition and the idempotence of mode `catch_up` in the reviewer's exact words); exact
+grouping for tables without a key; the planning schema that lives inside one lane transaction; the calls apply
+needs from D's transaction. Limits accepted for P3 and carried: an unchanged TOASTed key column needs `REPLICA
+IDENTITY FULL` on such a table (owner's question with F-7, P4); no pruning by key for some key types (measured in
+P9).
+
+**Package E, the engine — merged 2026-11-10** (`11599e6`; JVM program `jvm/src/cdc_v2/engine/`, the Python side
 `src/cdc_v2/stream/{frames,engine,jvm}.py`, `tests/engine/`, `docs/design/engine.md`, `evidence/p3/engine/`).
-Both reviews said "merge after fixes"; the fix round is finished (below) and with the coordinator. What had to
-change:
+Both reviews said "merge after fixes"; two fix rounds followed, and the orchestrator read the last one line by
+line before the merge. What had to change:
 
 - From the second review (acknowledgement path). The engine never confirmed more than it was told was durable, in
   every run. But a heartbeat could carry the commit position of a transaction not delivered yet (loss under the
@@ -304,10 +378,21 @@ will use — the lock of the Java runtime has an entry for Linux only, so that r
 - An interval above 2^31 hours ends the engine 1.4–1.5 s after every start, at the same event; the engine cannot
   name the table (the failure is in Debezium's decoding thread), but it passes the transaction once the table is
   left out. **New finding: `interval 'infinity'` and `'-infinity'` (Postgres 17 and later) do not fail — the
-  Postgres driver turns both into a zero interval, silently.** The rule for it is being decided with the
-  coordinator and goes into Decisions; until then the stream path must be taken as wrong for these two values.
+  Postgres driver turns both into a zero interval, silently.** The rule is in Decisions and in plan C3; until P4
+  builds the repair, the stream alerts and delivers zero for these two values.
 - On a black-holed connection the engine's `HEARTBEAT` frames stop after about 8 s; the server ended its sender
-  after about 60 s. The stream's task is corrected for this and for the two points above when E is merged.
+  after about 60 s. The stream's task is corrected for this and for the two points above.
+
+The second fix round (three items from the coordinator's re-check, all done):
+
+- The bounded list of unconfirmed `END` records now keeps its oldest entry when it thins, so the stated bound
+  holds for every list size from 2 up (a property test over random sizes; the earlier thinning broke it 580 times
+  in the same test).
+- Three more settings are required and checked in the JVM (`record.processing.order`, `include.unknown.datatypes`,
+  `schema.refresh.mode`), and every setting that filters, renames or rewrites records is refused as an extra
+  property (column filters, transforms, predicates, key overrides, table and schema lists other than our own).
+- `FATAL` names the position (`lsn` and transaction id) of the event that Debezium failed on, when Debezium names
+  one. The stream compares it across restarts to tell "the same event again" from a new failure.
 
 Its findings that reach other packages (now rules in the contracts and the tasks):
 
@@ -321,7 +406,8 @@ Its findings that reach other packages (now rules in the contracts and the tasks
   key change counts two.
 - Local rates (indications): 59.7K rows/s at 1,000 rows per transaction, 64–71K rows/s in a 1M-row transaction,
   15.9K one-row transactions per second; our own handler costs 1.2–1.3 µs of the 28 µs per row.
-- Not tested on Postgres 16 (waits for the `tools/localpg` repair).
+- Not run on Postgres 16 yet: the 14 version-dependent tests take their binaries from the environment and are
+  repeated by the orchestrator now that `tools/localpg` runs on 16 (next steps).
 
 Finished, not merged yet: **package X, the cut** (branch pushed; `src/cdc_v2/pg/cut.py`, a `pgoutput` decoder and
 stress tools for tests, `tools/cutstress`, `tests/cut/`, `docs/design/cut.md`, `evidence/p3/cut/`). Reviewed by the
@@ -366,6 +452,21 @@ for the cut worker.
 
 Finished and merged:
 
+- 2026-11-10 — P3 package P, the source (reviewed by the coordinator: merge after one fix, done):
+  `src/cdc_v2/pg/` (`settings`, `conn`, `errors`, `catalog`, `publication`, `replica_identity`, `slot`,
+  `timeline`, `heartbeat`, `preflight`, `sql`), `docs/design/source.md`, `tests/pg_source/` (18 live tests, about
+  10 minutes, on Postgres 18 and 16), `evidence/p3/source/`; `tools/localpg` now builds a pair on the Postgres 16
+  binaries. Every call has a deadline that closes the socket; read connections put their session settings into
+  the startup packet and read them back; a recovery conflict on the standby is its own error ("read again").
+  The slot is created, read and — only with the expected holder pair — taken from another holder; nothing drops
+  a slot implicitly. The heartbeat is a row in a published table written on the primary, and the `END` that
+  carries it proves that it was decoded. Role split: a setup role (publication, heartbeat table, replica
+  identity) and a runtime role that cannot change the source's schema. Findings that reach other packages are in
+  Decisions (slot identity, timeline, slot invalidation on 16, slot creation time, the primary-mode catalog rule,
+  publication membership). The review asked for an evidence run of the primary-mode finding (the package reported
+  12 cases of a lower-bound violation without a file). Done 2026-11-10: 40 repeats found none, so the 12 cases
+  are not evidence; a new test holds a commit between its WAL record and its visibility and shows the rule on 18
+  and 16 (`docs/design/source.md` section 7). Still open from the review: two test-support clean-ups.
 - 2026-11-10 — P3 package O, the oracle and the T1 harness (reviewed by the coordinator, fix round included):
   `src/cdc_v2/oracle/`, `tools/oracle`, `docs/oracle.md`; T1 harness
   `src/cdc_v2/testing/{pg,md,loader,datasets}.py` and the shared fixtures in `tests/conftest.py`; redaction
@@ -495,13 +596,20 @@ the exact-value layer.
 
 ## Next steps
 
-1. P3, as writer slots become free (at most four): merge E after the coordinator's re-check, then start package
-   F (it builds on the engine's frame codec). Review and merge P (finished), then D, A and X as they report: the
-   coordinator reviews each, D also gets a second reviewer.
-   Then L after D, Y after E and P, S after E, D, A and P; then V, B, T in the order of the table above. When X
-   merges: design 7.1–7.4 and open points 1 and 12 take its text, plan C9 is completed, and the tasks of B, S, V
-   and T take the rules of the cut (settle floor, `R0 ≥ P0` for every snapshot, the tracker on a primary, timeline).
-2. After P's repair of `tools/localpg` is on `main`: repeat the engine's version-dependent tests on Postgres 16.
-3. Carry into P5 (from the `tools/localpg` work): slot creation on a standby waits for a running-transactions record
+1. P3, as writer slots become free (at most four; now D, the fix round of X, Y and F): A's fix round at the next
+   free slot, with the findings of both reviews in one list; then package K; then the coordinator checks A
+   again, the second reviewer repeats its campaigns, A is merged and the review's sentences go into design
+   6.1–6.3, plan C0, C3a, C4 and C10, the tasks of D, Y, S and B, the hazard notes (a new entry for a TOASTed key
+   column sent as unchanged) and `docs/spike/md_semantics.md`. Review and merge D, X, Y and F as they report: the
+   coordinator reviews each, D also gets a second reviewer. Then L after D; S after D and A; then V, B, T in the
+   order of the table above. When X merges: design 7.1–7.4 and open points 1 and 12 take its text, plan C9 is
+   completed, and the tasks of B, S, V and T take the rules of the cut (settle floor, `R0 ≥ P0` for every snapshot,
+   the tracker on a primary, timeline).
+2. Add to the owner's questions when A merges: `REPLICA IDENTITY FULL` for a table whose key column can be
+   TOASTed (more WAL; with F-7); whether the DuckDB join-filter defect that apply works around should be
+   reported upstream.
+3. Carry into P4: the preflight warning for a server without the confirmed-flush guard. Carry into P5 (from the
+   `tools/localpg` work): slot creation on a standby waits for a running-transactions record
    and `pg_log_standby_snapshot()` needs a privileged role; a failover slot is synchronised to a standby only after it
-   has advanced past the standby's catalog horizon; raising a standby-matched setting on the primary pauses replay.
+   has advanced past the standby's catalog horizon; raising a standby-matched setting on the primary pauses replay;
+   the runbook rules "no other program imports snapshots on our standby" and "nothing else streams from our slot".

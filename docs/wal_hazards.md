@@ -419,14 +419,39 @@ stays in place behind every entry.
   (`PostgresChangeRecordEmitter`) **[src]**; swaps `A→B, B→A` in one transaction pass through an intermediate state that
   violates uniqueness if applied statement by statement. FULL identity on a keyless table: a delete of one of several
   identical rows carries the whole old row; applying it as `DELETE … WHERE all columns =` deletes all copies.
+- **What Postgres lets a key be** (**[test]** Postgres 16.6 and 18.6, `tests/pg_source/test_pg_keys.py`, evidence
+  `evidence/p3/source/replica_identity_keys_pg16.json` and `replica_identity_keys_pg18.json`).
+  - An immediate key is checked row by row, also under `REPLICA IDENTITY FULL`: `UPDATE t SET id = 3 - id WHERE id IN
+    (1, 2)` and `UPDATE t SET id = id + 1` fail with a unique violation (23505). A swap needs a free third value. In
+    the decoded stream of such a table no key is ever held by two rows, after any record: the changes of one
+    transaction arrive in the order the server made them, transactions arrive in commit order, and a second
+    transaction that inserts a key waits until the first one that touched it has ended. The same holds for the
+    source's coarser equality (`-0 = 0`, `1 mon = 30 days`, `1.0 = 1.00`, a nondeterministic collation): two rows the
+    source calls equal never exist together.
+  - A deferrable key is not a replica identity. `ALTER TABLE … REPLICA IDENTITY USING INDEX` on a deferrable unique
+    index is refused (0A000, `cannot use non-immediate index … as replica identity`). A deferrable primary key
+    (initially immediate or initially deferred) gives no identity under `REPLICA IDENTITY DEFAULT`
+    (`pg_get_replica_identity_index` is NULL), and the published table refuses its own `UPDATE` and `DELETE`
+    (55000), as a table without a primary key does (H-014).
+  - Only a table with a deferrable primary key and `REPLICA IDENTITY FULL` can hold two rows with one key inside a
+    transaction, and its decoded stream shows that state: the direct swap `UPDATE t SET id = 3 - id WHERE id IN
+    (1, 2)` arrives as `(1,a) → (2,a)`, then `(2,b) → (1,b)`; after the first record two rows hold key 2. An insert
+    of a duplicate followed by a delete of the old row in one transaction works too. A record of such a table that
+    names only a key does not say which row it means.
 - **Reproduction.** P: `BEGIN; UPDATE cdc_v2_t SET id = -id WHERE id IN (1,2); UPDATE cdc_v2_t SET id = 2 WHERE id = -1;
   UPDATE cdc_v2_t SET id = 1 WHERE id = -2; COMMIT;`; keyless: `CREATE TABLE cdc_v2_dup (a int) ; ALTER TABLE cdc_v2_dup
   REPLICA IDENTITY FULL; INSERT INTO cdc_v2_dup VALUES (1),(1),(1); DELETE FROM cdc_v2_dup WHERE ctid = (SELECT ctid FROM
   cdc_v2_dup LIMIT 1);`.
-- **Prevention.** Design rules for the applier: per transaction, collapse changes per key in order (net effect) before
-  applying set-based statements, so intermediate uniqueness states never reach the destination; keyless tables carry a
-  per-row multiplicity (or a synthetic row id) and a delete removes exactly one occurrence (SPEC 1.2).
-- **Why prevention.** The destination never executes the intermediate states.
+- **Prevention.** Design rules (core design section 6). Rule K: a table has a key only if its primary key is
+  immediate; a table with a deferrable primary key is a table without a key and needs `REPLICA IDENTITY FULL`, so
+  each of its records carries the whole old row. For a table with a key the applier follows each key record by
+  record: the first record of a key in a change set says whether the row existed, every later record must leave at
+  most one row, and a record that does not is an invariant violation, never applied silently; a key change moves the
+  row, so values that were not sent follow it. The statements are set-based and run once per change set, so the
+  destination never executes an intermediate state. Tables without a key carry a multiplicity per row image, and a
+  delete removes exactly one occurrence (SPEC 1.2).
+- **Why prevention.** The destination never executes the intermediate states, and the one table shape whose records
+  can be ambiguous by key is never applied by key.
 - **Test.** `test_h015_key_chains_swaps` (DEFAULT and FULL identity, history mode on), `test_h015_duplicate_rows`.
 - **Residual.** None known.
 
@@ -745,7 +770,9 @@ stays in place behind every entry.
 - **What.** Another session calls `pg_replication_slot_advance`, `pg_logical_slot_get_changes`, drops and re-creates the
   slot, or streams from it.
 - **Mechanism.** Any of these moves `confirmed_flush_lsn` past changes we never applied, or replaces the slot (new
-  `restart_lsn`, new catalog horizon); Debezium does not notice with `no_validation` **[src]**.
+  `restart_lsn`, new catalog horizon); Debezium does not notice with `no_validation` **[src]**. A replication client
+  that sends a status update with a lower flush position also moves `confirmed_flush_lsn` back on a server without
+  the guard of 13.22, 14.19, 15.14, 16.10, 17.6 and 18.0 (measured on 16.6; not on 18.6) **[test]**.
 - **Reproduction.** R: `SELECT pg_replication_slot_advance('cdc_v2_slot', pg_last_wal_replay_lsn());` while the pipeline
   is stopped; or `SELECT pg_drop_replication_slot('cdc_v2_slot'); SELECT pg_create_logical_replication_slot('cdc_v2_slot',
   'pgoutput');`.
@@ -754,11 +781,17 @@ stays in place behind every entry.
   consistent point plus `catalog_xmin` lower bound; on 17+ also `inactive_since` history) still plausible
   (`restart_lsn` never decreases between our observations except after a server crash we observed); otherwise alert +
   automatic backfill, no exit (SPEC 1.8). `active_pid` belonging to a session that is not ours ⇒ alert (contending
-  consumer).
+  consumer). The slot is read before our engine starts, and our engine never sends a flush position below the one it
+  started from (core design 8), so we never move the slot backwards ourselves. Preflight warns when the server's
+  minor release has no guard (P4).
 - **Why prevention.** No change is applied from a slot whose continuity is not proven.
 - **Test.** The four SPEC 1.8 tests (`pg_replication_slot_advance`, drop-and-recreate, changes consumed by another
   session, invalidation by `max_slot_wal_keep_size`).
 - **Residual.** A drop-and-recreate between two checks while we are disconnected is detected at the next acquisition.
+  On a server without the guard, a foreign client that streams from our slot, confirms a position above our applied
+  position and then one at or below it puts the slot back where the check expects it: not found by the slot check,
+  and what the server sends for the range in between is not measured. Runbook rule: nothing else streams from our
+  slot (P5).
 
 ### H-036 Slot invalidation by the WAL cap (`wal_removed`)
 
@@ -770,7 +803,10 @@ stays in place behind every entry.
 - **Reproduction.** R: `ALTER SYSTEM SET max_slot_wal_keep_size = '64MB'; SELECT pg_reload_conf();` (T1 only), stop the
   pipeline, write 500 MB on P, `CHECKPOINT` on P, wait for a restartpoint on R (`CHECKPOINT` on R).
 - **Prevention.** Size-lag trigger (SPEC 3.6) at 50 % of the cap with the cap read from the server holding the slot;
-  alert at `wal_status = 'extended'`/`'unreserved'`; slot check treats `invalidation_reason IS NOT NULL` as slot loss.
+  alert at `wal_status = 'extended'`/`'unreserved'`; slot check treats an invalid slot as slot loss. A slot is
+  invalid when `wal_status = 'lost'`, or `invalidation_reason` is set, or `conflicting` is true (`SlotFacts.invalid`):
+  on Postgres 16 a slot invalidated by the WAL cap shows `conflicting = true` (16 has no `invalidation_reason`); from
+  17 on it shows `conflicting = false` and `invalidation_reason = 'wal_removed'` (measured in P3, package P).
 - **Why prevention.** The backlog is abandoned (and re-backfilled) deliberately before the server invalidates the slot.
 - **Test.** SPEC 1.8 invalidation test; `test_h036_size_trigger_before_cap`.
 - **Residual.** A write burst faster than our check interval can still reach the cap; then the slot-loss path runs.
@@ -839,9 +875,12 @@ Background for every entry: `docs/research/replica_decoding.md`.
 - **Reproduction.** P idle, heartbeat off; R: `SELECT pg_create_logical_replication_slot('cdc_v2_s2', 'pgoutput');` —
   blocks; P: `SELECT pg_log_standby_snapshot();` (T1 superuser) — returns. Variant: P session `BEGIN; SELECT
   txid_current();` left open — creation blocks until it ends; same with a prepared transaction.
-- **Prevention.** Our code creates the slot (not Debezium), only after verifying the primary heartbeat is running (an
-  `xl_running_xacts` record within ~15 s is then guaranteed), with a deadline (default 120 s); on expiry it cancels and
-  reports the oldest running and prepared transactions on the primary, then retries with backoff and alerts (SPEC 4.7).
+- **Prevention.** Our code creates the slot (not Debezium), only after verifying the primary heartbeat is running. That
+  guarantees a running-transactions record within about 25 s (the background writer logs one at most every 15 s after
+  important WAL and wakes every 10 s while hibernating; measured in P3, package P); with `EXECUTE` on
+  `pg_log_standby_snapshot()` granted, within 1 s. Slot creation on a standby has a deadline well above that (default
+  120 s); on expiry it cancels and reports the oldest running and prepared transactions on the primary, then retries
+  with backoff and alerts (SPEC 4.7).
 - **Why prevention.** The idle-primary case cannot occur with the heartbeat running; the long-transaction case cannot
   hang the pipeline and is reported with its cause.
 - **Test.** `test_h040_slot_create_idle_primary`, `…_with_heartbeat`, `…_blocked_by_long_tx`, `…_blocked_by_prepared_tx`.
@@ -883,7 +922,8 @@ Background for every entry: `docs/research/replica_decoding.md`.
 - **Prevention.** Preconditions checked before slot creation and at every acquisition, refusing replica mode if any fails:
   `hot_standby_feedback = on` and `primary_slot_name` set on the replica; the primary's physical slot for that replica
   exists, is valid, and its `catalog_xmin` ≤ our slot's `catalog_xmin`; `wal_level = logical` on both. Our slot check
-  (H-035) reads `invalidation_reason`/`conflicting` every 30 s and before every engine start; an invalid slot stops the
+  (H-035) reads `wal_status`, `invalidation_reason` and `conflicting` (`SlotFacts.invalid`; H-036 has the values per
+  version) every 30 s and before every engine start; an invalid slot stops the
   engine (instead of Debezium's endless retry), alerts and takes the attach-elsewhere + backfill path (SPEC 4.1).
 - **Why prevention.** The configurations that lead to invalidation are refused up front; the residual cases cannot hang
   the pipeline.

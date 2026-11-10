@@ -1,0 +1,10 @@
+{
+  "after_advance": "0/80DFA8B0",
+  "after_status_updates_with_flush_at_the_old_position": "0/80DFA8B0",
+  "confirmed_flush_before_advance": "0/80DFA640",
+  "probe": "PROBE_DONE start=0/80DFA640 flush=0/80DFA640 last_receive=0/80DFA8B0",
+  "server_has_the_guard": true,
+  "server_version": "18.6 (Homebrew)",
+  "test": "tests/engine/test_engine_attach.py::test_lower_flush_position_and_the_slot",
+  "while_engine_streams": "0/80DFA8B0"
+}

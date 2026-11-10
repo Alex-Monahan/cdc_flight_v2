@@ -1,0 +1,26 @@
+{
+  "command": "CDC_V2_P_EVIDENCE=1 CDC_V2_P_EVIDENCE_NAME=primary_commit_waiting_pg18.json uv run pytest -m localpg tests/pg_source -k test_lower_bound_on_primary_while_a_commit_waits",
+  "machine_note": "shared 10-core laptop, up to three other workers running; indications only",
+  "major": 18,
+  "psycopg": "3.3.8",
+  "results": {
+    "bracket": {
+      "primary_commit_waiting": {
+        "after_release": {
+          "lower": "0/305F908",
+          "table_visible": true,
+          "visible_xid": true
+        },
+        "commit_record_end": "0/305F908",
+        "observation_lower": "0/305F908",
+        "observation_upper": "0/305F908",
+        "table_visible": false,
+        "visible_xid": false
+      }
+    }
+  },
+  "server_versions": {
+    "pg-p2": "PostgreSQL 18.6 (Homebrew) on aarch64-apple-darwin25.6.0, compiled by Apple clang version 21.0.0 (clang-2100.3.34.2), 64-bit"
+  },
+  "what": "package P (source) tests on a private tools/localpg pair; times in seconds"
+}

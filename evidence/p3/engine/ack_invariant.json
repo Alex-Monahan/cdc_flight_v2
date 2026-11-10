@@ -1,0 +1,12 @@
+{
+  "durables_sent": 76,
+  "phase1_slot_moved": false,
+  "samples": 1044,
+  "test": "tests/engine/test_engine_ack.py::test_slot_never_ahead_of_durable_and_follows_it",
+  "transactions": 746,
+  "unpublished_wal_only": {
+    "heartbeat_positions_seen": 1,
+    "slot_moved": false
+  },
+  "violations": 0
+}
