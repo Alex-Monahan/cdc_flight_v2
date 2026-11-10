@@ -7,14 +7,15 @@ from typing import List, Optional, Union
 
 import pyarrow as pa
 
-from .backend import LocalBackend, RemoteBackend
+from .backend import LocalBackend, LocalSpill, RemoteBackend
 from .changeset import ChangeSetError, LocalChangeSet, RelationChangeSet
 from .meta import TableMeta, Target
 from .plan import flat_x, keyed_stats_sql, keyed_steps, keyless_stats_sql, keyless_steps
 from .statements import Shapes
 from .types import affected
 
-__all__ = ["ApplyInvariantError", "ApplyCounts", "ApplySettings", "apply_group", "truncate", "reduce_duplicates"]
+__all__ = ["ApplyInvariantError", "ApplySpillFull", "ApplySettingsError", "ApplyCounts", "ApplySettings", "apply_group",
+           "truncate", "reduce_duplicates"]
 
 log = logging.getLogger("cdc_v2.apply")
 
@@ -27,15 +28,32 @@ class ApplyInvariantError(Exception):
     names the table and counts, never a value of a row (SPEC 8.3)."""
 
 
+class ApplySpillFull(Exception):
+    """The private DuckDB that plans a local change set ran out of memory and of spill space (SPEC 5.4). Nothing
+    was sent to the destination for this change set by the plan; the caller can stage the change set in MotherDuck
+    and apply it in the relation form instead. The message carries no value."""
+
+
+class ApplySettingsError(ValueError):
+    """ApplySettings that cannot be used (for example no spill directory for the local form)."""
+
+
 @dataclass(frozen=True)
 class ApplySettings:
     #: rows per DELETE or INSERT statement fed from local Arrow data (design 6.1: bounded hand-over)
     statement_rows: int = 1_000_000
     #: threads of the private DuckDB connection that plans a local change set (None: DuckDB's default)
     local_threads: Optional[int] = 2
-    #: memory limit of that connection; beyond it DuckDB spills to `local_temp_directory` (None: its default)
-    local_memory_limit: Optional[str] = "1GB"
+    #: memory limit of that connection; beyond it DuckDB spills to `local_temp_directory`
+    local_memory_limit: str = "1GB"
+    #: the pipeline's spill area for that connection (required for the local form: SPEC 5.4, one spill area with a
+    #: limit); it must exist
     local_temp_directory: Optional[str] = None
+    #: the most that connection may spill; beyond it the plan fails with ApplySpillFull
+    local_max_temp_directory_size: str = "4GB"
+    #: stream mode: also check, with one statement, that keys whose first record is a create have no destination
+    #: row when no other statement of the change set would see it (an insert-only change set)
+    check_new_keys: bool = True
 
 
 @dataclass
@@ -92,19 +110,28 @@ def apply_group(tx, target: Target, change_set: Union[LocalChangeSet, RelationCh
     meta = change_set.meta
     ucols = _ucols(change_set)
     if isinstance(change_set, LocalChangeSet):
+        import os
+        if not settings.local_temp_directory or not os.path.isdir(settings.local_temp_directory):
+            raise ApplySettingsError("ApplySettings.local_temp_directory must name an existing directory (the "
+                                     "pipeline's spill area) for a local change set")
         backend = LocalBackend(ctx, target, meta, change_set.rows, settings.statement_rows, settings.local_threads,
-                               settings.local_memory_limit, settings.local_temp_directory)
+                               settings.local_memory_limit, settings.local_temp_directory,
+                               settings.local_max_temp_directory_size)
     elif isinstance(change_set, RelationChangeSet):
         backend = RemoteBackend(ctx, target, meta, change_set.sql, change_set.params, change_set.scratch_prefix)
     else:
         raise ChangeSetError("a change set is a LocalChangeSet or a RelationChangeSet")
     try:
         if meta.has_key:
-            _keyed(ctx, backend, target, meta, ucols, mode, change_set, counts)
+            _keyed(ctx, backend, target, meta, ucols, mode, change_set, counts, settings)
         else:
             _keyless(ctx, backend, target, meta, ucols, change_set, counts)
         ctx.shape = "cleanup"
         backend.finish()
+    except LocalSpill:
+        backend.discard()
+        raise ApplySpillFull("%s: the plan of a local change set of %d records exceeded the memory limit and the "
+                             "spill limit" % (target, change_set.rows.num_rows)) from None
     finally:
         backend.close()
     log.debug("applied", extra={"cdc": {"table": str(target), "records": counts.records, "deleted": counts.deleted,
@@ -143,9 +170,9 @@ def _check_shape(stats, target):
         raise ChangeSetError("%s: %d records without a transaction order or seq" % (target, stats["n_nullorder"]))
 
 
-def _keyed(ctx, backend, target, meta, ucols, mode, cs, counts):
+def _keyed(ctx, backend, target, meta, ucols, mode, cs, counts, settings):
     steps = keyed_steps(meta, backend.src_sql, cs.order_column, ucols, mode, backend.rel, backend.src_params,
-                        backend.pos)
+                        backend.pos, settings.check_new_keys)
     _run_plan(ctx, backend, steps)
     ctx.shape = "plan"
     stats = backend.query_one(keyed_stats_sql(meta, ucols, backend.rel, mode))
@@ -157,10 +184,12 @@ def _keyed(ctx, backend, target, meta, ucols, mode, cs, counts):
     if stats["n_keynull"] or stats["n_okeypartial"]:
         raise ApplyInvariantError("%s: %d records without a key value, %d with a partial old key"
                                   % (target, stats["n_keynull"], stats["n_okeypartial"]))
+    if stats["n_bad"]:
+        # both modes: records that no source history can produce (a c at a key that holds a row, a u or d at a
+        # key that holds none; rule K, H-015)
+        raise ApplyInvariantError("%s: %d keys whose records are not a source history (a create at a held key, "
+                                  "an update or delete at a free one)" % (target, stats["n_bad"]))
     if mode == "stream":
-        if stats["n_bad"]:
-            raise ApplyInvariantError("%s: %d keys whose records cannot follow the destination's state"
-                                      % (target, stats["n_bad"]))
         if stats["n_unres_final"]:
             raise ApplyInvariantError("%s: %d keys whose unchanged values have no source" % (target,
                                                                                            stats["n_unres_final"]))
@@ -170,6 +199,11 @@ def _keyed(ctx, backend, target, meta, ucols, mode, cs, counts):
         ctx.shape = "K1"
         for rel in backend.statement_relations("del", chunked=True):
             counts.deleted += ctx.execute(sh.k1_delete(rel)) or 0
+        if mode == "stream" and counts.deleted != stats["n_del_held"]:
+            # the destination equals the source at the start of the change set: one row per key the source held,
+            # none for a key whose first record is a create
+            raise ApplyInvariantError("%s: %d destination rows removed for %d keys the source held at the start"
+                                      % (target, counts.deleted, stats["n_del_held"]))
     if n_upd:
         upd_rel = list(backend.statement_relations("upd", chunked=False))[0]
         if sh.sentinel_mover:

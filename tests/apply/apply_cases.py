@@ -89,11 +89,16 @@ def keyed_cases() -> List[Case]:
     r = R().c(1, row(10, "'n'")).u(1, row(2, "'B2x'", "2.5")).d(1, K(3))
     cs.append(Case("insert_update_delete", T, START, [r.out],
                    [row(1, "'B1'"), row(2, "'B2x'", "2.5"), row(10, "'n'")], max_statements=2))
+    # an insert-only change set: K6, plus K1 as the check that the new keys have no row (check_new_keys)
     r = R().c(1, row(10, "'n'")).c(1, row(11, "'m'"))
-    cs.append(Case("insert_only_one_statement", T, START, [r.out], START + [row(10, "'n'"), row(11, "'m'")],
-                   max_statements=1))
+    cs.append(Case("insert_only_two_statements", T, START, [r.out], START + [row(10, "'n'"), row(11, "'m'")],
+                   max_statements=2))
+    # stream mode: the destination equals the source at the start, so a delete or update of a missing row is a
+    # divergence; catch-up: the table was loaded separately, the row may be missing
     r = R().d(1, K(99))
-    cs.append(Case("delete_missing_row_is_not_an_error", T, START, [r.out], START))
+    cs.append(Case("stream_delete_of_a_missing_row_raises", T, START, [r.out], error="invariant",
+                   forms=("local", "relation")))
+    cs.append(Case("catch_up_delete_of_a_missing_row", T, START, [r.out], START, mode="catch_up", unresolved=[]))
     r = R().u(1, row(2, None, "9.0", "INTERVAL '2 days'"), unchanged=[1])
     cs.append(Case("partial_update_from_destination", T, START, [r.out],
                    [row(1, "'B1'"), row(2, "'B2'", "9.0", "INTERVAL '2 days'"), row(3, "'B3'")]))
@@ -119,12 +124,40 @@ def keyed_cases() -> List[Case]:
     r = (R().move(1, K(1), row(9, None), unchanged=[1]).move(1, K(2), row(1, None), unchanged=[1])
          .move(1, K(9), row(2, None), unchanged=[1]))
     cs.append(Case("swap_through_a_third_key", T, START, [r.out], [row(1, "'B2'"), row(2, "'B1'"), row(3, "'B3'")]))
+    r = (R().move(1, K(1), row(9, None), unchanged=[1]).move(1, K(2), row(1, None), unchanged=[1])
+         .move(1, K(3), row(2, None), unchanged=[1]).move(1, K(9), row(3, None), unchanged=[1]))
+    cs.append(Case("rotation_through_a_free_key", T, START, [r.out], [row(1, "'B2'"), row(2, "'B3'"), row(3, "'B1'")]))
+    r = R().move(1, K(1), row(5, None), unchanged=[1]).move(1, K(5), row(6, None), unchanged=[1]).d(1, K(2)).c(
+        1, row(2, "'again'"))
+    cs.append(Case("chain_and_key_reuse_in_one_transaction", T, START, [r.out],
+                   [row(6, "'B1'"), row(2, "'again'"), row(3, "'B3'")]))
+    # Not a keyed source history: an immediate key never has two holders (rule K, H-015). A direct swap (only a
+    # deferrable key allows it, and such a table is keyless here) arrives as d(1) c(2, k=1) while 2 holds a row.
+    # The first record of key 2 is a create, so the destination must have no row 2: stream mode finds one (K1).
     r = R().move(1, K(1), row(2, None), unchanged=[1]).move(1, K(2), row(1, None), unchanged=[1])
-    cs.append(Case("deferred_swap", T, START, [r.out], [row(1, "'B2'"), row(2, "'B1'"), row(3, "'B3'")]))
+    cs.append(Case("direct_swap_is_not_a_keyed_history", T, START, [r.out], error="invariant"))
     r = (R().move(1, K(3), row(1, None, "0.5"), unchanged=[1]).move(1, K(1), row(2, None), unchanged=[1])
          .move(1, K(2), row(3, None), unchanged=[1]))
-    cs.append(Case("deferred_rotation_of_three", T, START, [r.out],
-                   [row(1, "'B3'", "0.5"), row(2, "'B1'"), row(3, "'B2'")]))
+    cs.append(Case("direct_rotation_is_not_a_keyed_history", T, START, [r.out], error="invariant"))
+    # the second review's counterexamples A1, A4 and SEG, now loud: each puts a create at a key that holds a row
+    TV = TableMeta((Column(0, "id", "BIGINT", key=True), Column(1, "v", "VARCHAR"),
+                    Column(2, "big", "VARCHAR", unchanged_possible=True)))
+    r = R().c(1, {0: "2", 1: "'new'", 2: "'Bn'"}).u(1, {0: "2", 1: "'new!'", 2: None}, unchanged=[2]).d(1, {0: "2"})
+    cs.append(Case("review_A1_create_at_a_held_key", TV, [{0: "2", 1: "'old'", 2: "'Bo'"}], [r.out], error="invariant"))
+    a4 = [{0: "1", 1: "'a'", 2: "'Ba'"}, {0: "2", 1: "'b'", 2: "'Bb'"}]
+    r = (R().move(1, {0: "1"}, {0: "2", 1: "'a'", 2: None}, unchanged=[2]).u(1, {0: "2", 1: "'x'", 2: "'NEW'"})
+         .move(1, {0: "2"}, {0: "1", 1: "'b'", 2: None}, unchanged=[2]))
+    cs.append(Case("review_A4_create_at_a_held_key", TV, a4, [r.out], error="invariant"))
+    r1 = R().move(1, {0: "1"}, {0: "2", 1: "'a'", 2: "'Ba'"})
+    r2 = R().move(1, {0: "2"}, {0: "1", 1: "'b'", 2: "'Bb'"})
+    cs.append(Case("review_SEG_create_at_a_held_key_across_a_cut", TV, a4, [r1.out, r2.out], error="invariant",
+                   one_tx=True))
+    r = R().c(1, row(10, "'a'")).d(1, K(10)).d(1, K(10))
+    cs.append(Case("delete_twice_is_not_a_history", T, START, [r.out], error="invariant"))
+    cs.append(Case("delete_twice_is_not_a_history_catch_up", T, START, [r.out], error="invariant", mode="catch_up"))
+    r = R().d(1, K(1)).u(1, row(1, "'z'"))
+    cs.append(Case("update_after_delete_is_not_a_history", T, START, [r.out], error="invariant",
+                   forms=("local", "relation")))
     r = R().move(1, K(2), row(2, None, "8.0"), unchanged=[1])
     cs.append(Case("key_change_back_to_the_same_key", T, START, [r.out], [row(1, "'B1'"), row(2, "'B2'", "8.0"), row(3, "'B3'")]))
     r = R().d(1, K(2)).move(1, K(1), row(2, None), unchanged=[1])
@@ -138,7 +171,9 @@ def keyed_cases() -> List[Case]:
     r = R().move(1, K(1), row(10, None), unchanged=[1]).d(1, K(10))
     cs.append(Case("move_then_delete_in_one_transaction", T, START, [r.out], [row(2, "'B2'"), row(3, "'B3'")]))
     r = R().u(1, row(42, "'full'", "1.0", "INTERVAL '1 hour'"))
-    cs.append(Case("full_update_of_a_missing_row_upserts", T, START, [r.out], START + [row(42, "'full'", "1.0", "INTERVAL '1 hour'")]))
+    cs.append(Case("stream_full_update_of_a_missing_row_raises", T, START, [r.out], error="invariant"))
+    cs.append(Case("catch_up_full_update_of_a_missing_row_upserts", T, START, [r.out],
+                   START + [row(42, "'full'", "1.0", "INTERVAL '1 hour'")], mode="catch_up", unresolved=[]))
     r = R().u(1, row(42, None), unchanged=[1])
     cs.append(Case("stream_partial_update_of_a_missing_row_raises", T, START, [r.out], error="invariant"))
     r = R().move(1, K(42), row(43, None), unchanged=[1])
@@ -146,6 +181,10 @@ def keyed_cases() -> List[Case]:
     r1 = R().c(1, row(10, "'a'"))
     r2 = R().c(2, row(10, "'b'"))
     cs.append(Case("stream_insert_twice_raises", T, START, [r1.out + r2.out], error="invariant"))
+    cs.append(Case("insert_twice_raises_in_catch_up", T, START, [r1.out + r2.out], error="invariant", mode="catch_up"))
+    r = R().c(1, row(3, "'again'"))
+    cs.append(Case("stream_insert_at_a_held_key_raises", T, START, [r.out], error="invariant",
+                   forms=("local", "relation")))
     r = R().c(1, row(5, "'x'"))
     r.out[0].op = "t"
     cs.append(Case("truncate_record_is_refused", T, START, [r.out], error="changeset"))
@@ -161,7 +200,25 @@ def keyed_cases() -> List[Case]:
          .u(3, row(6, None, "4.0"), unchanged=[1]))
     cs.append(Case("catch_up_chain_is_idempotent", T, START, [r.out], [row(6, "'B1'", "4.0"), row(2, "'B2'"), row(3, "'B3'")],
                    mode="catch_up", unresolved=[], twice=True))
+    # c(10) d(10): the first record fixes p = 0, so nothing is unresolved
+    r = R().c(1, row(10, "'t'")).u(1, row(10, None, "2.0"), unchanged=[1]).d(1, K(10))
+    cs.append(Case("catch_up_insert_and_delete_leave_nothing_unresolved", T, START, [r.out], START, mode="catch_up",
+                   unresolved=[], twice=True))
+    # a chain 1 -> 5 -> 6 in one transaction resolves by rule 1 (root 1 is in the table and the log creates nothing
+    # at 1)
+    r = R().move(1, K(1), row(5, None, "2.0"), unchanged=[1]).move(1, K(5), row(6, None, "3.0"), unchanged=[1])
+    cs.append(Case("catch_up_chain_in_one_transaction_resolves", T, START, [r.out],
+                   [row(6, "'B1'", "3.0"), row(2, "'B2'"), row(3, "'B3'")], mode="catch_up", unresolved=[], twice=True))
+    # A swap through a free key does not resolve by rule 1: the log creates rows at both roots. Why that rule is
+    # needed: the table can hold the rows of a snapshot taken after the swap (start below), where row 1 holds B2;
+    # taking key 2's unchanged value from row 2 would give B1 to the row that must hold B2. Both keys are reported.
+    swap = (R().move(1, K(1), row(9, None), unchanged=[1]).move(1, K(2), row(1, None), unchanged=[1])
+            .move(1, K(9), row(2, None), unchanged=[1]))
+    cs.append(Case("catch_up_swap_through_a_free_key_after_the_swap", T, [row(1, "'B2'"), row(2, "'B1'"), row(3, "'B3'")],
+                   [swap.out], [row(3, "'B3'")], mode="catch_up", unresolved=[("1",), ("2",)]))
     # a snapshot that already holds the row under its new key, and loses nothing when applied twice
+    r = (R().move(1, K(1), row(5, None, "2.0"), unchanged=[1]).move(2, K(5), row(6, None, "3.0"), unchanged=[1])
+         .u(3, row(6, None, "4.0"), unchanged=[1]))
     cs.append(Case("catch_up_snapshot_after_the_move", T, [row(6, "'B1'", "3.0"), row(2, "'B2'"), row(3, "'B3'")],
                    [r.out], [row(6, "'B1'", "4.0"), row(2, "'B2'"), row(3, "'B3'")], mode="catch_up", unresolved=[],
                    twice=True))
@@ -236,6 +293,12 @@ def special_cases() -> List[Case]:
     cs.append(Case("date_key_beyond_the_timestamp_range", KF, far, [r.out],
                    [{0: "'300000-01-01'::DATE", 1: "'far2'"}, {0: "'2020-01-01'::DATE", 1: "'near'"}],
                    forms=("local", "relation")))
+    # The second review's B: d(-0) c(0, k=-0) and d(5) c(-0, k=5). Not a source history: for Postgres -0 = 0, so
+    # moving 5 onto -0 while 0 holds a row is a unique violation. Pinned: the copy path's count finds it.
+    r = R().move(1, {0: NZ}, {0: "0.0::DOUBLE", 1: None}, unchanged=[1]).move(1, {0: "5.0::DOUBLE"},
+                                                                              {0: NZ, 1: None}, unchanged=[1])
+    cs.append(Case("review_B_two_forms_of_one_key_held_at_once", KD, [{0: NZ, 1: "'A'"}, {0: "5.0::DOUBLE", 1: "'B'"}],
+                   [r.out], error="invariant"))
     r = R().d(1, {0: "0.0::DOUBLE"}).u(1, {0: NZ, 1: "'X'"})
     cs.append(Case("double_keys_negative_zero_and_zero_are_two_keys", KD, [{0: NZ, 1: "'B'"}, {0: "0.0::DOUBLE", 1: "'C'"}],
                    [r.out], [{0: NZ, 1: "'X'"}]))

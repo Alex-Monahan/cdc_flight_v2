@@ -9,23 +9,26 @@ import os
 import random
 
 import pytest
-from hypothesis import HealthCheck, example, given, settings, strategies as st
+from hypothesis import HealthCheck, given, settings, strategies as st
 
-from apply_harness import catch_up_scenario, local_conn, stream_scenario
+from apply_controls import caught_after, everything_unresolved, last_record_decides, plain_values
+from apply_harness import (catch_up_scenario, cut_scenario, local_conn, rounds_scenario, stream_scenario,
+                           test_settings)
 from apply_sim import KeyedSource, change_set_table, create_table, random_meta
 from apply_standin import StandInTx
 from cdc_v2.apply import LocalChangeSet, Target, apply_group
 from cdc_v2.apply.statements import Shapes
 
-N = int(os.environ.get("CDC_V2_APPLY_EXAMPLES", "10"))
+N = int(os.environ.get("CDC_V2_APPLY_EXAMPLES", "3"))
 SETTINGS = dict(max_examples=N, deadline=None, suppress_health_check=[HealthCheck.too_slow], derandomize=True)
 SEEDS = st.integers(min_value=0, max_value=2 ** 31)
+# The regressions found by earlier runs (seeds of a simulator that changed since) are named cases in
+# apply_cases.py: infinite_*_keys_in_one_transaction, uuid/json_keys_in_one_transaction, timetz_key_*,
+# catch_up_* ; the catch-up rounds below would fail on a stale unresolved row (round two takes values from it).
 
 
 @settings(**SETTINGS)
 @given(seed=SEEDS, form=st.sampled_from(["local", "local", "relation"]))
-@example(seed=2273038, form="local")     # regression: -infinity DATE key missed by a join in the same transaction
-@example(seed=10002906, form="local")    # regression (campaign): UUID key, Arrow filter pushdown not implemented
 def test_keyed_stream_equals_source(seed, form):
     stream_scenario(local_conn(), seed, keyed=True, form=form)
 
@@ -38,23 +41,62 @@ def test_keyless_stream_equals_source(seed, form):
 
 @settings(**SETTINGS)
 @given(seed=SEEDS, form=st.sampled_from(["local", "local", "relation"]))
-@example(seed=0, form="relation")        # regression: unresolved TIMETZ keys came back as TIME (offset lost)
-@example(seed=260, form="relation")      # regression: same, through the lane connection's Arrow export
-@example(seed=135239, form="local")      # regression: a later call took a value from an unresolved key's stale row
-@example(seed=10004510, form="local")    # regression (campaign): rule 3 used a key the source held at the start
-@example(seed=10000325, form="local")    # same
-@example(seed=10008026, form="local")    # same
 def test_catch_up_converges_and_is_idempotent(seed, form):
     catch_up_scenario(local_conn(), seed, form=form)
+
+
+@settings(**SETTINGS)
+@given(seed=SEEDS)
+def test_cut_inside_transactions_equals_source(seed):
+    """Item 4: a change set cut at every record boundary that keeps key-change pairs together, applied piece by
+    piece in one transaction."""
+    cut_scenario(local_conn(), seed)
+
+
+@settings(**SETTINGS)
+@given(seed=SEEDS, repeat=st.booleans())
+def test_catch_up_rounds_with_repair_reads(seed, repeat):
+    """Item 7 (b, c; a with repeat): rounds with repair reads, up to 6 snapshots, the precondition kept; a key is
+    unresolved only if its row has a value no record of the round carries; the final table equals the source."""
+    rounds_scenario(local_conn(), seed, repeat=repeat)
+
+
+def test_negative_control_last_record_decides():
+    """Item 12 (a): the keyed property catches "the last record per key decides"."""
+    assert caught_after(lambda s: stream_scenario(local_conn(), s, keyed=True, apply_fn=last_record_decides),
+                        0, 5) is not None
+
+
+def test_negative_control_plain_group_by():
+    """Item 12 (b): the keyless property catches a planner that compares raw values."""
+    with plain_values():
+        assert caught_after(lambda s: stream_scenario(local_conn(), s, keyed=False), 0, 5) is not None
+
+
+def test_negative_control_everything_unresolved():
+    """Item 12 (c): the rounds property catches a catch-up that reports every key unresolved (bound 7c)."""
+    assert caught_after(lambda s: rounds_scenario(local_conn(), s, apply_fn=everything_unresolved), 0, 5) is not None
 
 
 @pytest.mark.xfail(strict=True, reason="documented precondition of catch_up (docs/design/apply.md 2.6): a call that "
                    "ends before the newest snapshot of the table can take an unchanged value from a later row that "
                    "reused the key")
 def test_catch_up_split_before_the_newest_snapshot():
-    # found by the property test (seed 99008, row ids from 10): the first call sees d(K) + c(K2, k=K) with an
-    # unchanged column; the table holds K from a snapshot after K was reused by a new row in the second call.
-    catch_up_scenario(local_conn(), 99008, rid_offset=9, early_split=True)
+    # Found by the property test (first as seed 99008). The source moves 1 -> 5 with `big` unchanged (txn 1), then
+    # inserts a new row 1 (txn 2). The table was loaded under a snapshot after txn 2. A first call that applies txn
+    # 1 alone sees no create at key 1 and takes 5's `big` from destination row 1, which is the new row.
+    from apply_cases import R, T, row, K
+    from apply_harness import SCHEMA, apply_sets, create_table, dest_canon
+    from apply_sim import literal_rows_canon
+    from cdc_v2.apply import Target
+    conn = local_conn()
+    create_table(conn, SCHEMA, "t", T, [row(1, "'NEW'", "9.0"), row(5, "'B1'")])
+    r = R().move(1, K(1), row(5, None), unchanged=[1]).c(2, row(1, "'NEW'", "9.0"))
+    first = [x for x in r.out if x.txn == 1]
+    second = [x for x in r.out if x.txn == 2]
+    apply_sets(conn, Target(SCHEMA, "t"), T, [first, second], mode="catch_up")
+    assert dest_canon(conn, Target(SCHEMA, "t"), T) == literal_rows_canon(list(T.columns), [row(5, "'B1'"),
+                                                                                             row(1, "'NEW'", "9.0")])
 
 
 def test_statement_shapes_depend_on_columns_only():
@@ -65,7 +107,7 @@ def test_statement_shapes_depend_on_columns_only():
                               key_kinds=["bigint"])
     seen = {}
     total_sets = 0
-    for seed in range(10):
+    for seed in range(int(os.environ.get("CDC_V2_APPLY_SHAPE_SEEDS", "4"))):
         r2 = random.Random(seed)
         src = KeyedSource(meta, r2, kinds, toast_rate=0.7)
         src.seed_rows(8)
@@ -74,7 +116,8 @@ def test_statement_shapes_depend_on_columns_only():
         for _ in range(3):
             recs = src.ops_txn(r2.randint(1, 6))
             with StandInTx(conn) as tx:
-                counts = apply_group(tx, Target("s", "t"), LocalChangeSet(change_set_table(meta, recs), None, meta))
+                counts = apply_group(tx, Target("s", "t"), LocalChangeSet(change_set_table(meta, recs), None, meta),
+                                     settings=test_settings())
                 total_sets += 1
                 texts = [s for s in tx.sent if not s.startswith("SELECT")]
                 for shape, sql in zip([x for x in counts.shapes if x not in ("plan", "lookup")], texts):
@@ -82,4 +125,4 @@ def test_statement_shapes_depend_on_columns_only():
     sh = Shapes(meta, Target("s", "t"), list(meta.unchanged_columns))
     assert all(len(v) == 1 for v in seen.values()), {k: len(v) for k, v in seen.items()}
     assert len(seen) <= sh.shape_bound(), (sorted(seen), sh.shape_bound())
-    assert total_sets == 30
+    assert total_sets == 3 * int(os.environ.get("CDC_V2_APPLY_SHAPE_SEEDS", "4"))

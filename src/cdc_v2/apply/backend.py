@@ -46,30 +46,65 @@ _local = threading.local()
 _calls = itertools.count()
 
 
-def _planning_db(threads: Optional[int], memory_limit: Optional[str] = None, temp_directory: Optional[str] = None):
-    """One private in-memory DuckDB database per thread; each call works in a cursor and a schema of its own
-    (a new database costs about 5 ms, a cursor and a schema well under 1 ms). With a memory limit DuckDB spills
-    the plan's sorts and tables to `temp_directory` instead of growing."""
-    db = getattr(_local, "db", None)
+def _planning_db(threads: Optional[int], memory_limit: str, temp_directory: str, max_temp: str):
+    """One private in-memory DuckDB database per thread and configuration; each call works in a cursor and a
+    schema of its own (a new database costs about 5 ms, a cursor and a schema well under 1 ms). Memory limit, spill
+    directory and spill limit are set before the database's first statement; beyond the memory limit DuckDB
+    spills to the directory, beyond the spill limit the statement fails (core.ApplySpillFull)."""
+    key = (threads, memory_limit, temp_directory, max_temp)
+    dbs = getattr(_local, "dbs", None)
+    if dbs is None:
+        dbs = _local.dbs = {}
+    db = dbs.get(key)
     if db is None:
-        db = duckdb.connect(":memory:")
+        config = {"memory_limit": memory_limit, "temp_directory": temp_directory, "max_temp_directory_size": max_temp}
         if threads:
-            db.execute("SET threads = %d" % int(threads))
-        if memory_limit:
-            db.execute("SET memory_limit = '%s'" % memory_limit.replace("'", ""))
-        if temp_directory:
-            db.execute("SET temp_directory = '%s'" % temp_directory.replace("'", "''"))
-        _local.db = db
-    return db
+            config["threads"] = int(threads)
+        db = duckdb.connect(":memory:", config=config)
+        dbs[key] = db
+    return db, key
+
+
+def _discard_db(key) -> None:
+    """Close a planning database (DuckDB removes its spill files) so that the next call starts afresh."""
+    dbs = getattr(_local, "dbs", {})
+    db = dbs.pop(key, None)
+    if db is not None:
+        try:
+            db.close()
+        except Exception:                                    # noqa: BLE001 - a private connection
+            pass
+
+
+class LocalSpill(Exception):
+    """The planning database (not the destination) ran out of memory and spill space."""
+
+
+class _Guarded:
+    """The planning cursor: an out-of-memory error of it becomes LocalSpill, so that it is never confused with an
+    error of the destination."""
+
+    def __init__(self, cur):
+        self._cur = cur
+
+    def execute(self, sql, params=None):
+        try:
+            return self._cur.execute(sql, params)
+        except duckdb.OutOfMemoryException as e:
+            raise LocalSpill(type(e).__name__) from None
+
+    def __getattr__(self, name):
+        return getattr(self._cur, name)
 
 
 class LocalBackend:
     def __init__(self, tx, target: Target, meta: TableMeta, rows: pa.Table, statement_rows: int,
-                 threads: Optional[int] = None, memory_limit: Optional[str] = None,
-                 temp_directory: Optional[str] = None):
+                 threads: Optional[int], memory_limit: str, temp_directory: str, max_temp: str):
         self.tx, self.target, self.meta = tx, target, meta
         self.statement_rows = max(1, int(statement_rows))
-        self.L = _planning_db(threads, memory_limit, temp_directory).cursor()
+        self.planning = True
+        db, self.db_key = _planning_db(threads, memory_limit, temp_directory, max_temp)
+        self.L = _Guarded(db.cursor())
         self.L.execute("SET TimeZone = 'UTC'")
         # UUID, TIME WITH TIME ZONE and JSON leave as Arrow extension types; without this they would become
         # VARCHAR and TIME (the offset lost) on their way to the destination.
@@ -156,12 +191,23 @@ class LocalBackend:
     def finish(self) -> None:
         pass
 
+    def discard(self) -> None:
+        """After a failure of the planning database itself: close it, so that its spill files go."""
+        try:
+            self.L.close()
+        except Exception:                                    # noqa: BLE001
+            pass
+        _discard_db(self.db_key)
+        self.L = None
+
     def close(self) -> None:
+        if self.L is None:
+            return
         try:
             self.L.execute("DROP SCHEMA IF EXISTS %s CASCADE" % self.schema)
             self.L.close()
         except Exception:                                    # noqa: BLE001 - a private connection
-            _local.db = None                                 # start again with a fresh database
+            _discard_db(self.db_key)                         # start again with a fresh database
 
 
 class RemoteBackend:
@@ -201,7 +247,7 @@ class RemoteBackend:
         data = self.tx.fetch_arrow("SELECT %s FROM %s" % (sel, self.rel(name)))
         if not any(c.dtype.base in _TEXT_FETCH for c in keys):
             return data
-        L = _planning_db(None).cursor()
+        L = duckdb.connect(":memory:")                       # a few keys: no spill
         try:
             L.execute("SET arrow_lossless_conversion = true")
             L.register("fetched", data)

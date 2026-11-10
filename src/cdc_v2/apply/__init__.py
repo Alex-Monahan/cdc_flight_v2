@@ -10,8 +10,9 @@ caller opened and will commit (contract C3a, design section 6; the full account 
 never begins, commits, rolls back or fences.
 """
 from .changeset import ChangeSetError, LocalChangeSet, RelationChangeSet
-from .core import ApplyCounts, ApplyInvariantError, ApplySettings, apply_group, reduce_duplicates, truncate
+from .core import (ApplyCounts, ApplyInvariantError, ApplySettings, ApplySettingsError, ApplySpillFull, apply_group,
+                   reduce_duplicates, truncate)
 from .meta import Column, TableMeta, Target
 
 __all__ = ["Column", "TableMeta", "Target", "LocalChangeSet", "RelationChangeSet", "ChangeSetError", "ApplyCounts",
-           "ApplyInvariantError", "ApplySettings", "apply_group", "truncate", "reduce_duplicates"]
+           "ApplyInvariantError", "ApplySettings", "ApplySettingsError", "ApplySpillFull", "apply_group", "truncate", "reduce_duplicates"]

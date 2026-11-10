@@ -13,6 +13,7 @@ import time
 import duckdb
 import pyarrow as pa
 
+from apply_harness import spill_dir
 from apply_standin import StandInTx
 from cdc_v2.apply import ApplySettings, Column, LocalChangeSet, TableMeta, Target, apply_group
 
@@ -110,7 +111,7 @@ def run_perf(conn, sizes=(1, 100, 100_000, 1_000_000), reps_small: int = 5):
                     c0, w0 = time.process_time(), time.monotonic()
                     with StandInTx(conn) as tx:
                         counts = apply_group(tx, Target("perf", table), LocalChangeSet(rows, None, m),
-                                             settings=ApplySettings())
+                                             settings=ApplySettings(local_temp_directory=spill_dir()))
                     times.append(time.monotonic() - w0)
                     cpus.append(time.process_time() - c0)
                     stmts = counts.shapes

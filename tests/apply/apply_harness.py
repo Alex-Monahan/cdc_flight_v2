@@ -11,9 +11,25 @@ from apply_sim import (KeyedSource, KeylessSource, Rec, canon_rows, change_set_t
 from apply_standin import StandInTx
 from cdc_v2.apply import (ApplySettings, LocalChangeSet, RelationChangeSet, Target, apply_group,
                           reduce_duplicates)
-from cdc_v2.apply.types import quote_ident
+from cdc_v2.oracle.canonical import quote_ident
 
 SCHEMA = "s p.ä"
+
+
+def spill_dir() -> str:
+    """The planning database's spill area for tests (under the test run's temporary directory)."""
+    import os
+    import tempfile
+    d = os.path.join(tempfile.gettempdir(), "cdc_v2_apply_spill")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def test_settings(**kw) -> ApplySettings:
+    return ApplySettings(local_temp_directory=spill_dir(), **kw)
+
+
+test_settings.__test__ = False
 
 
 def local_conn():
@@ -44,6 +60,7 @@ def apply_sets(conn, target, meta, sets: List[List[Rec]], mode="stream", form="l
                settings: Optional[ApplySettings] = None, stage_conn=None):
     """Apply each change set (one transaction each, or all in one). Returns the list of ApplyCounts."""
     out = []
+    settings = settings or test_settings()
 
     def one(tx, recs, i):
         rows = change_set_table(meta, recs)
@@ -133,7 +150,8 @@ def run_case(case, conn, form="local", table="t"):
 
 
 def stream_scenario(conn, seed: int, keyed: bool, form: str = "local", table: str = "t", n_txn: Optional[int] = None,
-                    max_ops: int = 5, one_tx: Optional[bool] = None, value_kinds=None, key_kinds=None):
+                    max_ops: int = 5, one_tx: Optional[bool] = None, value_kinds=None, key_kinds=None,
+                    apply_fn=None):
     """A random table and history; the history cut into change sets at random transaction boundaries and applied
     in stream mode, one transaction per change set or all in one. Returns a ledger entry; raises AssertionError
     when the destination differs from the source."""
@@ -150,7 +168,7 @@ def stream_scenario(conn, seed: int, keyed: bool, form: str = "local", table: st
     create_table(conn, SCHEMA, table, meta, start)
     sets = split_by_txn(recs, [t for t in range(1, n_txn + 1) if rng.random() < 0.35])
     one_tx = rng.random() < 0.3 if one_tx is None else one_tx
-    counts = apply_sets(conn, target, meta, sets, form=form, one_tx=one_tx)
+    counts = (apply_fn or apply_sets)(conn, target, meta, sets, form=form, one_tx=one_tx)
     got = dest_canon(conn, target, meta)
     want = literal_rows_canon(list(meta.columns), src.snapshot())
     entry = {"seed": seed, "keyed": keyed, "form": form, "mode": "stream", "records": len(recs), "sets": len(sets),
@@ -227,3 +245,114 @@ def catch_up_scenario(conn, seed: int, form: str = "local", table: str = "t", n_
     assert U1 <= logkeys and U2 <= logkeys, "seed %d: an unresolved key that is not in the log" % seed
     entry["ok"] = True
     return entry
+
+
+# ------------------------------------------------------------------------------------------------ cuts (item 4)
+
+
+def cut_all(recs: List[Rec]) -> List[List[Rec]]:
+    """Every record boundary that does not separate the d and the c of one key change is a cut: a change set may
+    start and end inside a source transaction (design 6.5)."""
+    pieces, cur = [], []
+    for r in recs:
+        if cur and not (r.op == "c" and r.k and cur[-1].op == "d"):
+            pieces.append(cur)
+            cur = []
+        cur.append(r)
+    if cur:
+        pieces.append(cur)
+    return pieces
+
+
+def cut_scenario(conn, seed: int, form: str = "local", table: str = "t"):
+    """A keyed history applied as pieces cut at every allowed boundary, all in one transaction, must give the
+    source's table (the same table as the uncut change set gives, stream_scenario)."""
+    rng = random.Random(seed)
+    meta, kinds = random_meta(rng, True, rng.randint(1, 4))
+    src = KeyedSource(meta, rng, kinds)
+    src.seed_rows(rng.randint(0, 8))
+    start = src.snapshot()
+    recs = []
+    for _ in range(rng.randint(1, 5)):
+        recs += src.ops_txn(rng.randint(1, 5))
+    target = Target(SCHEMA, table)
+    create_table(conn, SCHEMA, table, meta, start)
+    pieces = cut_all(recs)
+    apply_sets(conn, target, meta, pieces, form=form, one_tx=True)
+    got = dest_canon(conn, target, meta)
+    want = literal_rows_canon(list(meta.columns), src.snapshot())
+    assert got == want, "seed %d: the cut change set differs from the source" % seed
+    return {"seed": seed, "records": len(recs), "pieces": len(pieces), "ok": True}
+
+
+# ------------------------------------------------------------------------------------------------ rounds (item 7)
+
+
+def rounds_scenario(conn, seed: int, form: str = "local", table: str = "t", n_txn: int = 8, max_ops: int = 4,
+                    max_snapshots: int = 6, toast_rate: float = 0.8, repeat: bool = False, apply_fn=None,
+                    check_bound: bool = True):
+    """Catch-up as the backfill runs it (design 7.3): the table is loaded under up to `max_snapshots` snapshots;
+    the pending log is replayed in rounds; after each round the unresolved keys are read again from the source at
+    the round's end (a repair read) and loaded. The precondition of apply.md 2.6 is kept: the first round reaches
+    past every snapshot, and a repair snapshot is the round's end. With `repeat`, every round is applied twice and
+    the caller repairs the keys of both calls. Asserted: (c) a key is unresolved only if its row at the round's
+    end has a column whose value is in no record of the round; and the final table equals the source."""
+    import zlib
+    import apply_sim
+    from apply_sim import lit_canon, values_table
+    rng = random.Random(seed)
+    meta, kinds = random_meta(rng, True, rng.randint(1, 3))
+    src = KeyedSource(meta, rng, kinds, toast_rate=toast_rate)
+    apply_sim._Row._n = 0
+    src.seed_rows(rng.randint(2, 10))
+    snaps, states, prov = [src.snapshot_full()], [src.snapshot()], [src.provenance()]
+    recs = []
+    for _ in range(n_txn):
+        recs += src.ops_txn(rng.randint(1, max_ops))
+        snaps.append(src.snapshot_full())
+        states.append(src.snapshot())
+        prov.append(src.provenance())
+    start = rng.randint(0, n_txn - 1)
+    m = rng.randint(1, max_snapshots)
+    times = [rng.randint(start, n_txn) for _ in range(m)]
+    dest_rows = [vals for j, s in enumerate(times) for rid, ver, vals in snaps[s]
+                 if zlib.crc32(b"%d:%d" % (rid, ver)) % m == j]
+    target = Target(SCHEMA, table)
+    create_table(conn, SCHEMA, table, meta, dest_rows)
+    keys = meta.key_columns
+    first_end = max(max(times), start + 1)
+    ends = sorted({first_end} | {rng.randint(first_end, n_txn) for _ in range(rng.randint(0, 3))} | {n_txn})
+    apply_fn = apply_fn or apply_sets
+    total_unres, rounds, lo = 0, 0, start
+    exact_key = lambda vals: tuple(lit_canon(vals[c.position], c.type) for c in keys)
+    for end in ends:
+        part = [r for r in recs if lo < r.txn <= end]
+        if not part:
+            lo = end
+            continue
+        with StandInTx(conn) as tx:
+            reduce_duplicates(tx, target, LocalChangeSet(change_set_table(meta, part), None, meta),
+                              settings=test_settings())
+        calls = apply_fn(conn, target, meta, [part] + ([part] if repeat else []), mode="catch_up", form=form)
+        U = set().union(*[key_canon(meta, c.unresolved) for c in calls])
+        total_unres += len(key_canon(meta, calls[0].unresolved))
+        rounds += 1
+        at_end = {exact_key(v): src.kcanon(v) for v in states[end]}
+        if check_bound:
+            for k in U:
+                assert k in at_end, "seed %d: a key reported unresolved that the source does not hold" % seed
+                sup = prov[end][at_end[k]]
+                assert any(sup.get(c.position, 0) <= lo for c in meta.value_columns), \
+                    "seed %d: a key reported unresolved although every value is in the round's records" % seed
+        rows = [v for v in states[end] if exact_key(v) in U]       # the repair read, at the round's end
+        if rows:
+            conn.register("cdc_v2_test_repair", values_table(list(meta.columns), rows))
+            conn.execute("INSERT INTO %s SELECT * FROM cdc_v2_test_repair" % target.sql())
+            conn.unregister("cdc_v2_test_repair")
+        lo = end
+    got = dest_canon(conn, target, meta)
+    want = literal_rows_canon(list(meta.columns), states[n_txn])
+    assert got == want, "seed %d: the table after the rounds and their repair reads differs from the source" % seed
+    log_records = sum(1 for r in recs if r.txn > start)
+    return {"seed": seed, "form": form, "mode": "rounds", "records": log_records, "rounds": rounds,
+            "snapshots": m, "unresolved": total_unres, "repeat": repeat, "ok": True}

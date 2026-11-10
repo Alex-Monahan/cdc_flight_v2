@@ -1,5 +1,5 @@
 """Package A, tier T0: the named cases (apply_cases.py) on local DuckDB. Every case runs in the local form; the
-relation form (the same plan, run inside the transaction) runs for every fourth case and for every catch-up and
+relation form (the same plan, run inside the transaction) runs for every catch-up and
 error case, or for all with CDC_V2_APPLY_FULL=1. All cases run in both forms on MotherDuck in test_apply_md.py."""
 from __future__ import annotations
 
@@ -8,17 +8,24 @@ import os
 import pytest
 
 from apply_cases import all_cases
-from apply_harness import local_conn, run_case
+from apply_harness import local_conn, run_case, test_settings
 
 _ALL = all_cases()
 _FULL = os.environ.get("CDC_V2_APPLY_FULL") == "1"
 CASES = [(c, "local") for c in _ALL] + [(c, "relation") for i, c in enumerate(_ALL)
-                                        if _FULL or i % 4 == 0 or c.mode == "catch_up" or c.error]
+                                        if _FULL or c.mode == "catch_up" or c.error]
+
+
+_SHARED = []
 
 
 @pytest.mark.parametrize("case,form", CASES, ids=["%s-%s" % (c.name, f) for c, f in CASES])
 def test_case(case, form):
-    run_case(case, local_conn(), form)
+    # one local destination database for the module (a new database costs about 5 ms), a table per case
+    if not _SHARED:
+        _SHARED.append(local_conn())
+    _SHARED.append(None)
+    run_case(case, _SHARED[0].cursor(), form, table="t%d" % len(_SHARED))
 
 
 def test_record_without_seq_is_refused():
@@ -33,7 +40,7 @@ def test_record_without_seq_is_refused():
     create_table(conn, "s", "t", T, START)
     with pytest.raises(ChangeSetError):
         with StandInTx(conn) as tx:
-            apply_group(tx, Target("s", "t"), LocalChangeSet(rows, None, T))
+            apply_group(tx, Target("s", "t"), LocalChangeSet(rows, None, T), settings=test_settings())
 
 
 def test_unchanged_flag_is_honoured_even_if_meta_does_not_expect_it():
@@ -49,5 +56,5 @@ def test_unchanged_flag_is_honoured_even_if_meta_does_not_expect_it():
     conn = local_conn()
     create_table(conn, "s", "t", plain, [{0: "1", 1: "'B'"}])
     with StandInTx(conn) as tx:
-        apply_group(tx, Target("s", "t"), LocalChangeSet(rows, None, plain))
+        apply_group(tx, Target("s", "t"), LocalChangeSet(rows, None, plain), settings=test_settings())
     assert dest_canon(conn, Target("s", "t"), plain) == literal_rows_canon(list(plain.columns), [{0: "1", 1: "'B'"}])

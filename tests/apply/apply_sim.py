@@ -20,8 +20,29 @@ import duckdb
 import pyarrow as pa
 
 from cdc_v2.apply import Column, TableMeta
-from cdc_v2.apply.types import parse, quote_ident
 from cdc_v2.oracle import canonical as oc
+from cdc_v2.oracle.canonical import quote_ident
+
+# The model shares no code with the package under test: types are read with the oracle's parser.
+
+
+def _fields(m) -> list:
+    """(name, type text) of a STRUCT parsed by the oracle."""
+    out = []
+    for arg in m.args:
+        if arg.startswith('"'):
+            end = 1
+            while True:
+                end = arg.index('"', end)
+                if arg.startswith('""', end):
+                    end += 2
+                    continue
+                break
+            out.append((arg[1:end].replace('""', '"'), arg[end + 1:].strip()))
+        else:
+            name, _, rest = arg.partition(" ")
+            out.append((name, rest.strip()))
+    return out
 
 NZ = "CAST('-0' AS DOUBLE)"
 NZF = "CAST('-0' AS FLOAT)"
@@ -105,7 +126,9 @@ SPECS: Dict[str, TSpec] = {
                     "union_value(s := '1.5')", "union_value(n := 0)"), toast=True),
     "dblunion": TSpec("UNION(d DOUBLE, i BIGINT)", ("union_value(d := %s)" % NZ, "union_value(d := 0.0::DOUBLE)",
                                                      "union_value(i := 0)")),
-    "map": TSpec("MAP(VARCHAR, DOUBLE)", ("MAP {'a': %s}" % NZ, "MAP {'a': 0.0::DOUBLE}", "MAP {'b': 1.0::DOUBLE}"),
+    "map": TSpec("MAP(VARCHAR, DOUBLE)", ("MAP {'a': %s, 'b': 1.0::DOUBLE, 'c': NULL}" % NZ,
+                                          "MAP {'a': 0.0::DOUBLE, 'b': 1.0::DOUBLE, 'c': NULL}", "MAP {'b': 1.0::DOUBLE}",
+                                          "MAP {'a': 'nan'::DOUBLE, 'z': %s}" % NZ, "MAP {}::MAP(VARCHAR, DOUBLE)"),
                  toast=True),
 }
 
@@ -139,25 +162,26 @@ def _pgtype(t) -> Optional[oc.PgColumnType]:
 def canon(expr: str, typ: str, depth: int = 0) -> str:
     """SQL: a token text for a value of destination type `typ` that is equal for two values exactly when the oracle
     calls them equal; UNION values carry their member; NULL is `N`."""
-    t = parse(typ)
+    t = oc.parse_md_type(typ)
     pg = _pgtype(t)
     if pg is not None:
-        inner = oc.md_canon(expr, pg, oc.parse_md_type(t.sql()))
+        inner = oc.md_canon(expr, pg, t)
     elif t.base == "STRUCT":
         inner = "'{' || %s || '}'" % " || ',' || ".join(canon("struct_extract(%s, '%s')" % (expr, n.replace("'", "''")),
-                                                               ft.sql(), depth + 1) for n, ft in t.fields)
+                                                               ft, depth + 1) for n, ft in _fields(t))
     elif t.base == "UNION":
         inner = "CAST(union_tag(%s) AS VARCHAR) || ':' || (CASE CAST(union_tag(%s) AS VARCHAR) %s END)" % (
-            expr, expr, " ".join("WHEN '%s' THEN %s" % (n, canon("union_extract(%s, '%s')" % (expr, n), ft.sql(), depth + 1))
-                                 for n, ft in t.fields))
+            expr, expr, " ".join("WHEN '%s' THEN %s" % (n, canon("union_extract(%s, '%s')" % (expr, n), ft.text, depth + 1))
+                                 for n, ft in t.members))
     elif t.base == "MAP":
         v = "_m%d" % depth
+        kt, vt = t.args
         inner = "array_to_string(list_transform(map_entries(%s), lambda %s: %s || '=' || %s), ',')" % (
-            expr, v, canon("%s.key" % v, t.key.sql(), depth + 1), canon("%s.value" % v, t.value.sql(), depth + 1))
+            expr, v, canon("%s.key" % v, kt, depth + 1), canon("%s.value" % v, vt, depth + 1))
     elif t.base == "LIST":
         v = "_l%d" % depth
         inner = "'[' || array_to_string(list_transform(%s, lambda %s: %s), ',') || ']'" % (
-            expr, v, canon(v, t.elem.sql(), depth + 1))
+            expr, v, canon(v, t.elem.text, depth + 1))
     else:                                            # TIME WITH TIME ZONE: DuckDB's text keeps the offset
         inner = "CAST(%s AS VARCHAR)" % expr
     return "(CASE WHEN %s IS NULL THEN 'N' ELSE 'V' || %s END)" % (expr, inner)
@@ -190,6 +214,28 @@ def literal_rows_canon(cols: List[Column], rows: List[Dict[int, Optional[str]]])
     out = canon_rows(con, "vals", cols)
     con.close()
     return out
+
+
+def src_key_canon(lit: Optional[str], typ: str, _cache={}) -> str:
+    """The source's (Postgres's) equality of a key value: -0 = 0, every NaN is one value, an interval compares by
+    its length with 30-day months and 24-hour days. Other key types compare exactly (deterministic collation)."""
+    key = (lit, typ)
+    if key not in _cache:
+        base = oc.parse_md_type(typ).base
+        x = cast(lit, typ)
+        if base in ("DOUBLE", "FLOAT"):
+            sql = "SELECT CASE WHEN isnan(%s) THEN 'nan' ELSE CAST(CAST(%s AS DOUBLE) + 0.0 AS VARCHAR) END" % (x, x)
+        elif base == "INTERVAL":
+            sql = "SELECT CAST(CAST(datepart('epoch', %s) * 1000000 AS HUGEINT) AS VARCHAR)" % x
+        else:
+            sql = None
+        if sql is None:
+            _cache[key] = lit_canon(lit, typ)
+        else:
+            con = helper_conn()
+            _cache[key] = con.execute(sql).fetchone()[0]
+            con.close()
+    return _cache[key]
 
 
 def lit_canon(lit: Optional[str], typ: str, _cache={}) -> str:
@@ -261,20 +307,23 @@ def create_table(conn, schema: str, table: str, meta: TableMeta, rows: List[Dict
 
 
 class _Row:
-    __slots__ = ("vals", "toasted", "rid", "ver")
+    __slots__ = ("vals", "toasted", "rid", "ver", "sup")
     _n = 0
 
     def __init__(self, vals, toasted):
         self.vals = dict(vals)
         self.toasted = set(toasted)
         self.ver = 0
+        self.sup = {}                  # column -> the last transaction whose record carried its current value
         _Row._n += 1
         self.rid = _Row._n
 
 
 class KeyedSource:
-    """A source table with a key. `ops_txn` runs one source transaction of random statements and returns its
-    records. Keys are unique at every transaction end; a deferred permutation holds duplicates inside one."""
+    """A source table keyed by an immediate replica-identity key, as Postgres keeps it (H-015): after every record
+    no two rows hold keys that the source calls equal (`src_key_canon`: -0 = 0, NaN = NaN, intervals by length).
+    No statement passes through a state with two holders; swaps and rotations go through a free key. `ops_txn`
+    runs one source transaction of random statements and returns its records."""
 
     def __init__(self, meta: TableMeta, rng: random.Random, kinds: Dict[int, str], toast_rate: float = 0.5):
         self.meta, self.rng, self.kinds = meta, rng, kinds
@@ -302,8 +351,9 @@ class KeyedSource:
         return uniq
 
     def kcanon(self, row_or_vals):
+        """The source's equality of keys (what uniqueness is checked with)."""
         vals = row_or_vals.vals if isinstance(row_or_vals, _Row) else row_or_vals
-        return tuple(lit_canon(vals[c.position], c.type) for c in self.keys)
+        return tuple(src_key_canon(vals[c.position], c.type) for c in self.keys)
 
     def _rand_val(self, c: Column):
         pool = SPECS[self.kinds[c.position]].values
@@ -323,12 +373,16 @@ class KeyedSource:
 
     def _free_key(self, extra_taken=()):
         taken = {self.kcanon(r) for r in self.rows} | set(extra_taken)
-        free = [kt for kt in self.key_pool if tuple(lit_canon(l, c.type) for l, c in zip(kt, self.keys)) not in taken]
+        free = [kt for kt in self.key_pool if tuple(src_key_canon(l, c.type) for l, c in zip(kt, self.keys)) not in taken]
         return self.rng.choice(free) if free else None
 
-    def _emit(self, recs, op, a, u=None, k=None):
+    def _emit(self, recs, op, a, u=None, k=None, row=None):
         recs.append(Rec(self.txn, self.seq, op, dict(a), dict(u or {}), dict(k or {})))
         self.seq += 1
+        if row is not None and op in "cu":
+            for p in a:
+                if not (u or {}).get(p):
+                    row.sup[p] = self.txn
 
     def _image(self, row, changed):
         """The new image as pgoutput sends it: an unchanged value that is stored out of line is "unchanged"."""
@@ -359,7 +413,7 @@ class KeyedSource:
             return
         row = self._new_row(kt)
         self.rows.append(row)
-        self._emit(recs, "c", row.vals)
+        self._emit(recs, "c", row.vals, row=row)
 
     def delete(self, recs, row=None):
         if not self.rows:
@@ -374,7 +428,7 @@ class KeyedSource:
         row = self.rng.choice(self.rows)
         changed = self._update_values(row)
         a, u = self._image(row, changed)
-        self._emit(recs, "u", a, u)
+        self._emit(recs, "u", a, u, row=row)
 
     def move(self, recs, row=None, new_key=None):
         """UPDATE that changes the key (immediate constraint): d(old) + c(new image, k=old)."""
@@ -392,7 +446,7 @@ class KeyedSource:
             changed.add(c.position)
         a, u = self._image(row, changed)
         self._emit(recs, "d", old)
-        self._emit(recs, "c", a, u, old)
+        self._emit(recs, "c", a, u, old, row=row)
 
     def move_same_key(self, recs):
         """A key change back to the same key (UPDATE SET id = id, seen by Debezium as a key change only when the
@@ -402,27 +456,35 @@ class KeyedSource:
         row = self.rng.choice(self.rows)
         self.move(recs, row, tuple(row.vals[c.position] for c in self.keys))
 
-    def permute(self, recs):
-        """One UPDATE that permutes the keys of several rows (deferred unique constraint): each row's d + c in
-        heap order; duplicates exist between the records of one statement."""
-        if len(self.rows) < 2:
+    def move_form(self, recs):
+        """A key that changes only in form (-0 -> 0, 1 mon -> 30 days): for the source the same key, for Debezium a
+        key change d(-0) c(0, k=-0) (Java compares the doubles by bits)."""
+        rows = list(self.rows)
+        self.rng.shuffle(rows)
+        for row in rows:
+            kt = tuple(row.vals[c.position] for c in self.keys)
+            src = self.kcanon(row)
+            forms = [k for k in self.key_pool if k != kt
+                     and tuple(src_key_canon(l, c.type) for l, c in zip(k, self.keys)) == src
+                     and tuple(lit_canon(l, c.type) for l, c in zip(k, self.keys)) != tuple(
+                         lit_canon(l, c.type) for l, c in zip(kt, self.keys))]
+            if forms:
+                self.move(recs, row, self.rng.choice(forms))
+                return
+
+    def rotate_via_temp(self, recs):
+        """A -> T, B -> A, C -> B, T -> C: a rotation of three keys through a free key, four statements."""
+        if len(self.rows) < 3:
             return
-        group = self.rng.sample(self.rows, self.rng.randint(2, min(4, len(self.rows))))
-        keys = [tuple(r.vals[c.position] for c in self.keys) for r in group]
-        perm = keys[1:] + keys[:1]
-        order = list(range(len(group)))
-        self.rng.shuffle(order)
-        for i in order:
-            row = group[i]
-            old = {c.position: row.vals[c.position] for c in self.keys}
-            changed = self._update_values(row) if self.rng.random() < 0.3 else set()
-            row.ver += 1
-            for c, l in zip(self.keys, perm[i]):
-                row.vals[c.position] = l
-                changed.add(c.position)
-            a, u = self._image(row, changed)
-            self._emit(recs, "d", old)
-            self._emit(recs, "c", a, u, old)
+        r1, r2, r3 = self.rng.sample(self.rows, 3)
+        k1, k2, k3 = (tuple(r.vals[c.position] for c in self.keys) for r in (r1, r2, r3))
+        tmp = self._free_key()
+        if tmp is None:
+            return
+        self.move(recs, r1, tmp)
+        self.move(recs, r2, k1)
+        self.move(recs, r3, k2)
+        self.move(recs, r1, k3)
 
     def swap_via_temp(self, recs):
         """A <-> B through a third key, three immediate statements."""
@@ -459,11 +521,11 @@ class KeyedSource:
             return
         row = self._new_row(kt)
         self.rows.append(row)
-        self._emit(recs, "c", row.vals)
+        self._emit(recs, "c", row.vals, row=row)
         if self.rng.random() < 0.5:
             changed = self._update_values(row)
             a, u = self._image(row, changed)
-            self._emit(recs, "u", a, u)
+            self._emit(recs, "u", a, u, row=row)
         self.delete(recs, row)
 
     def delete_then_reuse(self, recs):
@@ -475,8 +537,8 @@ class KeyedSource:
         self.delete(recs, b)
         self.move(recs, a, kb)
 
-    OPS = ["insert", "insert", "update", "update", "update", "delete", "move", "move_same_key", "permute",
-           "swap_via_temp", "chain", "temp_row", "delete_then_reuse"]
+    OPS = ["insert", "insert", "update", "update", "update", "delete", "move", "move_same_key", "move_form",
+           "swap_via_temp", "rotate_via_temp", "chain", "temp_row", "delete_then_reuse"]
 
     def ops_txn(self, n_ops: int, ops=None) -> List[Rec]:
         self.txn += 1
@@ -494,6 +556,10 @@ class KeyedSource:
         """(row id, version, values) of every row: a row gets a new version, and so maybe another place in the
         table, whenever a statement changes it."""
         return [(r.rid, r.ver, dict(r.vals)) for r in self.rows]
+
+    def provenance(self):
+        """Per row (by source key): the last transaction whose record carried each column's current value."""
+        return {self.kcanon(r): dict(r.sup) for r in self.rows}
 
     def seed_rows(self, n: int):
         for _ in range(n):
@@ -514,8 +580,8 @@ class KeylessSource:
         _Row._n = 0                              # row ids count from 1 for every simulated table
         self.seq = 0
         self.txn = 0
-        # a small value pool per column, so that identical rows are common
-        self.pool = {c.position: [None] + list(SPECS[kinds[c.position]].values[:3]) for c in self.cols}
+        # a small value pool per column (five values and NULL), so that identical rows are common
+        self.pool = {c.position: [None] + list(SPECS[kinds[c.position]].values[:5]) for c in self.cols}
 
     def _val(self, c):
         return self.rng.choice(self.pool[c.position])
@@ -565,7 +631,53 @@ class KeylessSource:
                 a[p] = row.vals[p]
         self._emit(recs, "u", a, old, u)
 
-    OPS = ["insert", "insert", "delete", "update", "update"]
+    def _set(self, recs, row, changes):
+        """One row's update to `changes` (column -> value), as pgoutput sends it under FULL."""
+        old = dict(row.vals)
+        for p, v in changes.items():
+            row.vals[p] = v
+            row.toasted.discard(p)
+        a, u = {}, {}
+        for c in self.cols:
+            p = c.position
+            if c.unchanged_possible and p not in changes and p in row.toasted:
+                a[p], u[p] = None, True
+            else:
+                a[p] = row.vals[p]
+        self._emit(recs, "u", a, old, u)
+
+    def swap(self, recs):
+        """The direct swap a deferrable key allows (rule K: such a table is keyless here): one statement exchanges
+        the first column of two rows; after its first record two rows hold one value (H-015, table def_full)."""
+        if len(self.rows) < 2:
+            return
+        r1, r2 = self.rng.sample(self.rows, 2)
+        p = self.cols[0].position
+        v1, v2 = r1.vals[p], r2.vals[p]
+        self._set(recs, r1, {p: v2})
+        self._set(recs, r2, {p: v1})
+
+    def shift(self, recs):
+        """UPDATE t SET k = next(k): every row moves to the next value of the first column's pool."""
+        p = self.cols[0].position
+        pool = self.pool[p]
+        for row in list(self.rows):
+            i = pool.index(row.vals[p]) if row.vals[p] in pool else 0
+            self._set(recs, row, {p: pool[(i + 1) % len(pool)]})
+
+    def dup_then_delete_old(self, recs):
+        """Insert a duplicate of a row's first column, then delete the old row (both in one transaction)."""
+        if not self.rows:
+            return
+        old = self.rng.choice(self.rows)
+        new = self._new_row()
+        new.vals[self.cols[0].position] = old.vals[self.cols[0].position]
+        self.rows.append(new)
+        self._emit(recs, "c", new.vals, {})
+        self.rows.remove(old)
+        self._emit(recs, "d", {}, old.vals)
+
+    OPS = ["insert", "insert", "delete", "update", "update", "swap", "shift", "dup_then_delete_old"]
 
     def ops_txn(self, n_ops: int) -> List[Rec]:
         self.txn += 1

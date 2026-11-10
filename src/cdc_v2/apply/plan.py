@@ -83,7 +83,8 @@ def _ordered(src_sql: str, order_col: str, cols: str, params: tuple, pos: str) -
 
 
 def keyed_steps(meta: TableMeta, src_sql: str, order_col: str, ucols: List[Column], mode: str,
-                rel: Callable[[str], str], src_params: tuple = (), pos: str = "pos") -> List[Step]:
+                rel: Callable[[str], str], src_params: tuple = (), pos: str = "pos",
+                check_new_keys: bool = True) -> List[Step]:
     keys = meta.key_columns
     ucols = [c for c in ucols if not c.key]
     upos = {c.position for c in ucols}
@@ -120,7 +121,7 @@ FROM (
          CAST(sum(CASE op WHEN 'c' THEN 1 WHEN 'd' THEN -1 ELSE 0 END) OVER wk AS BIGINT) AS s_after,
          CAST(coalesce(sum(CASE WHEN op = 'd' THEN 1 ELSE 0 END) OVER wb, 0) AS BIGINT) AS d_before,
          CAST(coalesce(sum(CASE WHEN op = 'c' THEN 1 ELSE 0 END) OVER wb, 0) AS BIGINT) AS c_before,
-         rn = max(rn) OVER (PARTITION BY kx, tord) AS txn_last
+         first_value(op) OVER wk AS first_op
   FROM {r}
   WINDOW wk AS (PARTITION BY kx ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW),
          wb AS (PARTITION BY kx ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING)
@@ -128,29 +129,20 @@ FROM (
 WINDOW o AS (ORDER BY rn)
 """.format(r=R("r"))))
 
-    # kb: per key, the bounds of p (did the source hold the key when the change set starts?).
-    steps.append(Step("kb", "sql", """
-SELECT kx,
-       greatest(0, coalesce(max(CASE WHEN op = 'd' THEN -s_after WHEN op = 'u' THEN 1 - s_after END), 0),
-                coalesce(max(CASE WHEN txn_last THEN -s_after END), 0)) AS lo,
-       least(1, min(CASE WHEN txn_last THEN 1 - s_after END)) AS hi,
-       CAST(sum(CASE WHEN op = 'c' THEN 1 ELSE 0 END) AS BIGINT) AS n_c,
-       CAST(sum(CASE WHEN op = 'd' THEN 1 ELSE 0 END) AS BIGINT) AS n_d,
-       min(rn) AS first_rn
-FROM {w} GROUP BY kx
-""".format(w=R("w"))))
-
-    if mode == "stream":
-        steps.append(Step("cand_p", "sql", "SELECT %s FROM %s WHERE lo < hi" % (flat_x(meta, "kx"), R("kb"))))
-        steps.append(Step("present", "lookup", source="cand_p"))
-        undet = "CASE WHEN pr.n > 0 THEN 1 ELSE 0 END"
-        pjoin = "LEFT JOIN %s AS pr ON %s" % (R("present"), x_join(meta, "pr", "kb.kx"))
-    else:
-        undet, pjoin = "NULL", ""
+    # kp: per key, p (did the source hold the key when the change set starts?) and whether its records are a
+    # source history. For a table keyed by an immediate replica-identity key no two rows hold one key at any
+    # record of the stream (rule K, H-015), so the first record fixes p (c: 0; u, d: 1) and after every record the
+    # key holds no row or one row (p + S in {0, 1}; a u needs one). A key that breaks this is `bad`: a divergence.
     steps.append(Step("kp", "sql", """
-SELECT kb.*, CAST(CASE WHEN lo = hi THEN lo WHEN lo < hi THEN {undet} END AS BIGINT) AS p, lo > hi AS bad
-FROM {kb} AS kb {pjoin}
-""".format(undet=undet, kb=R("kb"), pjoin=pjoin)))
+SELECT kx, first_rn, n_c, n_d, p,
+       bool_or(p + s_after < 0 OR p + s_after > 1 OR (op = 'u' AND p + s_after <> 1)) AS bad
+FROM (SELECT w.*, CASE w.first_op WHEN 'c' THEN 0 ELSE 1 END AS p,
+             min(rn) OVER (PARTITION BY kx) AS first_rn,
+             CAST(sum(CASE WHEN op = 'c' THEN 1 ELSE 0 END) OVER (PARTITION BY kx) AS BIGINT) AS n_c,
+             CAST(sum(CASE WHEN op = 'd' THEN 1 ELSE 0 END) OVER (PARTITION BY kx) AS BIGINT) AS n_d
+      FROM {w} AS w) AS q
+GROUP BY kx, first_rn, n_c, n_d, p
+""".format(w=R("w"))))
 
     # ev: every record with its arrival index (c: the arrival it creates; d: the one it removes; u: the one it
     # changes) and, for the c of a key change, the link to the d before it.
@@ -232,8 +224,8 @@ FROM {fin} AS f {res_join}
         steps.append(Step("cand_r", "sql", """
 SELECT DISTINCT {fx} FROM (
   SELECT rkx AS kx FROM {dec} WHERE how = 'ref'
-  UNION ALL SELECT d.kx FROM {dec} AS d JOIN {kp} AS kf ON kf.kx = d.kx
-            WHERE d.how IN ('ref', 'unres') AND d.crn IS NOT NULL AND d.crn = d.first_rn AND kf.p = 0
+  UNION ALL SELECT d.kx FROM {dec} AS d
+            WHERE d.how IN ('ref', 'unres') AND d.crn IS NOT NULL AND d.crn = d.first_rn
 ) AS c
 """.format(fx=flat_x(meta, "kx"), dec=R("dec"), kp=R("kp"))))
         steps.append(Step("rootcnt", "lookup", source="cand_r"))
@@ -242,13 +234,11 @@ SELECT DISTINCT {fx} FROM (
 SELECT d.*,
   CASE WHEN d.how = 'complete' THEN 'ins'
        WHEN d.how = 'ref' AND r2.n = 1 AND kr.n_c = 0 THEN 'upd'
-       WHEN d.how IN ('ref', 'unres') AND d.crn IS NOT NULL AND d.crn = d.first_rn AND kf.p = 0 AND r3.n = 1
-            THEN 'upd3'
+       WHEN d.how IN ('ref', 'unres') AND d.crn IS NOT NULL AND d.crn = d.first_rn AND r3.n = 1 THEN 'upd3'
        ELSE 'unres' END AS action0
 FROM {dec} AS d
 LEFT JOIN {rc} AS r2 ON {j2}
 LEFT JOIN {kp} AS kr ON kr.kx = d.rkx
-LEFT JOIN {kp} AS kf ON kf.kx = d.kx
 LEFT JOIN {rc} AS r3 ON {j3}
 """.format(dec=R("dec"), rc=R("rootcnt"), kp=R("kp"), j2=rc("r2", "d.rkx"), j3=rc("r3", "d.kx"))))
         root = "CASE WHEN action0 = 'upd3' THEN kx ELSE rkx END"
@@ -276,13 +266,20 @@ LEFT JOIN {r} AS rf ON rf.rn = a.lrn
     steps.append(Step("act", "sql", act_sql))
 
     # outputs: values are read from the records by record number
-    # stream: only keys the source held when the change set started (p = 1) can have a destination row. Catch-up:
-    # every key of the log, because the table was loaded under other snapshots; the row of an unresolved key is
-    # removed as well: it is stale, a later call must not take values from it, and the repair read loads it again
-    # (docs/design/apply.md 2.6).
-    pfilter = " AND kp.p = 1" if mode == "stream" else ""
+    # del. Stream: the keys the source held at the start (p = 1), except roots that K3 moves; the destination
+    # equals the source then, so each has exactly one row and K1's count must equal their number (core.py). Keys
+    # with p = 0 must have no row: they are added to K1 (expected to remove nothing) whenever K1 runs anyway, and,
+    # with `check_new_keys`, also when it would not (an insert-only change set). Catch-up: every key of the change
+    # set (the table was loaded under other snapshots), the row of an unresolved key included: it is stale, a later
+    # call must not take values from it, and the repair read loads it again (docs/design/apply.md 2.6).
+    if mode == "stream":
+        pfilter = (" AND (kp.p = 1 OR {chk} OR EXISTS (SELECT 1 FROM {kp} AS k2 WHERE k2.p = 1 AND NOT EXISTS "
+                   "(SELECT 1 FROM {act} AS a2 WHERE a2.action IN ('upd', 'copy') AND a2.root = k2.kx)))"
+                   ).format(chk="true" if check_new_keys else "false", kp=R("kp"), act=R("act"))
+    else:
+        pfilter = ""
     steps.append(Step("del", "sql", """
-SELECT {fx} FROM {kp} AS kp
+SELECT {fx}, kp.p FROM {kp} AS kp
 WHERE true{pfilter}
   AND NOT EXISTS (SELECT 1 FROM {act} AS a WHERE a.action IN ('upd', 'copy') AND a.root = kp.kx)
 """.format(fx=flat_x(meta, "kp.kx"), kp=R("kp"), act=R("act"), pfilter=pfilter)))
@@ -317,8 +314,7 @@ WHERE true{pfilter}
         kvs = ", ".join("q.%s AS %s" % (c.a, c.a) for c in keys)
         steps.append(Step("unres", "sql", """
 SELECT {kvs} FROM {act} AS a JOIN {r} AS q ON q.rn = a.lrn WHERE a.action = 'unres'
-UNION ALL SELECT {kvs} FROM {kp} AS kp JOIN {r} AS q ON q.rn = kp.first_rn WHERE kp.p IS NULL
-""".format(kvs=kvs, act=R("act"), kp=R("kp"), r=R("r"))))
+""".format(kvs=kvs, act=R("act"), r=R("r"))))
     return steps
 
 
@@ -338,6 +334,7 @@ def keyed_stats_sql(meta: TableMeta, ucols: List[Column], rel: Callable[[str], s
         "(SELECT count(*) FROM {kp} WHERE bad) AS n_bad",
         "(SELECT count(*) FROM {act} WHERE action = 'unres') AS n_unres_final",
         "(SELECT count(*) FROM {del}) AS n_del",
+        "(SELECT count(*) FROM {del} WHERE p = 1) AS n_del_held",
         "(SELECT count(*) FROM {act} WHERE action = 'ins') AS n_ins",
         "(SELECT count(*) FROM {act} WHERE action = 'upd') AS n_upd",
         "(SELECT count(*) FROM {act} WHERE action = 'copy') AS n_copy",
