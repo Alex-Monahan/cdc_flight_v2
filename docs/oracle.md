@@ -72,6 +72,25 @@ attach mode.
    table locks can stall replay (a replayed `ACCESS EXCLUSIVE` lock waits up to 30 s, also for a stream that decodes
    there) and then cancel the oracle with SQLSTATE 40001. The whole comparison is then started again, at most
    `conflict_retries` (3) times.
+
+   **On a standby whose server has the export defect** (`cdc_v2.pg.cut.export_defect(server_version_num)`:
+   every release up to 16.15, 17.11 and 18.6; `docs/design/cut.md` section 7) a snapshot exported there loses
+   its list of running transactions while a primary transaction is open whose first write was inside a
+   subtransaction, or that has more than 64 of them. An importer then sees transactions the exporter does not
+   see, and marks the rows of a still-running transaction as aborted, for every later reader of that standby.
+   The pipeline's own reads would then miss those rows, and the oracle, reading the same spoiled rows, could say
+   EQUAL falsely. So there the coordinator keeps a snapshot only if it is quiet (`xmin = xmax` in
+   `pg_current_snapshot()`: nothing to lose), taking another every 50 ms for at most `quiet_wait_s` (default
+   5 s); if none comes, the coordinator reads alone on its own snapshot, the scan jobs take turns on that one
+   connection, and nothing is exported or imported. The position is still read before each snapshot. On a
+   primary and on a server with the fix nothing changes. `Result.source_snapshot` says which way was taken
+   (`exported`, `quiet exported`, `one connection`); `snapshot_way` is the choice, tested in
+   `tests/test_oracle_unit.py`. Live (`tests/cut/test_cut_live.py`, marker `localpg`, the cut's private
+   cluster; `evidence/p3/cut/oracle_standby.json`): with such a transaction open the oracle took one connection
+   and was right both ways, and after the commit an ordinary standby session saw the row. The oracle before
+   this change, run the same way, left that row invisible to every reader of the standby and then reported an
+   extra destination row that the source does have (`oracle_standby_before_the_fix.json`). The version table
+   is shared with the pipeline: if it is wrong, both are.
 2. **One destination transaction** on one connection (`BEGIN TRANSACTION` ... `ROLLBACK`). A caller may pass its own
    connection with an open transaction (`Destination(conn=..., in_transaction=True)`); the mutation tests use this.
    Every MotherDuck statement has a deadline (`md_statement_s`, default 1,800 s, never past the comparison's

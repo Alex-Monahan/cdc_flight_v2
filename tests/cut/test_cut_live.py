@@ -231,6 +231,26 @@ def test_a_primary_cut_does_not_outlive_a_crash_of_its_server(cluster):
     assert after["valid_if_the_server_start_were_not_compared"], case      # the negative control
 
 
+def test_the_oracle_reads_a_standby_with_the_export_defect_without_importing_a_snapshot(cluster):
+    """docs/oracle.md, step 1.  A primary transaction is open whose first write is inside a subtransaction, and a
+    younger one has committed, so no snapshot of the standby is quiet.  On a server with the export defect the
+    oracle reads on one connection and its result is right (equal, and different when the destination lacks a
+    row).  After the open transaction commits, an ordinary session of the standby sees its row: the oracle left
+    no wrong hint bits (the oracle before the fix did, `evidence/p3/cut/oracle_standby_before_the_fix.json`), and
+    with a quiet snapshot it exports again.  The destination is a local DuckDB database."""
+    r = CP.oracle_standby(cluster, quiet_wait_s=1.0)
+    assert r["ok"], r
+    defect = r["server_has_the_export_defect"]
+    assert defect == C.export_defect(r["server_version_num"])
+    first, missing, last = (r[k] for k in ("while_open", "while_open_with_a_row_missing_on_the_destination",
+                                           "after_the_commit"))
+    assert first["source_in_recovery"] and first["equal"], first
+    assert first["source_snapshot"] == ("one connection" if defect else "exported"), first
+    assert not missing["equal"] and missing["missing_rows"] == 1 and missing["extra_rows"] == 0, missing
+    assert r["after_the_commit_an_ordinary_standby_session_sees_the_row"], r
+    assert last["equal"] and last["source_rows"] == first["source_rows"] + 1, last
+
+
 def test_primary_rules_under_a_held_back_synchronous_standby(cluster):
     """Cuts on the primary while commits wait for a standby whose replay is paused now and then: the stream
     delivers transactions that snapshots do not see yet.  The exact rule and the gap tracker hold; a later

@@ -1,6 +1,7 @@
 """Scenarios around the cut that are not a standby campaign (docs/design/cut.md): the exported snapshot on a
 standby, the gap on a primary, a campaign of cuts taken on a primary, promotion, a primary that crashes after a
-commit it had not flushed, and what the stream says about one known transaction.
+commit it had not flushed, what the stream says about one known transaction, and the oracle's reader on a
+standby with the export defect.
 
 Each scenario returns a dictionary of plain facts (no host, user or path in it) and prints it as JSON.
 Test code: never imported by the engine.
@@ -1186,6 +1187,106 @@ def primary_crash(cl: S.Cluster, attempts: int = 3) -> dict:
 
 
 # --------------------------------------------------------------------------------------------------------------
+# The oracle's reader on a standby whose server has the export defect
+# --------------------------------------------------------------------------------------------------------------
+
+ORACLE_TABLE = S.SCHEMA + ".oracle_check"
+ORACLE_SLOT = "cdc_v2_cut_oracle_check"        # a name for the destination's stand-in position row; no slot
+
+
+def oracle_standby(cl: S.Cluster, rows: int = 4000, quiet_wait_s: float = 1.0) -> dict:
+    """The oracle reads the standby while a primary transaction is open whose first write is inside a
+    subtransaction, and a younger transaction has committed: no snapshot of the standby is quiet then.  On a
+    server with the export defect the oracle reads on one connection, exporting and importing nothing
+    (docs/oracle.md, step 1), and its result is right: equal to a destination that holds the same rows, and
+    different from one that lacks a row.  Then the open transaction commits: an ordinary session of the standby
+    must see its row (an importer of a defective snapshot would have marked it aborted for every later reader;
+    ``export_defect.json`` shows that), and the oracle, with a quiet snapshot now, finds the destination equal
+    once it has the row.  The destination is a local DuckDB database (no MotherDuck); its position row stands
+    in for the pipeline's applied position."""
+    import duckdb
+
+    from cdc_v2.oracle import comparison as O
+
+    open_id, younger_id = rows + 100, rows + 1
+    out: dict = {"rows": rows, "quiet_wait_s": quiet_wait_s}
+    duck = duckdb.connect()
+    dest = O.Destination(conn=duck)
+    source = O.Source(conninfo=cl.node("replica")["dsn_admin"])
+    cfg = O.OracleConfig(tables=[ORACLE_TABLE], source_workers=4, min_blocks_per_range=1)
+    cfg.quiet_wait_s = quiet_wait_s
+
+    def at(position: int) -> None:
+        duck.execute("DELETE FROM _cdc.stream_state")
+        duck.execute("INSERT INTO _cdc.stream_state VALUES (?, ?)", [ORACLE_SLOT, position])
+
+    def compare(position: int) -> dict:
+        t = time.monotonic()
+        r = O.compare(source, dest, cfg, position=position, slot_name=ORACLE_SLOT)
+        table = r.tables[0]
+        return {"source_snapshot": getattr(r, "source_snapshot", None), "equal": r.equal,
+                "source_in_recovery": r.source_in_recovery, "source_rows": table.source_rows,
+                "destination_rows": table.destination_rows, "missing_rows": table.missing_rows,
+                "extra_rows": table.extra_rows, "seconds": round(time.monotonic() - t, 2)}
+
+    try:
+        with cl.connect("primary") as a, cl.connect("primary") as b:
+            out["server_version_num"] = _version_num(a)
+            defect = out["server_has_the_export_defect"] = C.export_defect(out["server_version_num"])
+            a.execute("CREATE SCHEMA IF NOT EXISTS " + S.SCHEMA)
+            a.execute("DROP TABLE IF EXISTS " + ORACLE_TABLE)
+            a.execute("CREATE TABLE %s (id integer PRIMARY KEY, v text)" % ORACLE_TABLE)
+            a.execute("INSERT INTO %s SELECT g, 'row ' || g FROM generate_series(1, %%s) g" % ORACLE_TABLE, (rows,))
+            a.execute("ANALYZE " + ORACLE_TABLE)       # the oracle splits the scan by relpages
+            schema, name = ORACLE_TABLE.split(".")
+            duck.execute("CREATE SCHEMA %s" % schema)
+            duck.execute("CREATE TABLE %s (id INTEGER, v VARCHAR)" % ORACLE_TABLE)
+            duck.execute("INSERT INTO %s SELECT g, 'row ' || g FROM range(1, %d) t(g)" % (ORACLE_TABLE, rows + 1))
+            duck.execute("CREATE SCHEMA _cdc")
+            duck.execute("CREATE TABLE _cdc.stream_state (slot_name VARCHAR, applied_lsn UBIGINT)")
+            a.execute("BEGIN")
+            a.execute("SAVEPOINT first_write")      # the first write of the transaction is inside a subtransaction
+            a.execute("INSERT INTO %s VALUES (%%s, 'open')" % ORACLE_TABLE, (open_id,))
+            b.execute("INSERT INTO %s VALUES (%%s, 'younger')" % ORACLE_TABLE, (younger_id,))   # xmax moves on
+            duck.execute("INSERT INTO %s VALUES (?, 'younger')" % ORACLE_TABLE, [younger_id])
+            q = _lsn(b, INSERT_LSN)
+            at(q)
+            with cl.connect("replica") as r:
+                C.wait_replay_reached(r, q, Deadline.after(60))
+                out["standby_snapshot_while_open"] = r.execute("SELECT pg_current_snapshot()::text").fetchone()[0]
+            out["while_open"] = compare(q)
+            duck.execute("DELETE FROM %s WHERE id = 7" % ORACLE_TABLE)
+            out["while_open_with_a_row_missing_on_the_destination"] = compare(q)
+            duck.execute("INSERT INTO %s VALUES (7, 'row 7')" % ORACLE_TABLE)
+            a.execute("RELEASE SAVEPOINT first_write")
+            a.execute("COMMIT")
+            q2 = _lsn(b, INSERT_LSN)
+            with cl.connect("replica") as r:
+                C.wait_replay_reached(r, q2, Deadline.after(60))
+                out["after_the_commit_an_ordinary_standby_session_sees_the_row"] = r.execute(
+                    "SELECT count(*) FROM %s WHERE id = %%s" % ORACLE_TABLE, (open_id,)).fetchone()[0] == 1
+            duck.execute("INSERT INTO %s VALUES (?, 'open')" % ORACLE_TABLE, [open_id])
+            at(q2)
+            out["after_the_commit"] = compare(q2)
+            a.execute("DROP TABLE " + ORACLE_TABLE)
+        first, missing, last = (out[k] for k in ("while_open", "while_open_with_a_row_missing_on_the_destination",
+                                                  "after_the_commit"))
+        out["ok"] = bool(
+            first["source_in_recovery"] and first["equal"] and first["source_rows"] == rows + 1
+            and first["source_snapshot"] == (O.ONE_CONNECTION if defect else O.EXPORTED)
+            and not missing["equal"] and missing["missing_rows"] == 1 and missing["extra_rows"] == 0
+            and missing["source_snapshot"] == first["source_snapshot"]
+            and out["after_the_commit_an_ordinary_standby_session_sees_the_row"]
+            and last["equal"] and last["source_rows"] == rows + 2
+            and last["source_snapshot"] in ((O.QUIET_EXPORTED, O.ONE_CONNECTION) if defect else (O.EXPORTED,)))
+    finally:
+        duck.close()
+        with cl.connect("primary") as a:
+            a.execute("DROP TABLE IF EXISTS " + ORACLE_TABLE)
+    return out
+
+
+# --------------------------------------------------------------------------------------------------------------
 # A standby that starts from a checkpoint taken while a commit was still waiting
 # --------------------------------------------------------------------------------------------------------------
 
@@ -1351,6 +1452,9 @@ def add_commands(sub) -> None:
     k = sub.add_parser("keyless", help="tables without a key: quiet exported snapshot within a wait, else one reader")
     k.add_argument("--quiet-wait", type=float, default=1.0)
     k.add_argument("--out")
+    o = sub.add_parser("oracle-standby", help="the oracle's reader on a standby while a subtransaction writer is open")
+    o.add_argument("--quiet-wait", type=float, default=1.0)
+    o.add_argument("--out")
 
 
 def primary_summary(r: dict) -> str:
@@ -1394,6 +1498,9 @@ def dispatch(cl: S.Cluster, args) -> int:
         ok = result.get("ok", False)
     elif args.cmd == "keyless":
         result = keyless(cl, quiet_wait_s=args.quiet_wait)
+        ok = result.get("ok", False)
+    elif args.cmd == "oracle-standby":
+        result = oracle_standby(cl, quiet_wait_s=args.quiet_wait)
         ok = result.get("ok", False)
     else:
         raise SystemExit("unknown command %s" % args.cmd)
