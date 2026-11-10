@@ -48,9 +48,12 @@ class Shapes:
                                          join_wrap("%s.%s%d" % (right, prefix, c.position), c.dtype))
                             for c in self.meta.key_columns)
 
-    def _free_target(self, alias: str = "n") -> str:
-        """A target key that the source did not hold at the start (xp = 0) has no row."""
-        return " ANTI JOIN %s AS t3 ON %s.xp = 0 AND %s" % (self.T, alias, key_join(self.meta, "t3", alias, "x"))
+    def _free_target(self, rel: str) -> str:
+        """The relation's rows whose target key is held by the source at the start (xp = 1), and those whose
+        target the source did not hold (xp = 0) and that have no row there. (Two parts: an ANTI JOIN whose
+        condition also tests the left side is a nested loop in DuckDB.)"""
+        return ("(SELECT n.* FROM {rel} AS n WHERE n.xp = 1 UNION ALL SELECT n.* FROM {rel} AS n ANTI JOIN {T} AS t3 "
+                "ON {j} WHERE n.xp = 0)").format(rel=rel, T=self.T, j=key_join(self.meta, "t3", "n", "x"))
 
     def k1_delete(self, rel: str) -> str:
         """Stream (`per_key`): the rows of the relation's keys go only if every key holds p rows (p = 1: the
@@ -81,9 +84,9 @@ class Shapes:
         src = rel
         if self.per_key:
             # each root alone at its key; with new_keys, each target that must be free is free
-            src = "(SELECT n.* FROM %s AS n JOIN %s AS q ON %s%s WHERE q.c = 1)" % (
-                rel, self._counts(rel, "rx", False), self._pjoin("n", "q", "rx"),
-                self._free_target() if self.new_keys else "")
+            src = "(SELECT n.* FROM %s AS n JOIN %s AS q ON %s WHERE q.c = 1)" % (
+                self._free_target(rel) if self.new_keys else rel, self._counts(rel, "rx", False),
+                self._pjoin("n", "q", "rx"))
         return "UPDATE %s AS t SET %s FROM %s AS n WHERE %s" % (self.T, sets, src, key_join(self.meta, "t", "n", "rx"))
 
     def k4_sentinel_column(self, c: Column, rel: str) -> str:
@@ -117,8 +120,8 @@ class Shapes:
         upos = {c.position for c in self.ucols}
         sel = ", ".join(("CASE WHEN n.h%d THEN n.%s ELSE t.%s END" % (c.position, c.a, c.qname))
                         if c.position in upos else "n.%s" % c.a for c in cols)
-        return "INSERT INTO %s (%s) SELECT %s FROM %s AS n JOIN %s AS t ON t.rowid = n.rid%s" % (
-            self.T, ", ".join(c.qname for c in cols), sel, rel, self.T, self._free_target() if self.new_keys else "")
+        return "INSERT INTO %s (%s) SELECT %s FROM %s AS n JOIN %s AS t ON t.rowid = n.rid" % (
+            self.T, ", ".join(c.qname for c in cols), sel, self._free_target(rel) if self.new_keys else rel, self.T)
 
     def k8_delete_copied(self, rel: str) -> str:
         return "DELETE FROM %s WHERE rowid IN (SELECT rid FROM %s)" % (self.T, rel)
