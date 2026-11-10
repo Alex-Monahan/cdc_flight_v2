@@ -13,6 +13,7 @@ import subprocess
 import time
 
 import psycopg
+from psycopg import sql
 
 BASE = "/tmp/cdc_v2_pg"
 DATA = BASE + "/data"
@@ -154,7 +155,8 @@ def setup(bindir):
     password = secrets.token_urlsafe(24)
     with connect() as c:
         c.execute(LINEITEM)
-        c.execute("CREATE ROLE %s LOGIN REPLICATION PASSWORD %%s" % ROLE, (password,))
+        c.execute(sql.SQL("CREATE ROLE {} LOGIN REPLICATION PASSWORD {}").format(sql.Identifier(ROLE),
+                                                                                  sql.Literal(password)))
         c.execute("GRANT SELECT ON lineitem TO %s" % ROLE)
         c.execute("CREATE PUBLICATION %s FOR TABLE lineitem" % PUB)
     return password, time.time() - t

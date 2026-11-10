@@ -601,7 +601,7 @@ def phase_tput():
     pg_up()
     prepare()
     n = int(os.environ.get("CDC_V2_TPUT_ROWS", "1000000"))
-    only = [x for x in os.environ.get("CDC_V2_TPUT_ONLY", "").split(",") if x]
+    only = [x for x in os.environ.get("CDC_V2_TPUT_ONLY", "").split(",") if x and x != "all"]
     best = None
     for name, props, heap, opts in TPUT:
         if only and name not in only:
