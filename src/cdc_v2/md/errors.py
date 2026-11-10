@@ -11,6 +11,9 @@ The mapping was found with real MotherDuck and with fault sites; the evidence is
    server as different classes with the same phrases). Before `COMMIT`: `ConnectionLost`. After: `CommitUnknown`.
 3. A **conflict**: a client error whose text says ``Conflict on ...`` or ``write-write conflict`` and that is not
    a transport error: `Conflict`.
+
+   The text decides nothing for an error about the data of a statement (the client's `DataError` and
+   `IntegrityError` families: a conversion, a constraint). Such a text quotes a value of a row.
 4. Everything else is passed on unchanged before `COMMIT` was sent, and is `CommitUnknown` after.
 
 Messages of these errors never repeat the client's text for a conflict (it can hold a key value, SPEC 8.3). For a
@@ -64,6 +67,10 @@ TRANSPORT_RE = re.compile(
     r"Could not connect|UNAVAILABLE|DEADLINE_EXCEEDED|Connection already closed|No open result set|"
     r"connection (has been |was |is )?closed", re.IGNORECASE)
 CONFLICT_RE = re.compile(r"\bconflict on \w+|write-write conflict", re.IGNORECASE)
+#: Errors about the data of a statement (a value that does not convert, a constraint). Their text quotes a value
+#: of a row, so their text decides nothing: a value that holds one of the phrases above must not look like a lost
+#: connection or a conflict, which a caller answers by running the transaction again.
+DATA_CLASSES = (duckdb.DataError, duckdb.IntegrityError)
 
 _SCRUB = (
     (re.compile(r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"), "<token>"),
@@ -90,6 +97,8 @@ def kind_of(exc):
         return "other"
     if isinstance(exc, TRANSPORT_CLASSES):
         return "transport"
+    if isinstance(exc, DATA_CLASSES):
+        return "other"
     text = str(exc)
     if isinstance(exc, (duckdb.Error, OSError)) and TRANSPORT_RE.search(text):
         return "transport"
