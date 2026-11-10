@@ -1,8 +1,10 @@
 """The one place where the harness writes evidence files (ledgers, summaries, measurements).
 
-Evidence is committed to a public repository (SPEC R23, §4). This writer scrubs what it can (the user's home becomes
-``~``, the user name ``<user>``, registered run directories ``<run>``) and then fails closed: text that still holds an
-absolute path under a user or temporary directory, or the user name, is refused with `EvidenceError`.
+Evidence is committed to a public repository (SPEC R23, §4). This writer scrubs what it can, longest path first and
+only at a path boundary: registered run directories become ``<run>``, the temporary directory ``<tmp>``, the Python
+installation ``<python>``, the user's home ``~`` and the user name ``<user>``. Then it fails closed: text that still
+holds an absolute path under ``/Users``, ``/home``, ``/root``, ``/private``, ``/var``, ``/tmp``, ``/Volumes`` or
+``/opt``, or the user name, is refused with `EvidenceError`.
 
 At the merge with the oracle worker's evidence writer, replace the body of `write_evidence` with a call to it; every
 harness module writes through this function only.
@@ -11,10 +13,12 @@ import getpass
 import json
 import os
 import re
+import sys
 import tempfile
 
-_ROOTS = []                          # (absolute path, placeholder), longest first
-_ABS_PATH = re.compile(r"(?<![\w.~<>-])/(Users|home|private|var|tmp|Volumes|opt/homebrew/var)/")
+_ROOTS = []                          # (absolute path, placeholder) registered by runners
+_ABS_PATH = re.compile(r"(?<![\w.~<>-])/(Users|home|root|private|var|tmp|Volumes|opt)/")
+_BOUNDARY = r"(?![A-Za-z0-9_-])"
 
 
 class EvidenceError(ValueError):
@@ -26,26 +30,36 @@ def register_root(path, placeholder="<run>"):
     for p in {os.path.abspath(str(path)), os.path.realpath(str(path))}:
         if (p, placeholder) not in _ROOTS:
             _ROOTS.append((p, placeholder))
-    _ROOTS.sort(key=lambda r: -len(r[0]))
 
 
 def _user():
     try:
         return getpass.getuser()
-    except Exception:
+    except Exception:                # noqa: BLE001
         return os.environ.get("USER", "")
 
 
-def scrub(text):
-    """Replace known roots, the temporary directory, the home directory and the user name."""
-    text = str(text)
-    for p, ph in _ROOTS:
-        text = text.replace(p, ph)
-    for t in {tempfile.gettempdir(), os.path.realpath(tempfile.gettempdir())}:
-        text = text.replace(t, "<tmp>")
+def _replacements():
+    reps = list(_ROOTS)
+    for t in (tempfile.gettempdir(),):
+        reps += [(t, "<tmp>"), (os.path.realpath(t), "<tmp>")]
+    for p in (sys.prefix, sys.base_prefix, sys.exec_prefix):
+        reps += [(p, "<python>"), (os.path.realpath(p), "<python>")]
     home = os.path.expanduser("~")
-    for h in {home, os.path.realpath(home)}:
-        text = text.replace(h, "~")
+    reps += [(home, "~"), (os.path.realpath(home), "~")]
+    seen, out = set(), []
+    for p, ph in sorted(reps, key=lambda r: (-len(r[0]), r[0], r[1])):    # longest first, deterministic
+        if p and p != "/" and p not in seen:
+            seen.add(p)
+            out.append((p, ph))
+    return out
+
+
+def scrub(text):
+    """Replace known roots, the temporary directory, the Python installation, the home and the user name."""
+    text = str(text)
+    for p, ph in _replacements():
+        text = re.sub(re.escape(p) + _BOUNDARY, lambda _m, ph=ph: ph, text)
     user = _user()
     if user and len(user) >= 3:
         text = re.sub(r"(?<![A-Za-z0-9])%s(?![A-Za-z0-9])" % re.escape(user), "<user>", text)
@@ -53,7 +67,7 @@ def scrub(text):
 
 
 def check_clean(text):
-    """Raise EvidenceError if ``text`` still holds an absolute user/temporary path or the user name."""
+    """Raise EvidenceError if ``text`` still holds an absolute user, system or temporary path, or the user name."""
     m = _ABS_PATH.search(text)
     if m:
         raise EvidenceError("evidence holds an absolute path near %r" % text[max(0, m.start() - 20):m.end() + 20])

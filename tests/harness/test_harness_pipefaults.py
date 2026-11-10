@@ -29,7 +29,7 @@ def test_each_kind_exactly():
     assert out == DATA[:600] + DATA[500:600] + DATA[600:]
     assert log[0]["out_offset"] == 600
     out, log = pf.apply_bytes(DATA, [ev("truncate", length=37)])
-    assert out == DATA[:-37] and log[0]["dropped"] == 37
+    assert out == DATA[:-37] and log[0]["dropped"] == 37 and log[0]["in_offset"] == len(DATA) - 37
     out, log = pf.apply_bytes(DATA, [ev("flip", offset=4321, mask=0x10)])
     diff = [i for i in range(len(DATA)) if out[i] != DATA[i]]
     assert len(out) == len(DATA) and diff == [4321] and out[4321] == DATA[4321] ^ 0x10
@@ -38,6 +38,23 @@ def test_each_kind_exactly():
     assert out == DATA and log[0]["kind"] == "stall"
     out, log = pf.apply_bytes(DATA, [ev("flip", offset=len(DATA) + 5, mask=1)])
     assert out == DATA and log[0]["fired"] is False
+
+
+def test_truncate_acts_on_the_input_before_other_faults():
+    """A dup or flip inside the truncated tail never fires, and the log says so (review finding)."""
+    data = bytes(range(100))
+    plan = [dict(kind="dup", id=0, offset=90, length=10), dict(kind="truncate", id=1, length=10)]
+    out, log = pf.apply_bytes(data, plan, chunk=7)
+    assert out == data[:90]
+    by = {e["kind"]: e for e in log}
+    assert by["dup"]["fired"] is False and by["dup"]["why"] == "in the truncated tail"
+    assert by["truncate"]["fired"] and by["truncate"]["in_offset"] == 90 and by["truncate"]["dropped"] == 10
+    out, log = pf.apply_bytes(data, [dict(kind="flip", id=0, offset=95, mask=1), dict(kind="truncate", id=1,
+                                                                                     length=10)])
+    assert out == data[:90] and [e["fired"] for e in log if e["kind"] == "flip"] == [False]
+    out, log = pf.apply_bytes(data, [dict(kind="flip", id=0, offset=80, mask=1), dict(kind="truncate", id=1,
+                                                                                     length=10)])
+    assert out[80] == data[80] ^ 1 and len(out) == 90 and all(e["fired"] for e in log)
 
 
 def test_reproducible_and_independent_of_chunking():

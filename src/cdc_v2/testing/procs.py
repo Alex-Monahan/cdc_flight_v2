@@ -150,9 +150,12 @@ class Proc:
         except ProcessLookupError:
             return False
 
-    def signal_group(self, sig):
-        """Signal the whole process group; False if the group is gone."""
+    def signal_group(self, sig, table=None):
+        """Signal the whole process group; False if the group is gone. After the leader has been reaped the group is
+        signalled only if ``ps`` still shows members (a group id is not reused while the group has members)."""
         if self.group_gone:
+            return False
+        if self.popen.poll() is not None and not self.group_members(table):
             return False
         try:
             os.killpg(self.pgid, sig)
@@ -184,7 +187,7 @@ class Proc:
         """SIGKILL to the group and to every descendant that left it (found through parent pids)."""
         table = process_table()
         self._remember(table)
-        self.kill_group()
+        self.signal_group(signal.SIGKILL, table)
         for pid in self._known_alive(table):
             try:
                 os.kill(pid, signal.SIGKILL)

@@ -120,8 +120,9 @@ The file is re-read only when one `stat` shows a new inode, modification time or
 `site` may be an `fnmatch` pattern. `action` is `raise`, `delay` (`seconds`) or `block` (while the rule is in the file
 and its window is open; at most `seconds` if given). `exception` is a built-in name or `module.Class` of a module that
 the process has already imported (the reader never imports); the default is `FaultInjected`, and the raised exception
-carries `cdc_v2_fault = <rule id>`. `skip` hits pass first, then `hits` hits fire; hits outside the window
-neither fire nor count. The first rule that fires decides.
+carries `cdc_v2_fault = <rule id>`; a `raise` rule whose exception cannot be built logs an `error` line and does
+not fire. `skip` hits pass first, then `hits` hits fire; hits outside the window neither fire nor count. Counters
+belong to the rule (id and content), so a changed rule starts from zero. The first rule that fires decides.
 
 Test side:
 
@@ -224,9 +225,12 @@ The summary (`write_summary`) gives `declared_points`, `reached_points`, `missin
 (points that fired at least once in mode (a) / declared; both are `null` when mode (a) did not run), outcomes per
 mode and per point, the failures and `all_passed`. A crash suite is complete when `missing_points` is empty and `all_passed` is true.
 
-Evidence files contain no absolute path and no user name: `harness_evidence.write_evidence` replaces the run
-directory with `<run>`, the temporary directory with `<tmp>`, the home with `~` and the user name with `<user>`, and
-then refuses any text that still holds an absolute user or temporary path. At the merge with the oracle worker's
+Evidence files contain no absolute path and no user name: `harness_evidence.write_evidence` replaces, longest path
+first and only at a path boundary, the run directory with `<run>`, the temporary directory with `<tmp>`, the Python
+installation with `<python>`, the home with `~` and the user name with `<user>`, and then refuses any text that still
+holds an absolute path under `/Users`, `/home`, `/root`, `/private`, `/var`, `/tmp`, `/Volumes` or `/opt`, or the
+user name. A scenario directory is new for every scenario, and only hit-log lines of the scenario's own process
+(its pid) count, so a stale log can never produce a pass. At the merge with the oracle worker's
 evidence writer, only the body of that function changes.
 
 ## 7. TCP fault proxy
@@ -296,7 +300,8 @@ not help when the request or the reply is lost.
 
 For the one-directional frame pipe from the engine to the applier. Faults chosen from a seed at random input offsets:
 `stall`, `cut` (end of stream; the input is closed too, so the writer sees EPIPE), `dup` (a byte range relayed twice),
-`truncate` (the last bytes dropped at the end), `flip` (one bit). At most one terminal fault (cut or truncate) per
+`truncate` (the last input bytes dropped at the end, before any other fault sees them; a fault inside that tail is
+logged as not fired), `flip` (one bit). At most one terminal fault (cut or truncate) per
 plan.
 
 ```python

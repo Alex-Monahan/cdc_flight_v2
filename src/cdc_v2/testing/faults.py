@@ -26,6 +26,7 @@ class FaultControl:
         self.rules = []
         self._last_mtime = None
         self._n = 0
+        self._run = uuid.uuid4().hex[:6]           # ids differ between FaultControl objects on one directory
         self._write()
 
     def env(self, tag=""):
@@ -52,7 +53,7 @@ class FaultControl:
         if rid:
             return rid
         self._n += 1
-        return "r%d" % self._n
+        return "r%d-%s" % (self._n, self._run)
 
     def add(self, site, action, rid=None, **fields):
         """Append one rule; returns its id. ``window=(start_offset_s, end_offset_s)`` is relative to now."""

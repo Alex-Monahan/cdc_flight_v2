@@ -43,6 +43,7 @@ import random
 import re
 import sys
 import threading
+import shutil
 import time
 import traceback
 import zlib
@@ -119,9 +120,11 @@ class _Scenario:
 
     def __init__(self, runner, mode, point, seed):
         self.runner, self.mode, self.point, self.seed = runner, mode, point, seed
-        label = re.sub(r"[^A-Za-z0-9_.-]", "_", "%s-%s-%d" % (mode, point or "any", seed))
+        label = re.sub(r"[^A-Za-z0-9_.-]", "_", "%s-%s-%d-%d" % (mode, point or "any", seed, runner.next_serial()))
         self.dir = os.path.join(runner.workdir, label)
-        os.makedirs(self.dir, exist_ok=True)
+        if os.path.exists(self.dir):                 # never read a hit log of an earlier run (reused workdir)
+            shutil.rmtree(self.dir)
+        os.makedirs(self.dir)
         self.hits_path = os.path.join(self.dir, "hits.jsonl")
         self.adapter = runner.factory()
         self.fleet = procs.Fleet()
@@ -152,8 +155,15 @@ class _Scenario:
         self.fleet.add(p)
         return p
 
-    def hits(self, tag=None):
-        return [h for h in crashpoints.read_log(self.hits_path) if tag is None or h.get("tag") == tag]
+    def hits(self, tag=None, proc=None):
+        """Hit-log lines, optionally of one tag and one process (its pid)."""
+        return [h for h in crashpoints.read_log(self.hits_path)
+                if (tag is None or h.get("tag") == tag) and (proc is None or h.get("pid") == proc.pid)]
+
+    def fired(self, proc, point, hit):
+        """The fire line of ``proc`` at ``point`` and ``hit``, or None."""
+        lines = [h for h in self.hits(proc=proc) if h.get("fire")]
+        return lines[-1] if lines and lines[-1]["point"] == point and lines[-1]["hit"] == hit else None
 
     def timing(self, key, since):
         self.rec["timings"][key] = round(time.monotonic() - since, 3)
@@ -224,6 +234,7 @@ class CrashRunner:
         self.cfg = config or Config()
         self.records = []
         self._lock = threading.Lock()
+        self._serial = 0
         probe = adapter_factory()
         self.adapter_name = probe.name
         self.declared = list(probe.crash_points())
@@ -232,6 +243,11 @@ class CrashRunner:
             raise ValueError("adapter names invalid crash points: %r" % unknown)
 
     # -- bookkeeping -------------------------------------------------------------------------------------------
+    def next_serial(self):
+        with self._lock:
+            self._serial += 1
+            return self._serial
+
     def _record(self, rec):
         rec = json.loads(json.dumps(rec, default=str))
         rec["ts"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -291,16 +307,16 @@ class CrashRunner:
             sc.feed()
             time.sleep(0.005)
         sc.timing("to_crash_s", t)
-        fired = [h for h in sc.hits("a") if h.get("fire")]
+        fired = sc.fired(a, point, sc.rec["hit"])
         if a.alive():
             a.kill_and_wait(cfg.stop_timeout)
             return sc.fail("not_reached", "process did not die at %s within %.0f s (hit %d)"
                            % (point, cfg.crash_timeout, sc.rec["hit"]))
         status = a.poll()
         sc.rec["exit"] = status.as_dict()
-        if not fired or fired[-1]["point"] != point:
-            return sc.fail("not_reached", "process exited (%r) without firing %s; log tail: %s"
-                           % (status, point, scrub(a.log_text()[-400:])))
+        if fired is None:
+            return sc.fail("not_reached", "process exited (%r) without firing %s at hit %d; log tail: %s"
+                           % (status, point, sc.rec["hit"], scrub(a.log_text()[-400:])))
         if action in ("kill", "kill_later") and not status.killed:
             return sc.fail("wrong_exit", "expected SIGKILL at %s, got %r" % (point, status))
         sc.start("b")
@@ -326,7 +342,7 @@ class CrashRunner:
                 return sc.fail("wrong_exit", "%s exited by itself (%r) before its kill" % (tag, p.poll()))
             p.kill_tree()
             st = p.wait(cfg.stop_timeout)
-            h = sc.hits(tag)
+            h = sc.hits(tag, proc=p)
             kills.append({"tag": tag, "after_s": round(after, 3), "exit": st.as_dict(),
                           "last_point": h[-1]["point"] if h else None, "points_hit": len(h)})
         sc.rec["kills"] = kills
@@ -364,7 +380,7 @@ class CrashRunner:
             sc.rec.update(hit_spec=spec, hit=crashpoints.hit_from_seed(hs, mx), action=action)
             a = sc.start("a", crashpoints.env_for(at_point, hit=spec, action=action, log=sc.hits_path, tag="a"))
             deadline = time.monotonic() + cfg.crash_timeout
-            while not [h for h in sc.hits("a") if h.get("fire")]:
+            while sc.fired(a, at_point, sc.rec["hit"]) is None:
                 if time.monotonic() >= deadline or not a.alive():
                     if a.alive():
                         a.kill_and_wait(cfg.stop_timeout)
@@ -380,7 +396,7 @@ class CrashRunner:
                 return sc.fail("wrong_exit", "a exited by itself (%r) before the freeze" % (a.poll(),))
             a.stop_group()
             a.wait_state("T", 5)
-        h = sc.hits("a")
+        h = sc.hits("a", proc=a)
         sc.rec["frozen_after_point"] = h[-1]["point"] if h else None
         frozen_for = rng.uniform(*cfg.freeze_for)
         t = time.monotonic()
@@ -391,6 +407,8 @@ class CrashRunner:
         if action == "stop":
             a.cont_group()
             sc.feed_for(cfg.settle_after_cont)
+        elif not a.alive():
+            return sc.fail("wrong_exit", "the hung instance exited (%r); it should still hang" % (a.poll(),))
         if not a.alive():
             sc.rec["a_exit_after_cont"] = a.poll().as_dict()
         return sc.catch_up_and_check()

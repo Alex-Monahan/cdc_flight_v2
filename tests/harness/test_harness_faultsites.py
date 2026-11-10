@@ -71,6 +71,23 @@ def test_exception_classes_and_marker(fc):
         fs.resolve_exception("never_imported_module.Error")    # never imports
 
 
+def test_an_exception_that_cannot_be_built_does_not_fire(fc):
+    fc.raise_at("harness_test.commit", "never_imported_module.Error", rid="bad")
+    assert calls("harness_test.commit", 2) == ["ok", "ok"]
+    assert fc.fired(rule="bad") == []
+    assert any(e.get("rule") == "bad" and "error" in e for e in fc.log())
+
+
+def test_a_new_rule_that_reuses_an_id_starts_from_zero(fc):
+    fc.raise_at("harness_test.commit", "OSError", hits=1, rid="same")
+    assert calls("harness_test.commit", 2) == ["OSError", "ok"]
+    fc.clear()
+    fc.raise_at("harness_test.commit", "TimeoutError", hits=1, rid="same")   # same id, different rule
+    assert calls("harness_test.commit", 2) == ["TimeoutError", "ok"]
+    other = FaultControl(os.path.dirname(fc.path))                          # a second writer on the directory
+    assert other._id(None) != fc._id(None)
+
+
 def test_window_and_glob(fc):
     fc.raise_at("harness_test.*", "TimeoutError", window=(0.3, 0.6))
     assert calls("harness_test.read", 1) == ["ok"]           # before the window

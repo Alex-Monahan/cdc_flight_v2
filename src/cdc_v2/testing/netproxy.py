@@ -534,7 +534,7 @@ class NetProxy:
                     async with self.cond:
                         self.cond.notify_all()
         except (OSError, ConnectionError):
-            return
+            self._drop(c, "close")              # the reader of this direction would otherwise wait for ever
 
     # -- control socket ------------------------------------------------------------------------------------------
     async def _control_client(self, r, w):

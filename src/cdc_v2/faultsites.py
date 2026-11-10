@@ -28,7 +28,8 @@ Control file::
                 "exception": "ConnectionError", "message": "injected",
                 "skip": 0, "hits": 2, "start": 1731100000.0, "end": 1731100060.0, "seconds": 1.5, "tag": ""}]}
 
-``id``        required, unique. Hit counters are kept per id across re-reads; a new id starts from zero.
+``id``        required, unique. Hit counters are kept per rule (id and content) across re-reads; a new or changed
+              rule starts from zero.
 ``site``      a site name or an ``fnmatch`` pattern (``md.*``).
 ``action``    ``raise`` | ``delay`` (sleep ``seconds``, then continue) | ``block`` (wait while the rule is still in
               the file and its window is open, re-checking every 50 ms; at most ``seconds`` if given).
@@ -174,8 +175,8 @@ class _State:
                 self.log({"error": "%s: %s" % (type(exc).__name__, exc)})
                 return
             self.rules = [r for r in rules if not r.get("tag") or r.get("tag") == self.tag]
-        ids = {r["id"] for r in self.rules}
-        self.counts = {k: v for k, v in self.counts.items() if k in ids}
+        keys = {_rule_key(r) for r in self.rules}
+        self.counts = {k: v for k, v in self.counts.items() if k in keys}
 
     def rule_present(self, rid):
         with self.lock:
@@ -192,7 +193,8 @@ class _State:
         os.write(self.log_fd, (json.dumps(obj, separators=(",", ":")) + "\n").encode())
 
     def pick(self, name):
-        """The rule that fires for this call, or None. Counts hits."""
+        """(rule, exception or None) for the rule that fires on this call, or None. Counts hits. A ``raise`` rule
+        whose exception cannot be built logs an error line and does not fire."""
         now = time.time()
         with self.lock:
             self.refresh()
@@ -201,15 +203,37 @@ class _State:
                     continue
                 if (r.get("start") is not None and now < r["start"]) or (r.get("end") is not None and now >= r["end"]):
                     continue
-                c = self.counts.setdefault(r["id"], [0, 0])
+                c = self.counts.setdefault(_rule_key(r), [0, 0])
                 c[0] += 1
                 skip, hits = r.get("skip") or 0, r.get("hits")
                 if c[0] <= skip or (hits is not None and c[1] >= hits):
                     continue
+                exc = None
+                if r["action"] == "raise":
+                    try:
+                        exc = _make_exception(r, name)
+                    except Exception as e:          # noqa: BLE001 - reported in the log, never raised here
+                        self.log({"site": name, "rule": r["id"], "error": "%s: %s" % (type(e).__name__, e)})
+                        continue
                 c[1] += 1
                 self.log({"site": name, "rule": r["id"], "action": r["action"], "n": c[1]})
-                return r
+                return r, exc
         return None
+
+
+def _rule_key(r):
+    """Hit counters belong to a rule's id and content: a new rule that reuses an id starts from zero."""
+    return json.dumps(r, sort_keys=True)
+
+
+def _make_exception(r, name):
+    cls = resolve_exception(r.get("exception"))
+    exc = cls(r.get("message") or "fault injected at %s (rule %s)" % (name, r["id"]))
+    try:
+        exc.cdc_v2_fault = r["id"]
+    except AttributeError:              # a few C exception types refuse attributes; the message still says it
+        pass
+    return exc
 
 
 def _window_open(r):
@@ -243,9 +267,10 @@ def fault_site(name):
         return
     if name not in _SITES:
         raise UndeclaredFaultSite("fault site %r is not declared" % (name,))
-    r = st.pick(name)
-    if r is None:
+    picked = st.pick(name)
+    if picked is None:
         return
+    r, exc = picked
     action = r["action"]
     if action == "delay":
         time.sleep(r["seconds"])
@@ -262,12 +287,6 @@ def fault_site(name):
         with st.lock:
             st.log({"site": name, "rule": r["id"], "action": "unblock", "blocked_s": round(time.monotonic() - t0, 3)})
     else:
-        cls = resolve_exception(r.get("exception"))
-        exc = cls(r.get("message") or "fault injected at %s (rule %s)" % (name, r["id"]))
-        try:
-            exc.cdc_v2_fault = r["id"]
-        except AttributeError:          # a few C exception types refuse attributes; the message still says it
-            pass
         raise exc
 
 

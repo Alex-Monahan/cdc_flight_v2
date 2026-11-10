@@ -39,6 +39,15 @@ def test_own_session_group_and_signals(tmp_path):
         assert not p.signal(signal.SIGTERM)                  # reaped: never signalled again
 
 
+def test_a_reaped_and_empty_group_is_never_signalled():
+    p = procs.start([sys.executable, "-c", SLEEPER])
+    p.kill()
+    assert p.wait(5).killed
+    assert not p.group_gone
+    assert p.signal_group(signal.SIGKILL) is False and p.group_gone      # checked with ps, then marked gone
+    assert p.signal_group(signal.SIGKILL) is False
+
+
 def test_exit_status_of_normal_exit(tmp_path):
     p = procs.start([sys.executable, "-c", "import sys; print('hi'); sys.exit(7)"], log_path=str(tmp_path / "o.log"))
     st = p.wait(10)

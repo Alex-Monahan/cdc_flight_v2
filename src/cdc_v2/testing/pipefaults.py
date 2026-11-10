@@ -7,8 +7,8 @@ From a seed, `make_plan` chooses faults at random input offsets:
 ``cut``       end of stream before the byte at ``offset``: the output is closed (and, by default, the input too, so
               the writer sees EPIPE, like a dead reader).
 ``dup``       after the bytes ``[offset, offset + length)`` have been relayed, relay them once more.
-``truncate``  at the end of the input, drop the last ``length`` bytes (the relay holds that many bytes back while it
-              runs, so a live stream is delayed by them).
+``truncate``  at the end of the input, drop its last ``length`` bytes, before any other fault sees them (the relay
+              holds that many input bytes back while it runs, so a live stream is delayed by them).
 ``flip``      XOR the byte at ``offset`` with ``mask`` (one bit).
 
 The relay records what it injected and where (input and output offset), so a test can check that the receiver
@@ -70,7 +70,10 @@ def _trigger(e):
 
 class Mutator:
     """Applies a plan to a byte stream. ``feed`` and ``finish`` return actions: ``("data", bytes)``,
-    ``("stall", seconds)`` or ``("cut",)``. ``log`` lists the faults that fired."""
+    ``("stall", seconds)`` or ``("cut",)``. ``log`` lists every fault, with ``fired`` true or false.
+
+    ``truncate`` acts on the input: the last ``length`` input bytes are held back and dropped at the end, before any
+    other fault sees them, so a fault whose offset lies in the dropped tail never fires (and the log says so)."""
 
     _ORDER = {"dup": 0, "stall": 1, "cut": 2, "flip": 3}
 
@@ -79,29 +82,19 @@ class Mutator:
                              key=lambda e: (_trigger(e), self._ORDER[e["kind"]], e["id"]))
         trunc = [e for e in plan if e["kind"] == "truncate"]
         self.truncate = trunc[0] if trunc else None
-        self.pos = 0                    # input bytes consumed
+        self.pos = 0                    # input bytes processed (handed to the faults)
         self.out = 0                    # output bytes released
         self.history = bytearray()      # input bytes, for dup (bounded below)
         self.hist_start = 0
         self.max_dup = max([e["length"] for e in self.events if e["kind"] == "dup"] or [0])
-        self.tail = bytearray()
+        self.held = bytearray()         # input held back for truncate
         self.cut = False
         self.log = []
 
     def _release(self, actions, data):
-        if not data:
-            return
-        if self.truncate is None:
+        if data:
             actions.append(("data", bytes(data)))
             self.out += len(data)
-            return
-        self.tail += data
-        keep = self.truncate["length"]
-        if len(self.tail) > keep:
-            n = len(self.tail) - keep
-            actions.append(("data", bytes(self.tail[:n])))
-            self.out += n
-            del self.tail[:n]
 
     def _remember(self, data):
         if self.max_dup:
@@ -112,38 +105,50 @@ class Mutator:
                 self.hist_start += extra
 
     def feed(self, chunk):
-        actions = []
         if self.cut:
-            return actions
+            return []
+        if self.truncate is None:
+            return self._process(chunk)
+        self.held += chunk
+        n = len(self.held) - self.truncate["length"]
+        if n <= 0:
+            return []
+        piece = bytes(self.held[:n])
+        del self.held[:n]
+        return self._process(piece)
+
+    def _process(self, chunk):
+        actions = []
         i = 0
         while i < len(chunk) or (self.events and _trigger(self.events[0]) == self.pos):
             if self.events and _trigger(self.events[0]) == self.pos:
                 e = self.events.pop(0)
                 k = e["kind"]
+                if k == "flip" and i >= len(chunk):
+                    self.events.insert(0, e)                   # the byte comes with the next chunk
+                    break
+                entry = dict(e, in_offset=self.pos, out_offset=self.out, fired=True)
                 if k == "dup":
                     s = e["offset"] - self.hist_start
-                    data = bytes(self.history[s:s + e["length"]])
-                    self.log.append(dict(e, in_offset=self.pos, out_offset=self.out + len(self.tail), fired=True))
-                    self._release(actions, data)
+                    self.log.append(entry)
+                    self._release(actions, self.history[s:s + e["length"]])
                 elif k == "stall":
-                    self.log.append(dict(e, in_offset=self.pos, out_offset=self.out + len(self.tail), fired=True))
+                    self.log.append(entry)
                     actions.append(("stall", e["seconds"]))
                 elif k == "cut":
-                    self.log.append(dict(e, in_offset=self.pos, out_offset=self.out + len(self.tail), fired=True))
-                    self._release_all_tail(actions)
+                    self.log.append(entry)
                     self.cut = True
+                    if self.truncate is not None:
+                        self.log.append(dict(self.truncate, fired=False, why="cut came first"))
+                        self.truncate = None
                     actions.append(("cut",))
                     return actions
                 else:                                          # flip the byte at self.pos
-                    if i >= len(chunk):
-                        self.events.insert(0, e)               # the byte comes with the next chunk
-                        break
                     b = chunk[i]
-                    nb = b ^ e["mask"]
-                    self.log.append(dict(e, in_offset=self.pos, out_offset=self.out + len(self.tail), fired=True,
-                                         before=b, after=nb))
+                    entry.update(before=b, after=b ^ e["mask"])
+                    self.log.append(entry)
                     self._remember(chunk[i:i + 1])
-                    self._release(actions, bytes([nb]))
+                    self._release(actions, bytes([b ^ e["mask"]]))
                     self.pos += 1
                     i += 1
                 continue
@@ -156,27 +161,25 @@ class Mutator:
             i = end
         return actions
 
-    def _release_all_tail(self, actions):
-        if self.tail:
-            actions.append(("data", bytes(self.tail)))
-            self.out += len(self.tail)
-            self.tail = bytearray()
-        if self.truncate is not None:
-            self.log.append(dict(self.truncate, fired=False, why="cut came first"))
-            self.truncate = None
-
     def finish(self):
-        """End of input: drop the truncated tail; record faults that never fired."""
-        actions = []
+        """End of input: drop the held-back tail; record faults that never fired."""
+        total = self.pos                # input length, known now
         if not self.cut and self.truncate is not None:
-            self.log.append(dict(self.truncate, in_offset=self.pos - len(self.tail), out_offset=self.out,
-                                 dropped=len(self.tail), fired=bool(self.tail)))
-            self.tail = bytearray()
+            total = self.pos + len(self.held)
+            self.log.append(dict(self.truncate, in_offset=self.pos, out_offset=self.out, dropped=len(self.held),
+                                 fired=bool(self.held)))
+            self.held = bytearray()
             self.truncate = None
-        for e in self.events:
-            self.log.append(dict(e, fired=False, why="beyond the end of the stream" if not self.cut else "after cut"))
+        for e in self.events:           # not fired: their trigger lies at or beyond the processed input
+            if self.cut:
+                why = "after cut"
+            elif e["offset"] < total:
+                why = "in the truncated tail"
+            else:
+                why = "beyond the end of the stream"
+            self.log.append(dict(e, fired=False, why=why))
         self.events = []
-        return actions
+        return []
 
     def injected(self):
         return [e for e in self.log if e.get("fired")]
