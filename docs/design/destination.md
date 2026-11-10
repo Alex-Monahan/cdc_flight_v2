@@ -1549,7 +1549,7 @@ A DDL that drops a table does not conflict with a committed write of another lan
 `stream.fenced`) the take-over returned and the old block's `COMMIT` then returned success. The fence row was not
 recorded, so it could not say whether both had committed or MotherDuck had answered OK for nothing.
 
-**How it was told apart** (`tests/destination/fence_campaign.py`). The fence row's counter `n` grows only when
+**How it was told apart** (`tests/destination/fence_campaign.py`; every run is in `fence_campaign.json`). The fence row's counter `n` grows only when
 a transaction of the lane commits, and the take-over does not touch it in design 4.5. So between a read before the
 old block and a read after it, `n` grows by one exactly when the old block committed. Every round records the
 fence row, every fence epoch, the leader row, the heartbeat's epoch, the old block's own trace (a row, a
@@ -1559,9 +1559,9 @@ row and the server's listing of the old connection at the crash point, before th
 | Run (MotherDuck) | Code | Rounds | of them the reviewer's case (`nothing@fenced`) | Breaches |
 |---|---|---|---|---|
 | 1 (stopped at the pause) | `b7b02dd` (the fix round's first code; the take-over as designed) | 393 | 197 | 0 |
-| diagnostic | `e671405` (as designed) | 232 | 232 | 1 |
+| diagnostic | `e671405` (as designed) | 235 | 235 | 1 |
 | 2 (stopped when the cause was found) | `e671405` (as designed) | 681 | 341 | 8 (3 `nothing@fenced`, 3 `registered_relation@fenced`, 1 `transition@fenced`, 1 `row@fenced`) |
-| 3 | `7193b39` (the fix) | RUN3_ROUNDS | RUN3_MAIN | RUN3_BREACHES |
+| 3 (stopped at round 1001 of 1040 for a pause) | `7193b39` (the fix) | 1001 | 501 | **0** |
 
 **What it is: both committed.** In the diagnostic breach, at the crash point the committed `n` was the old value
 and the server listed the old connection with its transaction open; the take-over then met **no** conflict (1

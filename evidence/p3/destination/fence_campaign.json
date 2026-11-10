@@ -1,0 +1,808 @@
+{
+  "cause": "a write of an unchanged value is not recorded when the column has had no update since the table was written or checkpointed: unchanged_write.json (probe_unchanged_write.py) and test_fix_round.py::test_duckdb_does_not_record_a_write_of_an_unchanged_value_after_a_checkpoint",
+  "command": "tools/with-env uv run python tests/destination/fence_campaign.py --rounds 1040 (each run from a copy of the tree at its commit, PYTHONPATH pointing at the copy)",
+  "failed_rounds": {
+    "diagnostic": [
+      {
+        "after": {
+          "fence_epochs": [
+            255
+          ],
+          "fence_stream": {
+            "epoch": 255,
+            "n": 129
+          },
+          "heartbeat_epoch": 255,
+          "leader": {
+            "epoch": 255,
+            "run_id": "new-427ca2168f2a",
+            "state": "leading"
+          }
+        },
+        "at_point_fence": {
+          "epoch": 254,
+          "n": 128
+        },
+        "at_point_listed": true,
+        "at_point_server_row": [
+          "81a1c6e5-ebac-4355-9247-9c3e714feb66",
+          "duckdb/v1.5.6(osx_arm64) python/3.13 cdc_v2",
+          "(1, 5, 6)",
+          "b5865fb7-eec7-4d52-81ad-27d619181e93",
+          "7",
+          "ACTIVE",
+          "0:00:00.584544",
+          "None",
+          "None",
+          "None",
+          "None",
+          "None",
+          "None",
+          "None",
+          "None",
+          "None"
+        ],
+        "before": {
+          "fence_epochs": [
+            254
+          ],
+          "fence_stream": {
+            "epoch": 254,
+            "n": 128
+          },
+          "heartbeat_epoch": 254,
+          "leader": {
+            "epoch": 254,
+            "run_id": "old-427ca2168f2a",
+            "state": "leading"
+          }
+        },
+        "checks": [
+          "old_block_committed_after_take_over"
+        ],
+        "new_epoch": 255,
+        "old_block": "OK",
+        "old_epoch": 254,
+        "old_lane_next": "FenceLost: lane stream: epoch 254 no longer leads (the fence statement changed 0 rows)",
+        "old_listed_before_commit": true,
+        "old_trace": null,
+        "point": "fenced",
+        "round": 126,
+        "shape": "nothing",
+        "t_block_end": 1.864,
+        "t_continue": 1.785,
+        "t_point": 1.117,
+        "t_point_probed": 1.341,
+        "t_take_returned": 1.711,
+        "take_alive_after_wait": false,
+        "takeover": {
+          "attempts": 1,
+          "conflicts": 0,
+          "interrupted": 0,
+          "last_error": null,
+          "listed": 0,
+          "seconds": 0.37,
+          "unknown": 0
+        },
+        "transitions": [],
+        "verdict": "breach"
+      }
+    ],
+    "run_1": [],
+    "run_2": [
+      {
+        "after": {
+          "fence_epochs": [
+            215
+          ],
+          "fence_stream": {
+            "epoch": 215,
+            "n": 114
+          },
+          "heartbeat_epoch": 215,
+          "leader": {
+            "epoch": 215,
+            "run_id": "new-dd37af440418",
+            "state": "leading"
+          }
+        },
+        "before": {
+          "fence_epochs": [
+            214
+          ],
+          "fence_stream": {
+            "epoch": 214,
+            "n": 113
+          },
+          "heartbeat_epoch": 214,
+          "leader": {
+            "epoch": 214,
+            "run_id": "old-dd37af440418",
+            "state": "leading"
+          }
+        },
+        "checks": [
+          "old_block_committed_after_take_over"
+        ],
+        "new_epoch": 215,
+        "old_block": "OK",
+        "old_epoch": 214,
+        "old_lane_next": "FenceLost: lane stream: epoch 214 no longer leads (the fence statement changed 0 rows)",
+        "old_listed_before_commit": true,
+        "old_trace": null,
+        "point": "fenced",
+        "round": 106,
+        "shape": "nothing",
+        "t_block_end": 1.587,
+        "t_continue": 1.51,
+        "t_point": 1.043,
+        "t_take_returned": 1.434,
+        "take_alive_after_wait": false,
+        "takeover": {
+          "attempts": 1,
+          "conflicts": 0,
+          "interrupted": 0,
+          "last_error": null,
+          "listed": 0,
+          "seconds": 0.391,
+          "unknown": 0
+        },
+        "transitions": [],
+        "verdict": "breach"
+      },
+      {
+        "after": {
+          "fence_epochs": [
+            507
+          ],
+          "fence_stream": {
+            "epoch": 507,
+            "n": 268
+          },
+          "heartbeat_epoch": 507,
+          "leader": {
+            "epoch": 507,
+            "run_id": "new-ce9d98693ac6",
+            "state": "leading"
+          }
+        },
+        "before": {
+          "fence_epochs": [
+            506
+          ],
+          "fence_stream": {
+            "epoch": 506,
+            "n": 267
+          },
+          "heartbeat_epoch": 506,
+          "leader": {
+            "epoch": 506,
+            "run_id": "old-ce9d98693ac6",
+            "state": "leading"
+          }
+        },
+        "checks": [
+          "old_block_committed_after_take_over"
+        ],
+        "new_epoch": 507,
+        "old_block": "OK",
+        "old_epoch": 506,
+        "old_lane_next": "FenceLost: lane stream: epoch 506 no longer leads (the fence statement changed 0 rows)",
+        "old_trace": null,
+        "point": "fenced",
+        "round": 252,
+        "shape": "nothing",
+        "t_block_end": 1.478,
+        "t_continue": 1.398,
+        "t_point": 1.022,
+        "t_take_returned": 1.398,
+        "take_alive_after_wait": false,
+        "takeover": {
+          "attempts": 1,
+          "conflicts": 0,
+          "interrupted": 0,
+          "last_error": null,
+          "listed": 0,
+          "seconds": 0.376,
+          "unknown": 0
+        },
+        "transitions": [],
+        "verdict": "breach"
+      },
+      {
+        "after": {
+          "fence_epochs": [
+            637
+          ],
+          "fence_stream": {
+            "epoch": 637,
+            "n": 337
+          },
+          "heartbeat_epoch": 637,
+          "leader": {
+            "epoch": 637,
+            "run_id": "new-0176d691e55a",
+            "state": "leading"
+          }
+        },
+        "before": {
+          "fence_epochs": [
+            636
+          ],
+          "fence_stream": {
+            "epoch": 636,
+            "n": 336
+          },
+          "heartbeat_epoch": 636,
+          "leader": {
+            "epoch": 636,
+            "run_id": "old-0176d691e55a",
+            "state": "leading"
+          }
+        },
+        "checks": [
+          "old_block_committed_after_take_over"
+        ],
+        "new_epoch": 637,
+        "old_block": "OK",
+        "old_epoch": 636,
+        "old_lane_next": "FenceLost: lane stream: epoch 636 no longer leads (the fence statement changed 0 rows)",
+        "old_trace": 1,
+        "point": "fenced",
+        "round": 317,
+        "shape": "transition",
+        "t_block_end": 5.624,
+        "t_continue": 5.543,
+        "t_point": 5.161,
+        "t_take_returned": 5.543,
+        "take_alive_after_wait": false,
+        "takeover": {
+          "attempts": 1,
+          "conflicts": 0,
+          "interrupted": 0,
+          "last_error": null,
+          "listed": 0,
+          "seconds": 0.382,
+          "unknown": 0
+        },
+        "transitions": [
+          [
+            "example_door",
+            "[\"fc_door\"]",
+            "closed",
+            "open",
+            "fence campaign 0176d691e55a",
+            636,
+            "stream",
+            337,
+            null
+          ]
+        ],
+        "verdict": "breach"
+      },
+      {
+        "after": {
+          "fence_epochs": [
+            829
+          ],
+          "fence_stream": {
+            "epoch": 829,
+            "n": 438
+          },
+          "heartbeat_epoch": 829,
+          "leader": {
+            "epoch": 829,
+            "run_id": "new-e2e042795ceb",
+            "state": "leading"
+          }
+        },
+        "before": {
+          "fence_epochs": [
+            828
+          ],
+          "fence_stream": {
+            "epoch": 828,
+            "n": 437
+          },
+          "heartbeat_epoch": 828,
+          "leader": {
+            "epoch": 828,
+            "run_id": "old-e2e042795ceb",
+            "state": "leading"
+          }
+        },
+        "checks": [
+          "old_block_committed_after_take_over"
+        ],
+        "new_epoch": 829,
+        "old_block": "OK",
+        "old_epoch": 828,
+        "old_lane_next": "FenceLost: lane stream: epoch 828 no longer leads (the fence statement changed 0 rows)",
+        "old_trace": 1,
+        "point": "fenced",
+        "round": 413,
+        "shape": "registered_relation",
+        "t_block_end": 2.247,
+        "t_continue": 2.165,
+        "t_point": 1.781,
+        "t_take_returned": 2.164,
+        "take_alive_after_wait": false,
+        "takeover": {
+          "attempts": 1,
+          "conflicts": 0,
+          "interrupted": 0,
+          "last_error": null,
+          "listed": 0,
+          "seconds": 0.383,
+          "unknown": 0
+        },
+        "transitions": [],
+        "verdict": "breach"
+      },
+      {
+        "after": {
+          "fence_epochs": [
+            897
+          ],
+          "fence_stream": {
+            "epoch": 897,
+            "n": 475
+          },
+          "heartbeat_epoch": 897,
+          "leader": {
+            "epoch": 897,
+            "run_id": "new-dc3028a9d154",
+            "state": "leading"
+          }
+        },
+        "before": {
+          "fence_epochs": [
+            896
+          ],
+          "fence_stream": {
+            "epoch": 896,
+            "n": 474
+          },
+          "heartbeat_epoch": 896,
+          "leader": {
+            "epoch": 896,
+            "run_id": "old-dc3028a9d154",
+            "state": "leading"
+          }
+        },
+        "checks": [
+          "old_block_committed_after_take_over"
+        ],
+        "new_epoch": 897,
+        "old_block": "OK",
+        "old_epoch": 896,
+        "old_lane_next": "FenceLost: lane stream: epoch 896 no longer leads (the fence statement changed 0 rows)",
+        "old_trace": 1,
+        "point": "fenced",
+        "round": 447,
+        "shape": "row",
+        "t_block_end": 1.41,
+        "t_continue": 1.329,
+        "t_point": 0.946,
+        "t_take_returned": 1.329,
+        "take_alive_after_wait": false,
+        "takeover": {
+          "attempts": 1,
+          "conflicts": 0,
+          "interrupted": 0,
+          "last_error": null,
+          "listed": 0,
+          "seconds": 0.383,
+          "unknown": 0
+        },
+        "transitions": [],
+        "verdict": "breach"
+      },
+      {
+        "after": {
+          "fence_epochs": [
+            961
+          ],
+          "fence_stream": {
+            "epoch": 961,
+            "n": 509
+          },
+          "heartbeat_epoch": 961,
+          "leader": {
+            "epoch": 961,
+            "run_id": "new-78bfadf5f3af",
+            "state": "leading"
+          }
+        },
+        "before": {
+          "fence_epochs": [
+            960
+          ],
+          "fence_stream": {
+            "epoch": 960,
+            "n": 508
+          },
+          "heartbeat_epoch": 960,
+          "leader": {
+            "epoch": 960,
+            "run_id": "old-78bfadf5f3af",
+            "state": "leading"
+          }
+        },
+        "checks": [
+          "old_block_committed_after_take_over"
+        ],
+        "new_epoch": 961,
+        "old_block": "OK",
+        "old_epoch": 960,
+        "old_lane_next": "FenceLost: lane stream: epoch 960 no longer leads (the fence statement changed 0 rows)",
+        "old_trace": 1,
+        "point": "fenced",
+        "round": 479,
+        "shape": "registered_relation",
+        "t_block_end": 1.917,
+        "t_continue": 1.835,
+        "t_point": 1.444,
+        "t_take_returned": 1.835,
+        "take_alive_after_wait": false,
+        "takeover": {
+          "attempts": 1,
+          "conflicts": 0,
+          "interrupted": 0,
+          "last_error": null,
+          "listed": 0,
+          "seconds": 0.39,
+          "unknown": 0
+        },
+        "transitions": [],
+        "verdict": "breach"
+      },
+      {
+        "after": {
+          "fence_epochs": [
+            1093
+          ],
+          "fence_stream": {
+            "epoch": 1093,
+            "n": 579
+          },
+          "heartbeat_epoch": 1093,
+          "leader": {
+            "epoch": 1093,
+            "run_id": "new-fecc6b1604a6",
+            "state": "leading"
+          }
+        },
+        "before": {
+          "fence_epochs": [
+            1092
+          ],
+          "fence_stream": {
+            "epoch": 1092,
+            "n": 578
+          },
+          "heartbeat_epoch": 1092,
+          "leader": {
+            "epoch": 1092,
+            "run_id": "old-fecc6b1604a6",
+            "state": "leading"
+          }
+        },
+        "checks": [
+          "old_block_committed_after_take_over"
+        ],
+        "new_epoch": 1093,
+        "old_block": "OK",
+        "old_epoch": 1092,
+        "old_lane_next": "FenceLost: lane stream: epoch 1092 no longer leads (the fence statement changed 0 rows)",
+        "old_trace": 1,
+        "point": "fenced",
+        "round": 545,
+        "shape": "registered_relation",
+        "t_block_end": 2.012,
+        "t_continue": 1.927,
+        "t_point": 1.543,
+        "t_take_returned": 1.927,
+        "take_alive_after_wait": false,
+        "takeover": {
+          "attempts": 1,
+          "conflicts": 0,
+          "interrupted": 0,
+          "last_error": null,
+          "listed": 0,
+          "seconds": 0.385,
+          "unknown": 0
+        },
+        "transitions": [],
+        "verdict": "breach"
+      },
+      {
+        "after": {
+          "fence_epochs": [
+            1127
+          ],
+          "fence_stream": {
+            "epoch": 1127,
+            "n": 598
+          },
+          "heartbeat_epoch": 1127,
+          "leader": {
+            "epoch": 1127,
+            "run_id": "new-fa1eda57c480",
+            "state": "leading"
+          }
+        },
+        "before": {
+          "fence_epochs": [
+            1126
+          ],
+          "fence_stream": {
+            "epoch": 1126,
+            "n": 597
+          },
+          "heartbeat_epoch": 1126,
+          "leader": {
+            "epoch": 1126,
+            "run_id": "old-fa1eda57c480",
+            "state": "leading"
+          }
+        },
+        "checks": [
+          "old_block_committed_after_take_over"
+        ],
+        "new_epoch": 1127,
+        "old_block": "OK",
+        "old_epoch": 1126,
+        "old_lane_next": "FenceLost: lane stream: epoch 1126 no longer leads (the fence statement changed 0 rows)",
+        "old_listed_before_commit": true,
+        "old_trace": null,
+        "point": "fenced",
+        "round": 562,
+        "shape": "nothing",
+        "t_block_end": 1.755,
+        "t_continue": 1.677,
+        "t_point": 1.211,
+        "t_take_returned": 1.596,
+        "take_alive_after_wait": false,
+        "takeover": {
+          "attempts": 1,
+          "conflicts": 0,
+          "interrupted": 0,
+          "last_error": null,
+          "listed": 0,
+          "seconds": 0.385,
+          "unknown": 0
+        },
+        "transitions": [],
+        "verdict": "breach"
+      },
+      {
+        "after": {
+          "fence_stream": {
+            "n": 0
+          }
+        },
+        "before": {
+          "fence_stream": {
+            "n": 0
+          }
+        },
+        "checks": [
+          "round_error"
+        ],
+        "error": "RuntimeError: Query interrupted",
+        "old_block": "n/a",
+        "point": "fenced",
+        "round": 662,
+        "shape": "nothing",
+        "takeover": {},
+        "verdict": "round_error"
+      }
+    ],
+    "run_3": []
+  },
+  "machine_note": "a laptop over the public internet; the MotherDuck account was shared with other workers and with the MotherDuck test files of this package that ran at the same time",
+  "runs": {
+    "diagnostic": {
+      "by_case": {
+        "nothing@fenced": {
+          "breach": 1,
+          "pass": 234
+        }
+      },
+      "commit": "e671405 (a copy with a probe at the crash point)",
+      "note": "the take-over as designed; only nothing@fenced; also reads the committed fence row and the server's listing of the old connection at the crash point, before the take-over; stopped at round 235",
+      "nothing_at_fenced": 235,
+      "rounds": 235,
+      "takeover_conflicts_by_verdict": {
+        "breach": {
+          "0": 1
+        },
+        "pass": {
+          "1": 92,
+          "2": 142
+        }
+      },
+      "verdicts": {
+        "breach": 1,
+        "pass": 234
+      }
+    },
+    "run_1": {
+      "by_case": {
+        "ddl_only@fenced": {
+          "pass": 18
+        },
+        "nothing@commit_sent": {
+          "pass": 18
+        },
+        "nothing@committed": {
+          "pass": 18
+        },
+        "nothing@fenced": {
+          "pass": 197
+        },
+        "nothing@in_block": {
+          "pass": 18
+        },
+        "other_schema_rows@fenced": {
+          "pass": 18
+        },
+        "registered_relation@fenced": {
+          "pass": 18
+        },
+        "returning@fenced": {
+          "pass": 18
+        },
+        "row@commit_sent": {
+          "pass": 17
+        },
+        "row@fenced": {
+          "pass": 18
+        },
+        "transition@fenced": {
+          "pass": 18
+        },
+        "transition@in_block": {
+          "pass": 17
+        }
+      },
+      "commit": "b7b02dd",
+      "note": "the take-over as design 4.5 writes it; stopped at round 393 for the owner's pause (SIGINT, the database was dropped)",
+      "nothing_at_fenced": 197,
+      "rounds": 393,
+      "takeover_conflicts_by_verdict": {
+        "pass": {
+          "0": 53,
+          "1": 246,
+          "2": 94
+        }
+      },
+      "verdicts": {
+        "pass": 393
+      }
+    },
+    "run_2": {
+      "by_case": {
+        "ddl_only@fenced": {
+          "pass": 31
+        },
+        "nothing@commit_sent": {
+          "pass": 31
+        },
+        "nothing@committed": {
+          "pass": 31
+        },
+        "nothing@fenced": {
+          "breach": 3,
+          "pass": 337,
+          "round_error": 1
+        },
+        "nothing@in_block": {
+          "pass": 31
+        },
+        "other_schema_rows@fenced": {
+          "pass": 31
+        },
+        "registered_relation@fenced": {
+          "breach": 3,
+          "pass": 28
+        },
+        "returning@fenced": {
+          "pass": 31
+        },
+        "row@commit_sent": {
+          "pass": 31
+        },
+        "row@fenced": {
+          "breach": 1,
+          "pass": 30
+        },
+        "transition@fenced": {
+          "breach": 1,
+          "pass": 30
+        },
+        "transition@in_block": {
+          "pass": 30
+        }
+      },
+      "commit": "e671405",
+      "note": "the take-over as designed; stopped at round 681 when the cause was found (one round_error is the stop itself)",
+      "nothing_at_fenced": 341,
+      "rounds": 681,
+      "takeover_conflicts_by_verdict": {
+        "breach": {
+          "0": 8
+        },
+        "pass": {
+          "0": 92,
+          "1": 196,
+          "2": 384
+        },
+        "round_error": {
+          "None": 1
+        }
+      },
+      "verdicts": {
+        "breach": 8,
+        "pass": 672,
+        "round_error": 1
+      }
+    },
+    "run_3": {
+      "by_case": {
+        "ddl_only@fenced": {
+          "pass": 45
+        },
+        "nothing@commit_sent": {
+          "pass": 46
+        },
+        "nothing@committed": {
+          "pass": 46
+        },
+        "nothing@fenced": {
+          "pass": 501
+        },
+        "nothing@in_block": {
+          "pass": 46
+        },
+        "other_schema_rows@fenced": {
+          "pass": 45
+        },
+        "registered_relation@fenced": {
+          "pass": 45
+        },
+        "returning@fenced": {
+          "pass": 45
+        },
+        "row@commit_sent": {
+          "pass": 45
+        },
+        "row@fenced": {
+          "pass": 46
+        },
+        "transition@fenced": {
+          "pass": 46
+        },
+        "transition@in_block": {
+          "pass": 45
+        }
+      },
+      "commit": "7193b39",
+      "note": "the fix: the take-over and the registration write the fence counter n; stopped by SIGTERM at round 1001 of 1040 for the owner's second pause (its handler dropped the database)",
+      "nothing_at_fenced": 501,
+      "rounds": 1001,
+      "takeover_conflicts_by_verdict": {
+        "pass": {
+          "0": 137,
+          "1": 455,
+          "2": 409
+        }
+      },
+      "verdicts": {
+        "pass": 1001
+      }
+    }
+  },
+  "what": "fix round item 8 (F0): a take-over at every point of an old run's lane transaction, on MotherDuck; the fence row (n, epoch), every fence epoch, the leader row, the heartbeat's epoch, the old block's trace and both answers after every round. A breach is an old block that committed after the take-over returned (the counter n grew, or its row or transition is there)."
+}
