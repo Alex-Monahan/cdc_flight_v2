@@ -1,0 +1,117 @@
+{
+  "duckdb": "1.5.6",
+  "machine": "shared 10-core laptop (other workers may run); indications only",
+  "pyarrow": "26.0.1",
+  "results": {
+    "lineitem/backfill/1": {
+      "calls": 2000,
+      "mb_per_s": 0.0,
+      "rows_per_s": 122,
+      "us_per_call": 8229.0
+    },
+    "lineitem/backfill/1000": {
+      "calls": 55,
+      "mb_per_s": 22.9,
+      "rows_per_s": 108477,
+      "us_per_call": 9218.6
+    },
+    "lineitem/backfill/100000": {
+      "calls": 4,
+      "mb_per_s": 179.0,
+      "rows_per_s": 781973,
+      "us_per_call": 127881.6
+    },
+    "lineitem/stream/1": {
+      "calls": 5415,
+      "mb_per_s": 2.2,
+      "rows_per_s": 10829,
+      "us_per_call": 92.3
+    },
+    "lineitem/stream/1000": {
+      "calls": 2781,
+      "mb_per_s": 992.6,
+      "rows_per_s": 5560205,
+      "us_per_call": 179.8
+    },
+    "lineitem/stream/100000": {
+      "calls": 58,
+      "mb_per_s": 2149.7,
+      "rows_per_s": 11405961,
+      "us_per_call": 8767.3
+    },
+    "narrow/backfill/1": {
+      "calls": 2000,
+      "mb_per_s": 0.0,
+      "rows_per_s": 1361,
+      "us_per_call": 734.5
+    },
+    "narrow/backfill/1000": {
+      "calls": 648,
+      "mb_per_s": 28.1,
+      "rows_per_s": 1295614,
+      "us_per_call": 771.8
+    },
+    "narrow/backfill/100000": {
+      "calls": 75,
+      "mb_per_s": 384.9,
+      "rows_per_s": 14964955,
+      "us_per_call": 6682.3
+    },
+    "narrow/stream/1": {
+      "calls": 59519,
+      "mb_per_s": 3.5,
+      "rows_per_s": 119038,
+      "us_per_call": 8.4
+    },
+    "narrow/stream/1000": {
+      "calls": 60066,
+      "mb_per_s": 3003.8,
+      "rows_per_s": 120130849,
+      "us_per_call": 8.3
+    },
+    "narrow/stream/100000": {
+      "calls": 60244,
+      "mb_per_s": 301217.0,
+      "rows_per_s": 12048662429,
+      "us_per_call": 8.3
+    },
+    "wide200/backfill/1": {
+      "calls": 2000,
+      "mb_per_s": 0.0,
+      "rows_per_s": 5,
+      "us_per_call": 201829.7
+    },
+    "wide200/backfill/1000": {
+      "calls": 3,
+      "mb_per_s": 13.9,
+      "rows_per_s": 4266,
+      "us_per_call": 234407.4
+    },
+    "wide200/backfill/100000": {
+      "calls": 1,
+      "mb_per_s": 78.5,
+      "rows_per_s": 22275,
+      "us_per_call": 4489243.8
+    },
+    "wide200/stream/1": {
+      "calls": 2000,
+      "mb_per_s": 0.1,
+      "rows_per_s": 20,
+      "us_per_call": 49629.5
+    },
+    "wide200/stream/1000": {
+      "calls": 8,
+      "mb_per_s": 38.4,
+      "rows_per_s": 15564,
+      "us_per_call": 64250.7
+    },
+    "wide200/stream/100000": {
+      "calls": 1,
+      "mb_per_s": 137.0,
+      "rows_per_s": 52252,
+      "us_per_call": 1913793.8
+    }
+  },
+  "test": "tests/transform/test_transform_measure.py::test_speed",
+  "threads": 1
+}

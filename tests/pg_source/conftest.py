@@ -189,9 +189,14 @@ def _stop_clusters_at_end():
             c.lp("down", check=False)
     if os.environ.get("CDC_V2_P_EVIDENCE") == "1" and EVIDENCE:
         from cdc_v2.testing.harness_evidence import write_evidence
-        write_evidence(os.path.join(EVIDENCE_DIR, "localpg_pg%d.json" % MAJOR), {
+        # a partial run names its own file and command (CDC_V2_P_EVIDENCE_NAME, CDC_V2_P_EVIDENCE_COMMAND), so that
+        # it does not replace the file of the whole suite
+        name = os.environ.get("CDC_V2_P_EVIDENCE_NAME") or "localpg_pg%d.json" % MAJOR
+        assert os.path.basename(name) == name and name.endswith(".json"), name
+        write_evidence(os.path.join(EVIDENCE_DIR, name), {
             "what": "package P (source) tests on a private tools/localpg pair; times in seconds",
-            "command": ("CDC_V2_P_EVIDENCE=1 CDC_V2_P_PG_MAJOR=%d uv run pytest -m localpg tests/pg_source" % MAJOR),
+            "command": os.environ.get("CDC_V2_P_EVIDENCE_COMMAND") or (
+                "CDC_V2_P_EVIDENCE=1 CDC_V2_P_PG_MAJOR=%d uv run pytest -m localpg tests/pg_source" % MAJOR),
             "major": MAJOR, "server_versions": versions, "psycopg": psycopg.__version__,
             "machine_note": "shared 10-core laptop, up to three other workers running; indications only",
             "results": EVIDENCE})

@@ -1,0 +1,47 @@
+{
+  "families": {
+    "bytea": {
+      "printed_by_postgres_differs_from_ours": 0,
+      "values": 3000
+    },
+    "date": {
+      "printed_by_postgres_differs_from_ours": 0,
+      "values": 3000
+    },
+    "float4": {
+      "printed_by_postgres_differs_from_ours": 70,
+      "values": 3000
+    },
+    "float8": {
+      "printed_by_postgres_differs_from_ours": 5,
+      "values": 3000
+    },
+    "interval": {
+      "printed_by_postgres_differs_from_ours": 3007,
+      "values": 3013
+    },
+    "numeric": {
+      "printed_by_postgres_differs_from_ours": 1,
+      "values": 3000
+    },
+    "time": {
+      "printed_by_postgres_differs_from_ours": 0,
+      "values": 3000
+    },
+    "timestamp": {
+      "printed_by_postgres_differs_from_ours": 0,
+      "values": 3000
+    },
+    "timestamptz": {
+      "printed_by_postgres_differs_from_ours": 0,
+      "values": 3000
+    },
+    "timetz": {
+      "printed_by_postgres_differs_from_ours": 0,
+      "values": 3000
+    }
+  },
+  "seed": 20261110,
+  "server_version_num": 160006,
+  "test": "tests/transform/test_transform_localpg.py::test_postgres_prints_and_the_backfill_reads_it_back"
+}

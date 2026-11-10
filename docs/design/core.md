@@ -255,6 +255,22 @@ take-over and cancel).
 
 ## 6. Apply
 
+**Which tables have a key (rule K).** A table *has a key* when it has a primary key that is not deferrable
+(`pg_index.indimmediate`) and its replica identity is `DEFAULT`, `FULL`, or `USING INDEX` on the primary key's own
+index. Its key is the primary key. Every other table that can be published is a *table without a key* and needs
+`REPLICA IDENTITY FULL`: a table with no primary key (also when it has unique indexes), and a table whose primary
+key is deferrable. Why: an immediate key is checked row by row, so in the decoded stream no two rows hold one key
+after any record; a deferrable key allows two rows with one key inside a transaction, and a record that names only
+a key then does not say which row it means (H-015, measured on Postgres 16.6 and 18.6). The catalog
+(`cdc_v2.pg.catalog`) is the one authority. The engine is told which tables are without a key and sends the old
+image for them; the consumer checks at every table frame that the engine's key flag equals the catalog's, and a
+difference is an error, never ignored. What a table without a key costs: its history is a plain changelog (SPEC
+8.2), and its backfill reads the whole table under one snapshot (7.4).
+
+The destination's equality on the mapped key must not be coarser than the source's: two keys that the source
+calls different must be different in the destination. The type mapping of a key column and any transform on it
+must keep that (a salted hash keeps it; masking or truncating a key column does not, and is refused).
+
 ### 6.1 Staging
 
 The engine sends change records as Arrow record batches, one stream per table. The names and exact column sets
@@ -536,9 +552,27 @@ recreated in between. The **attach step** therefore is:
    frame is applied before the decision. While our engine holds the slot, nobody else can advance or drop it; if
    the engine loses it, the stream component restarts and attaches again.
 
-A restart of the stream component always kills the engine and starts a new one. **[test]** whether a status
-update that carries a lower flush position can move `confirmed_flush_lsn` backwards on Postgres 16, 17 and 18:
-if it can, comparing only after the attach would hide a slot that was ahead, which is why step 1 reads first.
+A restart of the stream component always kills the engine and starts a new one.
+
+**A lower flush position (open point 14, measured).** A status update that carries a flush position below
+`confirmed_flush_lsn` moves the slot back to that position on a server without the guard (measured on 16.6) and
+does nothing on a server with it (measured on 18.6). The guard is in 13.22, 14.19, 15.14, 16.10, 17.6 and 18.0
+(`docs/design/engine.md` section 5). The four steps do not depend on the guard:
+
+- Step 1 reads the slot before the engine starts. A check that reads only after the attach would not see a slot
+  that was ahead, if the client that attached sent a lower position on a server without the guard.
+- Our engine sends no flush position before its first `DURABLE` (measured on both versions). The pipeline sends no
+  `DURABLE` before the decision of step 4 and never one below the applied position of that decision, which by the
+  table below is at or above the `confirmed_flush_lsn` of step 1 (any other finding is enacted first: the applied
+  position is set to the slot's, and the loop starts again at step 1). The engine keeps the highest `DURABLE` of
+  its life and ignores a lower one. So our own engine never moves the slot backwards, and equal facts in steps 1
+  and 4 mean that it started at the position of step 1.
+- Limit, on a server without the guard only: a foreign replication client that streams from our slot, confirms a
+  position above our applied position and then one at or below it, leaves `confirmed_flush_lsn` where the check
+  expects it. The slot check does not find this, and what the server then sends for the range in between is not
+  measured (the slot's `restart_lsn` and catalog horizon may have moved on). Prevention: the preflight warns when
+  the server's minor release is below the first one with the guard (P4); the runbook rule "nothing else streams
+  from our slot" (P5); stage 2 checks the provider's version.
 
 | Finding | Meaning | Action |
 |---|---|---|
@@ -619,7 +653,7 @@ src/cdc_v2/oracle/          source/destination comparison used by every test tie
 | 11 | A schema change of a table during its own backfill | P4 schema wave; first rule: the table's backfill starts again |
 | 12 | Cut on a primary: a transaction decoded before `P0` that a later snapshot does not see yet (7.2) | P3 cut stress test proposes and proves the rule |
 | 13 | Catch-up that never converges (changes with unchanged values arrive faster than repair reads resolve them) | P4: bound the rounds, alert; P6 fuzzers |
-| 14 | Can a status update with a lower flush position move `confirmed_flush_lsn` backwards (8)? | P3, packages E and V. Not on 18.6 (E's test, repeated by the second review). 16 is repeated once `tools/localpg` runs the 16 binaries; 17 where a 17 server is available |
+| 14 | Can a status update with a lower flush position move `confirmed_flush_lsn` backwards (8)? | Measured in P3 (package E): yes on a server without the guard (16.6), no on one with it (18.6); the guard is in 13.22, 14.19, 15.14, 16.10, 17.6, 18.0. The attach rule does not depend on it; the limit on a server without the guard is stated in 8. Package V shows the negative control on the 16.6 binaries. Carried: preflight warning (P4), runbook rule (P5), the provider's version (stage 2); 17 where a 17 server is available |
 | 15 | SPEC 1.3 during a re-backfill: a table that streams stays in the guarantee (7.1, "without a gap"); after a gap each table swaps on its own (SPEC 3.6) and is outside the guarantee until then, like a first backfill | decided here; reported to the owner |
 | 16 | Leader tables created by several first runs at once end as one row set (4) | P3, package L, on MotherDuck |
 | 17 | SPEC 4.2 "a newcomer exits within 10 s": measured from the first line of `main.py`; the platform's own start time varies (p95 7 s, max 21 s in the spike) and is outside our control | reported to the owner |

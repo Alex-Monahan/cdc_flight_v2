@@ -299,10 +299,16 @@ message's `final_lsn` (= Commit's `commit_lsn`, the start of the commit record).
 of the Begin message.
 
 **Slot regression (core design open point 14).** A standby status update with a flush position below the slot's
-`confirmed_flush_lsn` does **not** move it back on Postgres 18.6 (`evidence/p3/engine/slot_flush_backwards_pg18.json`:
-slot advanced with `pg_replication_slot_advance`, then a pgjdbc replication client started at the old position and
-sent flush = old for 3 s; and our engine streamed for 3 s). The Postgres 18 source has an explicit guard
-(`LogicalConfirmReceivedLocation`: "Prevent moving the confirmed_flush backwards"). Postgres 16 and 17: section 13.
+`confirmed_flush_lsn` moves the slot **back to the position sent on Postgres 16.6** and does **not** move it on
+Postgres 18.6 (`evidence/p3/engine/slot_flush_backwards_pg16.json` and `slot_flush_backwards_pg18.json`: slot
+advanced with `pg_replication_slot_advance`, then a pgjdbc replication client started at the old position and sent
+flush = old for 3 s; then our engine streamed for 3 s). The difference is a guard in
+`LogicalConfirmReceivedLocation` ("Prevent moving the confirmed_flush backwards"), a Postgres commit of 2025-05-19
+that was back-patched through 13. The 16.10 release notes list it ("Never move a replication slot's
+confirmed-flush position backwards"). The minor releases of the same date on the other branches are 13.22, 14.19,
+15.14 and 17.6 (taken from the back-patch and the common release date; their release notes were not read); 18.0
+has the guard from the start. Our engine sends no flush position before its first `DURABLE`: while it streamed,
+the slot stayed where the probe had left it, on both versions. What this means for the attach rule: core design 8.
 
 ## 6. Attach rule
 
@@ -496,8 +502,9 @@ here (P9).
     `failing_position`, not `positions`, to recognise "the same place" across restarts. Its messages are filtered
     (section 7).
 12. **Two transport forms of text, on purpose.** The walsender session of the engine uses `IntervalStyle=postgres`
-    and `DateStyle=ISO` (`driver.options`, section 4); the read connections of the source package use `iso_8601`
-    and `ISO, YMD`. The stream form of every type is the table of section 3 of this document; the backfill form is
+    and `DateStyle=ISO` (`driver.options`, section 4); the read connections of the source package use `postgres`
+    too (since the fix round of package Y, so that arrays and composites that hold intervals print alike) and
+    `ISO, YMD`. The stream form of every type is the table of section 3 of this document; the backfill form is
     the source package's.
 13. The source package's nudge writes a logical message with the prefix `cdc_v2.nudge`, which lies outside the
     default `message.prefix.include.list` (`cdc_v2_.*`) on purpose: it never reaches the pipeline.
@@ -537,10 +544,14 @@ them, also on failure. TCP proxies of these tests lease ports 55624–55627 (`Ne
 **Other Postgres versions.** The tests take the Postgres binaries from `CDC_V2_PG_BIN` (as `tools/localpg` does) and
 the home from `CDC_V2_E_PG_HOME`, for example
 `CDC_V2_PG_BIN=/opt/homebrew/opt/postgresql@16/bin CDC_V2_E_PG_HOME=~/.cache/cdc_flight_v2/pg-e16 uv run -q pytest
--q -m "jvm and localpg" tests/engine`, once `tools/localpg` builds a 16 pair (package P). Expected differences on 16:
-infinite intervals do not exist (the infinite-interval test skips; the baseline type test has none); logical decoding
-on a standby exists since 16, so the attach tests should pass; `confirmed_flush_lsn` regression
-(`test_lower_flush_position_does_not_move_the_slot_back`) may differ, because the guard in
-`LogicalConfirmReceivedLocation` is recent and was back-patched only to some branches: the test then fails and
-reports it; pgoutput sends empty transactions differently before 15 only, so no difference is expected for event
-counts; slot creation on a 16 standby also needs `pg_log_standby_snapshot()` (present since 16).
+-q -m "jvm and localpg" tests/engine`.
+
+Run on 16.6 on 2026-11-10: the 14 tests whose result can depend on the server version. 13 give the same result as
+on 18.6: restart after random kills and Java crash points, slot never ahead of `DURABLE`, frozen reader, `DURABLE`
+sent before the redelivery, the holder that `HELLO` names, terminated walsender, slot held by another engine,
+position mapping, operations and event counts, unchanged TOAST, schema change between transactions, large
+transaction in bounded memory, baseline types value by value. The fourteenth is the slot regression test of
+section 5, where 16.6 differs: `test_lower_flush_position_and_the_slot` knows the first minor release with the
+guard on each branch and asserts the behaviour that belongs to the server it runs on. The other engine tests do
+not touch a version-dependent part of the server and were not repeated on 16. Infinite intervals exist from
+Postgres 17 on; their test skips on 16. Postgres 17 is not installed on the build machine: not run.

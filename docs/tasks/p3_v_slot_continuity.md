@@ -40,9 +40,13 @@ says elsewhere, these points and that document hold.
   connection inside a long transaction: the server ends a silent walsender after `wal_sender_timeout`, so the bound
   is `wal_sender_timeout` + `slot.verify_interval`. Refuse to stream from a server whose `wal_sender_timeout` is 0
   (an alert that names the setting; SPEC 4.7 retry), and test the bound with package H's proxy.
-- Open point 14 was tested by package E on Postgres 18.6: a status update with a lower flush position does not move
-  `confirmed_flush_lsn` back. Repeat it on Postgres 16 (`tools/localpg` runs the 16 binaries since package P's
-  repair) and keep the negative control this task asks for.
+- Open point 14 is measured (design section 8, `docs/design/engine.md` section 5,
+  `tests/engine/test_engine_attach.py::test_lower_flush_position_and_the_slot`): a status update with a lower flush
+  position moves `confirmed_flush_lsn` back on a server without the guard (16.6) and not on one with it (18.6; the
+  first minor release with the guard on each branch is in `CONFIRMED_FLUSH_GUARD` in that test file). Our engine
+  sends no flush position before its first `DURABLE`. Your attach step must not depend on the guard. The negative
+  control this task asks for can be shown only on a server without the guard: run it on the 16.6 binaries
+  (`CDC_V2_PG_BIN`) and skip it elsewhere.
 
 ## From the source package as built — build on it
 
@@ -125,19 +129,28 @@ body and keep the callers. Design section 8, steps 1 to 4, exactly:
 4. After `HELLO`, read the facts again. The holder must be the pair (`active_pid`, `backend_start`) that `HELLO`
    names; the engine must not have sent `FATAL` or exited; and every fact the decision used must be unchanged: same
    incarnation, same `confirmed_flush_lsn`, same server. If not, kill the engine and start again at 1. No frame is
-   handed to the stream and no `DURABLE` is sent before this. Why this is enough: our engine acknowledges nothing
-   before the decision, and `confirmed_flush_lsn` never moves backwards (open point 14), so equal facts in steps 1
-   and 4 mean that our engine started at the position of step 1. The pair adds that nobody else can move the slot
-   from now on. A holder is never recognised by the process id alone.
+   handed to the stream and no `DURABLE` is sent before this. Why this is enough: once our engine holds the slot,
+   only it can move the slot, and it sends no flush position before its first `DURABLE` (measured on 16.6 and
+   18.6). So the `confirmed_flush_lsn` of step 4 is the one our engine found when it took the slot, and equal facts
+   in steps 1 and 4 mean that it started at the position of step 1. Do not argue with "`confirmed_flush_lsn` never
+   moves backwards": a server without the guard moves it back when a client sends a lower flush position (open
+   point 14). The pair adds that nobody else can move the slot from now on. A holder is never recognised by the
+   process id alone.
 
 - The loop has a deadline of at least 75 s after a take-over (`slot.attach_timeout`) and is a declared wait
   (C11) with a reason. When the deadline passes the stream component reports the failure to the supervisor; the
   supervisor's rules decide what follows. The attach step never gives up by exiting.
 - Fault sites between the steps (`slot.attach.after_read`, `slot.attach.after_start`), so that a test can change
   the slot exactly there.
-- Open point 14: prove on Postgres 16 and 18 whether a status update with a lower flush position can move
-  `confirmed_flush_lsn` backwards. If it can, show that step 1 (read before the engine starts) is what protects
-  the decision, with a negative control that reads only after the start and misses a slot that was ahead.
+- Open point 14: on a server without the guard (the 16.6 binaries) show that step 1 (read before the engine
+  starts) is what protects the decision. The negative control is a variant of the attach step, in the test only,
+  that reads the slot only after the client has attached, with the probe client of package E's test in place of
+  the engine (`repl_probe` in `tests/engine/test_engine_attach.py`: a pgjdbc replication client that confirms the
+  position it started from). On a slot that was ahead it finds `continuous`; the real attach step finds the slot
+  ahead. Skip the negative control on a server with the guard. Also assert the rule that keeps our own engine
+  harmless: no `DURABLE` before the decision, and none below the applied position of the decision.
+- The limit of design section 8 (on a server without the guard, a foreign client that confirms a higher position
+  and then a lower one) is stated, not detected. Do not build a detection for it.
 
 ### 4. A finding enacted
 
@@ -185,7 +198,8 @@ that passes; the enactment against a local DuckDB with crash points; the machine
 standby and on a primary: after `pg_replication_slot_advance`; after drop and recreate; after another session
 consumed changes (`pg_logical_slot_get_binary_changes`); after invalidation by `max_slot_wal_keep_size`; after
 a restart of the node; after a promotion of the standby that holds the slot (timeline history read through
-package P, the applied position before the switch point is `continuous`). Open point 14.
+package P, the applied position before the switch point is `continuous`). Open point 14: the negative control, on
+the 16.6 binaries only.
 
 **Marker `t1` — the gate test of SPEC 1.8.** The whole local path of package S's helper, a seeded workload that
 keeps writing through everything, the slot on the standby (the default) and once on the primary:

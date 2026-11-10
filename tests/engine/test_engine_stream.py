@@ -7,7 +7,6 @@ import pytest
 from cdc_v2.deadline import Deadline
 from cdc_v2.stream import frames as F
 from cdc_v2.stream.engine import Engine
-from conftest import LONG
 from stream_helpers import Collector, evidence, rss_kb
 
 pytestmark = [pytest.mark.jvm, pytest.mark.localpg, pytest.mark.timeout(900)]

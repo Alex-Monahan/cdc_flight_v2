@@ -1,16 +1,18 @@
 """Package P: catalog.tables, catalog.observe and its bracket, catalog.diff on the private pair (marker localpg)."""
 from __future__ import annotations
 
+import os
 import threading
 import time
 
+import psycopg
 import pytest
 
 from cdc_v2 import lsn as lsnmod
 from cdc_v2.deadline import Deadline
 from cdc_v2.pg import catalog
 
-from .conftest import MAJOR, record
+from .conftest import MAJOR, Scratch, record, wait_for
 
 pytestmark = [pytest.mark.localpg, pytest.mark.timeout(600)]
 
@@ -174,11 +176,11 @@ def test_observe_and_diff_rename_vs_drop_add(cluster, scratch):
         o4.by_name[(scratch.schema, "t2")].oid}
 
 
-def _bracket_run(cluster, scratch, node, n_ddl, wrong_sleep_s=0.02):
-    """A writer creates tables br_<i> on the primary and records, per DDL, an interval (L0, L1] that holds its
+def _bracket_run(cluster, scratch, node, n_ddl, wrong_sleep_s=0.02, tag="br"):
+    """A writer creates tables <tag>_<i> on the primary and records, per DDL, an interval (L0, L1] that holds its
     commit end: L0 = insert position inside the transaction, L1 = insert position after COMMIT. An observer
     observes on `node`; every observation must show every DDL with L1 <= b and none with L0 >= a."""
-    names = [(scratch.schema, "br_%d" % i) for i in range(n_ddl)]
+    names = [(scratch.schema, "%s_%d" % (tag, i)) for i in range(n_ddl)]
     marks = {}
     stop = threading.Event()
 
@@ -186,7 +188,7 @@ def _bracket_run(cluster, scratch, node, n_ddl, wrong_sleep_s=0.02):
         with cluster.raw("primary", "admin") as w:
             for i in range(n_ddl):
                 w.execute("begin")
-                w.execute('create table %s.%s (id int)' % (q(scratch.schema), q("br_%d" % i)))
+                w.execute('create table %s.%s (id int)' % (q(scratch.schema), q("%s_%d" % (tag, i))))
                 l0 = w.execute("select pg_current_wal_insert_lsn()::text").fetchone()[0]
                 w.execute("commit")
                 l1 = w.execute("select pg_current_wal_insert_lsn()::text").fetchone()[0]
@@ -216,12 +218,12 @@ def _bracket_run(cluster, scratch, node, n_ddl, wrong_sleep_s=0.02):
     missing_low = extra_high = 0
     for b, a, present, _ in observations:
         for i, (l0, l1) in marks.items():
-            if l1 <= b and "br_%d" % i not in present:
+            if l1 <= b and "%s_%d" % (tag, i) not in present:
                 missing_low += 1
-            if l0 >= a and "br_%d" % i in present:
+            if l0 >= a and "%s_%d" % (tag, i) in present:
                 extra_high += 1
     caught = sum(1 for _, a_wrong, present in wrong for i, (l0, l1) in marks.items()
-                 if l0 >= a_wrong and "br_%d" % i in present)
+                 if l0 >= a_wrong and "%s_%d" % (tag, i) in present)
     elapsed = sorted(x[3] for x in observations)
     return {"ddl": n_ddl, "observations": len(observations), "violations_lower": missing_low,
             "violations_upper": extra_high, "wrong_bracket_observations": len(wrong),
@@ -244,6 +246,21 @@ def test_bracket_on_primary(cluster, scratch):
     record("bracket", "primary", r)
     assert r["observations"] >= 50
     assert r["violations_upper"] == 0, r
+    # CDC_V2_P_BRACKET_RUNS=n repeats the run to count how often the lower bound fails (a rare race)
+    repeats = []
+    for k in range(1, int(os.environ.get("CDC_V2_P_BRACKET_RUNS", "1"))):
+        repeats.append(_bracket_run(cluster, scratch, "primary", 300, tag="br%d" % k))
+        for i in range(300):            # one DROP SCHEMA over the tables of every run would exhaust the lock table
+            scratch.admin('drop table "%s"."br%d_%d"' % (scratch.schema, k, i))
+    if repeats:
+        runs = [r] + repeats
+        record("bracket", "primary_repeats", {
+            "runs": len(runs),
+            "runs_with_lower_violations": sum(1 for x in runs if x["violations_lower"]),
+            "violations_lower_per_run": [x["violations_lower"] for x in runs],
+            "violations_upper_per_run": [x["violations_upper"] for x in runs],
+            "observations_per_run": [x["observations"] for x in runs]})
+        assert all(x["violations_upper"] == 0 for x in runs), runs
     assert r["wrong_bracket_violations_caught"] > 0, r
 
 
@@ -275,3 +292,64 @@ def test_observe_cost_with_1000_tables(cluster, scratch):
                      "tables_full_read_s": round(time.monotonic() - t0, 3), "tables": len(full)}
     record("observe_cost", "1000_tables_30_columns", out)
     assert out["replica"]["observe_p50_s"] < 2.0
+
+
+def test_lower_bound_on_primary_while_a_commit_waits(breakable):
+    """Why the lower bound is no guarantee on a primary, held open instead of raced: a commit record is in the WAL
+    before its transaction becomes visible. With a synchronous standby that never answers, COMMIT waits in exactly
+    that state. An observation taken then has a lower bound past the commit record and does not see the table;
+    `visible(xid)` gives the right answer."""
+    c = breakable
+    c.boot("primary", "create extension if not exists pg_walinspect")
+    s = Scratch(c)
+    w = c.raw("primary", "admin")
+    th, done = None, {}
+    try:
+        s.admin("create publication %s" % q(s.pub))
+        conn = s.connect("primary")
+        names = [(s.schema, "held")]
+        w.execute("begin")
+        w.execute('create table "%s".held (id int)' % s.schema)
+        xid = int(w.execute("select pg_current_xact_id()::text").fetchone()[0])
+        pid = w.execute("select pg_backend_pid()").fetchone()[0]
+        l0 = w.execute("select pg_current_wal_insert_lsn()::text").fetchone()[0]
+        c.lp("set", "primary", "synchronous_standby_names=cdc_v2_nobody")
+
+        def commit():
+            try:
+                w.execute("commit")
+                done["ok"] = True
+            except psycopg.Error as e:
+                done["error"] = type(e).__name__
+
+        th = threading.Thread(target=commit)
+        th.start()
+        wait_for(lambda: c.boot("primary", "select wait_event = 'SyncRep' from pg_stat_activity where pid = %s",
+                                (pid,))[0][0], timeout=20, what="the commit to wait for the synchronous standby")
+        p = c.boot("primary", "select pg_current_wal_insert_lsn()::text")[0][0]
+        commits = c.boot("primary", "select end_lsn::text from pg_get_wal_records_info(%s::pg_lsn, %s::pg_lsn) "
+                                    "where resource_manager = 'Transaction' and record_type like 'COMMIT%%' "
+                                    "and xid::text = %s", (l0, p, str(xid & 0xFFFFFFFF)))
+        assert len(commits) == 1, commits           # the commit record is in the WAL ...
+        commit_end = lsnmod.parse(commits[0][0])
+        o = catalog.observe(conn, names, publication=s.pub, deadline=Deadline.after(10))
+        assert not o.in_recovery and o.lower >= commit_end      # ... before the observation's lower bound ...
+        assert "held" not in {t.name for t in o.tables.values()}        # ... and the table is not visible
+        assert not o.visible(xid)
+        assert th.is_alive() and not done
+        c.lp("unset", "primary", "synchronous_standby_names")
+        th.join(30)
+        assert done == {"ok": True}, done
+        o2 = catalog.observe(conn, names, publication=s.pub, deadline=Deadline.after(10))
+        assert "held" in {t.name for t in o2.tables.values()} and o2.visible(xid)
+        record("bracket", "primary_commit_waiting", {
+            "commit_record_end": lsnmod.format(commit_end), "observation_lower": lsnmod.format(o.lower),
+            "observation_upper": lsnmod.format(o.upper), "table_visible": False, "visible_xid": False,
+            "after_release": {"table_visible": True, "visible_xid": True, "lower": lsnmod.format(o2.lower)}})
+    finally:
+        c.lp("unset", "primary", "synchronous_standby_names", check=False)
+        if th is not None:
+            th.join(30)
+        w.close()
+        s.close()
+

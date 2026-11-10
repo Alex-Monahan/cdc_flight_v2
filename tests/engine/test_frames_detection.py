@@ -14,7 +14,7 @@ import pytest
 from cdc_v2.stream import frames as F
 from cdc_v2.testing import frames as T
 from cdc_v2.testing import pipefaults as pf
-from conftest import LONG
+from stream_helpers import LONG
 
 
 def true_stream(seed, count=2):
