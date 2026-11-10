@@ -828,6 +828,10 @@ while two other sessions imported defective snapshots on the same standby; in `x
 show it proves nothing.
 
 The pipeline itself keeps the rule: on a server with the defect its own importers import quiet snapshots only.
+So does the oracle that judges it (`docs/oracle.md`, step 1): before this round its workers imported a snapshot
+that need not be quiet, and in `evidence/p3/cut/oracle_standby_before_the_fix.json` that left a committed row
+invisible to every reader of the standby. Now it reads on one connection when no quiet snapshot comes within
+its wait (`oracle_standby.json`).
 
 ## 8. A standby that has just started: the `inside` rule can fail
 
