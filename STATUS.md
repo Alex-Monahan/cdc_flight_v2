@@ -55,13 +55,13 @@ green on T1 (local primary and standby, real MotherDuck, local JVM).
 | X | The cut: where a snapshot lies in the stream | Fable | review: merge after fixes (below); **fix round running** |
 | E | Engine: the JVM program around stock Debezium, frames, the Python side | Opus | **merged** (two reviews, two fix rounds) |
 | D | Destination basics: lanes, fence, deadlines, errors, `_cdc` schema, transition function, alert records | Fable | running |
-| A | Apply: the statements over a change set, keyed and keyless | Opus | **delivered**; two reviews done (coordinator; a second reviewer, Fable, on the row-version model); **fix round running** (list below) |
+| A | Apply: the statements over a change set, keyed and keyless | Opus | **delivered**; two reviews; **fix round delivered** (13 items, `68df804`); the coordinator checks it again and the second reviewer repeats its campaigns |
 | P | Source: connections, catalog and its observation, publication, slot, slot facts, timeline, heartbeat | Opus | **merged** (with the repair of `tools/localpg` for Postgres 16; one fix after the review) |
 | L | Leadership: guard, take-over, heartbeat, hand-over, bootstrap, platform interface | Fable | task written; after D |
 | Y | Transform: source types to destination types | Opus | **merged** (`362d00b`; one review, one fix round, one last check) |
 | S | Stream: transactions, groups, commit and acknowledge, supervisor, pipeline process | Fable | task written; after E, D, A, P, K |
 | V | Slot continuity | Fable | task written; after S |
-| F | Fuzzers (stream, workload, fault, leadership), the consumer loop of 1.3 and 3.2 | Opus | **round 1 delivered** (branch `p3-f-fuzzers`, against a toy replicator); coordinator: merge after a fix round (below), which starts at the next free writer slot; round 2, against the real system, after S, L, B, V |
+| F | Fuzzers (stream, workload, fault, leadership), the consumer loop of 1.3 and 3.2 | Opus | **round 1 delivered** (branch `p3-f-fuzzers`, against a toy replicator); coordinator: merge after a fix round (below), **running**; round 2, against the real system, after S, L, B, V |
 | B | Backfill and hand-off | Fable | task written; after X, S, A, P, Y |
 | T | The catalog gate, truncate, drop and recreate, the document and the test over all state machines | Opus | task written; after S, B |
 | K | The key rule: the catalog reads whether a primary key is deferrable, the engine is told which tables are without a key, what Debezium calls a key is measured (added 2026-11-10) | Opus | **running** (task `docs/tasks/p3_k_key_rule.md`); S waits for it |
@@ -313,13 +313,12 @@ Each in its own worktree and branch; the orchestrator merges. The P3 packages ar
 | Job | Phase | Started | Delivers |
 |---|---|---|---|
 | Package D, destination basics (Fable, xhigh). MotherDuck databases `cdc_v2_t_d_*`. No Postgres | P3 | 2026-11-10 | `src/cdc_v2/md/`, `src/cdc_v2/state/`, `src/cdc_v2/alerts.py`, `docs/design/destination.md`, `docs/state_machines.md`, `evidence/p3/destination/` |
-| Package A, apply (Opus, high): **fix round running** on branch `worktree-agent-adbee9c1aec8e2051`. MotherDuck databases `cdc_v2_t_a_*` | P3 | 2026-11-10 | the 13 items below; then the coordinator checks it again, the second reviewer repeats its campaigns, and it is merged |
-| Second review of package A (Fable, reads only): **done**. It found counterexamples to the row-version model and the catch-up rules (below); it runs its campaigns again on the fixed branch | P3 | 2026-11-10 | findings in A's fix round |
+| Package A, apply: **fix round delivered** on branch `worktree-agent-adbee9c1aec8e2051` (`68df804`); re-check by the coordinator (Opus) and campaigns of the second reviewer (Fable, local DuckDB only), both reading only | P3 | 2026-11-10 | the verdict; then the merge and the sentences for design 6.1–6.5 and plan C0, C3a, C4, C10 |
 | Package K, the key rule (Opus, high). Homes `pg-p`, `pg-p2`, `pg-e`. No MotherDuck | P3 | 2026-11-10 | the catalog follows rule K, the engine's list of tables without a key, the measurement of what Debezium calls a key, `evidence/p3/key_rule/` |
-| Package F, fuzzers (Opus, high): **round 1 delivered**, branch `p3-f-fuzzers`, not merged; reviewed. Homes `pg-f<n>`, ports 55700 + 8·n (all stopped) | P3 | 2026-11-10 | the four fuzzers with seeds and replay, the consumer loop of SPEC 1.3 and 3.2, their self-tests with planted defects. Owed: the fix round below |
+| Package F, fuzzers (Opus, high): **fix round running** on branch `p3-f-fuzzers` (15 items: ledger rules, suite 1.7 again, reductions, two table shapes, the shared-memory repair of `tools/localpg`, the frame reader's allocation). Homes `pg-f<n>`, ports 55700 + 8·n; localpg self-test ports | P3 | 2026-11-10 | the four fuzzers with seeds and replay, the consumer loop of SPEC 1.3 and 3.2, their self-tests with planted defects. Owed: the fix round below |
 | Package X, fix round (Fable; the worker that built the cut). Home `pg-cut`, ports 55600–55607. No MotherDuck | P3 | 2026-11-10 | the items listed below; then the coordinator checks it again and it is merged |
 
-**Package A, apply — delivered 2026-11-10; two reviews; the fix round is running.** The coordinator's verdict was
+**Package A, apply — delivered 2026-11-10; two reviews; fix round delivered, under its last checks.** The coordinator's verdict was
 "merge after a short fix round". The second reviewer (Fable) then tested the model the package is built on —
 "a key is a queue of row versions, because a deferred unique constraint lets a transaction hold two rows of one
 key" — and found sequences for which it gives a wrong table, silently, in both modes. That question was settled
@@ -662,8 +661,8 @@ the exact-value layer.
 
 ## Next steps
 
-1. P3, as writer slots become free (at most four; now D, K and the fix rounds of X and A): F's fix round at the next
-   free slot. When A's fix round reports, the coordinator checks A again, the second reviewer repeats its campaigns, A
+1. P3, as writer slots become free (at most four; now D, K and the fix rounds of X and F). A's fix round is
+   delivered: the coordinator checks A again and the second reviewer repeats its campaigns; then A
    is merged and the review's sentences go into design 6.1–6.3, plan C0, C3a, C4 and C10, the tasks of D, Y, S and B,
    the hazard notes (a new entry for a TOASTed key column sent as unchanged) and `docs/spike/md_semantics.md`. Review
    and merge D, X, K and F as they report: the coordinator reviews each, D also gets a second reviewer. Then L after
