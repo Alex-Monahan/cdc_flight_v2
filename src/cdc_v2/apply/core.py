@@ -358,6 +358,49 @@ class _rowid_free:
         return False
 
 
+def repair_keys(tx, target: Target, meta: TableMeta, rows: Union[pa.Table, str], params: tuple = (),
+                keys: Union[pa.Table, str, None] = None, key_params: tuple = ()) -> ApplyCounts:
+    """Load a repair read (docs/design/apply.md 2.6) inside the caller's transaction: delete every destination row
+    whose key the source calls equal to a repaired key (DuckDB `=` through `types.source_wrap`: -0 = 0, NaN = NaN, intervals
+    by length; so that no stale form of the key survives), then insert the repaired rows. `rows` holds the source's
+    rows with the destination column names: an Arrow table or a SELECT (with `params`) the destination can run.
+    `keys` (optional, the same two forms, key columns by name) adds reported keys that the source no longer holds.
+    Returns the counts (`deleted`, `inserted`, `statements`)."""
+    from .backend import VIEW_PREFIX
+    from .types import source_wrap
+    if not isinstance(target, Target):
+        raise TypeError("target is a Target")
+    if not meta.has_key:
+        raise ValueError("repair_keys is for tables with a key")
+    counts = ApplyCounts()
+    ctx = _Counting(tx, counts)
+    cols = list(meta.columns)
+    kcols = meta.key_columns
+
+    def rel(data, name, prm):
+        if isinstance(data, pa.Table):
+            ctx.register(VIEW_PREFIX + name, data)
+            return VIEW_PREFIX + name, ()
+        return "(%s)" % data, tuple(prm)
+    src, p_rows = rel(rows, "repair_rows", params)
+    ksel = ", ".join("s.%s" % c.qname for c in kcols)
+    krel, p_all = "(SELECT %s FROM %s AS s)" % (ksel, src), p_rows
+    if keys is not None:
+        extra, p_keys = rel(keys, "repair_keys", key_params)
+        krel = "(SELECT %s FROM %s AS s UNION ALL SELECT %s FROM %s AS s)" % (ksel, src, ksel, extra)
+        p_all = p_rows + p_keys
+    cond = " AND ".join("%s = %s" % (source_wrap("t.%s" % c.qname, c.dtype), source_wrap("r.%s" % c.qname, c.dtype))
+                        for c in kcols)
+    ctx.shape = "RK1"
+    counts.deleted = ctx.execute("DELETE FROM %s AS t USING %s AS r WHERE %s" % (target.sql(), krel, cond),
+                                 list(p_all) or None) or 0
+    ctx.shape = "RK2"
+    names = ", ".join(c.qname for c in cols)
+    counts.inserted = ctx.execute("INSERT INTO %s (%s) SELECT %s FROM %s AS s" % (
+        target.sql(), names, ", ".join("s.%s" % c.qname for c in cols), src), list(p_rows) or None) or 0
+    return counts
+
+
 def truncate(tx, target: Target) -> int:
     """Empty the table inside the transaction (a TRUNCATE of the source at this place of the stream)."""
     if not isinstance(target, Target):

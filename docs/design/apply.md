@@ -203,11 +203,16 @@ history either.
    every destination row of the key and then inserts the source's row (or nothing, if the source has none). A
    plain INSERT duplicates the row when a later call resolved the key before the repair ran (2.3).
 
-Proposal, not built: apply could offer the repair statement, so that the backfill cannot get it wrong:
-`repair_keys(tx, target: Target, meta: TableMeta, rows: pa.Table, settings=None) -> ApplyCounts`, where `rows`
-holds the repair read (destination column names and types; the keys to clear are the keys of `rows` plus an
-optional `keys: pa.Table` of reported keys that the source no longer holds); it would send one DELETE by exact
-key and one INSERT, in the caller's transaction, and count both.
+The backfill loads a repair read with **`apply.repair_keys(tx, target, meta, rows, params=(), keys=None,
+key_params=()) -> ApplyCounts`**, in the caller's transaction. `rows` is the repair read with the destination's
+column names: an Arrow table (registered on `tx`) or a SELECT the destination runs (with `params`); `keys`, in the
+same two forms, adds reported keys that the source no longer holds. It sends two statements: RK1 deletes every
+destination row whose key the source calls equal to a key of `rows` or `keys` (DuckDB `=` through
+`types.source_wrap`: `-0` = `0`, NaN = NaN, `1 mon` = `30 days`), so that a stale row under another form of the
+key does not survive the repair of key `0`; RK2 inserts `rows`. It counts both (`deleted`, `inserted`). Tested
+in both forms, local and on MotherDuck: the late repair of 2.3 and a stale `-0` / `1 mon` row
+(`test_apply_limits.py`, `test_apply_md.py::test_repair_keys_on_motherduck`); the rounds property loads every
+repair read through it.
 
 ### 2.7 Other readings of C3a (contract notes)
 
@@ -396,7 +401,10 @@ unless another file is named).
    by the property test (seed 2273038); named cases `infinite_*_keys_in_one_transaction`. The same pushdown, into
    the Arrow scan, fails outright for UUID ("Unimplemented type UUID for Arrow Filter Pushdown") and JSON (no
    `is_in` kernel) keys once the transaction has written rows; `join_wrap` compares their text (found by the
-   campaign, seeds 10002906, 10005444, 10005702; named cases `uuid_keys_in_one_transaction` and others). (A first fix cast DATE to
+   campaign, seeds 10002906, 10005444, 10005702; named cases `uuid_keys_in_one_transaction` and others). On
+   MotherDuck a DELETE that joined a stored `-0` with an Arrow-side `0` by the plain DOUBLE column found no row
+   (where `=` says equal); `repair_keys`, which compares by the source's equality, therefore compares FLOAT,
+   DOUBLE and INTERVAL through an expression (`types.source_wrap`). (A first fix cast DATE to
    TIMESTAMP; the review found that this overflows for dates past 294247 AD, which Postgres and DuckDB allow, and
    puts the value into the error text: named cases `*date*beyond_the_timestamp_range`.) The cost: DuckDB cannot
    prune the destination scan by the join's key range for DATE, TIMESTAMP, FLOAT, DOUBLE and INTERVAL keys; every
@@ -494,5 +502,8 @@ how many examples it took (`campaign_local.json`, `negative_controls_examples_to
     `test_planning_settings_stay_with_the_cursor`).
 * `reduce_duplicates` plans a local change set in the same planning database as `apply_group`, under the same
   `ApplySettings` (spill directory required; `ApplySpillFull` beyond the limits).
+* C0 to K7/K8 relies on `rowid` staying the same within one transaction, also for a row that an earlier change
+  set of the transaction inserted and that is not committed yet (named case
+  `round3_copy_root_inserted_earlier_in_the_transaction`, both forms, local and on MotherDuck).
 * Catch-up rule 1 with two creates at the root key (`d(K) c(K, k=K)` twice, each taking a value from the start
   row) stays unresolved, although it could be resolved (2.3).

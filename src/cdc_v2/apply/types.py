@@ -283,3 +283,15 @@ def sentinel(expr: str, t: DType) -> str:
         return "(CASE WHEN %s IS NULL THEN NULL ELSE CAST(struct_pack(%s) AS %s) END)" % (expr, ", ".join(parts),
                                                                                          t.sql())
     raise ValueError("type %s needs no sentinel" % t.sql())
+
+
+def source_wrap(expr: str, t: DType) -> str:
+    """SQL: one side of a join by the source's equality (DuckDB `=`: -0 = 0, NaN = NaN, intervals by length), as
+    `repair_keys` deletes. FLOAT, DOUBLE and INTERVAL go through an expression: on MotherDuck a join of a stored -0
+    with an Arrow-side 0 by the plain column missed the row (the join filter pushdown again, section 5.5), and `-0 + 0`
+    is `0`. Other types as `join_wrap`."""
+    if t.base in _FLOATS:
+        return "(%s + 0)" % expr
+    if t.base == "INTERVAL":
+        return "(%s + INTERVAL '0 microseconds')" % expr
+    return join_wrap(expr, t)

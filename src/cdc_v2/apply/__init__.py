@@ -11,8 +11,9 @@ never begins, commits, rolls back or fences.
 """
 from .changeset import ChangeSetError, LocalChangeSet, RelationChangeSet
 from .core import (ApplyCounts, ApplyInvariantError, ApplySettings, ApplySettingsError, ApplySpillFull, apply_group,
-                   reduce_duplicates, truncate)
+                   reduce_duplicates, repair_keys, truncate)
 from .meta import Column, TableMeta, Target
 
 __all__ = ["Column", "TableMeta", "Target", "LocalChangeSet", "RelationChangeSet", "ChangeSetError", "ApplyCounts",
-           "ApplyInvariantError", "ApplySettings", "ApplySettingsError", "ApplySpillFull", "apply_group", "truncate", "reduce_duplicates"]
+           "ApplyInvariantError", "ApplySettings", "ApplySettingsError", "ApplySpillFull", "apply_group", "truncate", "reduce_duplicates",
+           "repair_keys"]

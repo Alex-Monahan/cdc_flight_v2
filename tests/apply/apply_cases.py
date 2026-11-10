@@ -477,6 +477,17 @@ def round2_cases() -> List[Case]:
                    [kc(Z, "1", "'a'", "'Ba'"), kc(P0, "2", "'b'", "'Bb'"), kc(F5, "5", "'c'", "'Bc'")],
                    [r.out], [kc(P0, "2", "'a2'", "'Ba'"), kc(F5, "5", "'b2'", "'Bb'"), kc(Z, "1", "'c2'", "'Bc'")],
                    forms=both))
+    # third round: the copy root was inserted by an earlier change set of the same transaction (not committed),
+    # and K1 and K3 change other rows of that transaction between C0 and K7/K8; then X1 onto its old form
+    r1 = R().c(1, kc(Z, "1", "'a'", "'Ba'")).c(1, kc("7.0::DOUBLE", "7", "'g'", "'Bg'"))
+    r2 = (R().d(2, key("3.0::DOUBLE", "3"))
+          .move(2, key("7.0::DOUBLE", "7"), kc("8.0::DOUBLE", "8", "'g2'", None), unchanged=[3])
+          .move(2, key(Z, "1"), kc(P0, "2", "'a2'", None), unchanged=[3])
+          .move(2, key(F5, "5"), kc(Z, "1", "'b2'", None), unchanged=[3]))
+    cs.append(Case("round3_copy_root_inserted_earlier_in_the_transaction", KC,
+                   [kc("3.0::DOUBLE", "3", "'c'", "'Bc'"), kc(F5, "5", "'b'", "'Bb'")], [r1.out, r2.out],
+                   [kc(P0, "2", "'a2'", "'Ba'"), kc(Z, "1", "'b2'", "'Bb'"), kc("8.0::DOUBLE", "8", "'g2'", "'Bg'")],
+                   one_tx=True, forms=both))
     # X1 with an INTERVAL key part: 1 month,1 -> 30 days,2 is copied, then 1 day,5 moves onto 1 month,1
     KI = TableMeta((Column(0, "k1", "INTERVAL", key=True), Column(1, "k2", "INTEGER", key=True),
                     Column(2, "v", "VARCHAR"), Column(3, "big", "VARCHAR", unchanged_possible=True)))

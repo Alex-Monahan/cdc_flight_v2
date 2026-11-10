@@ -147,6 +147,14 @@ def test_case_on_motherduck(case, form, mdb):
     _case_log.append(info)
 
 
+@pytest.mark.parametrize("form", ["local", "relation"])
+def test_repair_keys_on_motherduck(form, mdb):
+    """apply.repair_keys: the late repair and the delete by the source's equality (-0 / 0, 1 month / 30 days)."""
+    from test_apply_limits import repair_case_late, repair_case_source_equal
+    repair_case_late(mdb.conn, form, fresh_table())
+    repair_case_source_equal(mdb.conn, form, fresh_table())
+
+
 def test_write_case_evidence(evidence):
     if not _case_log:
         pytest.skip("no case ran")

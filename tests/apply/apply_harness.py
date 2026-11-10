@@ -297,17 +297,17 @@ def repair(conn, target, meta, rows, replace: bool = True) -> None:
     """Load a repair read as docs/design/apply.md 2.6 says: in one transaction, the rows of each key deleted and the
     source's row inserted (`replace=False`: a plain INSERT, the wrong way, kept for the test that shows it)."""
     from apply_sim import values_table
-    from cdc_v2.apply.types import exact, join_wrap, quote_ident
+    from cdc_v2.apply import repair_keys
     if not rows:
         return
-    conn.register("cdc_v2_test_repair", values_table(list(meta.columns), rows))
+    data = values_table(list(meta.columns), rows)
+    if replace:
+        with StandInTx(conn) as tx:
+            repair_keys(tx, target, meta, data)
+        return
+    conn.register("cdc_v2_test_repair", data)
     try:
         with StandInTx(conn) as tx:
-            if replace:
-                cond = " AND ".join("%s = %s" % (join_wrap(exact("t.%s" % c.qname, c.dtype), c.dtype),
-                                                 join_wrap(exact("r.%s" % quote_ident(c.name), c.dtype), c.dtype))
-                                    for c in meta.key_columns)
-                tx.execute("DELETE FROM %s AS t USING cdc_v2_test_repair AS r WHERE %s" % (target.sql(), cond))
             tx.execute("INSERT INTO %s SELECT * FROM cdc_v2_test_repair" % target.sql())
     finally:
         conn.unregister("cdc_v2_test_repair")

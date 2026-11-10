@@ -2,9 +2,11 @@
 break when it does not (second fix round, items 3 and 4)."""
 from __future__ import annotations
 
+import pytest
+
 from apply_cases import R
 from apply_harness import SCHEMA, apply_sets, dest_canon, key_canon, local_conn, repair
-from apply_sim import create_table, literal_rows_canon
+from apply_sim import NZ, create_table, literal_rows_canon
 from cdc_v2.apply import Column, TableMeta, Target
 
 TV = TableMeta((Column(0, "id", "BIGINT", key=True), Column(1, "v", "VARCHAR"),
@@ -59,3 +61,71 @@ def test_a_repair_replaces_the_row_of_its_key():
     assert _late_repair(replace=True) == want
     plain = _late_repair(replace=False)
     assert plain != want and sum(plain.values()) == 2
+
+
+# ------------------------------------------------------------------ apply.repair_keys (third round)
+
+KD = TableMeta((Column(0, "k", "DOUBLE", key=True), Column(1, "iv", "INTERVAL", key=True), Column(2, "v", "VARCHAR")))
+
+
+def _rows_arg(conn, meta, rows, form, name):
+    """The repair read as repair_keys takes it: an Arrow table (local) or a SELECT the destination runs."""
+    from apply_sim import values_table
+    data = values_table(list(meta.columns), rows)
+    if form == "local":
+        return data, ()
+    conn.register("cdc_v2_test_stage", data)
+    conn.execute("CREATE SCHEMA IF NOT EXISTS _cdc_stage")
+    conn.execute("CREATE OR REPLACE TABLE _cdc_stage.%s AS SELECT * FROM cdc_v2_test_stage" % name)
+    conn.unregister("cdc_v2_test_stage")
+    return "SELECT * FROM _cdc_stage.%s WHERE true = ?" % name, (True,)
+
+
+def repair_case_late(conn, form, table):
+    """The reviewer's case: call 1 reports key 1, call 2 (later) writes key 1 whole, then call 1's repair runs."""
+    from apply_harness import StandInTx
+    from cdc_v2.apply import repair_keys
+    create_table(conn, SCHEMA, table, TV, [])
+    target = Target(SCHEMA, table)
+    cs1 = R().u(1, tv(1, "'x'", None), unchanged=[2]).out
+    cs2 = R().d(2, {0: "1"}).c(2, tv(1, "'y'", "'B2'")).out
+    first, second = apply_sets(conn, target, TV, [cs1, cs2], mode="catch_up", form=form)
+    assert len(key_canon(TV, first.unresolved)) == 1 and key_canon(TV, second.unresolved) == set()
+    rows, params = _rows_arg(conn, TV, [tv(1, "'y'", "'B2'")], form, table + "_late")
+    with StandInTx(conn) as tx:
+        counts = repair_keys(tx, target, TV, rows, params)
+    assert (counts.deleted, counts.inserted) == (1, 1)
+    assert dest_canon(conn, target, TV) == literal_rows_canon(list(TV.columns), [tv(1, "'y'", "'B2'")])
+
+
+def repair_case_source_equal(conn, form, table):
+    """A stale row under another form of the repaired key (-0 for 0, 1 month for 30 days) goes too: the delete
+    compares by the source's equality, not by exact key. A reported key the source no longer holds goes as well."""
+    from apply_harness import StandInTx
+    from cdc_v2.apply import repair_keys
+    M, D30 = "INTERVAL '1 month'", "INTERVAL '30 days'"
+    start = [{0: NZ, 1: M, 2: "'stale'"}, {0: "5.0::DOUBLE", 1: M, 2: "'gone'"}, {0: "7.0::DOUBLE", 1: M, 2: "'kept'"}]
+    create_table(conn, SCHEMA, table, KD, start)
+    target = Target(SCHEMA, table)
+    rows, params = _rows_arg(conn, KD, [{0: "0.0::DOUBLE", 1: D30, 2: "'new'"}], form, table + "_eq")
+    keys = (values_table_keys(KD, [{0: "5.0::DOUBLE", 1: D30}]), ())
+    with StandInTx(conn) as tx:
+        counts = repair_keys(tx, target, KD, rows, params, keys=keys[0])
+    assert (counts.deleted, counts.inserted) == (2, 1)
+    assert dest_canon(conn, target, KD) == literal_rows_canon(list(KD.columns), [
+        {0: "0.0::DOUBLE", 1: D30, 2: "'new'"}, {0: "7.0::DOUBLE", 1: M, 2: "'kept'"}])
+
+
+def values_table_keys(meta, rows):
+    from apply_sim import values_table
+    return values_table(list(meta.key_columns), rows)
+
+
+@pytest.mark.parametrize("form", ["local", "relation"])
+def test_repair_keys_after_a_later_call(form):
+    repair_case_late(local_conn(), form, "t")
+
+
+@pytest.mark.parametrize("form", ["local", "relation"])
+def test_repair_keys_deletes_by_the_source_equality(form):
+    repair_case_source_equal(local_conn(), form, "t")
