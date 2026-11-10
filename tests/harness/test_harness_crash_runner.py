@@ -52,7 +52,7 @@ def test_correct_toy_passes_at_every_point_with_three_seeds(tmp_path):
     s = r.summary()
     r.write_summary(summary)
     assert len(recs) == len(r.declared) * len(SEEDS)
-    assert s["missing_points"] == [] and s["coverage"] == "6/6"
+    assert s["missing_points"] == [] and s["coverage"] == "7/7"
     assert s["all_passed"], s["failures"]
     for rec in recs:                                    # died by SIGKILL exactly at the armed point and hit
         fired = [h for h in rec["hits"] if h["tag"] == "a" and h["fire"]]
@@ -60,6 +60,17 @@ def test_correct_toy_passes_at_every_point_with_three_seeds(tmp_path):
         assert rec["exit"]["signal_name"] == "SIGKILL"
     assert {rec["hit"] for rec in recs if rec["point"] == "toy.schema_ready"} == {1}   # declared once=True
     assert_ledger_clean(ledger, tmp_path)
+    assert no_toy_process_left(tmp_path) == []
+
+
+def test_kill_while_the_commit_is_in_flight(tmp_path):
+    """kill_later: SIGKILL from another thread while the toy goes on into COMMIT (unknown commit outcome)."""
+    r, ledger, summary = runner(toy_adapter.CorrectToy, tmp_path, "toy_correct_commit_in_flight")
+    recs = r.run_crash_points(points=["toy.commit_sent"], seeds=SEEDS + (4, 5, 6), action="kill_later", delay_ms=0)
+    r.write_summary(summary)
+    assert all(rec["outcome"] == "pass" and rec["exit"]["signal_name"] == "SIGKILL" for rec in recs), \
+        [rec["reason"] for rec in recs]
+    assert all(rec["action"] == "kill_later" for rec in recs)
     assert no_toy_process_left(tmp_path) == []
 
 

@@ -27,15 +27,16 @@ POINTS = {
     "toy.data_written": ("batch rows inserted, not committed", False),
     "toy.data_committed": ("wrong variant: rows committed, position not yet written", False),
     "toy.position_written": ("position updated, not committed", False),
+    "toy.commit_sent": ("about to send the COMMIT of the position (with kill_later: COMMIT in flight)", False),
     "toy.committed": ("COMMIT of the position returned", False),
 }
 for _name, (_desc, _once) in POINTS.items():
     declare(_name, _desc, once=_once)
 
 CORRECT_POINTS = ["toy.schema_ready", "toy.begun", "toy.batch_read", "toy.data_written", "toy.position_written",
-                  "toy.committed"]
+                  "toy.commit_sent", "toy.committed"]
 WRONG_POINTS = ["toy.schema_ready", "toy.begun", "toy.batch_read", "toy.data_written", "toy.data_committed",
-                "toy.position_written", "toy.committed"]
+                "toy.position_written", "toy.commit_sent", "toy.committed"]
 
 LOCK_DEADLINE_S = 30.0
 POLL_S = 0.01
@@ -101,6 +102,7 @@ def batch(source, dest, variant, known_pos):
             con.execute("BEGIN")
         con.execute("UPDATE toy_position SET pos = ? WHERE k = 1", [rows[-1][0]])
         crash_point("toy.position_written")
+        crash_point("toy.commit_sent")
         con.execute("COMMIT")
         crash_point("toy.committed")
         return rows[-1][0]

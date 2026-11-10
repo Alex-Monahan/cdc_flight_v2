@@ -508,8 +508,8 @@ class NetProxy:
                 while True:
                     pol = self._pol(c)
                     if pol.blackholed(d):
-                        async with self.cond:
-                            await self.cond.wait()
+                        async with self.cond:              # predicate re-checked under the lock: no lost wake-up
+                            await self.cond.wait_for(lambda: not self._pol(c).blackholed(d) or c.state != "open")
                         continue
                     due = t_read + pol.delay(d)
                     wait = due - time.monotonic()

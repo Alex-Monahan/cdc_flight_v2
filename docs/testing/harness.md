@@ -51,11 +51,18 @@ The JVM engine will implement the same contract in Java. Variables are read once
 |---|---|
 | `CDC_V2_CRASH_POINT` | name of the one armed point; unset or empty = none |
 | `CDC_V2_CRASH_HIT` | which hit fires, counted per process from 1: `N` (default 1), or `seed:S:M` = 1 + splitmix64(S) mod M (S unsigned 64-bit, M ≥ 1) |
-| `CDC_V2_CRASH_ACTION` | `kill` (default; SIGKILL to itself), `stop` (SIGSTOP to itself; continues after SIGCONT), `hang` (the calling thread blocks for ever), `raise` (`CrashPointHit`, a `BaseException`) |
+| `CDC_V2_CRASH_ACTION` | `kill` (default; SIGKILL to itself), `kill_later` (a separate thread sends SIGKILL after `CDC_V2_CRASH_DELAY_MS` while the caller carries on into the next call), `stop` (SIGSTOP to itself; continues after SIGCONT), `hang` (the calling thread blocks for ever), `raise` (`CrashPointHit`, a `BaseException`) |
+| `CDC_V2_CRASH_DELAY_MS` | delay of `kill_later` in milliseconds (integer ≥ 0, default 0) |
 | `CDC_V2_CRASH_LOG` | optional hit log: one line per call of every declared point, armed or not |
 | `CDC_V2_CRASH_TAG` | optional instance tag written into each log line (`[A-Za-z0-9_.-]`, ≤ 64 characters) |
 
-A point fires at most once per process. An invalid value fails at start-up (`ValueError`), so a typo in a harness
+A point fires at most once per process.
+
+`kill_later` exists for the state that a plain `kill` cannot produce: a blocking call (COMMIT) in flight when the
+process dies, so that its outcome is unknown (`docs/design/core.md` §3, step 6). Put a point immediately before the
+call (`stream.commit_sent`) and run it with `kill_later`; with `kill` the same point is only "nothing sent yet".
+
+An invalid value fails at start-up (`ValueError`), so a typo in a harness
 never runs silently without a crash; calling an undeclared point fails while the module is active.
 
 splitmix64 (the standard finaliser) on unsigned 64-bit values:
@@ -80,7 +87,9 @@ action runs (so it survives SIGKILL and concurrent writers do not interleave):
 `hit` counts calls of that point in that process; `fire` is true only on the firing hit; `action` is empty on the
 other lines. Notes for the Java side: `Runtime.halt` is an exit, not SIGKILL; the runner requires death by SIGKILL,
 so the JVM must signal itself (for example run `kill -KILL <own pid>` and block until it arrives); `stop` likewise
-with `-STOP`.
+with `-STOP`; `kill_later` from a separate thread after the delay, without blocking the caller. The pipeline passes
+the `CDC_V2_CRASH_*` variables to the JVM child unchanged; both processes may append to the same hit log (their lines
+carry different pids), and each arms only a point that it declares and calls.
 
 ## 2. Fault sites
 
@@ -168,6 +177,7 @@ from cdc_v2.testing.crash import Config, CrashRunner
 
 r = CrashRunner(MyAdapter, workdir, ledger_path="evidence/.../ledger.jsonl", config=Config(workers=4))
 r.run_crash_points(seeds=(1, 2, 3))                       # (a) every declared point, 3 seeds, SIGKILL
+r.run_crash_points(points=["stream.commit_sent"], action="kill_later", delay_ms=0)   # COMMIT in flight
 r.run_random_kills(seeds=(1, 2, 3), kills=4)              # (b) kills at random times from the seed
 r.run_freeze(seeds=(1, 2, 3))                             # (c) SIGSTOP at a random time, second instance, SIGCONT
 r.run_freeze(seeds=(1,), at_points=["stream.committed"])  # (c) stop exactly at a point

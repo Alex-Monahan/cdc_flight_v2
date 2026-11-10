@@ -22,10 +22,14 @@ read once, when this module is imported (or when `reconfigure` is called).
     or ``seed:S:M``: hit = 1 + splitmix64(S) mod M, with S an unsigned 64-bit decimal integer and M >= 1.
     splitmix64 is the standard finaliser (constants below); splitmix64(0) = 0xE220A8397B1DCDAF.
 ``CDC_V2_CRASH_ACTION``
-    What happens at the firing hit: ``kill`` (default; the process sends itself SIGKILL), ``stop`` (SIGSTOP to itself;
-    after SIGCONT it continues normally), ``hang`` (the calling thread blocks for ever; signals still work),
-    ``raise`` (raises :class:`CrashPointHit`, a ``BaseException`` so that ``except Exception`` does not swallow it).
+    What happens at the firing hit: ``kill`` (default; the process sends itself SIGKILL), ``kill_later`` (a separate
+    thread sends SIGKILL ``CDC_V2_CRASH_DELAY_MS`` after the hit while the caller carries on, so that the blocking
+    call after the point, e.g. COMMIT, is in flight when the process dies), ``stop`` (SIGSTOP to itself; after
+    SIGCONT it continues normally), ``hang`` (the calling thread blocks for ever; signals still work), ``raise``
+    (raises :class:`CrashPointHit`, a ``BaseException`` so that ``except Exception`` does not swallow it).
     A point fires at most once per process.
+``CDC_V2_CRASH_DELAY_MS``
+    Delay of ``kill_later`` in milliseconds (decimal integer >= 0, default 0). Ignored by the other actions.
 ``CDC_V2_CRASH_LOG``
     Optional hit log, an append-only file. Every call of every declared point appends one line, whether a point is
     armed or not. The line is written with one ``write`` on a file opened with ``O_APPEND`` before the action runs, so
@@ -57,9 +61,10 @@ ENV_HIT = "CDC_V2_CRASH_HIT"
 ENV_ACTION = "CDC_V2_CRASH_ACTION"
 ENV_LOG = "CDC_V2_CRASH_LOG"
 ENV_TAG = "CDC_V2_CRASH_TAG"
-ENV_VARS = (ENV_POINT, ENV_HIT, ENV_ACTION, ENV_LOG, ENV_TAG)
+ENV_DELAY = "CDC_V2_CRASH_DELAY_MS"
+ENV_VARS = (ENV_POINT, ENV_HIT, ENV_ACTION, ENV_LOG, ENV_TAG, ENV_DELAY)
 
-ACTIONS = ("kill", "stop", "hang", "raise")
+ACTIONS = ("kill", "kill_later", "stop", "hang", "raise")
 NAME_RE = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$")
 TAG_RE = re.compile(r"^[A-Za-z0-9_.-]{0,64}$")
 _HIT_SEED_RE = re.compile(r"^seed:(\d+):(\d+)$")
@@ -162,8 +167,9 @@ def parse_hit(text):
 
 
 class _State:
-    def __init__(self, point, hit, action, log_path, tag):
+    def __init__(self, point, hit, action, log_path, tag, delay_ms=0):
         self.point, self.target, self.action, self.log_path, self.tag = point, hit, action, log_path, tag
+        self.delay_ms = delay_ms
         self.counts = {}
         self.fired = False
         self.lock = threading.Lock()
@@ -186,11 +192,18 @@ class _State:
                                    "action": self.action if fire else ""}, separators=(",", ":")) + "\n"
                 os.write(self.log_fd, line.encode())
         if fire:
-            _fire(self.action, name, n)
+            _fire(self.action, name, n, self.delay_ms)
 
 
-def _fire(action, name, n):
-    if action == "kill":
+def _kill_later(delay_ms):
+    time.sleep(delay_ms / 1000.0)
+    os.kill(os.getpid(), signal.SIGKILL)
+
+
+def _fire(action, name, n, delay_ms=0):
+    if action == "kill_later":
+        threading.Thread(target=_kill_later, args=(delay_ms,), name="crash-point-kill", daemon=True).start()
+    elif action == "kill":
         os.kill(os.getpid(), signal.SIGKILL)
         while True:                      # SIGKILL is delivered asynchronously; never run past the point
             time.sleep(1)
@@ -221,8 +234,11 @@ def reconfigure(environ=None):
     if not TAG_RE.match(tag):
         raise ValueError("%s=%r: [A-Za-z0-9_.-], at most 64 characters" % (ENV_TAG, tag))
     hit = parse_hit(env.get(ENV_HIT))
+    delay = (env.get(ENV_DELAY) or "0").strip() or "0"
+    if not delay.isdigit():
+        raise ValueError("%s=%r: expected milliseconds >= 0" % (ENV_DELAY, delay))
     old = _state
-    _state = _State(point, hit, action, log_path, tag) if (point or log_path) else None
+    _state = _State(point, hit, action, log_path, tag, int(delay)) if (point or log_path) else None
     if old is not None and old.log_fd is not None:
         os.close(old.log_fd)
     return _state is not None
@@ -239,11 +255,12 @@ def crash_point(name):
     _state.hit(name)
 
 
-def env_for(point=None, hit=1, action="kill", log=None, tag=None):
-    """Environment variables that switch on ``point`` in a child process (all five keys; empty means off)."""
+def env_for(point=None, hit=1, action="kill", log=None, tag=None, delay_ms=0):
+    """Environment variables that switch on ``point`` in a child process (every key; empty means off)."""
     if action not in ACTIONS:
         raise ValueError("unknown action %r" % (action,))
-    return {ENV_POINT: point or "", ENV_HIT: str(hit), ENV_ACTION: action, ENV_LOG: log or "", ENV_TAG: tag or ""}
+    return {ENV_POINT: point or "", ENV_HIT: str(hit), ENV_ACTION: action, ENV_LOG: log or "", ENV_TAG: tag or "",
+            ENV_DELAY: str(int(delay_ms))}
 
 
 def read_log(path):

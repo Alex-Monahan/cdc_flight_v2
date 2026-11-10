@@ -264,24 +264,28 @@ class CrashRunner:
         return out
 
     # -- mode (a): every crash point -----------------------------------------------------------------------------
-    def run_crash_points(self, points=None, seeds=(1, 2, 3), action="kill"):
-        """Mode (a). ``action`` is ``kill`` (SPEC 1.7) or ``raise`` (the process must exit by itself after firing);
+    def run_crash_points(self, points=None, seeds=(1, 2, 3), action="kill", delay_ms=0):
+        """Mode (a). ``action`` is ``kill`` (SPEC 1.7), ``kill_later`` (SIGKILL ``delay_ms`` after the hit from another
+        thread: the call after the point is in flight) or ``raise`` (the process must exit by itself after firing);
         ``stop`` and ``hang`` leave the process alive and belong to `run_freeze`."""
-        if action not in ("kill", "raise"):
-            raise ValueError("run_crash_points takes action kill or raise; use run_freeze for stop and hang")
+        if action not in ("kill", "kill_later", "raise"):
+            raise ValueError("run_crash_points takes action kill, kill_later or raise; use run_freeze for stop, hang")
         points = list(points or self.declared)
-        jobs = [(lambda sc, p=p: self._crash_point(sc, p, action), "crash_point", p, s) for p in points for s in seeds]
+        jobs = [(lambda sc, p=p: self._crash_point(sc, p, action, delay_ms), "crash_point", p, s)
+                for p in points for s in seeds]
         return self._run_all(jobs)
 
-    def _crash_point(self, sc, point, action):
+    def _crash_point(self, sc, point, action, delay_ms=0):
         cfg = self.cfg
         hs, mx = hit_seed(point, sc.seed), sc.adapter.max_hit(point) or cfg.max_hit
         sc.rec.update(action=action, hit_spec="seed:%d:%d" % (hs, mx), hit=crashpoints.hit_from_seed(hs, mx))
+        if action == "kill_later":
+            sc.rec["delay_ms"] = delay_ms
         sc.adapter.setup(sc.dir, sc.seed)
         sc.feed(force=True)
         t = time.monotonic()
         a = sc.start("a", crashpoints.env_for(point, hit=sc.rec["hit_spec"], action=action, log=sc.hits_path,
-                                              tag="a"))
+                                              tag="a", delay_ms=delay_ms))
         deadline = t + cfg.crash_timeout
         while a.alive() and time.monotonic() < deadline:
             sc.feed()
@@ -297,7 +301,7 @@ class CrashRunner:
         if not fired or fired[-1]["point"] != point:
             return sc.fail("not_reached", "process exited (%r) without firing %s; log tail: %s"
                            % (status, point, scrub(a.log_text()[-400:])))
-        if action == "kill" and not status.killed:
+        if action in ("kill", "kill_later") and not status.killed:
             return sc.fail("wrong_exit", "expected SIGKILL at %s, got %r" % (point, status))
         sc.start("b")
         return sc.catch_up_and_check()

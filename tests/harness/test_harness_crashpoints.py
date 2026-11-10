@@ -105,6 +105,33 @@ def test_kill_action_kills_the_process_at_the_point(tmp_path):
     assert [h["point"] for h in lines] == ["child.one", "child.two"] * 3      # order of reaching the points
 
 
+KILL_LATER_CHILD = r'''
+import time
+from cdc_v2 import crashpoints as cp
+cp.declare("child.commit_sent", "before a blocking call")
+cp.crash_point("child.commit_sent")
+print("after the point", flush=True)       # the caller carries on into the blocking call
+time.sleep(5)
+print("blocking call returned", flush=True)
+'''
+
+
+def test_kill_later_kills_while_the_next_call_is_in_flight(tmp_path):
+    log = str(tmp_path / "hits.jsonl")
+    env = procs.child_env(dict(cp.env_for("child.commit_sent", action="kill_later", log=log, delay_ms=300),
+                               PYTHONPATH=SRC))
+    t = time.monotonic()
+    p = subprocess.run([sys.executable, "-c", KILL_LATER_CHILD], env=env, capture_output=True, text=True, timeout=20)
+    elapsed = time.monotonic() - t
+    assert p.returncode == -signal.SIGKILL
+    assert "after the point" in p.stdout and "blocking call returned" not in p.stdout
+    assert 0.3 <= elapsed < 4
+    assert cp.read_log(log)[-1]["action"] == "kill_later"
+    with pytest.raises(ValueError):
+        cp.reconfigure({cp.ENV_POINT: "a.b", cp.ENV_DELAY: "-5"})
+    cp.reconfigure({})
+
+
 def test_seeded_hit_matches_the_contract(tmp_path):
     log = str(tmp_path / "hits.jsonl")
     p = run_child(cp.env_for("child.one", hit="seed:99:5", log=log))
