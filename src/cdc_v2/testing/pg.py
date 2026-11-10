@@ -52,7 +52,14 @@ def fixture_home() -> tuple:
     shared = os.environ.get("CDC_V2_T1_SHARED") == "1"
     base = os.environ.get("CDC_V2_PG_PORT_BASE")
     if named and Path(named).expanduser().resolve() != SHARED_HOME.resolve():
-        return Path(named).expanduser(), int(base) if base else None
+        home = Path(named).expanduser()
+        if not base and not (home / "state.json").exists():
+            raise HarnessError("CDC_V2_PG_HOME names a home that is not built yet: export CDC_V2_PG_PORT_BASE=<your "
+                               "base> too (without it the cluster would be built on the ports of the default home)")
+        if base and int(base) + PRIVATE_STEP - 1 >= SHARED_BASE and int(base) <= SHARED_BASE + PRIVATE_STEP - 1:
+            raise HarnessError("CDC_V2_PG_PORT_BASE=%s overlaps the ports of the default home (%d-%d)"
+                               % (base, SHARED_BASE, SHARED_BASE + PRIVATE_STEP - 1))
+        return home, int(base) if base else None
     if shared:
         return SHARED_HOME, SHARED_BASE
     raise HarnessError("T1 fixtures need a cluster of their own: export CDC_V2_PG_HOME=~/.cache/cdc_flight_v2/pg-<pkg> "

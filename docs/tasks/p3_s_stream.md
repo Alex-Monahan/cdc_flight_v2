@@ -223,7 +223,9 @@ block (fence, `COMMIT`: package D).
   source and the marker rule of SPEC 4.6 has its marker. Decide with package P's interface whether the heartbeat
   table itself is written to the destination or only its position is used, and keep the cost of an idle hour small
   (one small destination commit per `stream.idle_position_interval` is the bound; several heartbeat transactions may
-  share one group).
+  share one group). Recognise the marker by position — an `END` whose `ack_position` is at or past the position
+  `heartbeat.beat` returned — so that it is seen even when the heartbeat table is outside `table.include.list` (its
+  transaction then arrives as an `END` with count 0).
 - **Planned hand-over.** `finish_current_group(deadline)`: the group in flight is committed and acknowledged, no
   new group starts, and a transaction larger than a group that is still arriving is abandoned (its staging is
   left to the truncate of the next start). Returns the applied position.
@@ -271,7 +273,11 @@ block (fence, `COMMIT`: package D).
   `stream.marker_timeout` (default 60 s, SPEC 4.6); if not, the stream connection is torn down and built again
   through the attach step, and the slot and stream machine shows `stalled` meanwhile. In replica mode a standby
   that has stopped replaying produces the same silence: say what your code does then, and what it tells the
-  operator.
+  operator. Two cases are findings with an alert and not a reason to reconnect: the heartbeat table is not in the
+  publication (checked at attach with package P's check; reconnecting every 60 s would never end), and the beat
+  itself cannot be written (privilege revoked, primary read-only or unreachable). In the second case only beats
+  that were written count for the marker rule, the stream goes on, and the alert says that the slot's position
+  stands still while the replicated tables are idle and that kept WAL grows with other traffic (SPEC 4.4).
 - **`python -m cdc_v2.pipeline <configuration file>`** (C12): reads the environment of C12, opens the lanes with
   the epoch, runs every package's migration list as leader in fenced `control`-lane transactions, makes sure
   the publication exists as package P's document says (it never changes which tables are in it), starts the

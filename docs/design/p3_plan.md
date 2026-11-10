@@ -131,7 +131,10 @@ transactions (second review of package E: 80 of 20,000 in one run). The engine t
 heartbeat record, a `HEARTBEAT` frame may arrive anywhere (also between `BEGIN` and `END`) and never moves the
 applied position, and the pipeline sends `DURABLE` only for the commit end of an `END` it has applied. On an idle
 source the position moves with the transaction of the source-side heartbeat write (package P, every 10 s, in a
-published table). A non-transactional `MESSAGE` is not acknowledged either; SPEC 7.4 (P4) decides its rule.
+published table). A non-transactional `MESSAGE` is not acknowledged either; SPEC 7.4 (P4) decides its rule: the
+server sends such a message again after every restart, from the last confirmed `END` on, so P4 needs a position of
+its own (the position of the last applied message) to discard repeats. An `END` whose offset has no `lsn_commit`
+stops the engine with `FATAL`; the engine never falls back to another field for an `END`.
 
 The engine holds a bounded number of unacknowledged `END` records. When it must drop some, a `DURABLE` confirms a
 position at or below the durable one, never above it, and the distance stays within a bound that
@@ -420,7 +423,11 @@ Details in `docs/oracle.md`. What binds every package that writes a gate test:
 - A gate test passes only if `result.equal` holds and every table's `fallback_columns` is empty or declared by
   the test.
 - The compared tables are listed explicitly (`OracleConfig.tables`, `table_map`). Heartbeat, canary and `_cdc*`
-  objects are never compared.
+  objects are never compared. The oracle does not enforce the list: without one it compares every table of the
+  source, the heartbeat table too, which changes every 10 s and gives a false difference.
+- A comparison that reads the source from a standby can lose its connection to a recovery conflict. The oracle
+  starts again only on SQLSTATE 40001; a connection that the standby ends while it is idle in its transaction
+  can surface as a bare connection loss, which is not retried. Such a test retries the comparison itself.
 - The applied-position lookup that `wait_for_applied` and `compare` use is provided by package S (by slot name);
   until then the `_cdc.stream_state` reader of the oracle is a stand-in.
 - Waiting takes a `cdc_v2.deadline.Deadline`; evidence is written only through
@@ -458,7 +465,8 @@ As delivered by package X; its report defines the interface, and this section is
   `stream.reposition(tx, position, tables, cause)` — the position set (in any direction), a backfill request
   enacted for each table with `P0` = that position (after a gap), the alert, all in `tx`. V calls it for a
   finding; S calls it for a message that fails again and again at one position (SPEC 4.3, last line); P4 calls it
-  for the lag rule of SPEC 3.6.
+  for the lag rule of SPEC 3.6. Every `stream.reposition` is followed by a new engine: an engine keeps the highest
+  `DURABLE` of its life, so one that outlived a move backwards would still confirm the old, higher position.
 - The stream component starts its engine only through the attach step (design section 8):
   `attach(ctx, deadline) -> Attached(engine, facts, finding)`. V builds it. Until V is merged, S ships a
   minimal one behind the same signature: fence row read, slot facts read, a holder of our slot terminated,
@@ -613,9 +621,9 @@ path of SPEC 4.3. The quarantine exit of C10. The spill area: DuckDB's temporary
 transform connection under `max_temp_directory_size`, with a fault site for "no space left"; the stream waits
 and alerts, it never crashes on it (SPEC 5.4, 1.7). The batch commit/ack machine as one row per slot (design
 section 9). Staging is fenced, with a progress row, in one schema, truncated at every start of the stream
-component. After `CommitUnknown`: read the position in a new transaction and continue from it. A heartbeat's
-`ack_position` becomes the applied position only in a committed group that contains every transaction framed
-before it.
+component. After `CommitUnknown`: read the position in a new transaction and continue from it. Only an `END`'s
+`ack_position` becomes the applied position, in a committed group that contains every transaction framed before
+it; a `HEARTBEAT` frame never moves it.
 
 **L (leadership).** Two states. Take-over deadline (default 45 s), then exit non-zero. A take-over whose commit
 outcome is unknown: read again after more than 2 s and decide by `run_id`. A planned hand-over abandons an

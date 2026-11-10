@@ -133,7 +133,8 @@ Markers `jvm` and `localpg` (the private pair; decode from the standby):
   the right content at the right place).
 - The acknowledgement invariant, probed continuously during a workload: the slot's `confirmed_flush_lsn` is never
   beyond the last `DURABLE` position sent, and reaches it within a bounded time; with no `DURABLE` at all it never
-  moves. Heartbeats move the position when the tables are idle and other WAL is written.
+  moves. On an idle source the position moves with the `END` of the source-side heartbeat write; Debezium's
+  heartbeat records only cause the batch calls in which a `DURABLE` takes effect.
 - Restart: kill the JVM at random moments (also at each Java crash point); after a restart the first transaction
   delivered is the one after the last acknowledged one, complete, and nothing is missing.
 - Parent death: SIGKILL of the Python parent ends the JVM within a bounded time, and the slot becomes inactive.

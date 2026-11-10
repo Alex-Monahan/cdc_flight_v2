@@ -81,6 +81,18 @@ def test_fixture_home_needs_a_named_home_or_the_gate_switch(monkeypatch, tmp_pat
     monkeypatch.setenv("CDC_V2_PG_HOME", str(tmp_path / "pg-o"))
     monkeypatch.setenv("CDC_V2_PG_PORT_BASE", "55520")
     assert tpg.fixture_home() == (tmp_path / "pg-o", 55520)
+    monkeypatch.delenv("CDC_V2_PG_PORT_BASE")           # a home that is not built yet needs its port base ...
+    with pytest.raises(tpg.HarnessError, match="CDC_V2_PG_PORT_BASE"):
+        tpg.fixture_home()
+    (tmp_path / "pg-o").mkdir()
+    (tmp_path / "pg-o" / "state.json").write_text("{}")
+    assert tpg.fixture_home() == (tmp_path / "pg-o", None)          # ... a built one knows it
+    for overlapping in ("55425", "55432", "55439"):                 # never the ports of the default home
+        monkeypatch.setenv("CDC_V2_PG_PORT_BASE", overlapping)
+        with pytest.raises(tpg.HarnessError, match="default home"):
+            tpg.fixture_home()
+    monkeypatch.setenv("CDC_V2_PG_PORT_BASE", "55424")
+    assert tpg.fixture_home() == (tmp_path / "pg-o", 55424)
     monkeypatch.setenv("CDC_V2_PG_HOME", str(tpg.SHARED_HOME))       # naming the default home is not enough
     with pytest.raises(tpg.HarnessError):
         tpg.fixture_home()
