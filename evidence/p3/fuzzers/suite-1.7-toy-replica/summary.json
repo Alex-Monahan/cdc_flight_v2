@@ -1,5 +1,8 @@
 {
-  "all_passed": false,
+  "all_passed": true,
+  "clean": true,
+  "commit": "a6bc667457d48f585eb24422e4260367d00bc35d",
+  "label": "SELF-TEST of the fuzzers on the toy (15-minute soak allowed; never counts for SPEC 1.7)",
   "parts": {
     "crash_points": {
       "all_passed": true,
@@ -12,94 +15,42 @@
     },
     "destination": {
       "faults": {
-        "dest_delay": 3,
-        "dest_error": 2
+        "dest_delay": 2,
+        "dest_error": 1,
+        "dest_hang": 1
       },
-      "kinds_without_effect": [
-        "dest_hang"
-      ],
+      "kinds_without_effect": [],
       "no_effect": {
-        "dest_error": 3
+        "dest_delay": 2,
+        "dest_error": 3,
+        "dest_hang": 2
       },
       "outcome": "pass",
-      "passed": false,
+      "passed": true,
       "reason": ""
     },
     "network": {
       "faults": {
-        "net_blackhole": 3,
-        "net_drop": 1,
-        "net_latency": 2,
-        "net_reset": 2
+        "net_blackhole": 2,
+        "net_drop": 2,
+        "net_latency": 1,
+        "net_reset": 1
       },
       "kinds_without_effect": [],
-      "no_effect": {},
+      "no_effect": {
+        "net_blackhole": 2,
+        "net_drop": 1,
+        "net_latency": 2,
+        "net_reset": 3
+      },
       "outcome": "pass",
       "passed": true,
       "reason": ""
     },
     "slot_loss": {
       "faults": {
-        "slot_drop": 5,
-        "slot_invalidate": 5
-      },
-      "kinds_without_effect": [],
-      "no_effect": {
-        "slot_drop": 1
-      },
-      "outcome": "pass",
-      "passed": true,
-      "reason": ""
-    },
-    "soak": {
-      "faults": 171,
-      "minimum_faults": 200,
-      "no_effect": {
-        "dest_delay": 4,
-        "dest_error": 10,
-        "dest_hang": 4,
-        "hang_point": 5,
-        "kill_point": 5,
-        "net_latency": 3,
-        "spill_full": 2,
-        "src_terminate": 9
-      },
-      "not_attacked": [],
-      "outcome": "pass",
-      "passed": false,
-      "per_kind": {
-        "dest_delay": 6,
-        "dest_error": 10,
-        "dest_hang": 6,
-        "freeze": 7,
-        "hang_point": 3,
-        "kill_group": 9,
-        "kill_point": 16,
-        "kill_point_later": 9,
-        "net_blackhole": 19,
-        "net_drop": 9,
-        "net_latency": 5,
-        "net_reset": 7,
-        "replica_promote": 1,
-        "replica_restart": 10,
-        "slot_drop": 14,
-        "slot_invalidate": 1,
-        "spill_full": 8,
-        "src_cancel": 5,
-        "src_lock": 4,
-        "src_long_txn": 3,
-        "src_restart_primary": 5,
-        "src_terminate": 11,
-        "src_wal_switch": 3
-      },
-      "reason": "",
-      "seconds": 920.322,
-      "soak_s": 900.0
-    },
-    "source_backends": {
-      "faults": {
-        "src_cancel": 4,
-        "src_terminate": 4
+        "slot_drop": 7,
+        "slot_invalidate": 4
       },
       "kinds_without_effect": [],
       "no_effect": {},
@@ -107,25 +58,93 @@
       "passed": true,
       "reason": ""
     },
-    "spill": {
+    "soak": {
+      "faults_with_effect": 208,
+      "faults_without_effect": 56,
+      "minimum_faults": 200,
+      "minimum_seconds": 900.0,
+      "no_effect": {
+        "dest_delay": 1,
+        "dest_error": 3,
+        "dest_hang": 3,
+        "freeze": 3,
+        "hang_point": 4,
+        "kill_group": 2,
+        "kill_point": 10,
+        "kill_point_later": 1,
+        "net_drop": 4,
+        "net_latency": 5,
+        "net_reset": 1,
+        "replica_restart": 7,
+        "spill_full": 4,
+        "src_cancel": 3,
+        "src_terminate": 5
+      },
+      "not_attacked": [],
+      "outcome": "pass",
+      "passed": true,
+      "per_kind": {
+        "dest_delay": 6,
+        "dest_error": 8,
+        "dest_hang": 6,
+        "freeze": 21,
+        "hang_point": 7,
+        "kill_group": 20,
+        "kill_point": 20,
+        "kill_point_later": 10,
+        "net_blackhole": 7,
+        "net_drop": 7,
+        "net_latency": 9,
+        "net_reset": 12,
+        "replica_promote": 2,
+        "replica_restart": 5,
+        "slot_drop": 12,
+        "slot_invalidate": 2,
+        "spill_full": 14,
+        "src_lock": 4,
+        "src_long_txn": 6,
+        "src_restart_primary": 4,
+        "src_terminate": 15,
+        "src_wal_switch": 11
+      },
+      "reason": "",
+      "seconds": 913.056,
+      "soak_s": 900.0
+    },
+    "source_backends": {
       "faults": {
-        "spill_full": 3
+        "src_cancel": 1,
+        "src_terminate": 4
       },
       "kinds_without_effect": [],
       "no_effect": {
-        "spill_full": 5
+        "src_cancel": 4
+      },
+      "outcome": "pass",
+      "passed": true,
+      "reason": ""
+    },
+    "spill": {
+      "faults": {
+        "spill_full": 4
+      },
+      "kinds_without_effect": [],
+      "no_effect": {
+        "spill_full": 3
       },
       "outcome": "pass",
       "passed": true,
       "reason": ""
     }
   },
-  "seconds": 1250.4,
+  "seconds": 1324.6,
   "seeds": [
     1,
     2,
     3
   ],
+  "self_test": true,
+  "smoke": false,
   "source_node": "replica",
   "system": "toy"
 }

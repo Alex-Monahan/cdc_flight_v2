@@ -27,6 +27,15 @@ def _opts(pairs):
     return out
 
 
+def _local_bundle(meta, fdir):
+    lb = meta.get("local_bundle") or {}
+    if isinstance(lb, dict) and lb:
+        p = pool.CACHE / "fuzz" / "runs" / lb["campaign"] / lb["dir"]
+        if (p / "replay.jsonl").exists():
+            return p
+    return fdir / "bundle"
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="tools/fuzz")
     ap.add_argument("--ledger-root", default=str(LEDGER_ROOT), help=argparse.SUPPRESS)
@@ -45,6 +54,7 @@ def main(argv=None) -> int:
     r.add_argument("--reduce", action="store_true", help="reduce each failure to a regression test")
     r.add_argument("--option", action="append", help="system option key=value (JSON), e.g. toy.conflict_rate=0")
     r.add_argument("--keep", action="store_true", help="keep the work directory of passing runs")
+    r.add_argument("--stop-on-failure", action="store_true", help="stop after the first failing seed")
     r.add_argument("--ignore-self-report", action="store_true",
                    help="do not end a run on the system's own divergence report: the oracle decides")
     st = sub.add_parser("status", help="the ledger")
@@ -72,6 +82,10 @@ def main(argv=None) -> int:
     o.add_argument("--out", default=None, help="also write the summary to this evidence file")
     rd = sub.add_parser("reduce", help="reduce a kept failure to a seeded regression test")
     rd.add_argument("failure_id")
+    cf = sub.add_parser("confirm", help="replay a reduced case twice and run its regression test; record the result")
+    cf.add_argument("failure_id")
+    cf.add_argument("--replays", type=int, default=2)
+    cf.add_argument("--out", default=str(REPO / "evidence" / "p3" / "fuzzers" / "reductions.json"))
     sub.add_parser("clean", help="remove what killed campaigns left behind (by their lock records only)")
     a = ap.parse_args(argv)
     root = Path(a.ledger_root)
@@ -83,7 +97,8 @@ def main(argv=None) -> int:
         c = Campaign(a.fuzzer, a.system, a.source_node, seeds=parse_seeds(a.seeds) if a.seeds else None,
                      hours=a.hours, workers=a.workers, budget_s=a.budget, rounds=a.rounds, options=_opts(a.option),
                      reduce_failures=a.reduce, keep_workdir=a.keep, ledger_root=root,
-                     kinds=a.kinds.split(",") if a.kinds else None, ignore_self_report=a.ignore_self_report)
+                     kinds=a.kinds.split(",") if a.kinds else None, ignore_self_report=a.ignore_self_report,
+                     stop_on_failure=a.stop_on_failure)
         if a.seeds is None and a.hours is None:
             c.seeds = None
             c.hours = None
@@ -164,6 +179,42 @@ def main(argv=None) -> int:
         out = red.write_regression(root, fid, small, stats, bool(meta.get("self_test")))
         print(json.dumps(out))
         return 0
+    if a.cmd == "confirm":
+        import subprocess
+        from cdc_v2.testing.harness_evidence import write_evidence
+        from . import reduce as red
+        from .run import git_state
+        fid = a.failure_id
+        fdir = root / fid.split("-")[0] / "failures" / fid
+        meta = json.loads((fdir / "failure.json").read_text())
+        case = json.loads((fdir / "case.json").read_text())
+        rec = json.loads((fdir / "bundle" / "record.json").read_text())
+        original = red.case_from_bundle(_local_bundle(meta, fdir), dict(rec, system_spec=meta["system_spec"]))
+
+        def size(c):
+            return {"rounds": len({e.get("round", 0) for e in c["entries"]}),
+                    "writers": len({e.get("writer") for e in c["entries"] if e["type"] == "txn"}),
+                    "entries": len(c["entries"]), "faults": len(c["faults"])}
+        replays = [red.replay_case(case, pool.CACHE / "fuzz" / "confirm" / fid / ("r%d" % i))["outcome"]
+                   for i in range(a.replays)]
+        test = REPO / meta["regression_test"]
+        p = subprocess.run([sys.executable, "-m", "pytest", "-q", "-m", "localpg", "-p", "no:cacheprovider",
+                            "-rxX", str(test)], cwd=REPO, capture_output=True, text=True, timeout=1800)
+        summary = [line for line in p.stdout.splitlines() if "passed" in line or "failed" in line
+                   or "xfail" in line.lower() or "XPASS" in line][-4:]
+        entry = {"id": fid, "fuzzer": meta["fuzzer"], "system": meta["system_spec"], "seed": meta["seed"],
+                 "outcome": meta["outcome"], "before": size(original), "after": size(case),
+                 "reduction": meta.get("reduced"), "replays_of_the_reduced_case": replays,
+                 "both_replays_fail": all(o not in ("pass", "infrastructure", "error") for o in replays),
+                 "regression_test": meta["regression_test"], "regression_test_exit": p.returncode,
+                 "regression_test_summary": summary, **git_state(REPO)}
+        doc = json.loads(Path(a.out).read_text()) if Path(a.out).exists() else {
+            "about": "Reductions of real failures of the toy's variants to seeded regression tests (item 7 of the "
+                     "fix round; docs/testing/fuzzers.md section 5).", "reductions": []}
+        doc["reductions"] = [r for r in doc["reductions"] if r["id"] != fid] + [entry]
+        write_evidence(Path(a.out), doc)
+        print(json.dumps(entry))
+        return 0 if entry["both_replays_fail"] and p.returncode == 0 else 1
     if a.cmd == "clean":
         for line in pool.clean():
             print(json.dumps(line))
