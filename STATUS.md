@@ -12,7 +12,7 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
   (verdict: merge; the second reviewer's repeat campaigns found one correct history that is refused, so it is in a second, short fix round); the question the second
   review raised — which tables have a key — is measured and decided (rule K, below) and has a small package of its
   own, which is merged; the cut's fix round is checked (verdict: merge after one text fix) and it is in a second,
-  short round; the destination basics are delivered, reviewed once (merge after named fixes) and under the second reviewer's attack; round 1 of the fuzzers (against a toy replicator) is reviewed
+  short round; the destination basics are reviewed twice and in a fix round of sixteen items (the first is one unexplained result at the fence: once in 30 runs on MotherDuck an old run's empty transaction was answered "committed" after a take-over; it did not recur in 237 further cases and is now being reproduced with full diagnostics); round 1 of the fuzzers (against a toy replicator) is reviewed
   and in its fix round; the task file of every package is written.
 - Stage 2 (PlanetScale) cannot start: of its names only `PLANETSCALE_ORG` and `PLANETSCALE_DATABASE` are in the env
   file (checked again at the P1 gate). The service token and the connection values are owed by the owner.
@@ -53,9 +53,9 @@ green on T1 (local primary and standby, real MotherDuck, local JVM).
 |---|---|---|---|
 | H | Crash points, fault sites, process control, crash runner, TCP fault proxy, byte-stream relay | Opus | **merged** |
 | O | Oracle, T1 harness, evidence writer, workload generator and observer | Opus | **merged** (fix round included) |
-| X | The cut: where a snapshot lies in the stream | Opus (was Fable) | review: merge after fixes (below); fix round delivered (`23519bd`) and checked: merge after one text fix; **second, short round running** (below) |
+| X | The cut: where a snapshot lies in the stream | Opus (was Fable) | review: merge after fixes (below); fix round delivered (`23519bd`) and checked; second round delivered (`526d928`) and checked: **merge**; T1 tests on the branch pass; a small follow-up in the oracle (the settle floor; a mutation test read from the replica) is running, then the merge |
 | E | Engine: the JVM program around stock Debezium, frames, the Python side | Opus | **merged** (two reviews, two fix rounds) |
-| D | Destination basics: lanes, fence, deadlines, errors, `_cdc` schema, transition function, alert records | Opus (was Fable) | **delivered** (`9e389cc`); the coordinator's review: **merge after named fixes**; the second reviewer's attack is running; one fix round follows it |
+| D | Destination basics: lanes, fence, deadlines, errors, `_cdc` schema, transition function, alert records | Opus (was Fable) | **delivered** (`9e389cc`); two reviews: the coordinator **merge after named fixes**, the second reviewer **not yet** (one unexplained result at the fence on MotherDuck, defects in the error mapping, the state module and the migrations); **fix round running** (Opus, xhigh; 16 items) |
 | A | Apply: the statements over a change set, keyed and keyless | Opus | **delivered**; two reviews; **fix round delivered** (13 items, `68df804`); the coordinator's re-check: **merge**, with two small fixes; the second reviewer's repeat campaigns (about 17,000 seeds) found no silent error inside the preconditions and one correct history that is refused; **second, short fix round running** |
 | P | Source: connections, catalog and its observation, publication, slot, slot facts, timeline, heartbeat | Opus | **merged** (with the repair of `tools/localpg` for Postgres 16; one fix after the review) |
 | L | Leadership: guard, take-over, heartbeat, hand-over, bootstrap, platform interface | Opus (was Fable) | task written; after D |
