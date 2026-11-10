@@ -1,33 +1,41 @@
 {
+  "attempts": 1,
   "config": {
     "bucket_batch": 4,
     "check_extra_tables": null,
     "chunk_rows": 500,
+    "conflict_retries": 3,
     "exclude_source_schemas": [],
     "ignore_dest_schemas": [
-      "_cdc",
-      "_cdc_stage*",
+      "_cdc*",
       "information_schema",
       "pg_catalog"
     ],
     "max_buckets": 65536,
     "max_diff_buckets": 16,
+    "md_statement_s": 1800.0,
     "min_blocks_per_range": 2,
+    "position_wait_s": 60.0,
     "row_fetch_limit": 10000,
     "sample_limit": 10,
     "source_workers": 3,
     "statement_timeout_ms": 3600000,
     "table_map": "identity",
-    "tables": null
+    "tables": null,
+    "timeout_s": 3600.0
   },
+  "destination_position": "1/2DD57AA0",
   "equal": true,
   "extra_tables": [],
   "missing_tables": [],
+  "position": "1/2DD57AA0",
+  "positioned": true,
   "rows_compared": 3014,
-  "rows_per_second": 4973.0,
-  "seconds": 0.606,
+  "rows_per_second": 4969.4,
+  "seconds": 0.607,
+  "slot_name": "cdc_v2_o_stand_in",
   "source_in_recovery": false,
-  "source_lsn": "1/BA52A818",
+  "source_position": "1/2DD57AA0",
   "source_server_version": 180006,
   "tables": [
     {
@@ -71,7 +79,7 @@
         "extra": [],
         "missing": []
       },
-      "seconds": 0.141,
+      "seconds": 0.137,
       "source": "other.big",
       "source_rows": 3000,
       "truncated": false
@@ -101,7 +109,7 @@
         "extra": [],
         "missing": []
       },
-      "seconds": 0.091,
+      "seconds": 0.085,
       "source": "public.dups",
       "source_rows": 7,
       "truncated": false
@@ -156,7 +164,7 @@
         "extra": [],
         "missing": []
       },
-      "seconds": 0.253,
+      "seconds": 0.196,
       "source": "public.types_k",
       "source_rows": 7,
       "truncated": false

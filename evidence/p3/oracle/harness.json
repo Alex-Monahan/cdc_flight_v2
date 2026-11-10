@@ -1,8 +1,13 @@
 {
+  "drop_with_slot_in_use": {
+    "database_gone": true,
+    "slot_gone": true,
+    "slot_was_active": true
+  },
   "motherduck_leftovers_at_check": [],
   "private_cluster": {
     "kill_and_recover_replica": true,
-    "port_base": 55520
+    "port_base": 55840
   },
   "private_cluster_cleanup": {
     "home_removed": true,
@@ -15,20 +20,20 @@
   },
   "private_databases": {
     "cluster_ports": [
-      55432,
-      55433
+      55520,
+      55521
     ],
     "isolated": true
   },
   "quiesce": {
     "equal_at_first": true,
-    "first": "1/B9510990",
-    "rounds": 83,
-    "second": "1/B96CC588"
+    "first": "0/A0674E78",
+    "rounds": 67,
+    "second": "0/A083A630"
   },
   "wait_for_applied": {
     "returned": "1/2000",
-    "waited_seconds": 1.86
+    "waited_seconds": 1.77
   },
   "workload_replay": {
     "config": {

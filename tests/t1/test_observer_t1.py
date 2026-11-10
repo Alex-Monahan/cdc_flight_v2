@@ -53,9 +53,13 @@ def test_observer_catches_a_split_transaction(source_db, dest_db, tmp_path, evid
     evidence("p3/oracle").write_json("observer", {
         "what": "transfers observer on MotherDuck: whole destination transactions vs. split ones",
         "workload": cfg.to_dict(), "expected_sum": total,
-        "whole_transactions": {"transfers": len(good), "report": rep_good.__dict__, "oracle_equal_after": eq.equal},
+        "whole_transactions": {"transfers": len(good), "report": rep_good.__dict__, "oracle_equal_after": eq.equal,
+                               "position": eq.position, "source_position": eq.source_position,
+                               "destination_position": eq.destination_position},
         "split_transactions": {"transfers": len(bad), "report": rep_bad.__dict__,
-                               "oracle_equal_after": eq_after.equal},
+                               "oracle_equal_after": eq_after.equal, "position": eq_after.position,
+                               "source_position": eq_after.source_position,
+                               "destination_position": eq_after.destination_position},
         "note": "after the split run the final state is still equal: only the observer sees the split"})
     assert good and bad
     assert rep_good.ok and rep_good.observations >= 5, rep_good

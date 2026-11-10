@@ -8,9 +8,10 @@ from typing import Optional
 from .canonical import MdType, PgColumnType, parse_md_type
 
 PG_SYSTEM_SCHEMAS = ("pg_catalog", "information_schema", "pg_toast")
-# Destination objects that are not replicated data: the operations schema and the staging schemas
-# (docs/design/core.md sections 4 and 6.1), and DuckDB's own catalog schemas.
-MD_IGNORED_SCHEMAS = ("_cdc", "_cdc_stage*", "information_schema", "pg_catalog")
+# Objects that are not replicated data: everything in schemas whose names start with `_cdc` in any letter case (the
+# operations schema, the staging schemas, C0), on both sides; and DuckDB's own catalog schemas.
+CDC_SCHEMAS = ("_cdc*",)
+MD_IGNORED_SCHEMAS = CDC_SCHEMAS + ("information_schema", "pg_catalog")
 
 
 @dataclass
@@ -104,14 +105,15 @@ ORDER BY 1, 2, 4
 
 
 def matches(name: str, patterns) -> bool:
-    return any(fnmatch.fnmatchcase(name, p) for p in patterns)
+    """Shell-style patterns, compared without regard to case (DuckDB compares identifiers that way)."""
+    return any(fnmatch.fnmatchcase(name.lower(), p.lower()) for p in patterns)
 
 
 def read_source(cur, exclude_schemas=()) -> dict:
     """{(schema, table): SourceTable} for every user table (system schemas and exclude_schemas left out)."""
     tables: dict = {}
     for (schema, rel, oid, kind, att, _num, base, elem, full, blocks, reltuples) in cur.execute(SOURCE_SQL).fetchall():
-        if matches(schema, exclude_schemas):
+        if matches(schema, tuple(exclude_schemas) + CDC_SCHEMAS):
             continue
         t = tables.get((schema, rel))
         if t is None:

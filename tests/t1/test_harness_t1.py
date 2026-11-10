@@ -46,6 +46,39 @@ def test_private_database_drop_removes_it_and_its_slots(shared_pg):
     FACTS["private_database_drop"] = {"database_gone": True, "logical_slot_gone": True}
 
 
+def test_drop_terminates_the_holder_of_a_slot_in_use(shared_pg):
+    """A slot in use cannot be dropped, and then its database cannot be dropped: drop() terminates the holder."""
+    import os
+    import subprocess
+    db = tpg.PrivateDatabase(shared_pg)
+    slot = db.name + "_held"
+    db.sql("SELECT pg_create_logical_replication_slot(%s, 'pgoutput')", (slot,))
+    db.sql("CREATE PUBLICATION cdc_v2_o_pub")                     # empty: nothing is ever decoded
+    p = db.params()
+    env = {k: v for k, v in os.environ.items() if not k.startswith("PG")}
+    env.update(PGPASSWORD=p["password"], PGSSLMODE="verify-full", PGSSLROOTCERT=p["sslrootcert"])
+    holder = subprocess.Popen([os.path.join(os.environ.get("CDC_V2_PG_BIN", "/opt/homebrew/opt/postgresql@18/bin"),
+                                            "pg_recvlogical"), "-h", "localhost", "-p", str(p["port"]), "-U", p["user"],
+                               "-d", db.name, "-S", slot, "--start", "--no-loop", "-f", "/dev/null",
+                               "-o", "proto_version=1", "-o", "publication_names=cdc_v2_o_pub"],
+                              env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline and not shared_pg.sql(
+                "SELECT active FROM pg_replication_slots WHERE slot_name = %s", (slot,))[0][0]:
+            time.sleep(0.1)
+        assert shared_pg.sql("SELECT active FROM pg_replication_slots WHERE slot_name = %s", (slot,))[0][0]
+        db.drop()
+        assert shared_pg.sql("SELECT count(*) FROM pg_database WHERE datname = %s", (db.name,))[0][0] == 0
+        assert shared_pg.sql("SELECT count(*) FROM pg_replication_slots WHERE slot_name = %s", (slot,))[0][0] == 0
+        assert holder.wait(timeout=30) is not None
+    finally:
+        if holder.poll() is None:
+            holder.kill()
+            holder.wait(timeout=10)
+    FACTS["drop_with_slot_in_use"] = {"slot_was_active": True, "database_gone": True, "slot_gone": True}
+
+
 def test_private_cluster_for_destructive_drills(private_cluster):
     c = private_cluster
     base = c.port_base

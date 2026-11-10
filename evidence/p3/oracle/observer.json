@@ -2,7 +2,9 @@
   "expected_sum": 24000,
   "note": "after the split run the final state is still equal: only the observer sees the split",
   "split_transactions": {
+    "destination_position": "0/A10BE250",
     "oracle_equal_after": true,
+    "position": "0/A10BE250",
     "report": {
       "distinct_sums": [
         23890,
@@ -22,16 +24,19 @@
         "observation": 2,
         "sum": 23989
       },
-      "observations": 150,
-      "seconds": 14.568,
+      "observations": 161,
+      "seconds": 13.767,
       "unavailable": 0,
-      "violations": 132
+      "violations": 143
     },
+    "source_position": "0/A10BE250",
     "transfers": 10
   },
   "what": "transfers observer on MotherDuck: whole destination transactions vs. split ones",
   "whole_transactions": {
+    "destination_position": "0/A10BD6D8",
     "oracle_equal_after": true,
+    "position": "0/A10BD6D8",
     "report": {
       "distinct_sums": [
         24000
@@ -39,11 +44,12 @@
       "errors": [],
       "expected": 24000,
       "first_violation": null,
-      "observations": 38,
-      "seconds": 3.302,
+      "observations": 34,
+      "seconds": 2.949,
       "unavailable": 0,
       "violations": 0
     },
+    "source_position": "0/A10BD6D8",
     "transfers": 10
   },
   "workload": {

@@ -47,6 +47,7 @@ def loaded(make_source_db, make_dest_db, evidence):
     evidence("p3/oracle").write_json("mutations", {
         "what": "each mutation of the destination, applied inside a transaction and compared by the oracle",
         "dataset": counts, "config": CFG, "mutations": RESULTS,
+        "position": lsn.format(POS["q"]), "slot": STAND_IN_SLOT,
         "all_detected": all(r["detected"] == r["expected_difference"] for r in RESULTS)})
 
 
@@ -71,7 +72,8 @@ def table(result, name):
 
 def record(name, statements, expected, result, detail):
     RESULTS.append({"mutation": name, "statements": list(statements), "expected_difference": expected,
-                    "detected": not result.equal, "detail": detail, "seconds": result.seconds})
+                    "detected": not result.equal, "detail": detail, "seconds": result.seconds,
+                    "source_position": result.source_position, "destination_position": result.destination_position})
 
 
 def test_equal(loaded, evidence):
@@ -501,6 +503,6 @@ def test_domains_are_compared_by_their_base_type(source_db, dest_db):
     t = r.tables[0]
     assert r.equal, r.summary()
     assert t.fallback_columns == []                                   # no column fell back to text
-    dest_db.conn.execute("UPDATE dom SET a = 1.51 WHERE id = 1")
+    dest_db.conn.execute("UPDATE public.dom SET a = 1.51 WHERE id = 1")
     r = compare(source_db.source(), dest_db.destination(), OracleConfig(), position=q, slot_name=STAND_IN_SLOT)
     assert not r.equal and list(r.tables[0].sample["different"][0]["columns"]) == ["a"]

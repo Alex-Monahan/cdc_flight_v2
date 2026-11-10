@@ -59,6 +59,8 @@ def test_oracle_rate(source_db, dest_db, evidence):
         "what": "oracle rate on a TPC-H lineitem-width table (16 columns), laptop, source = local primary, "
                 "destination = MotherDuck over the public internet",
         "rows": ROWS, "source_table_bytes": pg_bytes,
+        "positions": {"position": r1.position, "source": r1.source_position, "destination": r1.destination_position,
+                      "slot": r1.slot_name},
         "setup_seconds": {"postgres_generate": round(t_src, 1), "motherduck_generate": round(t_dst, 1)},
         "equal": {"seconds": r1.seconds, "rows_per_second": r1.rows_per_second, "buckets": r1.tables[0].buckets},
         "one_row_changed": {"seconds": r2.seconds, "rows_per_second": r2.rows_per_second,
