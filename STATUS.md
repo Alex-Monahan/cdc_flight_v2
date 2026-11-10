@@ -436,8 +436,10 @@ Finished and merged:
   carries it proves that it was decoded. Role split: a setup role (publication, heartbeat table, replica
   identity) and a runtime role that cannot change the source's schema. Findings that reach other packages are in
   Decisions (slot identity, timeline, slot invalidation on 16, slot creation time, the primary-mode catalog rule,
-  publication membership). Open from the review: an evidence run of the primary-mode finding is kept again (its
-  file was overwritten); two test-support clean-ups.
+  publication membership). The review asked for an evidence run of the primary-mode finding (the package reported
+  12 cases of a lower-bound violation without a file). Done 2026-11-10: 40 repeats found none, so the 12 cases
+  are not evidence; a new test holds a commit between its WAL record and its visibility and shows the rule on 18
+  and 16 (`docs/design/source.md` section 7). Still open from the review: two test-support clean-ups.
 - 2026-11-10 — P3 package O, the oracle and the T1 harness (reviewed by the coordinator, fix round included):
   `src/cdc_v2/oracle/`, `tools/oracle`, `docs/oracle.md`; T1 harness
   `src/cdc_v2/testing/{pg,md,loader,datasets}.py` and the shared fixtures in `tests/conftest.py`; redaction
@@ -576,12 +578,10 @@ the exact-value layer.
    When X merges: design 7.1–7.4 and open points 1 and 12 take its text, plan C9 is completed, and the tasks of
    B, S, V and T take the rules of the cut (settle floor, `R0 ≥ P0` for every snapshot, the tracker on a primary,
    timeline).
-2. The evidence run of the source package's finding on a primary (12 cases, `docs/design/source.md` section 7),
-   when no other heavy run is on the machine.
-3. Add to the owner's questions when A merges: `REPLICA IDENTITY FULL` for a table whose key column can be
+2. Add to the owner's questions when A merges: `REPLICA IDENTITY FULL` for a table whose key column can be
    TOASTed or whose key is deferrable (more WAL; with F-7); whether the DuckDB join-filter defect that apply
    works around should be reported upstream.
-4. Carry into P4: the preflight warning for a server without the confirmed-flush guard. Carry into P5 (from the
+3. Carry into P4: the preflight warning for a server without the confirmed-flush guard. Carry into P5 (from the
    `tools/localpg` work): slot creation on a standby waits for a running-transactions record
    and `pg_log_standby_snapshot()` needs a privileged role; a failover slot is synchronised to a standby only after it
    has advanced past the standby's catalog horizon; raising a standby-matched setting on the primary pauses replay;
