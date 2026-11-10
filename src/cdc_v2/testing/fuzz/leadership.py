@@ -23,7 +23,7 @@ import threading
 import time
 import traceback
 
-from cdc_v2 import lsn
+from cdc_v2 import lsn  # noqa: F401 - used in messages
 from cdc_v2.deadline import Deadline, DeadlineExceeded
 from cdc_v2.testing.harness_evidence import scrub
 
@@ -99,6 +99,7 @@ class LeadershipRun:
                     "no_effect": {}, "config": {"rounds": rounds, "round_s": round_s, "tick_s": tick_s,
                                                 "catch_up_s": catch_up_s, "newcomer_exit_s": newcomer_exit_s}}
         self.actions = []
+        self.tick_pause = threading.Event()
         self.fault_log = []
         self.oracle_result = None
         self.first_failure_s = None
@@ -125,10 +126,13 @@ class LeadershipRun:
             platform = system.platform()
             env = fc.env(tag="")
 
+            tick_pause = self.tick_pause = threading.Event()
+
             def ticker():
                 while not tick_stop.is_set():
                     platform.poll()
-                    platform.start_run(env)
+                    if not tick_pause.is_set():
+                        platform.start_run(env)
                     tick_stop.wait(self.tick_s)
             threading.Thread(target=ticker, name="platform-schedule", daemon=True).start()
             t = time.monotonic()
@@ -142,6 +146,10 @@ class LeadershipRun:
             load = Load(wl, self.pace_s)
             rng = random.Random("%d/leadership" % self.seed)
             sup = _PlatformSup(platform)
+            load.resume()
+            for point, inside in system.fence_points():           # the fence drill, in every seed
+                self._drill(point, inside, rng, platform, env)
+                self._check_round("drill %s" % point, load)
             for r in range(self.rounds):
                 load.resume()
                 self._round(r, rng, platform, env, sup, fc, load)
@@ -159,6 +167,10 @@ class LeadershipRun:
                 problems = check_writer_log(system.writer_log())
                 if problems:
                     raise _Fail("violation", "round %d: writer log: %s" % (r, problems[:3]))
+                lost = self._lost_commits()
+                if lost:
+                    raise _Fail("violation", "round %d: commits reported as successful are not in the destination: "
+                                "%s" % (r, lost[:5]))
                 slow = self._slow_newcomers(platform)
                 if slow:
                     raise _Fail("violation", "round %d: newcomers that found a healthy leader exited late: %s"
@@ -212,6 +224,70 @@ class LeadershipRun:
                                     "workload_rounds": wl.round if wl is not None else 0},
                             actions=self.actions[-40:])
         return self.rec
+
+    def _lost_commits(self):
+        logged = {int(row[3]) for row in self.system.writer_log() if row[5] == "txn"}
+        return [lsn.format(int(p)) for p in self.system.committed_positions() if int(p) not in logged]
+
+    def _check_round(self, what, load):
+        """After a drill: the writer log and the reported commits (equality is checked at the end of each round)."""
+        problems = check_writer_log(self.system.writer_log())
+        if problems:
+            raise _Fail("violation", "%s: writer log: %s" % (what, problems[:3]))
+        lost = self._lost_commits()
+        if lost:
+            raise _Fail("violation", "%s: commits reported as successful are not in the destination: %s"
+                        % (what, lost[:5]))
+
+    def _drill(self, point, inside, rng, platform, env):
+        """Hold a fresh leader with SIGSTOP at `point` (its own crash point, action stop), let a newcomer take over,
+        interrupt the connections of earlier epochs, resume the old run. On a file destination a take-over cannot
+        overtake an open transaction (the file lock), so for a point inside the transaction the newcomer waits and
+        the old commit lands first; outside it the newcomer takes over while the old run is held."""
+        from cdc_v2 import crashpoints
+        act = {"action": "drill", "point": point, "inside_transaction": inside, "t": self._t()}
+        self.tick_pause.set()
+        for r in platform.alive():
+            r.proc.kill_tree()
+        deadline = time.monotonic() + 15
+        while platform.alive() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        time.sleep(float(getattr(self.system, "settings", {}).get("stale_s", 2.0)) + 0.5)   # the heartbeat goes stale
+        hits = str(self.workdir / ("drill-%s.jsonl" % point.replace(".", "_")))
+        hit = rng.randint(1, 3)
+        run = platform.start_run(dict(env, **crashpoints.env_for(point, hit=hit, action="stop", log=hits,
+                                                                   tag="drill")))
+        act.update(run=run.tag, hit=hit)
+        deadline = time.monotonic() + 90
+        fired = None
+        while time.monotonic() < deadline and fired is None:
+            if not run.proc.alive():
+                break
+            fired = next((h for h in crashpoints.read_log(hits) if h.get("fire") and h["pid"] == run.proc.pid), None)
+            time.sleep(0.05)
+        if fired is None:
+            self.tick_pause.clear()
+            raise _Fail("error", "fence drill: the run never stopped at %s (hit %d)" % (point, hit))
+        run.proc.wait_state("T", 5)
+        before = {e["tag"] for e in self.system.events() if e.get("kind") == "took_over"}
+        self.tick_pause.clear()
+        stale = float(getattr(self.system, "settings", {}).get("stale_s", 2.0))
+        deadline = time.monotonic() + (stale + 2.5 if inside else 30)
+        took = None
+        while time.monotonic() < deadline and took is None:
+            new = {e["tag"] for e in self.system.events() if e.get("kind") == "took_over"} - before - {run.tag}
+            took = sorted(new)[0] if new else None
+            time.sleep(0.1)
+        act["taken_over_while_held_by"] = took
+        if not inside and took is None:
+            run.proc.cont_group()
+            raise _Fail("stuck", "fence drill: no run took over while the old leader was held outside its "
+                                 "transaction")
+        act["interrupt_earlier_epochs"] = self.system.interrupt_earlier_epochs() \
+            if hasattr(self.system, "interrupt_earlier_epochs") else "not applicable to this destination"
+        _signal(run.proc.cont_group)
+        time.sleep(stale + 1.0)                                # the old run acts on its stale belief
+        self.actions.append(act)
 
     def _leader(self, alive):
         """The alive run that took over last (by the system's own events), or None."""

@@ -309,6 +309,18 @@ class ToySystem(PgSystem):
             except FileNotFoundError:
                 pass
 
+    def fence_points(self):
+        """The fence drill of the leadership fuzzer: (point, inside the destination transaction)."""
+        return [("toyrep.fenced", True), ("toyrep.commit_sent", True), ("toyrep.slot_advanced", False)]
+
+    def interrupt_earlier_epochs(self):
+        """The toy's equivalent of design 4.5's interrupt: a file destination has no server connections; a held old
+        run holds the file (and the newcomer waits) or holds nothing."""
+        return "not applicable: a file destination has no server connections to interrupt"
+
+    def committed_positions(self):
+        return [e["position"] for e in self.events() if e["kind"] == "committed"]
+
     def run_counts(self):
         ev = self.events()
         return {"stream_faults": sum(1 for e in ev if e["kind"] == "stream_fault"),

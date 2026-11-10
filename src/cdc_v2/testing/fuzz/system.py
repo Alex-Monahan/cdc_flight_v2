@@ -105,6 +105,16 @@ class System(Adapter):
     def set_spill_full(self, full: bool) -> None:
         raise NotImplementedError
 
+    def fence_points(self) -> list:
+        """[(crash point, inside the destination transaction)] where the leadership fuzzer holds the old run in its
+        fence drill: for the pipeline the lane points `<lane>.fenced` and `<lane>.commit_sent` (C4)."""
+        return []
+
+    def committed_positions(self) -> list:
+        """Positions of every commit a client of the system was told succeeded (for the pipeline: from S's batch
+        rows); each must be in the writer log after the round."""
+        return []
+
     def not_applicable(self) -> dict:
         """{suite 1.7 group: reason} for fault groups that cannot apply to this system at all; a group skipped
         without a reason fails the suite (suite17.judge)."""

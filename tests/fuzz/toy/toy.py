@@ -1011,6 +1011,7 @@ class Toy:
         self.attempt += 1
         if self.apply_group(group, prev):
             end = group[-1]["commit_lsn"]
+            self.event("committed", position=end, epoch=self.epoch)     # what this client was told succeeded
             if self.advance(end):
                 crash_point("toyrep.slot_advanced")
 
