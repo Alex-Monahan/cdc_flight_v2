@@ -240,8 +240,11 @@ applied twice.
 **Slot regression (core design open point 14).** A standby status update with a flush position below the slot's
 `confirmed_flush_lsn` does **not** move it back on Postgres 18.6 (`evidence/p3/engine/slot_flush_backwards_pg18.json`:
 slot advanced with `pg_replication_slot_advance`, then a pgjdbc replication client started at the old position and
-sent flush = old for 3 s; and our engine streamed for 3 s). The Postgres 16 result is in
-`slot_flush_backwards_pg16.json` (section 9).
+sent flush = old for 3 s; and our engine streamed for 3 s). Postgres 16 and 17 were not tested: Homebrew has no
+17 on this machine, and `tools/localpg` cannot build a Postgres 16 pair (it writes `sync_replication_slots`, a
+Postgres 17 setting, and the server refuses to start). The Postgres 18 source has an explicit guard
+(`LogicalConfirmReceivedLocation`: "Prevent moving the confirmed_flush backwards"); stage 2 must repeat the test on
+the PlanetScale version.
 
 ## 6. Attach rule
 

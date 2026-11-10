@@ -96,13 +96,13 @@ def run_pipefaults(seeds, count=2):
             detected += 1
         else:
             undetected_harmless += 1
-    return {"seeds": len(list(seeds)), "detected": detected, "undetected_and_output_identical": undetected_harmless,
+    return {"seeds": len(list(seeds)), "detected": detected, "undetected_output_identical_or_a_clean_shorter_stream": undetected_harmless,
             "faults_injected": injected}
 
 
 def test_pipefaults_seeds_default():
     r = run_pipefaults(range(60))
-    assert r["detected"] + r["undetected_and_output_identical"] == 60
+    assert r["detected"] + r["undetected_output_identical_or_a_clean_shorter_stream"] == 60
 
 
 @pytest.mark.skipif(not LONG, reason="opt-in: CDC_V2_E_LONG=1")
