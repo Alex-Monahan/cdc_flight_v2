@@ -136,6 +136,31 @@ public final class CdcEngine {
             FrameGen.main(java.util.Arrays.copyOfRange(args, 1, args.length));
             return;
         }
+        if (args.length >= 1 && args[0].equals("--splitmix")) {
+            for (int i = 1; i < args.length; i++) {
+                System.out.println(Long.toUnsignedString(Crash.splitmix64(Long.parseUnsignedLong(args[i]))));
+            }
+            return;
+        }
+        if (args.length == 3 && args[0].equals("--crash-selftest")) {
+            // Calls the point args[1] args[2] times under the environment contract (tests of the Java side).
+            Crash.init(System.getenv());
+            int n = Integer.parseInt(args[2]);
+            for (int i = 1; i <= n; i++) {
+                try {
+                    Crash.point(args[1]);
+                }
+                catch (Crash.CrashPointHit e) {
+                    System.out.println("raised " + i);
+                    System.out.flush();
+                    return;
+                }
+                System.out.println("after " + i);
+                System.out.flush();
+            }
+            Thread.sleep(Long.parseLong(System.getProperty("cdc_v2.selftest.linger.ms", "0")));
+            return;
+        }
         if (args.length != 0) {
             System.err.println("usage: CdcEngine | --list-crash-points | --framegen <seed> <out>");
             Runtime.getRuntime().halt(2);
