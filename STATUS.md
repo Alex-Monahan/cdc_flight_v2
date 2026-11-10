@@ -7,7 +7,7 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 - **Stage 1 (local). P1 Environment: gate passed on 2026-11-09** (one item cannot be shown from this session, see the
   table). **P2 Platform spike: gate passed on 2026-11-10** — every spike is done and merged, the report
   (`docs/spike_report.md`) is complete and was sent to the owner; nothing found contradicts SPEC, so the build
-  continues without waiting. **Paused for the usage limit at 2026-11-10 07:42 (the 5-hour window at 63 %); resumes after 11:30, when that window has reset (owner's rule: pause at 60 %).** **P3 Core: in progress** (table below): the fault harness, the oracle, the source
+  continues without waiting. **P3 Core: in progress** (table below): the fault harness, the oracle, the source
   package, the engine and the transform are merged; the apply package is reviewed twice and its fix round is checked
   (verdict: merge; the second reviewer's repeat campaigns found one correct history that is refused, so it is in a
   second, short fix round); the question the second review raised — which tables have a key — is measured and decided
