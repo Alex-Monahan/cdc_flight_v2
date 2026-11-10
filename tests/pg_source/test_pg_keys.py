@@ -275,3 +275,56 @@ def test_how_a_primary_key_becomes_deferrable(cluster, scratch):
     assert t3.primary_key_deferrable and not t3.has_key
     out["using_index_deferrable"] = {"has_key": t3.has_key, "primary_key_deferrable": t3.primary_key_deferrable}
     record("keys", "how_a_primary_key_becomes_deferrable", out)
+
+
+def _identity(scratch, conn, name):
+    return catalog.observe(conn, [(scratch.schema, name)], publication=scratch.pub, deadline=D()).by_name[
+        (scratch.schema, name)].identity
+
+
+def test_identity_sees_every_change_of_the_key_facts(cluster, scratch):
+    """TableFacts.identity (package T's gate) changes with each step: FULL to DEFAULT on a table without a key,
+    DEFAULT to USING INDEX, the index of USING INDEX replaced, the key made deferrable."""
+    s = q(scratch.schema)
+    scratch.admin(f"create table {s}.nk (a int not null, b int not null, v text); "
+                  f"alter table {s}.nk replica identity full; "
+                  f"create unique index nk_a on {s}.nk (a); create unique index nk_b on {s}.nk (b); "
+                  f"create table {s}.pk (id int primary key, w int not null unique, v text)")
+    conn = scratch.connect("primary", role="admin")
+    steps = {}
+    prev = _identity(scratch, conn, "nk")
+    for what, sql in (("FULL to DEFAULT", f"alter table {s}.nk replica identity default"),
+                      ("DEFAULT to USING INDEX", f"alter table {s}.nk replica identity using index nk_a"),
+                      ("the index of USING INDEX replaced", f"alter table {s}.nk replica identity using index nk_b")):
+        scratch.admin(sql)
+        cur = _identity(scratch, conn, "nk")
+        assert cur != prev and cur[2] == prev[2] == (), (what, prev, cur)       # key_attnums stay ()
+        steps[what] = {"before": list(prev[3:5]), "after": list(cur[3:5])}
+        prev = cur
+    prev = _identity(scratch, conn, "pk")
+    scratch.admin(f"alter table {s}.pk drop constraint pk_pkey, add primary key (id) deferrable")
+    cur = _identity(scratch, conn, "pk")
+    assert cur != prev and cur[5] is True and prev[5] is False
+    steps["the key made deferrable"] = {"key_attnums": [list(prev[2]), list(cur[2])], "pk_deferrable": [False, True]}
+    record("keys", "identity_sees_every_change_of_the_key_facts", steps)
+
+
+def test_name_rule_refuses_and_reports(cluster, scratch):
+    """A double quote in a table name: publication.ensure refuses the table (NotPublishable, the message holds no
+    name); publication.check reports such a table that was published by other means."""
+    s = q(scratch.schema)
+    bad = 'x "q"'
+    scratch.admin(f"create table {s}.{q(bad)} (id int primary key); create table {s}.ok (id int primary key)")
+    setup = scratch.connect("primary", role="admin")
+    with pytest.raises(publication.NotPublishable) as e:
+        publication.ensure(setup, [(scratch.schema, bad), (scratch.schema, "ok")], publication=scratch.pub,
+                           deadline=D())
+    assert set(e.value.problems) == {(scratch.schema, bad)}
+    msg = e.value.problems[(scratch.schema, bad)]
+    assert msg.startswith("table name contains a double quote") and bad not in msg
+    assert not publication.state(setup, publication=scratch.pub, deadline=D()).exists or not publication.state(
+        setup, publication=scratch.pub, deadline=D()).has(scratch.schema, bad)
+    scratch.admin(f"alter publication {q(scratch.pub)} add table {s}.{q(bad)}")      # by other means
+    got = catalog.tables(setup, [(scratch.schema, bad)], publication=scratch.pub, deadline=D())
+    assert got[0].published and publication.check(got) == {(scratch.schema, bad): msg}
+    record("keys", "name_rule_refuses_and_reports", {"refusal": msg, "published_by_other_means_reported": True})

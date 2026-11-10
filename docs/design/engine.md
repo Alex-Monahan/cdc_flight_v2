@@ -246,12 +246,18 @@ engine which tables are without a key.
   identity column under `DEFAULT` or `USING INDEX`. An old image that holds only the identity columns (a delete, or
   an update of an identity column, under `USING INDEX` or `DEFAULT`) arrives with NULLs in the other columns and
   cannot be told from real NULLs in the engine; the prevention is `publication.check`, which refuses every table
-  without a key that is not `REPLICA IDENTITY FULL` (`test_a_listed_table_without_an_old_image`,
-  `evidence/p3/key_rule/engine_incomplete_old_image.json`).
-- **The list is read at start.** A table that appears later is treated by Debezium's key. The `SCHEMA` frame of
-  every table carries `has_key`, the key positions and a key flag per column; package S compares them with the
-  catalog at every `SCHEMA` frame and restarts the engine with a new list when they differ (C2, plan 6.2). The
-  engine itself never consults the catalog.
+  without a key that is not `REPLICA IDENTITY FULL`, together with package T's gate on `TableFacts.identity`,
+  which includes the replica identity, the identity index and the key's deferrability, so a table whose identity
+  leaves `FULL` is seen before its next group is applied (`test_a_listed_table_without_an_old_image`,
+  `evidence/p3/key_rule/engine_incomplete_old_image.json`). The FATAL names the table (`schema` and `table` of the
+  FATAL frame, asserted), so package S can treat it as a failure of that one table.
+- **The list is read at start.** The pipeline tells the engine which tables are without a key
+  (`EngineSettings.keyless_tables`, read at engine start). For a listed table the engine ignores Debezium's key,
+  which would take a deferrable primary key and, when a table has no primary key, its unique index. A table that
+  appears later is treated by Debezium's key. The `SCHEMA` frame of every table carries `has_key`, the key
+  positions and a key flag per column; package S compares them with the catalog at every `SCHEMA` frame and
+  restarts the engine with a new list when they differ, and on T's `key_changed` (whether Debezium sends a new
+  `SCHEMA` frame after a key becomes deferrable was not measured). The engine itself never consults the catalog.
 
 **What Debezium calls a key, and what the list changes** (`tests/engine/test_engine_keys.py::test_what_debezium_
 calls_a_key_and_the_list`, Postgres 18.6 pair `pg-e`, Debezium 3.7.1, `evidence/p3/key_rule/engine_key_cases.json`).
@@ -290,8 +296,14 @@ cannot stream some names, with or without the list** (`test_names_stock_debezium
 double quote after a space (`x "q"`, `Odd.Name, "q"`) stops streaming with FATAL (`IllegalArgumentException` in
 Debezium's change event producer, at every start); a name that is wholly in double quotes (`"q"`) is **silently
 dropped**: its transactions arrive as BEGIN and END with event count 0, no SCHEMA, no rows, so the event-count
-check of section 9 does not see the loss. This is not a defect of the list; it needs a prevention outside the
-engine (open point for the orchestrator: refuse or exclude such names at discovery, before they are published).
+check of section 9 does not see the loss. The same holds for schema names, and a table `"q"` next to a table `q`
+in one schema has its rows arrive as rows of `q`, counted, with no error (`tests/engine/test_engine_names.py`,
+H-051). A schema `a.b` with table `c` next to schema `a` with table `b.c` is kept apart (the frames carry schema
+and table separately), and a table left out of `table.include.list` causes no FATAL. Stock Debezium 3.7.1
+cannot stream a name containing `"`: measured, it either stops with FATAL at every start or drops the table's
+records silently with `event_count` 0. This is not a defect of the list. The prevention is the catalog's name
+rule (`SourceTable.name_problem`, `docs/design/source.md` §3): a schema or table name containing `"` is refused
+by `publication.ensure` and reported by `publication.check`, so such a table is never in the publication.
 
 ## 5. Acknowledgement
 

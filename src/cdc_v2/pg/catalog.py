@@ -102,6 +102,13 @@ class SourceTable:
                        self.replica_identity_index_is_key)
 
     @property
+    def name_problem(self) -> str | None:
+        """The name rule: a double quote in the schema or table name means the table is not streamed (stock
+        Debezium 3.7.1 stops with FATAL or drops the records of such names; docs/design/engine.md 4a, H-051). The
+        message never holds the name."""
+        return name_problem(self.schema, self.name)
+
+    @property
     def replica_identity_problem(self) -> str | None:
         """Why the table cannot be published as it is, or None. A table without a primary key, and a table whose
         primary key is deferrable, needs REPLICA IDENTITY FULL (also with USING INDEX: such a table has no key by
@@ -122,6 +129,14 @@ class SourceTable:
                       "columns": [(c.attnum, c.name, c.type_oid, c.typmod, c.type_name) for c in self.columns],
                       "key": self.key_attnums, "has_key": self.has_key,
                       "pk_deferrable": self.primary_key_deferrable, "replica_identity": self.replica_identity})
+
+
+def name_problem(schema: str, name: str) -> str | None:
+    """See SourceTable.name_problem."""
+    where = [w for w, n in (("schema", schema), ("table", name)) if '"' in n]
+    if not where:
+        return None
+    return "%s name contains a double quote: stock Debezium cannot stream it" % " and ".join(where)
 
 
 def has_key(has_pk: bool, pk_deferrable: bool, replident: str, index_is_pk: bool) -> bool:
@@ -406,8 +421,10 @@ class TableFacts:
     @property
     def identity(self) -> tuple:
         """What a destination table is built for (package T): OID; per live column attnum, name, type, modifier;
-        the key columns. Not relfilenode."""
-        return (self.oid, tuple((c.attnum, c.name, c.type_oid, c.typmod) for c in self.columns), self.key_attnums)
+        the key columns (rule K); the replica identity, the attnums of the identity index (USING INDEX) and the
+        deferrability of the primary key, which decide what old image the stream carries. Not relfilenode."""
+        return (self.oid, tuple((c.attnum, c.name, c.type_oid, c.typmod) for c in self.columns), self.key_attnums,
+                self.replica_identity, self.replica_identity_index_attnums, self.pk_deferrable)
 
     @property
     def replica_identity_problem(self) -> str | None:

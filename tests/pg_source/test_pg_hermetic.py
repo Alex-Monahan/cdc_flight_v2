@@ -279,7 +279,7 @@ def test_diff_retype_rewrite_key_identity_persistence_publication():
 
 def test_table_facts_identity_and_replica_identity_rule():
     t = tf(1, "t", [(1, "id", 20, False), (2, "x", 23, True), (3, "v", 25, False)])
-    assert t.identity == (1, ((1, "id", 20, -1), (3, "v", 25, -1)), (1,))
+    assert t.identity == (1, ((1, "id", 20, -1), (3, "v", 25, -1)), (1,), "default", None, False)
     assert t.replica_identity_problem is None
     assert "FULL" in tf(1, "t", BASE, pk=()).replica_identity_problem
     assert tf(1, "t", BASE, pk=(), replident="full").replica_identity_problem is None
@@ -433,6 +433,46 @@ def test_rule_k_and_identity_problem_over_every_combination(pk, identity):
     if not keyed:                    # a table without a key: no key columns and no key source
         assert t.key == () and t.key_attnums == () and t.key_source is None
     assert publication.check([t]) == ({} if refusal is None else {("s", "t"): problem})
+
+
+def test_identity_sees_replica_identity_index_and_deferrability():
+    """TableFacts.identity (package T's gate) changes with the replica identity, the identity index's columns and
+    the deferrability of the primary key, also for a table without a key whose key_attnums stay ()."""
+    from dataclasses import replace
+    full = facts("none", "full")
+    assert full.identity != replace(full, replica_identity="default").identity            # FULL -> DEFAULT
+    imm = facts("immediate", "default")
+    idx = facts("immediate", "index on the key")
+    assert imm.identity != idx.identity                                                    # DEFAULT -> USING INDEX
+    other = facts("immediate", "other index")
+    assert other.identity != replace(other, replica_identity_index_attnums=(1, 2)).identity  # index replaced
+    dfull = facts("deferrable", "full")
+    assert dfull.key_attnums == full.key_attnums == ()
+    assert dfull.identity != replace(dfull, pk_deferrable=False, pk_attnums=()).identity
+    assert facts("immediate", "full").identity != facts("deferrable", "full").identity     # made deferrable
+    assert full.identity == replace(full, relfilenode=999).identity                        # not relfilenode
+
+
+# ----------------------------------------------------------------------------------------------- the name rule
+
+QUOTED_NAMES = ('"b', 'x "q"', 'Odd.Name, "q"', '"q"', 'a"b', 'a."b', 'a,"b', 'a "b', 'a"')
+PLAIN_NAMES = ("a.b", "a,b", "Mixed Case", "Odd.Name, q", "t", "schéma")
+
+
+@pytest.mark.parametrize("where", ["schema", "table"])
+@pytest.mark.parametrize("name", QUOTED_NAMES + PLAIN_NAMES)
+def test_name_problem(where, name):
+    """The name rule: a double quote anywhere in the schema or table name means the table is not streamed (stock
+    Debezium 3.7.1 stops or drops such names, engine.md 4a). The message never holds the name."""
+    from dataclasses import replace
+    t = source_table("immediate", "default")
+    t = replace(t, schema=name) if where == "schema" else replace(t, name=name)
+    p = t.name_problem
+    if '"' in name:
+        assert p is not None and name not in p and '"' not in p, p
+        assert publication.check([t]) == {t.qualified: p}
+    else:
+        assert p is None and publication.check([t]) == {}
 
 
 def test_build_tables_reads_indimmediate():

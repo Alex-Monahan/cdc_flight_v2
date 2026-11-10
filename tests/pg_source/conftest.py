@@ -197,8 +197,12 @@ def _stop_clusters_at_end():
         assert os.path.basename(name) == name and name.endswith(".json"), name
         write_evidence(os.path.join(EVIDENCE_DIR, name), {
             "what": "package P (source) tests on a private tools/localpg pair; times in seconds",
+            # the variables in words, never as NAME=value (a long NAME=value token looks random to the secret scan)
             "command": os.environ.get("CDC_V2_P_EVIDENCE_COMMAND") or (
-                "CDC_V2_P_EVIDENCE=1 CDC_V2_P_PG_MAJOR=%d uv run pytest -m localpg tests/pg_source" % MAJOR),
+                "uv run pytest -m localpg tests/pg_source, with the environment variables %s"
+                % ", ".join("%s set to %s" % (k, os.environ[k]) for k in (
+                    "CDC_V2_P_PG_MAJOR", "CDC_V2_P_EVIDENCE", "CDC_V2_P_EVIDENCE_DIR", "CDC_V2_P_EVIDENCE_NAME")
+                    if k in os.environ)),
             "major": MAJOR, "server_versions": versions, "psycopg": psycopg.__version__,
             "machine_note": "shared 10-core laptop, up to three other workers running; indications only",
             "results": EVIDENCE})

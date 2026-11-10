@@ -168,8 +168,13 @@ catalog columns are read (no `format_type`, no `regclass` casts): those use the 
   (a transaction at or above `xmax` is invisible without being listed). A DDL transaction's catalog change becomes
   visible at its commit, never before.
 
-`TableFacts.identity` = (OID, per live column `(attnum, name, type oid, typmod)`, key attnums) — what package T
-compares. `relfilenode` is not part of it. `TableFacts` carries the raw `pk_attnums`, `pk_deferrable` (read in the
+`TableFacts.identity` = (OID, per live column `(attnum, name, type oid, typmod)`, key attnums, replica identity,
+attnums of the identity index (`USING INDEX`, else `None`), `pk_deferrable`) — what package T compares. It
+includes the replica identity, so a table without a key that goes from `FULL` to `DEFAULT`, from `DEFAULT` to
+`USING INDEX`, whose identity index is replaced by one on other columns, or whose key becomes deferrable gets a
+new identity (`test_identity_sees_every_change_of_the_key_facts`, Postgres 16.6 and 18.6). An identity index
+replaced by another one on the same columns keeps the identity: the old images stay the same. `relfilenode` is
+not part of it. `TableFacts` carries the raw `pk_attnums`, `pk_deferrable` (read in the
 same statement), `has_key` (rule K) and `key_attnums` (`pk_attnums` when `has_key`, else empty), so an
 observation and `catalog.tables` give the same answer (`test_catalog_follows_rule_k`, 14 table shapes).
 
@@ -212,9 +217,17 @@ name and type is a drop of one `attnum` and an add of another, never a rename.
   and a table whose primary key is deferrable. `catalog.has_key(...)` is the rule, `SourceTable.has_key` and
   `TableFacts.has_key` apply it, and for a table without a key `key` and `key_attnums` are empty and `key_source`
   is `None`. The engine is told which tables are without a key (`docs/design/engine.md` 4a), because Debezium
-  calls more tables keyed than rule K does.
+  calls more tables keyed than rule K does. An update or delete of a table without a key that arrives without an
+  old image stops the engine with a FATAL that names the table.
+- **The name rule** (H-051). Stock Debezium 3.7.1 cannot stream a name containing `"`: it stops with FATAL at
+  every start, drops the table's records silently with event count 0, or credits them to another table (`"q"`
+  next to `q`). `SourceTable.name_problem` ("schema name …" / "table name contains a double quote: stock Debezium
+  cannot stream it", or `None`; the message never holds the name): a schema or table name containing `"` is
+  refused by `publication.ensure` and reported by `publication.check` (also for a table that was published by
+  other means; `test_name_rule_refuses_and_reports`, `test_name_problem`). Such a table is never in the
+  publication; what the pipeline does with it (routing `skip` with one alert in P3) is not this package's.
 - Before anything is added, every named table is read again and `check` refuses (`NotPublishable` with a reason per
-  table): unlogged or temporary tables (H-030); a table **without a primary key that is not `REPLICA IDENTITY FULL`,
+  table): unlogged or temporary tables (H-030); a name with a `name_problem`; a table **without a primary key that is not `REPLICA IDENTITY FULL`,
   also with `REPLICA IDENTITY USING INDEX`** (it has no key by rule K and the engine would carry an incomplete old
   image); a table **with a deferrable primary key that is not `REPLICA IDENTITY FULL`** ("primary key is
   deferrable: needs REPLICA IDENTITY FULL (replica identity is …)"); `REPLICA IDENTITY NOTHING`; a table with an

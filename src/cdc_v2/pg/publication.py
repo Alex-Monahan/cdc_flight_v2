@@ -110,13 +110,14 @@ def state(conn: PgConnection, *, publication: str = DEFAULT, deadline: Deadline)
 
 
 def check(tables: Iterable[catalog.SourceTable]) -> dict[tuple[str, str], str]:
-    """Why each table cannot be added as it is (H-014, H-030). Empty when all can."""
+    """Why each table cannot be added as it is, or, for a table that is published already, why it must not be
+    streamed (H-014, H-030, the name rule). Empty when all can."""
     out = {}
     for t in tables:
         if t.persistence != "permanent":
             out[t.qualified] = "%s table: no WAL for its rows, cannot be published" % t.persistence
             continue
-        p = t.replica_identity_problem
+        p = t.name_problem or t.replica_identity_problem
         if p:
             out[t.qualified] = p
     return out

@@ -88,15 +88,48 @@ def test_survivor_check_fails_while_something_lives():
 
 
 def test_three_competing_instances():
+    # Waits of 30 s: under a load average above 20 `ps -A` can take seconds. The failure seen once (package K,
+    # 2026-11-10) was DeadlineExceeded from `wait_state("T", 5)` (procs.py, the raise in wait_state).
     with procs.Fleet() as fleet:
         ps = [fleet.start([sys.executable, "-c", SLEEPER], name="i%d" % i) for i in range(3)]
-        assert len({p.pgid for p in ps}) == 3
+        assert len({p.pgid for p in ps}) == 3, [p.pgid for p in ps]
         ps[1].stop_group()
-        ps[1].wait_state("T", 5)
+        ps[1].wait_state("T", 30)
         ps[0].kill_group()
-        assert ps[0].wait(5).killed
-        assert [p.alive() for p in ps] == [False, True, True]
-    assert all(not p.alive() for p in ps)
+        st = ps[0].wait(30)
+        assert st.killed, st
+        alive = [p.alive() for p in ps]
+        assert alive == [False, True, True], alive
+    assert all(not p.alive() for p in ps), [p.alive() for p in ps]
+
+
+@pytest.mark.parametrize("seed", [1, 2, 3])
+def test_wait_state_counts_a_missed_ps_row_as_not_yet(monkeypatch, seed):
+    """A `ps` that misses the row of a live process once (seeded position) is "not yet", not a failure; a process
+    that has exited is still reported at once."""
+    import random
+    rnd = random.Random(seed)
+    with procs.Fleet() as fleet:
+        p = fleet.start([sys.executable, "-c", SLEEPER], name="w")
+        p.stop()
+        real = procs.process_table
+        misses = rnd.randint(1, 3)
+        calls = {"n": 0}
+
+        def flaky():
+            calls["n"] += 1
+            table = real()
+            if calls["n"] <= misses:
+                table.pop(p.pid, None)              # the first calls of ps miss the row
+            return table
+
+        monkeypatch.setattr(procs, "process_table", flaky)
+        assert p.wait_state("T", 30).startswith("T") and calls["n"] == misses + 1
+        p.kill()
+        p.wait(30)
+        monkeypatch.setattr(procs, "process_table", lambda: {})
+        with pytest.raises(procs.DeadlineExceeded):
+            p.wait_state("T", 30)                   # exited: reported at once, not after 30 s
 
 
 def test_harness_variables_are_not_inherited(monkeypatch, tmp_path):
