@@ -29,7 +29,7 @@ from cdc_v2.testing.harness_evidence import scrub
 
 from . import faultkinds as fk
 from . import observers as obs
-from .run import FAILURES, Infrastructure, Load, git_state, judge_source_errors, utc_now
+from .run import FAILURES, Infrastructure, Load, git_state, judge_setup_failure, judge_source_errors, utc_now
 from .run import _Outcome as _RunOutcome
 
 PLATFORM_FAULTS = ["net_drop", "net_reset", "net_blackhole", "net_latency", "src_terminate", "dest_error",
@@ -116,7 +116,10 @@ class LeadershipRun:
             try:
                 system.setup(self.workdir, self.seed)
             except Exception as e:                         # noqa: BLE001
-                raise Infrastructure("setup: %s: %s" % (type(e).__name__, str(e)[:300])) from None
+                try:
+                    judge_setup_failure(e)
+                except _RunOutcome as o:
+                    raise _Fail(o.outcome, o.reason) from None
             from cdc_v2.testing.faults import FaultControl
             fc = FaultControl(self.workdir / "faults")
             platform = system.platform()

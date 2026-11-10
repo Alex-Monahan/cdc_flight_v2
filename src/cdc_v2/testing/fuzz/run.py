@@ -98,6 +98,25 @@ def source_error(e: BaseException, window: Optional[FaultWindow]) -> dict:
             "during_fault": during, "allowed": lost and during}
 
 
+# A failure of system.setup() is a failure of the run (`error`): a refusal at start (for example the source
+# package's publication check) is the system's. Only these named causes of the environment, which the system cannot
+# cause, make it `infrastructure`.
+SETUP_ENVIRONMENT_CAUSES = (
+    "could not create shared memory segment",      # the kernel's System V table is full (other work on the machine)
+    "no free fuzz home",                           # every home of the pool is held by another campaign
+    "no free private port block",                  # every leased port block is held
+)
+
+
+def judge_setup_failure(e: BaseException) -> None:
+    """Raise Infrastructure for a named environment cause, _Outcome('error') for anything else."""
+    text = "%s: %s" % (type(e).__name__, str(e)[:300])
+    cause = next((c for c in SETUP_ENVIRONMENT_CAUSES if c in str(e)), None)
+    if cause:
+        raise Infrastructure("setup, environment (%s): %s" % (cause, text))
+    raise _Outcome("error", "setup failed: %s" % text)
+
+
 def judge_source_errors(errors: list) -> None:
     """Raise Infrastructure when every error is on the allow-list, _Outcome('error') otherwise."""
     bad = [e for e in errors if not e.get("allowed")]
@@ -373,7 +392,7 @@ class Run:
             try:
                 system.setup(self.workdir, self.seed)
             except Exception as e:                         # noqa: BLE001
-                raise Infrastructure("setup: %s: %s" % (type(e).__name__, str(e)[:300])) from None
+                judge_setup_failure(e)
             fc = FaultControl(self.workdir / "faults")
             sup = Supervisor(system, self.workdir, fc).start()
             t = time.monotonic()

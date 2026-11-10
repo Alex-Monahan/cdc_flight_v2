@@ -36,6 +36,27 @@ GROUPS = {
 }
 
 
+EXPECTED_PARTS = ("crash_points",) + tuple(GROUPS) + ("soak",)
+
+
+def judge(parts: dict) -> tuple:
+    """(all_passed, failed parts): every expected part must be present and must have passed; a missing part, or a
+    part without an explicit pass, never passes. A group passes when skipped only if the system declared it not
+    applicable with a reason (printed in the summary)."""
+    failed = []
+    for name in EXPECTED_PARTS:
+        p = parts.get(name)
+        if p is None:
+            failed.append("%s: missing" % name)
+        elif name == "crash_points":
+            if not (p.get("all_passed") is True and p.get("missing_points") == []):
+                failed.append("crash_points: not all passed or points missing")
+        elif p.get("passed") is not True:
+            failed.append("%s: %s" % (name, "skipped, not declared not applicable" if p.get("skipped")
+                                      else "not passed"))
+    return not failed, failed
+
+
 class _Leases:
     """At most `n` homes for the crash runner's scenarios, checked out by a scenario's system when it sets up and
     given back when it tears down (the runner makes new worker threads for every call, so a home per thread would
@@ -156,7 +177,9 @@ def run_suite(system_name: str, out_dir: Path, repo: Path, source_node: str = "r
             sysm = make_system(system_name, lease, source_node)
             kinds = [k for k in kinds if sysm.supports(k)]
             if not kinds:
-                summary["parts"][group] = {"skipped": "the system supports none of %s" % GROUPS[group]}
+                reason = (sysm.not_applicable() or {}).get(group)
+                summary["parts"][group] = {"skipped": "the system supports none of %s" % GROUPS[group],
+                                           "not_applicable": reason, "passed": bool(reason)}
                 continue
             sch = Schedule(sysm, only=kinds, per_episode=(len(kinds), len(kinds) + 1), cover_all=True)
             rec = run_once(sysm, 1000 + gi, work / group, RunConfig(fuzzer="fault", budget_s=group_budget_s,
@@ -189,9 +212,7 @@ def run_suite(system_name: str, out_dir: Path, repo: Path, source_node: str = "r
     finally:
         leases.release()
     parts = summary["parts"]
-    summary["all_passed"] = bool(parts.get("crash_points", {}).get("all_passed")) and \
-        not parts.get("crash_points", {}).get("missing_points") and \
-        all(p.get("passed", True) for k, p in parts.items() if k != "crash_points")
+    summary["all_passed"], summary["failed_parts"] = judge(parts)
     summary["seconds"] = round(time.monotonic() - t0, 1)
     write_evidence(out_dir / "summary.json", summary)
     return summary

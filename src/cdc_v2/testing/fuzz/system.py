@@ -105,6 +105,11 @@ class System(Adapter):
     def set_spill_full(self, full: bool) -> None:
         raise NotImplementedError
 
+    def not_applicable(self) -> dict:
+        """{suite 1.7 group: reason} for fault groups that cannot apply to this system at all; a group skipped
+        without a reason fails the suite (suite17.judge)."""
+        return {}
+
     def run_counts(self) -> dict:
         """Counts the system keeps of its own during a run (read before teardown): `stream_faults` (byte faults
         injected on the engine-to-applier path) and `stream_detected` (broken streams it detected)."""
