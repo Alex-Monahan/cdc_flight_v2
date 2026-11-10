@@ -30,8 +30,10 @@ D's call shapes over a plain DuckDB connection (local or MotherDuck).
 Terms. A *record* is one row of a change set (C3a): `op` `c`, `u` or `d`, the new image `a<i>`, for a table
 without a key the old image `b<i>`, the flags `u<i>` ("value absent because unchanged", SPEC 2.6, H-003), and for a
 table with a key the old key `k<i>` on the create that follows a key change. Records are ordered by (transaction,
-`seq`); `seq` alone orders nothing across transactions. A change set holds whole source transactions and is not
-reduced.
+`seq`); `seq` alone orders nothing across transactions. A change set is a contiguous run of records in stream order
+and is not reduced. It may start and end inside a source transaction (design 6.5 cuts a group at a TRUNCATE or a
+schema change); the one rule for a cut is that the `d` and the `c` of one key change are never separated. Nothing
+in the plan depends on transaction ends.
 
 The result of `apply_group` must be the table the source had after the change set, given the table the source had
 before it. For a table without a key the result is the multiset of row images. Two values are *equal* as the
@@ -41,43 +43,31 @@ structs element by element. Apply's own form of this is `types.exact(expr, type)
 
 ## 2. Tables with a key
 
-### 2.1 The model: one queue per key
+### 2.1 The model: one key, at most one row
 
-Design 6.2 says "the last record per key decides". That is wrong when a source transaction holds two rows with one
-key at once, which a deferred unique constraint allows: `UPDATE t SET id = 3 - id WHERE id IN (1, 2)` sends
-`d(1) c(2, k=1) d(2) c(1, k=2)`. After `c(2, k=1)` the source has two rows with key 2; `d(2)` removes the row that
-had key 2 before, not the one that just arrived. The last record for key 2 is a `d`, yet key 2 exists at the end.
-The same holds for `UPDATE t SET id = id + 1` over a whole table with a deferrable key (a realistic oversized
-transaction).
+Rule K (core design section 6): a table has a key only if its primary key is immediate; a table with a deferrable
+primary key is a table without a key and takes the path of section 4 with its full old images. So every table
+that reaches this path is keyed by an immediate replica-identity key, and (H-015, measured on Postgres 16.6 and
+18.6):
 
-Apply therefore models the source one key at a time, as a queue of row versions (*arrivals*):
+> For a table keyed by an immediate replica-identity key, no two rows hold one key at any record of the stream
+> (WAL order inside a transaction, commit order across). So a key's first record in the change set fixes its start
+> state (`c`: absent; `u`, `d`: present), and every later record must keep at most one row. A record that does not
+> is a divergence (`ApplyInvariantError`). A key change is the `d` of the old key directly followed by the `c` of
+> the new key with `k<i>`.
 
-* arrival 0 is the row the source had at the start of the change set, if it had one (`p` = 1);
-* `c` adds an arrival at the back; `d` removes the front one (the oldest); `u` changes the front one;
-* a key change is a `d` of the old key directly followed by the `c` of the new key with `k<i>` = the old key
-  (`docs/design/engine.md` 2: "a key change arrives as a delete with the old key followed by that create"); the
-  new arrival is *linked* to the arrival that `d` removed;
-* at the end of the change set each key holds at most one arrival; that arrival is the key's *final row*.
+The plan (`plan.py`, steps `w` and `kp`) computes per exact key `p` (1 if the first record is `u` or `d`) and the
+running sum `S` (+1 per `c`, −1 per `d`); a key is *bad* if after any record `p + S ∉ {0, 1}`, or a `u` finds
+`p + S ≠ 1`. A bad key raises `ApplyInvariantError` in both modes, naming the table and the number of such keys:
+a `c` at a key that holds a row, a `u` or a `d` at a key that holds none, is not a source history. Each key holds
+at most one *arrival* (row version) at a time: arrival 0 is the start row if `p = 1`, each `c` adds the next one,
+each `d` removes the current one, a `u` changes it. The final row is arrival `n_d` if `p + n_c − n_d = 1`.
 
-`p` is not known to the client, but the records almost always fix it. With `S(t)` the running sum of +1 per `c`
-and −1 per `d` at the key, consistency requires `p + S ≥ 0` after every `d`, `p + S ≥ 1` at every `u`, and
-`p + S ∈ {0, 1}` at the end of every transaction. That gives bounds `lo ≤ p ≤ hi` (`plan.py`, step `kb`).
-`lo > hi` is a divergence (stream: `ApplyInvariantError`; catch-up: the key is unresolved). `lo < hi` happens only
-when every record at the key comes after a `c` of the same transaction and nothing forces the start state, for
-example an insert and a delete in one transaction. Then:
-
-* stream mode asks the destination (one *lookup* statement for all such keys of the change set, only when there
-  are any): the destination equals the source before the change set;
-* catch-up mode cannot ask (its table was loaded under other snapshots): the key is unresolved.
-
-With `p` known, arrival numbers are counts: a `c` creates arrival `p + (c before it)`, a `d` removes arrival
-`(d before it)`, a `u` changes arrival `(d before it)`, and the final arrival is number `n_d` if
-`p + n_c − n_d = 1`. All of this is window sums over the records (steps `w`, `kp`, `ev`), with no loop.
-
-What the model cannot know: with a deferred constraint and default replica identity, `INSERT 2; DELETE the old 2`
-and `INSERT 2; DELETE the new 2` send the same records (a `d` carries only the key). Apply removes the oldest
-arrival, which is right for every single-statement permutation (deferred swap, rotation, shift). This is a limit
-of the stream, not of apply; it belongs in the hazard catalogue next to H-015.
+Keys are compared exactly (`types.exact`), which is finer than the source: for Postgres `-0 = 0` and
+`1 mon = 30 days = 720 hours`. Two rows whose keys differ only in form cannot exist at once at the source; one row
+can change the form of its key, which arrives as a key change `d(-0) c(0, k=-0)` and is a move like any other
+(3.4). A change set that holds two forms of one key at once (the second review's case B) is not a source history;
+it ends in `ApplyInvariantError` (named case `review_B_two_forms_of_one_key_held_at_once`).
 
 ### 2.2 Where an unchanged value comes from
 
@@ -92,68 +82,85 @@ ends:
 * elsewhere (a `c` without `k<i>` that carries "unchanged", or a broken link): no source.
 
 Mode `stream`: a final row without a source raises `ApplyInvariantError`, and so does a root that the destination
-lacks (the row mover's count, section 3.3). Only final rows count: a row that is deleted later in the change set
-needs no values (SPEC is met; the destination ends as the source).
+lacks (the row mover's count). Only final rows count: a row that is deleted later in the change set needs no
+values.
 
 ### 2.3 Mode catch_up
 
 In catch-up the destination was loaded under several snapshots (design 7.3), so a destination row is some version
-of the row with that key, older or newer than the change set's start. Rules, in order (C3a rules 2 and 3):
+of the row with that key, older or newer than the change set's start. With `p` fixed by the first record, the
+rules (C3a rules 2 and 3) are:
 
-1. the root X (arrival 0 of the key the row had before the change set) is used if the destination holds exactly
-   one row for X and **no `c` of the change set lands on X** (otherwise the destination row at X can be a later
-   row that reused the key; see 2.6);
-2. else, if the final row's own `c` is the first record of its key in the change set **and the source did not
-   hold that key when the change set starts** (`p = 0`), the destination row with the final key, if exactly one
-   (C3a rule 3: the snapshot already saw the row under its new name). The second condition was found by the
-   campaign (seeds 10000325, 10004510, 10008026): in a deferred permutation the final row's `c` can arrive while
-   the key's old row is still there, and the destination row under that key is then the old row;
+1. the root X (arrival 0 of the key the row had at the start, so the first record at X is a `u` or a `d`) is used
+   if the destination holds exactly one row for X and **no `c` of the change set lands on X**. Why the second
+   condition: a destination row at X is the row at X at its snapshot's time; if the change set creates a row at X
+   (the key is reused) a snapshot after that holds the new row, and nothing in the destination says which. With no
+   `c` at X, every destination row at X is the start row or nothing. A chain `1→5→6` resolves by this rule; a swap
+   through a free key does not (it creates rows at both roots), and named case
+   `catch_up_swap_through_a_free_key_after_the_swap` shows the wrong value the rule prevents;
+2. else, if the final row's own `c` is the first record of its key in the change set, the destination row with the
+   final key, if exactly one (C3a rule 3: the snapshot already saw the row under its new name). The first record
+   being a `c` means the key was free at the start (`p = 0`), so a destination row there can only be this row's;
 3. else the key is **unresolved**: nothing is inserted or moved for it, its destination row is deleted (2.6), and
    its key columns are returned in `ApplyCounts.unresolved` for the repair read.
 
-Catch-up asks the destination once per change set for the candidate rows of rules 1 and 2 (a lookup by exact key,
-returning counts).
+`c(10) d(10)` leaves nothing unresolved (the first record fixes `p = 0`). Catch-up asks the destination once per
+change set for the candidate rows of rules 1 and 2 (a lookup by exact key, returning counts). On the shape of the
+second review (rounds with repair reads, up to 6 snapshots, unchanged-value rate 0.8; `rounds_scenario`, the same
+200 seeds for both codes) the share of log records that end as an unresolved key went from 13.9 % (the code before
+this round) to 3.2 %.
 
-Idempotence (C3a): applying the same change set twice gives the same table except for keys returned as
-unresolved. Complete final rows are rewritten identically; a moved row whose root is gone the second time is found
-again under its final key by rule 2 when its `c` is the first record of that key. When it is not (the log deleted
-the final key before moving a row onto it: `d(2) d(1) c(2, k=1)` with an unchanged column), the second call
-reports key 2 unresolved and deletes its (correct) row: allowed by C3a, but a run-again then costs a repair read
-(found by the review). Tested in the named cases (`catch_up_*`, `twice=True`) and in every catch-up property
-example.
+Idempotence (C3a): applying the same change set twice gives the same table except for keys returned as unresolved
+by either call; the caller repairs the unresolved keys of every call, a repeated one included. (Example: after
+`d(2) d(1) c(2, k=1)` with an unchanged column, the first call resolves key 2 by rule 1; the second finds root 1
+gone and rule 2 does not apply, so it reports key 2 and deletes its correct row.) Tested: named cases
+(`catch_up_*`, `twice=True`), every catch-up property example, and `test_catch_up_rounds_with_repair_reads` with
+repeated calls whose keys are all repaired.
+
+The bound (asserted in every rounds example): a key is unresolved only if its row at the end of the call has a
+column whose value is in no record of the change set. A planner that reports everything unresolved fails it
+(negative control, section 8).
 
 ### 2.4 Several destination rows with one key
 
 Not apply's to repair (C3a), but what happens:
 
-* the delete removes all of them (it joins by key);
+* the delete removes all of them (it joins by key); in stream mode its count then differs from the expected one
+  and the change set raises `ApplyInvariantError` (2.5);
 * the row mover (K3) moves all of them; its count then exceeds the expected count and stream mode raises
   `ApplyInvariantError`; catch-up never uses a root with more than one row (2.3);
 * `reduce_duplicates(tx, target, change_set)` is offered to the backfill (design 7.3 step 1): for the keys of a
   change set it keeps one row per key (`DELETE ... WHERE rowid IN (... row_number() OVER (PARTITION BY key) > 1)`).
-  Which one stays does not matter (design 7.3).
 
-### 2.5 Stream mode trusts the destination
+### 2.5 Stream mode checks the start state it relies on
 
-Stream mode deletes only keys with `p = 1`: a key the source did not have at the start has no destination row,
-because the destination equals the source before the change set (exactly-once by position, C4). An insert-only
-change set is one statement. A diverged destination is not detected by stream apply except where values are
-needed from it (roots, counted). That is C3a's own statement: "mode stream makes no such promise and needs none".
+In stream mode the destination equals the source at the start of the change set (exactly-once by position, C4).
+So a key whose first record is `c` has no destination row, and a key whose first record is `u` or `d` has exactly
+one. Both are checked, and a difference raises `ApplyInvariantError`:
+
+* K1 deletes the keys with `p = 1` (except roots, which K3 moves and counts) and must remove exactly one row per
+  key; the keys with `p = 0` are added to K1, where they must remove nothing. No extra statement;
+* when no K1 would run (an insert-only change set), `ApplySettings.check_new_keys` (default on) still runs K1 for
+  the new keys: one statement. Its cost, measured locally on a table of 10 M rows with change sets of 10,000
+  inserts (`evidence/p3/apply/check_new_keys_cost.json`, medians of 5): increasing BIGINT keys 30.7 ms without,
+  31.5 ms with the check; random UUID keys 32.4 ms without, 72.2 ms with (no range pruning for random keys). On
+  MotherDuck add one round trip.
+
+This makes a `c` at a key that a row held before the change set loud: the second review's A1, A4 and SEG, a table
+wrongly treated as keyed, and a delete or full update of a missing row (named cases `review_*`,
+`stream_*_raises`).
 
 ### 2.6 Preconditions of catch_up (proposed for C3a)
 
-Both were found by the property tests; each has a regression test.
-
-1. **A catch-up call must reach past every snapshot whose rows the table holds** (chunk snapshots and repair
-   reads): its change set must contain every transaction up to the upper bound `R1` of each of them. Otherwise
-   the call can take an unchanged value from a destination row that a *later* transaction (outside the call) put
-   under a reused key, and nothing in the call shows the reuse. `test_catch_up_split_before_the_newest_snapshot`
-   (strict `xfail`) shows a wrong value when the rule is broken; with it, no later transaction can have reused
-   the key, because any reuse before a snapshot is in the call (2.3 rule 1 then sees the `c`). The backfill
-   meets it by starting catch-up only after the stream has passed every snapshot (the same condition as the swap,
-   design 7.3) and, after a repair read, by the next round reaching past the repair snapshot.
-2. **The row of an unresolved key is deleted.** It is stale by definition, and a later call (the next round)
-   would otherwise take values from it (seed 135239). The repair read loads it again.
+1. **A catch-up call starts at or before the lower bound of every snapshot not yet passed, and its change set
+   reaches at least `R1` of every snapshot whose rows the table holds, repair reads included; the backfill waits
+   for the pending log to reach that point.** Otherwise the call can take an unchanged value from a destination
+   row that a later transaction (outside the call) put under a reused key, and nothing in the call shows the
+   reuse. `test_catch_up_split_before_the_newest_snapshot` (strict `xfail`) shows the wrong value when the rule is
+   broken.
+2. **The row of an unresolved key is deleted.** It is stale by definition, and a later call (the next round) would
+   otherwise take values from it. The repair read loads it again; it must cover every reported key, including keys
+   the source no longer holds.
 
 ### 2.7 Other readings of C3a (contract notes)
 
@@ -161,9 +168,9 @@ Both were found by the property tests; each has a regression test.
   scratch_prefix="_cdc_apply", u_present=None)`. `transactions` is not needed for the current-state table and may
   be `None`; the local order column is `txn`, the relation order column `commit_lsn`.
 * A NULL `u<i>` means "not unchanged". A `u<i>` column is honoured whenever it is present, also if `meta` does not
-  flag the column (otherwise its NULL `a<i>` would be written as a value). `u<i>` on a key column is ignored: a key value is always present; a record
-  without its key value raises `ApplyInvariantError` (an unchanged TOASTed key column, which pgoutput can send, is
-  a hazard for the catalogue).
+  flag the column (otherwise its NULL `a<i>` would be written as a value). `u<i>` on a key column is ignored: a key
+  value is always present; a record without its key value raises `ApplyInvariantError` (an unchanged TOASTed key
+  column, which pgoutput can send, is a hazard for the catalogue).
 * A key change is recognised only when the `c` with `k<i>` directly follows the `d` of that old key in the same
   transaction (the engine's order). Otherwise the link is broken: values that need it are unresolved.
 * `op = 't'` (or anything but `c`, `u`, `d`) raises `ChangeSetError`, as do two records with one
@@ -174,6 +181,12 @@ Both were found by the property tests; each has a regression test.
   (statements sent through `tx`, one round trip each), `shapes` (the shape of each, section 3.2), `unresolved`
   (catch-up: an Arrow table with the key columns `a<i>` in destination types, also when empty; `None` in stream
   mode).
+* `ApplySettings`: `statement_rows`; for the planning database of the local form `local_threads`,
+  `local_memory_limit` (1 GB), `local_temp_directory` (required: the pipeline's spill area; a missing directory is
+  `ApplySettingsError`) and `local_max_temp_directory_size` (4 GB); all are set before that database's first
+  statement. A plan that exceeds both limits raises `ApplySpillFull` (no value in the message; the database is
+  closed, so its spill files go, and the next call starts afresh); the stream can then stage the change set and
+  use the relation form. `check_new_keys` (2.5).
 * The relation form creates its working tables in a schema `<scratch_prefix>_<random>` inside the caller's
   transaction and drops every table and the schema before returning (one `DROP TABLE` per table, section 5).
 * `TableMeta` refuses two names that differ only by case. Any other string is a destination name, including
@@ -208,7 +221,7 @@ each runs only when the plan says it has work.
 
 | Shape | Statement | Rows |
 |---|---|---|
-| lookup | `SELECT c.ci, count(t.k) FROM cand c LEFT JOIN t ON key GROUP BY ALL` | stream: keys with undetermined `p`; catch-up: candidate roots |
+| lookup | `SELECT c.ci, count(t.k) FROM cand c LEFT JOIN t ON key GROUP BY ALL` | catch-up only: candidate roots |
 | K1 | `DELETE FROM t USING del n WHERE key(t) = n.x` | stream: keys with `p = 1`; catch-up: every key of the change set, but not a root that will be moved |
 | K2 | `UPDATE t SET d = CASE WHEN need THEN sentinel ELSE t.d END, ... FROM upd n WHERE key(t) = n.rx AND (need ...)` | root rows whose always-present FLOAT/DOUBLE/INTERVAL/STRUCT column changes (5.2) |
 | K3 | `UPDATE t SET key = n.key, c = n.c ... FROM upd n WHERE key(t) = n.rx` — keys and always-present columns | every `upd` row; the count must equal the plan's |
@@ -229,7 +242,7 @@ Why it is right, in order:
 1. K1 removes every destination row whose key the change set touches, except roots of moved rows. After it, the
    keys of the change set hold nothing but roots.
 2. K3 moves each root row to its final key and writes the key and every always-present column, in **one**
-   statement, so a permutation of keys (deferred swap, rotation) is a parallel assignment: the join reads the
+   statement, so a permutation of keys (a swap or rotation through a free key, moves that land on keys other moves leave) is a parallel assignment: the join reads the
    rows before any is changed. Nothing unchanged is written, nothing is read into the client.
 3. K5 writes, per column, the values the change set supplied, only for rows that carry one, and only where the
    value differs exactly. An unchanged value is never written (it is not in the SET list for that row) and never
@@ -237,7 +250,7 @@ Why it is right, in order:
 4. K6 inserts complete final rows; their keys are free after K1.
 
 Round trips (local form): a change set of complete images on a table with a key is K1 + K6 (insert-only: K6);
-on a table without a key L1 + L2; a lookup is added only for keys of undetermined `p`; partial images add K3 and
+on a table without a key L1 + L2; an insert-only change set is K1 (the check of 2.5) + K6; partial images add K3 and
 one K5 per supplied unchanged-possible column (the cost of "never written"; a single combined `SET c = CASE WHEN
 n.h THEN n.c ELSE t.c END` would be one statement but assigns unchanged columns their own value, see the report).
 The relation form adds the plan's tables (about 20 statements). Measured counts: `md_cases.json`,
@@ -349,7 +362,7 @@ unless another file is named).
   for the oracle, different for apply). The pipeline writes one member per source value, so the two agree on
   everything the pipeline writes; after a type change (P4) old values keep their member and stay distinct.
 * **9 (key change with unchanged values):** the old key on the create, chains resolved by links back to the root
-  (2.2), the root moved by K3 (3.2) or copied (3.4); chains, swaps through a third key, deferred swaps and
+  (2.2), the root moved by K3 (3.2) or copied (3.4); chains, swaps and rotations through a free key, form-only key changes and
   rotations, a key change back to the same key and onto a deleted key, within one change set and across two, in
   both modes: named cases and the property tests.
 
@@ -363,13 +376,20 @@ the report for the comparison.
 ## 8. How to run
 
 ```sh
-uv run -q pytest -q tests/apply                                                       # T0, a few seconds
-CDC_V2_APPLY_EXAMPLES=800 uv run -q pytest -q tests/apply/test_apply_property.py      # more examples, local
-CDC_V2_APPLY_FULL=1 uv run -q pytest -q tests/apply/test_apply_cases.py               # every case in both forms, local
+uv run -q pytest -q tests/apply      # default run: every named case (local form; relation form for catch-up and
+                                     # error cases), the regression cases, 3 examples per property, one small case
+                                     # of each negative control; about 7 s on this laptop
+CDC_V2_APPLY_FULL=1 CDC_V2_APPLY_EXAMPLES=300 CDC_V2_APPLY_SHAPE_SEEDS=25 uv run -q pytest -q tests/apply   # full
 CDC_V2_MD_PREFIX=cdc_v2_t_a_ tools/with-env uv run pytest -m md tests/apply          # MotherDuck
 CDC_V2_MD_PREFIX=cdc_v2_t_a_ CDC_V2_APPLY_PERF=1 tools/with-env uv run pytest -m md tests/apply -k speed
-uv run python tests/apply/apply_campaign.py --seconds 600                             # ledger, local
+uv run python tests/apply/apply_campaign.py --seconds 600 --controls 200            # campaign and controls, local
+uv run python tests/apply/apply_checkcost.py                                         # cost of check_new_keys
 ```
+
+Negative controls (`tests/apply/apply_controls.py`): the properties run against planners that are wrong on
+purpose and must catch each: (a) "the last record per key decides" for keyed tables, (b) plain GROUP BY on the
+values for keyless tables, (c) a catch-up that reports every key unresolved (bound of 2.3). The campaign records
+how many examples it took (`campaign_local.json`, `negative_controls_examples_to_catch`).
 
 ## 9. Evidence
 
@@ -378,7 +398,8 @@ uv run python tests/apply/apply_campaign.py --seconds 600                       
 | `duckdb_semantics.json` | section 5, local and MotherDuck side by side |
 | `md_cases.json` | every named case on MotherDuck, both forms, with statements and seconds |
 | `md_property.json` | property examples on MotherDuck |
-| `campaign_local.json` | the opt-in campaign's ledger |
+| `campaign_local.json` | the campaign: summary, seed range, every failing seed, the negative controls, the code version |
+| `check_new_keys_cost.json` | the cost of the stream start-state check (2.5) |
 | `shapes.json` | the SQL of every statement shape for a sample table |
 | `perf_md.json` | speed indications |
 
@@ -386,7 +407,7 @@ uv run python tests/apply/apply_campaign.py --seconds 600                       
 
 * History tables and soft deletes (SPEC 8.1, 8.2) are P4. The plan computes, per record, its arrival and the
   final row of each key; a history table needs exactly that, from the same pass over the change set.
-* The deferred-constraint ambiguity of 2.1 is a property of the stream.
+* A table with a deferrable key reaches apply as a table without a key (rule K, not this package).
 * A key column sent as "unchanged" (a TOASTed key) cannot be applied: `ApplyInvariantError`.
 * Speed is measured from this laptop only; Flight numbers are P9.
 * The relation form sends about 40 statements per change set (one CREATE TABLE and one DROP TABLE per plan step;

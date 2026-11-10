@@ -28,6 +28,24 @@ def test_case(case, form):
     run_case(case, _SHARED[0].cursor(), form, table="t%d" % len(_SHARED))
 
 
+_CUT = [c for c in _ALL if c.meta.has_key and c.mode == "stream" and not c.error]
+
+
+@pytest.mark.parametrize("case", [c for i, c in enumerate(_CUT) if _FULL or i % 5 == 0], ids=lambda c: c.name)
+def test_case_cut_at_every_boundary(case):
+    """Fix round item 4: the case's records cut at every boundary that keeps a key change's d and c together, each
+    piece applied in turn in one transaction, give the expected table (CDC_V2_APPLY_FULL=1: every keyed case)."""
+    from apply_harness import SCHEMA, apply_sets, create_table, cut_all, dest_canon
+    from apply_sim import literal_rows_canon
+    from cdc_v2.apply import Target
+    conn = local_conn()
+    create_table(conn, SCHEMA, "t", case.meta, case.start)
+    pieces = cut_all([r for s in case.sets for r in s])
+    apply_sets(conn, Target(SCHEMA, "t"), case.meta, pieces, one_tx=True)
+    assert dest_canon(conn, Target(SCHEMA, "t"), case.meta) == literal_rows_canon(list(case.meta.columns),
+                                                                                    case.expect)
+
+
 def test_record_without_seq_is_refused():
     import pyarrow as pa
     from apply_cases import START, T, R, row
