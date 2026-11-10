@@ -613,6 +613,21 @@ def test_connect_has_a_deadline_and_tries_again(dest, faults):
 
 
 # ------------------------------------------------------------------------------------------- registry, take-over
+#: An interrupt answers before the server has let go of the rows of the transaction it ended (seeded by the run of
+#: 2026-11-10: a writer that came right after the interrupt got `Conflict`; a take-over needed a third attempt).
+#: So a test asserts that the row is free within this time, not at once. Without the interrupt it is never free:
+#: the old transaction of these tests belongs to a client that is alive.
+FREE_WITHIN_S = 10.0
+
+
+def won_after_conflicts_only(report):
+    """A take-over that interrupted won: at least one conflict, at least one connection interrupted, every attempt
+    before the last one ended with a conflict, and it took less than `FREE_WITHIN_S`. How many conflicts it met is
+    a measurement (1 or 2 so far); the evidence records it."""
+    return (report["conflicts"] >= 1 and report["interrupted"] >= 1 and report["unknown"] == 0
+            and report["attempts"] == report["conflicts"] + 1 and report["seconds"] < FREE_WITHIN_S)
+
+
 def test_an_open_transaction_of_the_old_run_blocks_a_take_over_until_it_is_interrupted(led, evidence):
     """Task: "a transaction left open on an abandoned connection blocks a take-over without this and does not
     with it". The old run's transaction has changed the heartbeat row, which the take-over writes."""
@@ -628,7 +643,7 @@ def test_an_open_transaction_of_the_old_run_blocks_a_take_over_until_it_is_inter
             assert without["conflicts"] >= 3 and without["interrupted"] == 0
             assert td.read_leader(led.settings)["epoch"] == led.epoch
             assert led.take_over(timeout_s=20.0, report=with_) == led.epoch + 1
-            assert with_["conflicts"] == 1 and with_["interrupted"] >= 1 and with_["attempts"] == 2
+            assert won_after_conflicts_only(with_)
             tx.execute(BUMP)                                    # the old run learns it at its next statement
     assert value(c) == 0
     assert c.fetchone("SELECT phase FROM _cdc.heartbeat") == ("starting",)
@@ -661,8 +676,17 @@ def test_an_open_transaction_that_holds_only_data_rows_does_not_block_the_take_o
                     tx2.execute(BUMP)                           # the old run's open transaction holds the row
             listed, done = md.interrupt_earlier(c, new_epoch)
             assert listed >= 2 and done >= 1                    # control (migrations) and stream of the old epoch
-            with new.transaction() as tx2:
-                tx2.execute(BUMP)
+            t0, conflicts = time.monotonic(), 0
+            while True:                                         # the row is free a moment after the interrupt
+                try:
+                    with new.transaction() as tx2:
+                        tx2.execute(BUMP)
+                    break
+                except md.Conflict:
+                    conflicts += 1
+                    assert time.monotonic() - t0 < FREE_WITHIN_S, "%d conflicts after the interrupt" % conflicts
+                    time.sleep(0.1)
+            free_s = time.monotonic() - t0
             assert value(c) == 1
             tx.execute(BUMP)
     assert value(c) == 1 and fence(c) == (new_epoch, 1)
@@ -671,6 +695,8 @@ def test_an_open_transaction_that_holds_only_data_rows_does_not_block_the_take_o
         "take_over": dict(rep, result="won without a conflict"),
         "new_run_updating_the_same_row": "Conflict until md.interrupt_earlier(conn, new_epoch) ran",
         "interrupt_earlier": {"listed": listed, "interrupted": done},
+        "new_run_after_the_interrupt": {"conflicts": conflicts, "row_free_after_s": round(free_s, 2),
+                                        "pause_between_tries_s": 0.1},
         "old_run_at_its_next_statement": "ConnectionLost"})
 
 
@@ -694,7 +720,7 @@ def test_a_commit_that_hangs_holds_the_fence_row_until_the_take_over_interrupts_
             led.take_over(interrupt=False, timeout_s=5.0, report=without)
         assert without["conflicts"] >= 3
         assert led.take_over(timeout_s=20.0, report=with_) == led.epoch + 1
-        assert with_["conflicts"] == 1 and with_["interrupted"] >= 1
+        assert won_after_conflicts_only(with_)
     finally:
         faults.clear()
     t.join(60)
@@ -771,6 +797,7 @@ def test_starters_at_once_end_with_exactly_one_row_set(no_leftovers, evidence, t
         what="Simultaneous initialisation of the leader tables on MotherDuck")
 
 
+ROUNDS_AFTER_INTERRUPT = 5
 LISTED_SQL = ("SELECT count(*), coalesce(bool_and(contains(client_user_agent, ?)), false) "
               "FROM md_active_server_connections() WHERE client_connection_id = ?::UUID")
 
@@ -804,15 +831,37 @@ def test_what_the_server_lists_and_what_an_interrupt_answers(dest, evidence):
         begin_s = time.monotonic() - t0
         assert look("after BEGIN alone") == {"listed": 0, "interrupt_answers": False}
         other.execute(BUMP)
-        assert look("open transaction with one statement, idle") == {
-            "listed": 1, "user_agent_carries_the_marker": True, "interrupt_answers": True}
-        again = look("the same transaction after the interrupt, before the client sent anything")
-        assert again["interrupt_answers"] is True               # the server keeps the entry until the client comes
-        ok, text, kind, _s = raw_try(other, BUMP)
-        assert not ok and kind == "transport", text
-        rows["the client's next statement"] = {"error": text, "class": kind}
-        raw_try(other, "ROLLBACK")
-        assert look("after the client heard of the interrupt") == {"listed": 0, "interrupt_answers": False}
+        after, held = [], []
+        for round_no in range(ROUNDS_AFTER_INTERRUPT):
+            if round_no:                                        # a new transaction on the same client connection
+                t1 = time.monotonic()
+                other.execute("BEGIN")
+                while not raw_try(other, BUMP)[0]:              # the row of the round before is still held
+                    assert time.monotonic() - t1 < FREE_WITHIN_S
+                    raw_try(other, "ROLLBACK")
+                    time.sleep(0.1)
+                    other.execute("BEGIN")
+                held.append(round(time.monotonic() - t1, 2))
+            assert look("open transaction with one statement, idle") == {
+                "listed": 1, "user_agent_carries_the_marker": True, "interrupt_answers": True}
+            # What the server says right after the interrupt is recorded and not asserted: in the first runs it
+            # kept the entry until the client came (a second interrupt answered true); on 2026-11-10 it did not.
+            again = dict(look("the same transaction after the interrupt, before the client sent anything"))
+            time.sleep(1.0)
+            again["listed_1s_later"] = look("the same transaction 1 s later", interrupt=False)["listed"]
+            after.append(again)
+            ok, text, kind, _s = raw_try(other, BUMP)
+            assert not ok and kind == "transport", text
+            rows["the client's next statement"] = {"error": text, "class": kind}
+            raw_try(other, "ROLLBACK")
+            assert look("after the client heard of the interrupt") == {"listed": 0, "interrupt_answers": False}
+        del rows["the same transaction 1 s later"]
+        rows["the same transaction after the interrupt, before the client sent anything"] = {
+            "rounds": len(after),
+            "still_listed_at_once": sum(a["listed"] for a in after),
+            "a_second_interrupt_answered_true": sum(a["interrupt_answers"] for a in after),
+            "still_listed_1s_later": sum(a["listed_1s_later"] for a in after),
+            "next_transaction_on_the_same_row_began_after_s": held}
         t, box = in_thread(lambda: other.execute(SLOW % 8000).fetchall())
         time.sleep(1.5)
         assert look("statement in flight") == {
