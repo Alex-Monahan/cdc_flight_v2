@@ -11,5 +11,6 @@ from cdc_v2.pg.conn import PgConnection, SessionSettingsMismatch, connect
 from cdc_v2.pg.settings import (FIXED_SESSION_SETTINGS, NodeSettings, Password, SourceSettings, configure,
                                 configured)
 
-__all__ = ["catalog", "errors", "heartbeat", "preflight", "publication", "replica_identity", "slot", "timeline", "connect", "PgConnection", "SessionSettingsMismatch", "NodeSettings", "Password", "SourceSettings",
+__all__ = ["catalog", "errors", "heartbeat", "preflight", "publication", "replica_identity", "slot", "timeline",
+           "connect", "PgConnection", "SessionSettingsMismatch", "NodeSettings", "Password", "SourceSettings",
            "configure", "configured", "FIXED_SESSION_SETTINGS"]

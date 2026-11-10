@@ -66,7 +66,7 @@ def test_create_on_standby_nudged_by_a_write_of_our_own(cluster, scratch):
     assert f.plugin == "pgoutput" and f.slot_type == "logical" and not f.temporary and not f.two_phase
     assert f.confirmed_flush_lsn == c.consistent_point and f.server.in_recovery
     record("slot_create", "standby_write_nudge_after_idle_s", round(c.seconds, 2))
-    assert c.seconds < 20
+    assert c.seconds < 35                                  # up to two background-writer cycles of 15 s
 
 
 def test_create_on_standby_with_granted_standby_snapshot(cluster, scratch):
@@ -94,13 +94,29 @@ def test_create_on_idle_primary_without_nudge_times_out_and_leaves_nothing(break
     c.q("primary", "create table if not exists cdc_v2_idlep (id int primary key)")
     c.q("primary", "create publication cdc_v2_pub_idlep for table cdc_v2_idlep")
     c.replay_to_primary()
-    stby = c.connect("replica", cancel_grace_s=0.5)
-    idle_primary(c)
-    t = time.monotonic()
-    with pytest.raises(slot.SlotCreateTimeout) as ei:
-        slot.create(stby, "cdc_v2_slot_idlep", D(4), nudge=None)
-    took = time.monotonic() - t
-    rep = ei.value.report
+    attempts = []
+    for _ in range(3):
+        stby = c.connect("replica", cancel_grace_s=0.5)
+        idle_primary(c)
+        before = c.boot("primary", "select pg_current_wal_insert_lsn()::text")[0][0]
+        t = time.monotonic()
+        try:
+            slot.create(stby, "cdc_v2_slot_idlep", D(4), nudge=None)
+        except slot.SlotCreateTimeout as e:
+            took, rep = time.monotonic() - t, e.report
+            break
+        after = c.boot("primary", "select pg_current_wal_insert_lsn()::text")[0][0]
+        # inconclusive only if the primary wrote WAL during the attempt (something else woke the bgwriter)
+        assert after != before, "the creation finished on an idle primary without any new WAL"
+        db = c.info["database"]
+        c.boot("primary", "create extension if not exists pg_walinspect", db=db)
+        recs = c.boot("primary", "select resource_manager, record_type, record_length from "
+                                 "pg_get_wal_records_info(%s, %s)", (before, after), db=db)
+        attempts.append({"created_anyway_primary_wal_moved": [before, after], "records": [list(r) for r in recs]})
+        slot.drop(stby, "cdc_v2_slot_idlep", D())
+    else:
+        record("slot_create", "idle_primary_no_nudge", {"inconclusive_attempts": attempts})
+        pytest.skip("the primary did not stay idle during 3 attempts (records: %r)" % attempts)
     assert rep["leftover"] is False and took < 4 + 6
     with c.connect("replica") as cc:
         assert slot.facts(cc, "cdc_v2_slot_idlep", deadline=D()) is None
@@ -111,6 +127,7 @@ def test_create_on_idle_primary_without_nudge_times_out_and_leaves_nothing(break
     with c.connect("replica") as cc:
         assert slot.facts(cc, "cdc_v2_slot_idlep", deadline=D()) is None
     record("slot_create", "idle_primary_no_nudge", {"deadline_s": 4, "returned_after_s": round(took, 2),
+                                                    "inconclusive_attempts": attempts,
                                                     "report": rep})
 
 

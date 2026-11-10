@@ -16,7 +16,8 @@ Modules under `src/cdc_v2/pg/`:
 | `replica_identity.py` | `set_full`, `problem` |
 | `slot.py` | `create`, `drop`, `facts` → `SlotFacts`, `server_facts`, `terminate_holder`, `timeline_history`, `nudge_method` |
 | `timeline.py` | `parse_history`, `contains` |
-| `heartbeat.py` | `beat` → `HeartbeatWrite`, `setup_sql`, `standby_lag` |
+| `heartbeat.py` | `beat` → `HeartbeatWrite`, `ensure`, `check`, `setup_sql`, `standby_lag` |
+| `preflight.py` | `check` → `Preflight`: what a node must offer the runtime role (§6a) |
 | `sql.py` | identifier quoting |
 
 ## 1. Connections
@@ -356,13 +357,129 @@ Shown by test: the runtime role cannot run `publication.ensure` or `set_full` (`
 `publication.state`, can terminate the walsender of its own role holding our slot, can call `TIMELINE_HISTORY`, and
 sees `pg_control_system()`/`pg_control_checkpoint()`.
 
+## 6a. Pre-flight
+
+`preflight.check(conn, *, deadline) -> Preflight(in_recovery, control_checkpoint_callable, checkpoint_next_xid,
+control_system_callable, replication_role, wal_level, hot_standby_feedback, primary_slot_name,
+recovery_min_apply_delay_ms, replay_paused, problems)`, run as the role that will use the node:
+
+- `pg_control_checkpoint()` must be callable: the backfill reads its `next_xid` once per connection on the server it
+  reads from (a standby that has just started can hide a committed transaction until it replays its next commit; the
+  cut is used only when the snapshot's `xmax` is at or above that value). `checkpoint_next_xid` is the 64-bit value
+  (`epoch << 32 | xid` from the `epoch:xid` text). Shown by test: the runtime role can call it on the primary and on
+  the standby, on 18 and 16, with the default privileges (EXECUTE for PUBLIC). Where a provider has revoked it, the
+  grant needed is `GRANT EXECUTE ON FUNCTION pg_catalog.pg_control_checkpoint() TO <runtime role>` on the primary
+  (it replicates to the standbys); the test revokes it from PUBLIC, sees the problem named, grants it to the runtime
+  role and sees it pass. The same for `pg_control_system()`.
+- the REPLICATION attribute; `wal_level = logical`; on a standby `hot_standby_feedback = on`, a
+  `primary_slot_name`, no `recovery_min_apply_delay`, replay not paused (H-042, H-044; test with feedback off).
+
 ## 7. Answers to the [test] points and measurements
 
-FILLED FROM EVIDENCE
+Postgres 18.6 and 16.6 (`localpg_pg18.json`, `localpg_pg16.json`). Postgres 17 is not installed on this machine:
+the 17 column list of `slot.facts` (`invalidation_reason`, `inactive_since`, `failover`, `synced` present,
+`two_phase_at` absent) is written from the documentation and **not run**.
+
+| Point | Answer | Evidence key |
+|---|---|---|
+| Bracket on a standby (H-008) | 0 violations in either direction over 125–160 observations of 400 DDLs per run, on 18 and 16; the negative control (upper bound read before the observing statement) was caught 230–290 times per run | `bracket.standby` |
+| Bracket on a primary | upper bound: 0 violations in every run; lower bound: 0 in the committed runs, but 12 cases in an earlier run of the same test on 18 (a DDL whose commit ended before `b` was not yet visible; that run's file was overwritten by the final one) — as predicted, the lower bound is not a guarantee on a primary; use `visible(xid)` | `bracket.primary` |
+| Observation cost, 1,000 tables × 30 columns | p50 ≈ 0.07 s, max ≈ 0.1 s on standby and primary (one round trip; local); a single observation of a few hundred names ≈ 0.006–0.01 s | `observe_cost`, `bracket.*.observe_p50_s` |
+| Session settings vs `ALTER ROLE/DATABASE … SET` | held, on SQL and replication connections, primary and standby | `session_settings` |
+| Deadlines with the fault proxy (grace 0.5 s) | black hole: connect (deadline 1.5 s) 2.0 s, statement (1.0 s) 1.5 s, idle in transaction (1.0 s) 1.5 s and the server session gone after ≈ 2.1 s; reset and refused: < 1 ms; 0.2 s delay each way: statement 0.40 s; `pg_sleep(30)` with 0.5 s: 0.51 s | `proxy`, `deadlines` |
+| Recovery conflict | `RecoveryConflict` (40001) after `max_standby_streaming_delay` = 30 s | `errors.recovery_conflict` |
+| Slot creation on a standby, idle primary | `write` nudge (runtime role): 2.3–21.7 s across runs (one or two background-writer cycles of 15 s; 6.9 s in the final 18 run); `standby_snapshot` granted: 0.02–0.2 s; no nudge on an idle primary (autovacuum off): times out at the deadline, nothing left (an attempt during which the primary wrote WAL anyway is retried and recorded) | `slot_create.*` |
+| … long transaction on the primary | times out at the deadline (6 s), report names `oldest_running_xid` = the open transaction; succeeds 11–15 s after its commit | `slot_create.long_transaction` |
+| … prepared transaction | times out, `prepared_transactions = 1`; succeeds ≈ 7.6–8 s after `COMMIT PREPARED` | `slot_create.prepared_transaction` |
+| … client killed while waiting (creation verified waiting at the kill) | with `client_connection_check_interval` no slot appears; negative control without it: the slot appears later | `slot_create.killed_client` |
+| `pg_control_checkpoint()` as the runtime role | callable on primary and standby, 18 and 16 (default EXECUTE for PUBLIC); the grant if revoked: see §6a | `preflight` |
+| Holder visible to the runtime role | yes, primary and standby, `backend_start` to the µs, without `pg_read_all_stats` | `slot_facts.holder_visible_to_runtime_*` |
+| `pg_replication_slot_advance` in the facts | `confirmed_flush_lsn` moved to the target exactly | `slot_facts.advance_seen` |
+| Invalidation by `max_slot_wal_keep_size` (standby slot, restartpoint) | 18: `wal_status = lost`, `invalidation_reason = wal_removed`, `conflicting = false`, `restart_lsn` NULL; **16: `wal_status = lost`, `conflicting = true`**, no reason column | `invalidation.max_slot_wal_keep_size` |
+| Idle timeout (18, `idle_replication_slot_timeout = 1s`) | primary slot and standby slot both invalidated (`idle_timeout`); the standby slot at a restartpoint | `invalidation.idle_timeout_pg18` |
+| Timeline history after a real promotion | switch point found by the runtime role over `replication=database`; `contains`: before → true, after on the old timeline → false, new timeline → true | `timeline.promotion` |
+| Publication add under writers, `next_xid` | every transaction with id ≥ `next_xid` decoded (≈ 446 of ≈ 893); see the finding on the open transaction below | `publication.add_under_writers` |
+| Heartbeat | decoded, recognised by marker and xid, commit inside `[lower, upper]`; own `END` == `position` in 4 of 4 beats; ≈ 230 WAL bytes per write; table stays at one row per slot (3 pages after 200 writes) | `heartbeat.*` |
+
+**Slot identity** (design open point 6). No fact identifies one incarnation of a slot, on 16 or 18. After a drop and a
+recreate under the same name: `restart_lsn`, `confirmed_flush_lsn` and `catalog_xmin` are those of the new creation
+point (later than the original's, but the same slot also moves forward, so a later value proves nothing);
+`inactive_since` (17+) is just the time of the last release; `stats_reset` is NULL on both; the statistics
+(`total_txns`, `total_bytes`) start again from 0 — but they are also reset by `pg_stat_reset_replication_slot()` and
+lost by a crash restart, so a drop to 0 is a hint, not a proof. The slot's state file is not readable through SQL
+without superuser rights. So continuity rests on what design section 8 and plan 6.2 already say: same system
+identifier, applied position on the timeline history, a valid slot of our plugin and database, and
+`confirmed_flush_lsn ≤` applied position; a recreated slot that is not ahead has lost nothing.
+
+**Findings that differ from the research documents, the hazard list or the design**
+
+1. Design 7.5 says that changes written before a table joins the publication are not published even if their
+   transaction commits later. Measured on 18 and 16: a transaction that wrote a row **before** the
+   `ALTER PUBLICATION … ADD TABLE` and another after it, and committed after it, had **both** rows decoded. The rule
+   "first snapshot with `xmin ≥ next_xid`" stays correct (that transaction's id is below `next_xid`, so the snapshot
+   waits for it and contains its rows; the cut then treats its stream rows as inside).
+2. On 16, a standby slot invalidated by `max_slot_wal_keep_size` shows `conflicting = true` (the research note
+   says `conflicting` is true only for recovery conflicts). On 18 it is false with `invalidation_reason =
+   wal_removed`. `SlotFacts.invalid` treats any of `wal_status = lost`, a reason, or `conflicting` as invalid.
+3. On a primary the observation's lower bound is not a guarantee (finding 12 cases in one run); see §2.
+4. `pg_stat_wal_receiver` columns other than `pid` are hidden from the runtime role, so a standby's timeline in
+   `slot.facts` comes from `pg_control_checkpoint()` and can lag behind a timeline switch until the next
+   restartpoint; `IDENTIFY_SYSTEM` gives the exact one.
+5. `system_identifier` is equal on a primary and its standbys: it does not tell one replica from another (H-047).
+6. Slot creation that is abandoned by a dead client finishes later unless `client_connection_check_interval` is set
+   (fixed in `create`). A creation abandoned on a dead network path (no FIN reaches the server) can still finish
+   later; the result is a fresh, unused slot of our name whose `confirmed_flush_lsn` is its consistent point.
+7. The background writer's 15 s cadence makes the `write` nudge take up to two cycles (21.7 s measured once on
+   16); with `pg_log_standby_snapshot` granted it is below 1 s. Package V's slot-creation deadline must be well above
+   30 s (the default of 120 s is).
+8. `idle_replication_slot_timeout` (18) invalidates ordinary slots on a standby too (at a restartpoint), as H-037
+   says; reading the setting is in `ServerFacts.idle_replication_slot_timeout_s`.
+9. Heartbeat statistics: `pg_stat_user_tables` update counters were not yet flushed when read (0); the table size
+   (3 pages after 200 writes) is the evidence that it stays small.
 
 ## 8. Contract notes
 
-FILLED
+Readings of C7 where it left something open (simplest reading taken):
+
+1. Every function takes an already open `PgConnection` (`node`, `conn`, `primary`), not a target name; `connect` is
+   the only place where names are resolved. `connect(target, deadline, *, replication=False, settings=None,
+   application_name=None)`: `target` may also be a `NodeSettings`; names come from `pg.configure(SourceSettings)`.
+2. Every call takes a `deadline` (keyword where C7 shows none), as C0 requires.
+3. `slot.facts` returns `None` for a missing slot (the task's signature); `slot.server_facts` gives the server part.
+4. `slot.create` takes `primary=` (a connection to the primary) for the running-transactions request, and returns
+   `CreatedSlot` (the consistent point and how it was reached).
+5. `slot.terminate_holder(node, name, deadline, *, expect=None)` returns `TerminateResult`; `expect` lets the
+   attach step terminate only the previous engine.
+6. `slot.timeline_history(node, timeline=None, *, deadline)` returns `TimelineHistory` (with the system identifier
+   and position of `IDENTIFY_SYSTEM`).
+7. `catalog.tables(conn, include, *, publication, deadline)` and `catalog.observe(node, names, *, publication,
+   deadline)`: `names` are the replicated names (absent ones are reported in `absent`); tables in the publication are
+   always included.
+8. The observation reads its facts in one statement instead of a REPEATABLE READ transaction: the same snapshot
+   semantics with one round trip (§2).
+9. `heartbeat.beat(primary, deadline, *, slot='cdc_v2_slot')`: one row per slot name, so that two pipelines on one
+   source do not share a marker row.
+10. `publication.ensure` and `replica_identity.set_full` need the setup role (ownership); the runtime role gets
+    `PermissionDenied`.
+11. Tests use the TCP fault proxy on this package's own ports (55644–55647 / 55652–55655) by setting
+    `cdc_v2.testing.netproxy.PORT_FIRST/PORT_LAST` in the test: `NetProxy` refuses ports outside 55440–55459.
+    A port-range parameter in `NetProxy` would remove that.
+
+**What packages V, B, S, T and Y must know that C7 does not say**
+
+- V: use `SlotFacts.holder` (pid, start µs) for the attach rule; `terminate_holder(…, expect=…)`; `'holder unknown'`
+  means another role holds the slot; `SlotCreateTimeout.report`; a leftover slot of our name after an abandoned
+  creation is a fresh slot (`confirmed_flush_lsn` = consistent point); `wal_sender_timeout_ms` is in the facts; no
+  slot identity exists (above); `timeline.contains` wants end-of-record positions.
+- B: read connections pin the session settings of §1 (the backfill's text form); `row_security = off` makes an RLS
+  filtered read fail (H-039); `RecoveryConflict` is "read again"; `conn.guard(deadline, …)` wraps raw psycopg COPY.
+  `SourceTable.relfilenode` and `key_attnums` (without INCLUDE columns).
+- S: `heartbeat.beat` returns `position`; recognise a beat by an `END` with `ack_position ≥ position`;
+  `heartbeat.check` before the stream starts; xids are compared on their low 32 bits.
+- T: `catalog.observe` on the standby gives the bracket; on a primary use `visible(xid)`; `TableFacts.identity`
+  excludes `relfilenode`; `published` includes membership through a partition ancestor; `publication.has_table`.
+- Y: the session settings table of §1 (IntervalStyle `iso_8601`, DateStyle `ISO, YMD`, `extra_float_digits = 3`,
+  `bytea_output = hex`, TimeZone UTC, `lc_monetary = C`).
 
 ## 9. Crash points and fault sites
 
@@ -371,3 +488,18 @@ deadline) and `pg.execute` (inside the statement guard, so an injected `OSError`
 points `pg.slot_created`, `pg.slot_dropped`, `pg.holder_terminated`, `pg.publication_changed`,
 `pg.replica_identity_set`, each after the step that changed state on the source. They are reached only by the
 callers' crash suites (V, T, S); a declared point that their runner never reaches is a failure of that suite.
+
+## 10. Running the tests
+
+```sh
+uv run -q pytest -q tests/pg_source/test_pg_hermetic.py                        # default run (T0): ≈ 1 s
+uv run pytest -m localpg tests/pg_source                                        # Postgres 18: pg-p (55640) + pg-p2
+CDC_V2_P_PG_MAJOR=16 uv run pytest -m localpg tests/pg_source                   # Postgres 16: pg-p2 (55648)
+CDC_V2_P_EVIDENCE=1 …                                                           # also writes evidence/p3/source/
+```
+
+The `localpg` suite builds or starts its own pairs through `tools/localpg`, runs ≈ 8 minutes per version (the
+recovery-conflict test waits 30 s; slot-creation tests wait for an idle primary, 17 s each), removes every schema,
+publication and slot it created, and stops its clusters at the end. Tests that reconfigure or promote use the
+breakable pair (`pg-p2`), which is rebuilt after each of them. Do not run the two versions at the same time (they
+share `pg-p2`).
