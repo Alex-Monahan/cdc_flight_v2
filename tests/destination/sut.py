@@ -126,13 +126,19 @@ class SourceWriter:
 
 # ---------------------------------------------------------------------------------------------------- the check
 def read_state(raw, lanes=LANES):
-    """Positions and data of the destination: ``{lane: {"pos", "n", "rows": [(seq, payload, epoch, tag)]}}``."""
+    """Positions and data of the destination: ``{lane: {"pos", "n", "rows": [(seq, payload, epoch, tag)]}}``.
+    Read in one transaction, so that a commit that lands between two statements cannot tear the picture."""
     out = {}
-    pos = {r[0]: (int(r[1]), int(r[2])) for r in raw.execute("SELECT lane, pos, n FROM sut.position").fetchall()}
-    for lane in lanes:
-        rows = raw.execute("SELECT seq, payload, epoch, tag FROM sut.data WHERE lane = ? ORDER BY seq, epoch, tag",
-                           [lane]).fetchall()
-        out[lane] = {"pos": pos[lane][0], "n": pos[lane][1], "rows": [(int(r[0]), r[1], int(r[2]), r[3]) for r in rows]}
+    raw.execute("BEGIN")
+    try:
+        pos = {r[0]: (int(r[1]), int(r[2])) for r in raw.execute("SELECT lane, pos, n FROM sut.position").fetchall()}
+        for lane in lanes:
+            rows = raw.execute("SELECT seq, payload, epoch, tag FROM sut.data WHERE lane = ? ORDER BY seq, epoch, tag",
+                               [lane]).fetchall()
+            out[lane] = {"pos": pos[lane][0], "n": pos[lane][1],
+                         "rows": [(int(r[0]), r[1], int(r[2]), r[3]) for r in rows]}
+    finally:
+        raw.execute("ROLLBACK")
     return out
 
 
