@@ -876,3 +876,16 @@ def test_cleanup_and_interrupt_earlier_with_real_server_connections(led):
     assert value(c) == 4
     assert registry.cleanup(c, 3) == 2
     assert c.fetchall("SELECT DISTINCT epoch FROM _cdc.connections ORDER BY 1") == [(2,), (3,)]
+
+
+# --------------------------------------------------------------------------------------------- test databases
+def test_a_test_database_is_in_the_ledger_until_it_is_dropped():
+    """Every database of these tests is created through `cdc_v2.testing.md`, which keeps a ledger. After a run the
+    ledger says, by name, whether a database of this package is left (`td.leftover_databases`)."""
+    with td.motherduck_destination(MD_PREFIX, leader_tables=False) as dest:
+        name = dest.settings.database
+        assert name.startswith(MD_PREFIX) and name in td.leftover_databases(MD_PREFIX)
+        conn = dest.connect("look")
+        assert conn.fetchone("SELECT current_database()")[0] == name
+        conn.close()
+    assert name not in td.leftover_databases(MD_PREFIX)

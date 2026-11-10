@@ -22,6 +22,7 @@ from cdc_v2.deadline import Deadline, DeadlineExceeded
 from cdc_v2.md import errors as md_errors
 from cdc_v2.md import registry
 from cdc_v2.md.connection import _interrupt_local
+from cdc_v2.testing import md as test_databases
 
 READ_LEADER_SQL = "SELECT epoch, state, run_id, flight_id, run_number FROM _cdc.leader"
 TAKEOVER_LEADER_SQL = (
@@ -213,12 +214,28 @@ def local_destination(leader_tables=True, **overrides):
         dest.close()
 
 
-def _admin(sql):
-    con = duckdb.connect("md:")
+def create_database(name):
+    """Create the MotherDuck test database ``name``. `cdc_v2.testing.md` is the one place that creates and drops
+    test databases: it checks the name, has a deadline, and writes a ledger entry **before** it creates, so that a
+    database which a killed test left behind is found by its name (`leftover_databases`), without listing the
+    account. Returns the name."""
+    if not isinstance(name, str) or not name:
+        raise ValueError("a test database needs a name")
+    return test_databases.create_database(name)
+
+
+def drop_database(name):
+    """Drop the test database ``name`` if it exists, and remove its ledger entry."""
+    test_databases.drop_database(name)
+
+
+def leftover_databases(prefix):
+    """The ledger entries that start with ``prefix``: test databases that were created and not dropped yet (also
+    the ones of a test that is running now). Reads only the ledger; it opens no connection."""
     try:
-        con.execute(sql)
-    finally:
-        con.close()
+        return sorted(p.name for p in test_databases.LEDGER.iterdir() if p.name.startswith(prefix))
+    except FileNotFoundError:
+        return []
 
 
 @contextlib.contextmanager
@@ -232,8 +249,8 @@ def motherduck_destination(prefix, leader_tables=True, **overrides):
     opts = dict(statement_deadline_s=30.0, transaction_deadline_s=60.0, rollback_deadline_s=5.0, grace_s=2.0)
     opts.update(overrides)
     settings = md.Settings(database=name, **opts)
-    _admin("CREATE DATABASE " + name)
-    dest = Destination(settings, drop=lambda: _admin("DROP DATABASE IF EXISTS " + name))
+    create_database(name)
+    dest = Destination(settings, drop=lambda: drop_database(name))
     try:
         if leader_tables:
             conn = dest.connect("init")

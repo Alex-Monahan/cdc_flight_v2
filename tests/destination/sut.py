@@ -432,7 +432,7 @@ class SutAdapter(crash.Adapter):
         self.dir = workdir
         self.database = "%s%s" % (self.prefix, uuid.uuid4().hex[:12])
         type(self).created.append(self.database)
-        td._admin("CREATE DATABASE " + self.database)
+        td.create_database(self.database)
         self.writer = SourceWriter(os.path.join(workdir, "source.jsonl"))
 
     def start(self, tag, env):
@@ -478,7 +478,7 @@ class SutAdapter(crash.Adapter):
                 pass
             self.raw = None
         if self.database is not None:
-            td._admin("DROP DATABASE IF EXISTS " + self.database)
+            td.drop_database(self.database)
 
 
 if __name__ == "__main__":

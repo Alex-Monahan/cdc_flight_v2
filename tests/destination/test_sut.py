@@ -61,3 +61,49 @@ def test_the_check_sees_a_double_application_and_a_gap():
     assert "stream: 1 events applied more than once" in text
     assert "control: counter 3 differs from position 2" in text and "control: data rows differ" in text
     assert "backfill.0: data rows differ" in text
+
+
+# ------------------------------------------------------------------------- test support: MotherDuck test databases
+def test_a_test_database_is_in_the_ledger_from_before_it_is_created_until_it_is_dropped(tmp_path, monkeypatch):
+    """The md tests create and drop their databases through `cdc_v2.testing.md` (shared with the oracle's tests):
+    one place, and a ledger entry before the database is created. A database that a killed test left behind is
+    then found by its name; nothing lists the account. Here without MotherDuck: the statement is recorded."""
+    import pytest
+    from cdc_v2.testing import destination as td
+    from cdc_v2.testing import md as tmd
+    monkeypatch.setattr(tmd, "LEDGER", tmp_path / "ledger")
+    monkeypatch.delenv("CDC_V2_MD_PREFIX", raising=False)
+    sent = []
+
+    def record(sql):
+        assert sql.startswith("DROP") or sql.split()[-1] in td.leftover_databases("cdc_v2_t_"), "ledger first"
+        sent.append(sql)
+    monkeypatch.setattr(tmd, "_workspace_statement", record)
+    assert td.leftover_databases("cdc_v2_t_d_") == []
+    name = td.create_database("cdc_v2_t_d_0123abcd")
+    assert name == "cdc_v2_t_d_0123abcd"
+    td.create_database("cdc_v2_t_x_0123abcd")                   # another package's database is not listed as ours
+    assert td.leftover_databases("cdc_v2_t_d_") == [name]
+    td.drop_database(name)
+    assert td.leftover_databases("cdc_v2_t_d_") == []
+    assert sent == ["CREATE DATABASE cdc_v2_t_d_0123abcd", "CREATE DATABASE cdc_v2_t_x_0123abcd",
+                    "DROP DATABASE IF EXISTS cdc_v2_t_d_0123abcd"]
+    for bad in ("some_other_db", "cdc_v2_t_d_x; DROP DATABASE y", "cdc_v2_prod"):
+        with pytest.raises(tmd.DestinationError):               # never a name outside the test prefix
+            td.create_database(bad)
+        with pytest.raises(tmd.DestinationError):
+            td.drop_database(bad)
+    for bad in ("", None):
+        with pytest.raises(ValueError):                         # and never a name that this code did not choose
+            td.create_database(bad)
+    assert len(sent) == 3
+
+    def fails(sql):
+        raise RuntimeError("no answer")
+    monkeypatch.setattr(tmd, "_workspace_statement", fails)
+    with pytest.raises(RuntimeError):
+        td.create_database("cdc_v2_t_d_4567abcd")
+    assert td.leftover_databases("cdc_v2_t_d_") == ["cdc_v2_t_d_4567abcd"]      # it may exist: the entry stays
+    with pytest.raises(RuntimeError):
+        td.drop_database("cdc_v2_t_d_4567abcd")
+    assert td.leftover_databases("cdc_v2_t_d_") == ["cdc_v2_t_d_4567abcd"]      # not dropped: the entry stays

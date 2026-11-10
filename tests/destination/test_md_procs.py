@@ -139,7 +139,7 @@ class Scene:
         self.writer = sut.SourceWriter(os.path.join(self.dir, "source.jsonl"), self.lanes)
         self.settings = md.Settings(database=self.database, marker=sut.MARKER)
         self._raw = None
-        td._admin("CREATE DATABASE " + self.database)       # the last statement: nothing to drop when it fails
+        td.create_database(self.database)       # the last statement: nothing to drop when it fails
 
     def hits(self, tag):
         return os.path.join(self.dir, "hits-%s.jsonl" % tag)
@@ -196,7 +196,7 @@ class Scene:
             except duckdb.Error:
                 pass
             finally:
-                td._admin("DROP DATABASE IF EXISTS " + self.database)
+                td.drop_database(self.database)
 
 
 @pytest.fixture
@@ -779,7 +779,7 @@ def test_crash_runner_over_the_sut(tmp_path, evidence):
     finally:
         for name in list(sut.SutAdapter.created):            # once more, whatever happened
             assert name.startswith(MD_PREFIX)
-            td._admin("DROP DATABASE IF EXISTS " + name)
+            td.drop_database(name)
     assert summary["all_passed"], summary["failures"]
     assert not summary["missing_points"], summary["missing_points"]
     assert sorted(summary["declared_points"]) == sorted(p for lane in sut.LANES for p in md.crash_points(lane))
