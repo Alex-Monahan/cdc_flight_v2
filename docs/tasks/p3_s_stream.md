@@ -41,8 +41,12 @@ says elsewhere, these points and that document hold.
   it differs on `BEGIN`, on every row and on `END`. `positions.txId` is the 32-bit xid and is used only by the cut
   on a primary.
 - `seq` numbers every record, `BEGIN`, `END` and `HEARTBEAT` included, from 0 for every engine life.
-- `HEARTBEAT` frames may arrive inside a transaction; they are not boundaries. A `HEARTBEAT` without `ack_position`
-  acknowledges nothing.
+- `HEARTBEAT` frames may arrive anywhere, also inside a transaction; they are not boundaries and they never move the
+  applied position (plan C2, design section 2: a heartbeat can carry the commit position of a transaction whose
+  `END` is not framed yet; a pipeline that adopted heartbeat positions lost transactions in the second review of
+  package E). The applied position is always the `ack_position` of an `END` you have applied, and `DURABLE` is sent
+  only for such a position. Show it by test: a stream whose `HEARTBEAT` carries a position above the last `END`
+  changes nothing.
 - `END.event_count` = rows in `ROWS` frames + `TRUNCATE` frames + transactional `MESSAGE` frames between `BEGIN` and
   `END`. A key change counts two (a delete and a create). The per-collection counts name a message collection by a
   text with an unstable ending; match those by prefix. An `END` with count 0 is a legal empty transaction (for
@@ -213,9 +217,13 @@ block (fence, `COMMIT`: package D).
   a stream-lane transaction (state `quarantined`, routing `skip`, alert) and the group is applied without it
   (C10). Healthy tables never wait for it longer than those attempts take (SPEC 4.0). The stored rows and the
   slow retries of the full quarantine are P4.
-- **Idle.** When no transaction arrives, a `HEARTBEAT` frame's `ack_position` becomes the applied position in a
-  group of its own, at most every `stream.idle_position_interval`, and only when every transaction framed before
-  it is committed (design section 2). The slot's `confirmed_flush_lsn` therefore moves on an idle source.
+- **Idle.** When the replicated tables are idle, the only transactions are those of the source-side heartbeat write
+  (package P: one row in a published table of ours on the primary, every 10 s). Each arrives as `BEGIN` … `END`; its
+  `END` moves the applied position in a group like any other, so the slot's `confirmed_flush_lsn` moves on an idle
+  source and the marker rule of SPEC 4.6 has its marker. Decide with package P's interface whether the heartbeat
+  table itself is written to the destination or only its position is used, and keep the cost of an idle hour small
+  (one small destination commit per `stream.idle_position_interval` is the bound; several heartbeat transactions may
+  share one group).
 - **Planned hand-over.** `finish_current_group(deadline)`: the group in flight is committed and acknowledged, no
   new group starts, and a transaction larger than a group that is still arriving is abandoned (its staging is
   left to the truncate of the next start). Returns the applied position.

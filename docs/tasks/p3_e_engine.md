@@ -38,9 +38,10 @@ the JVM, reads frames and sends commands. Contract: `docs/design/p3_plan.md` C0,
    logs a property value whose name contains `password`. Start from `docs/research/debezium.md` 8.4; every
    deviation is written down with its reason. The Python side builds the properties; Java only passes them on.
 2. **Consumer.** `handleBatch` writes every record as frames to file descriptor 3 and never waits for the
-   destination. Acknowledgement follows research 3.3 exactly: the program keeps references only to `END` and
-   heartbeat records that are not acknowledged yet, and on `DURABLE p` marks the newest one whose `ack_position`
-   is at or below `p` as processed and finishes the batch. This bookkeeping is bounded: when it holds more than a
+   destination. Acknowledgement follows research 3.3 exactly: the program keeps references only to `END`
+   records that are not acknowledged yet (never to heartbeat records; plan C2, changed after the second review),
+   and on `DURABLE p` marks the newest one whose `ack_position` is at or below `p` as processed and finishes the
+   batch. This bookkeeping is bounded: when it holds more than a
    configured number of records it thins them (dropping an entry is always safe: a later `DURABLE` then
    acknowledges an older record). `DURABLE` commands are applied at the start and at the end of every
    `handleBatch` call; show how long an acknowledgement can be delayed when the stream is idle and when it is busy.
@@ -70,7 +71,7 @@ the JVM, reads frames and sends commands. Contract: `docs/design/p3_plan.md` C0,
      records Debezium emits (delete with the old key, then create) how the engine recognises the pair, and prove it
      for a chain A→B, B→C and for a swap inside one transaction.
    - Tables without a key (`REPLICA IDENTITY FULL`): `b<i>` carries the old image for update and delete.
-   - `ack_position` and all raw position fields on `BEGIN`, `END`, `HEARTBEAT`; `END` with the event counts.
+   - all raw position fields on `BEGIN`, `END`, `HEARTBEAT`; `ack_position` on `END`; `END` with the event counts.
    - `TRUNCATE` (set `skipped.operations=none`), `MESSAGE`, `BATCH_END`, `HELLO`, `FATAL`.
 4. **Stopping.** `STOP`: close the engine and exit 0 within a deadline; if Debezium does not close in time
    (research 8.2, known stalls), halt. End of standard input: halt at once, acknowledging nothing. Any engine
