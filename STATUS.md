@@ -29,7 +29,7 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 | 1 JVM and stock Debezium on a Flight | done | `docs/spike/jvm_on_flight.md` |
 | 2 Run semantics | done | `docs/spike/run_semantics.md` |
 | 5 Local throughput (first indication) | part 1 (read rate from the replica, end to end into MotherDuck, hazards of long reads on a standby) done; part 2 (stock Debezium streaming rate on the replica's slot) running | `docs/spike/local_throughput.md`; part 2: `docs/spike/local_streaming.md` |
-| `docs/spike_report.md` and the architecture decision record | after the spikes | — |
+| `docs/spike_report.md` and the architecture decision record | written and checked against the spike reports; the local streaming section of the report waits for part 2. Nothing found contradicts SPEC | `docs/spike_report.md`, `docs/adr/0001-architecture.md` |
 
 ## Decisions
 
@@ -133,6 +133,12 @@ Each in its own worktree and branch (Opus, high effort); the orchestrator merges
 | P3 worker, started early in a free slot: crash-point and fault-injection harness (named crash points, crash runner with a ledger, process control for competing runs, TCP fault proxy on ports 55440–55459, byte-stream fault relay, run-time fault sites, toy systems that prove the harness catches a wrong commit protocol). No MotherDuck use | P3 | 2026-11-10 | `src/cdc_v2/crashpoints.py`, `src/cdc_v2/faultsites.py`, `src/cdc_v2/testing/{procs,crash,netproxy,pipefaults,faults}.py`, `tools/netproxy`, `tests/harness/`, `docs/testing/harness.md`, `evidence/p3/harness/` |
 
 | P3 core-correctness worker (Fable, xhigh): the cut — where a snapshot lies in the stream (`docs/design/core.md` 7.2). Library, a small `pgoutput` decoder for tests, a stress tool with a negative control, the argument from the Postgres source. Private cluster, home `pg-cut`, ports 55600–55607. No MotherDuck use | P3 | 2026-11-10 | `src/cdc_v2/pg/cut.py`, `src/cdc_v2/testing/pgoutput.py`, `tools/cutstress`, `tests/cut/`, `docs/design/cut.md`, `evidence/p3/cut/` |
+
+Written by the orchestrator for P3: `docs/design/p3_plan.md` — the packages of the core (engine, destination
+basics and leadership, apply, source, stream, fuzzers, backfill and hand-off, truncate/drop and the machines), the
+contracts between them (engine frames in a column-oriented layout, change batch, destination lanes, transition
+function, platform interface with a local simulator, source interface), private ports and databases per package,
+and the review rule. The next workers start as writer slots become free.
 
 Written by the orchestrator while the spikes ran: `docs/design/core.md`, the draft contracts of the core
 (position, commit and acknowledge, leader/fence/heartbeat rows, bootstrap, apply, snapshot and stream, slot
