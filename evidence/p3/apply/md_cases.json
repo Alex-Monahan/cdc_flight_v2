@@ -1,6 +1,6 @@
 {
   "all_passed": true,
-  "cases": 150,
+  "cases": 156,
   "command": "CDC_V2_MD_PREFIX=cdc_v2_t_a_ tools/with-env uv run pytest -m md tests/apply/test_apply_md.py",
   "note": "every named case of tests/apply/apply_cases.py on MotherDuck, local form and relation form; statements = statements per change set (round trips); this machine to MotherDuck over the internet",
   "runs": [
@@ -8,7 +8,7 @@
       "case": "insert_update_delete",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.334,
+      "seconds": 1.324,
       "shapes": [
         [
           "K1",
@@ -23,7 +23,7 @@
       "case": "insert_update_delete",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.664,
+      "seconds": 4.496,
       "shapes": [
         [
           "plan",
@@ -77,7 +77,7 @@
       "case": "insert_only_one_statement",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.04,
+      "seconds": 0.929,
       "shapes": [
         [
           "K6"
@@ -91,7 +91,7 @@
       "case": "insert_only_one_statement",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.545,
+      "seconds": 4.4,
       "shapes": [
         [
           "plan",
@@ -144,7 +144,7 @@
       "case": "delete_missing_row_is_not_an_error",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.975,
+      "seconds": 0.928,
       "shapes": [
         [
           "K1"
@@ -158,7 +158,7 @@
       "case": "delete_missing_row_is_not_an_error",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.491,
+      "seconds": 4.375,
       "shapes": [
         [
           "plan",
@@ -211,7 +211,7 @@
       "case": "partial_update_from_destination",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.654,
+      "seconds": 1.626,
       "shapes": [
         [
           "K2",
@@ -228,7 +228,7 @@
       "case": "partial_update_from_destination",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.07,
+      "seconds": 4.706,
       "shapes": [
         [
           "plan",
@@ -284,7 +284,7 @@
       "case": "insert_then_partial_update",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.045,
+      "seconds": 0.954,
       "shapes": [
         [
           "K6"
@@ -298,7 +298,7 @@
       "case": "insert_then_partial_update",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.877,
+      "seconds": 4.414,
       "shapes": [
         [
           "plan",
@@ -351,7 +351,7 @@
       "case": "consecutive_partial_updates",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.227,
+      "seconds": 1.166,
       "shapes": [
         [
           "K1",
@@ -366,7 +366,7 @@
       "case": "consecutive_partial_updates",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.016,
+      "seconds": 4.48,
       "shapes": [
         [
           "plan",
@@ -420,7 +420,7 @@
       "case": "key_change_takes_unchanged_from_destination",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.302,
+      "seconds": 1.172,
       "shapes": [
         [
           "K2",
@@ -435,7 +435,7 @@
       "case": "key_change_takes_unchanged_from_destination",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.668,
+      "seconds": 4.56,
       "shapes": [
         [
           "plan",
@@ -489,7 +489,7 @@
       "case": "chain_a_b_c_one_transaction",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.859,
+      "seconds": 1.728,
       "shapes": [
         [
           "lookup",
@@ -507,7 +507,7 @@
       "case": "chain_a_b_c_one_transaction",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.197,
+      "seconds": 4.757,
       "shapes": [
         [
           "plan",
@@ -563,7 +563,7 @@
       "case": "chain_across_two_change_sets",
       "form": "local",
       "mode": "stream",
-      "seconds": 3.129,
+      "seconds": 2.575,
       "shapes": [
         [
           "K2",
@@ -587,7 +587,7 @@
       "case": "chain_across_two_change_sets",
       "form": "relation",
       "mode": "stream",
-      "seconds": 9.475,
+      "seconds": 8.792,
       "shapes": [
         [
           "plan",
@@ -689,7 +689,7 @@
       "case": "chain_across_two_change_sets_one_transaction",
       "form": "local",
       "mode": "stream",
-      "seconds": 2.705,
+      "seconds": 2.538,
       "shapes": [
         [
           "K2",
@@ -713,7 +713,7 @@
       "case": "chain_across_two_change_sets_one_transaction",
       "form": "relation",
       "mode": "stream",
-      "seconds": 9.125,
+      "seconds": 8.905,
       "shapes": [
         [
           "plan",
@@ -815,7 +815,7 @@
       "case": "workload_chain_b_new_then_a_b",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.775,
+      "seconds": 1.625,
       "shapes": [
         [
           "K2",
@@ -832,7 +832,7 @@
       "case": "workload_chain_b_new_then_a_b",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.267,
+      "seconds": 4.881,
       "shapes": [
         [
           "plan",
@@ -888,7 +888,7 @@
       "case": "swap_through_a_third_key",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.891,
+      "seconds": 1.743,
       "shapes": [
         [
           "lookup",
@@ -906,7 +906,7 @@
       "case": "swap_through_a_third_key",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.293,
+      "seconds": 4.868,
       "shapes": [
         [
           "plan",
@@ -962,7 +962,7 @@
       "case": "deferred_swap",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.875,
+      "seconds": 1.743,
       "shapes": [
         [
           "lookup",
@@ -980,7 +980,7 @@
       "case": "deferred_swap",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.279,
+      "seconds": 4.863,
       "shapes": [
         [
           "plan",
@@ -1036,7 +1036,7 @@
       "case": "deferred_rotation_of_three",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.844,
+      "seconds": 1.723,
       "shapes": [
         [
           "lookup",
@@ -1054,7 +1054,7 @@
       "case": "deferred_rotation_of_three",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.412,
+      "seconds": 4.729,
       "shapes": [
         [
           "plan",
@@ -1110,7 +1110,7 @@
       "case": "key_change_back_to_the_same_key",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.833,
+      "seconds": 1.635,
       "shapes": [
         [
           "K2",
@@ -1127,7 +1127,7 @@
       "case": "key_change_back_to_the_same_key",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.088,
+      "seconds": 4.743,
       "shapes": [
         [
           "plan",
@@ -1183,7 +1183,7 @@
       "case": "key_change_onto_a_deleted_key",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.919,
+      "seconds": 1.847,
       "shapes": [
         [
           "K1",
@@ -1201,7 +1201,7 @@
       "case": "key_change_onto_a_deleted_key",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.115,
+      "seconds": 4.826,
       "shapes": [
         [
           "plan",
@@ -1258,7 +1258,7 @@
       "case": "key_change_onto_a_key_deleted_in_the_previous_set",
       "form": "local",
       "mode": "stream",
-      "seconds": 2.038,
+      "seconds": 1.963,
       "shapes": [
         [
           "K1"
@@ -1279,7 +1279,7 @@
       "case": "key_change_onto_a_key_deleted_in_the_previous_set",
       "form": "relation",
       "mode": "stream",
-      "seconds": 9.444,
+      "seconds": 8.674,
       "shapes": [
         [
           "plan",
@@ -1378,7 +1378,7 @@
       "case": "insert_update_delete_in_one_transaction",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.902,
+      "seconds": 0.822,
       "shapes": [
         [
           "lookup"
@@ -1392,7 +1392,7 @@
       "case": "insert_update_delete_in_one_transaction",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.742,
+      "seconds": 4.412,
       "shapes": [
         [
           "plan",
@@ -1444,7 +1444,7 @@
       "case": "move_then_delete_in_one_transaction",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.052,
+      "seconds": 1.023,
       "shapes": [
         [
           "lookup",
@@ -1459,7 +1459,7 @@
       "case": "move_then_delete_in_one_transaction",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.96,
+      "seconds": 4.535,
       "shapes": [
         [
           "plan",
@@ -1512,7 +1512,7 @@
       "case": "full_update_of_a_missing_row_upserts",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.195,
+      "seconds": 1.2,
       "shapes": [
         [
           "K1",
@@ -1527,7 +1527,7 @@
       "case": "full_update_of_a_missing_row_upserts",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.802,
+      "seconds": 4.599,
       "shapes": [
         [
           "plan",
@@ -1582,63 +1582,63 @@
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.183
+      "seconds": 1.17
     },
     {
       "case": "stream_partial_update_of_a_missing_row_raises",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 3.102
+      "seconds": 2.93
     },
     {
       "case": "stream_key_change_of_a_missing_row_raises",
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.283
+      "seconds": 1.167
     },
     {
       "case": "stream_key_change_of_a_missing_row_raises",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 3.211
+      "seconds": 2.951
     },
     {
       "case": "stream_insert_twice_raises",
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.651
+      "seconds": 0.654
     },
     {
       "case": "stream_insert_twice_raises",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.912
+      "seconds": 2.787
     },
     {
       "case": "truncate_record_is_refused",
       "error": "changeset",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.804
+      "seconds": 0.82
     },
     {
       "case": "truncate_record_is_refused",
       "error": "changeset",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.804
+      "seconds": 2.849
     },
     {
       "case": "catch_up_reports_a_key_it_cannot_resolve",
       "form": "local",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 3.758,
+      "seconds": 3.772,
       "shapes": [
         [
           "lookup",
@@ -1660,7 +1660,7 @@
       "form": "relation",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 10.29,
+      "seconds": 10.256,
       "shapes": [
         [
           "plan",
@@ -1725,7 +1725,7 @@
       "form": "local",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 3.306,
+      "seconds": 3.325,
       "shapes": [
         [
           "lookup",
@@ -1746,7 +1746,7 @@
       "form": "relation",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 10.252,
+      "seconds": 10.184,
       "shapes": [
         [
           "plan",
@@ -1810,7 +1810,7 @@
       "form": "local",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 3.308,
+      "seconds": 3.289,
       "shapes": [
         [
           "lookup",
@@ -1831,7 +1831,7 @@
       "form": "relation",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 10.286,
+      "seconds": 10.109,
       "shapes": [
         [
           "plan",
@@ -1895,7 +1895,7 @@
       "form": "local",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 3.286,
+      "seconds": 3.351,
       "shapes": [
         [
           "lookup",
@@ -1916,7 +1916,7 @@
       "form": "relation",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 10.315,
+      "seconds": 10.083,
       "shapes": [
         [
           "plan",
@@ -1979,7 +1979,7 @@
       "case": "negative_zero_and_interval_form_complete_image",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.224,
+      "seconds": 1.237,
       "shapes": [
         [
           "K1",
@@ -1994,7 +1994,7 @@
       "case": "negative_zero_and_interval_form_complete_image",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.856,
+      "seconds": 4.791,
       "shapes": [
         [
           "plan",
@@ -2048,7 +2048,7 @@
       "case": "negative_zero_and_interval_form_partial_image",
       "form": "local",
       "mode": "stream",
-      "seconds": 2.707,
+      "seconds": 2.56,
       "shapes": [
         [
           "K2",
@@ -2069,7 +2069,7 @@
       "case": "negative_zero_and_interval_form_partial_image",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.712,
+      "seconds": 5.242,
       "shapes": [
         [
           "plan",
@@ -2129,7 +2129,7 @@
       "case": "zero_to_negative_zero_partial_image",
       "form": "local",
       "mode": "stream",
-      "seconds": 2.649,
+      "seconds": 2.538,
       "shapes": [
         [
           "K2",
@@ -2150,7 +2150,7 @@
       "case": "zero_to_negative_zero_partial_image",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.612,
+      "seconds": 5.254,
       "shapes": [
         [
           "plan",
@@ -2210,7 +2210,7 @@
       "case": "null_then_zero_over_a_negative_zero_slot",
       "form": "local",
       "mode": "stream",
-      "seconds": 4.694,
+      "seconds": 4.442,
       "shapes": [
         [
           "K2",
@@ -2242,7 +2242,7 @@
       "case": "null_then_zero_over_a_negative_zero_slot",
       "form": "relation",
       "mode": "stream",
-      "seconds": 10.564,
+      "seconds": 9.855,
       "shapes": [
         [
           "plan",
@@ -2353,7 +2353,7 @@
       "form": "local",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 4.983,
+      "seconds": 4.717,
       "shapes": [
         [
           "lookup",
@@ -2377,7 +2377,7 @@
       "form": "relation",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 11.802,
+      "seconds": 11.05,
       "shapes": [
         [
           "plan",
@@ -2443,7 +2443,7 @@
       "case": "double_key_negative_zero_to_zero_with_unchanged",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.228,
+      "seconds": 1.194,
       "shapes": [
         [
           "K7",
@@ -2458,7 +2458,7 @@
       "case": "double_key_negative_zero_to_zero_with_unchanged",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.036,
+      "seconds": 4.826,
       "shapes": [
         [
           "plan",
@@ -2512,7 +2512,7 @@
       "case": "double_key_negative_zero_to_zero_complete",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.208,
+      "seconds": 1.183,
       "shapes": [
         [
           "K1",
@@ -2527,7 +2527,7 @@
       "case": "double_key_negative_zero_to_zero_complete",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.245,
+      "seconds": 4.764,
       "shapes": [
         [
           "plan",
@@ -2581,7 +2581,7 @@
       "case": "interval_key_change_of_form_with_unchanged",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.28,
+      "seconds": 1.183,
       "shapes": [
         [
           "K7",
@@ -2596,7 +2596,7 @@
       "case": "interval_key_change_of_form_with_unchanged",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.924,
+      "seconds": 4.77,
       "shapes": [
         [
           "plan",
@@ -2664,7 +2664,7 @@
       "case": "interval_key_delete_removes_only_its_form",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.826,
+      "seconds": 4.775,
       "shapes": [
         [
           "plan",
@@ -2717,7 +2717,7 @@
       "case": "composite_key_with_a_double_part_changing_form",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.247,
+      "seconds": 1.165,
       "shapes": [
         [
           "K7",
@@ -2732,7 +2732,7 @@
       "case": "composite_key_with_a_double_part_changing_form",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.988,
+      "seconds": 4.805,
       "shapes": [
         [
           "plan",
@@ -2786,7 +2786,7 @@
       "case": "composite_key_changed_form_then_updated",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.788,
+      "seconds": 1.727,
       "shapes": [
         [
           "K7",
@@ -2806,7 +2806,7 @@
       "case": "composite_key_changed_form_then_updated",
       "form": "relation",
       "mode": "stream",
-      "seconds": 9.199,
+      "seconds": 9.03,
       "shapes": [
         [
           "plan",
@@ -2904,7 +2904,7 @@
       "case": "date_key_beyond_the_timestamp_range",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.434,
+      "seconds": 2.095,
       "shapes": [
         [
           "K1",
@@ -2920,7 +2920,7 @@
       "case": "date_key_beyond_the_timestamp_range",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.928,
+      "seconds": 4.866,
       "shapes": [
         [
           "plan",
@@ -2975,7 +2975,7 @@
       "case": "double_keys_negative_zero_and_zero_are_two_keys",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.152,
+      "seconds": 1.175,
       "shapes": [
         [
           "K1",
@@ -2990,7 +2990,7 @@
       "case": "double_keys_negative_zero_and_zero_are_two_keys",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.989,
+      "seconds": 4.821,
       "shapes": [
         [
           "plan",
@@ -3044,7 +3044,7 @@
       "case": "key_type_int",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.506,
+      "seconds": 1.42,
       "shapes": [
         [
           "K1",
@@ -3060,7 +3060,7 @@
       "case": "key_type_int",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.997,
+      "seconds": 4.881,
       "shapes": [
         [
           "plan",
@@ -3115,7 +3115,7 @@
       "case": "key_type_bigint",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.379,
+      "seconds": 1.417,
       "shapes": [
         [
           "K1",
@@ -3131,7 +3131,7 @@
       "case": "key_type_bigint",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.0,
+      "seconds": 4.904,
       "shapes": [
         [
           "plan",
@@ -3186,7 +3186,7 @@
       "case": "key_type_decimal",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.374,
+      "seconds": 1.391,
       "shapes": [
         [
           "K1",
@@ -3202,7 +3202,7 @@
       "case": "key_type_decimal",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.183,
+      "seconds": 5.035,
       "shapes": [
         [
           "plan",
@@ -3257,7 +3257,7 @@
       "case": "key_type_double",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.447,
+      "seconds": 1.402,
       "shapes": [
         [
           "K1",
@@ -3273,7 +3273,7 @@
       "case": "key_type_double",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.119,
+      "seconds": 4.895,
       "shapes": [
         [
           "plan",
@@ -3344,7 +3344,7 @@
       "case": "key_type_varchar",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.879,
+      "seconds": 4.931,
       "shapes": [
         [
           "plan",
@@ -3399,7 +3399,7 @@
       "case": "key_type_blob",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.372,
+      "seconds": 1.397,
       "shapes": [
         [
           "K1",
@@ -3415,7 +3415,7 @@
       "case": "key_type_blob",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.034,
+      "seconds": 4.914,
       "shapes": [
         [
           "plan",
@@ -3470,7 +3470,7 @@
       "case": "key_type_uuid",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.374,
+      "seconds": 1.425,
       "shapes": [
         [
           "K1",
@@ -3486,7 +3486,7 @@
       "case": "key_type_uuid",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.882,
+      "seconds": 4.897,
       "shapes": [
         [
           "plan",
@@ -3541,7 +3541,7 @@
       "case": "key_type_date",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.421,
+      "seconds": 1.407,
       "shapes": [
         [
           "K1",
@@ -3557,7 +3557,7 @@
       "case": "key_type_date",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.16,
+      "seconds": 4.88,
       "shapes": [
         [
           "plan",
@@ -3612,7 +3612,7 @@
       "case": "key_type_ts",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.362,
+      "seconds": 1.429,
       "shapes": [
         [
           "K1",
@@ -3628,7 +3628,7 @@
       "case": "key_type_ts",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.024,
+      "seconds": 4.86,
       "shapes": [
         [
           "plan",
@@ -3683,7 +3683,7 @@
       "case": "key_type_timetz",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.38,
+      "seconds": 1.39,
       "shapes": [
         [
           "K1",
@@ -3699,7 +3699,7 @@
       "case": "key_type_timetz",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.797,
+      "seconds": 4.887,
       "shapes": [
         [
           "plan",
@@ -3754,7 +3754,7 @@
       "case": "key_type_interval",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.393,
+      "seconds": 1.417,
       "shapes": [
         [
           "K1",
@@ -3770,7 +3770,7 @@
       "case": "key_type_interval",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.05,
+      "seconds": 4.912,
       "shapes": [
         [
           "plan",
@@ -3825,7 +3825,7 @@
       "case": "composite_key_move_onto_deleted",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.235,
+      "seconds": 1.188,
       "shapes": [
         [
           "K1",
@@ -3840,7 +3840,7 @@
       "case": "composite_key_move_onto_deleted",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.975,
+      "seconds": 4.902,
       "shapes": [
         [
           "plan",
@@ -3894,7 +3894,7 @@
       "case": "infinite_date_keys_in_one_transaction",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.215,
+      "seconds": 1.179,
       "shapes": [
         [
           "K6"
@@ -3913,7 +3913,7 @@
       "case": "infinite_date_keys_in_one_transaction",
       "form": "relation",
       "mode": "stream",
-      "seconds": 9.121,
+      "seconds": 8.658,
       "shapes": [
         [
           "plan",
@@ -4010,7 +4010,7 @@
       "case": "infinite_timestamp_keys_in_one_transaction",
       "form": "local",
       "mode": "stream",
-      "seconds": 3.561,
+      "seconds": 1.192,
       "shapes": [
         [
           "K6"
@@ -4029,7 +4029,7 @@
       "case": "infinite_timestamp_keys_in_one_transaction",
       "form": "relation",
       "mode": "stream",
-      "seconds": 9.548,
+      "seconds": 8.577,
       "shapes": [
         [
           "plan",
@@ -4126,7 +4126,7 @@
       "case": "infinite_timestamptz_keys_in_one_transaction",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.217,
+      "seconds": 1.206,
       "shapes": [
         [
           "K6"
@@ -4145,7 +4145,7 @@
       "case": "infinite_timestamptz_keys_in_one_transaction",
       "form": "relation",
       "mode": "stream",
-      "seconds": 9.252,
+      "seconds": 8.617,
       "shapes": [
         [
           "plan",
@@ -4236,13 +4236,307 @@
       "statements": [
         40,
         41
+      ]
+    },
+    {
+      "case": "uuid_keys_in_one_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.226,
+      "shapes": [
+        [
+          "K6"
+        ],
+        [
+          "K1",
+          "K3"
+        ]
+      ],
+      "statements": [
+        1,
+        2
+      ]
+    },
+    {
+      "case": "uuid_keys_in_one_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 8.714,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "lookup",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "lookup",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        40,
+        41
+      ]
+    },
+    {
+      "case": "json_keys_in_one_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.205,
+      "shapes": [
+        [
+          "K6"
+        ],
+        [
+          "K1",
+          "K3"
+        ]
+      ],
+      "statements": [
+        1,
+        2
+      ]
+    },
+    {
+      "case": "json_keys_in_one_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 8.721,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "lookup",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "lookup",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        40,
+        41
+      ]
+    },
+    {
+      "case": "keyless_json_uuid_in_one_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.006,
+      "shapes": [
+        [
+          "L2"
+        ],
+        [
+          "L1"
+        ]
+      ],
+      "statements": [
+        1,
+        1
+      ]
+    },
+    {
+      "case": "keyless_json_uuid_in_one_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.769,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L2",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L1",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        14,
+        14
       ]
     },
     {
       "case": "timetz_key_lookup_keeps_the_offset",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.843,
+      "seconds": 0.813,
       "shapes": [
         [
           "lookup"
@@ -4256,7 +4550,7 @@
       "case": "timetz_key_lookup_keeps_the_offset",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.278,
+      "seconds": 4.77,
       "shapes": [
         [
           "plan",
@@ -4308,7 +4602,7 @@
       "case": "timetz_key_unresolved_comes_back_with_its_offset",
       "form": "local",
       "mode": "catch_up",
-      "seconds": 1.095,
+      "seconds": 1.04,
       "shapes": [
         [
           "lookup",
@@ -4324,7 +4618,7 @@
       "case": "timetz_key_unresolved_comes_back_with_its_offset",
       "form": "relation",
       "mode": "catch_up",
-      "seconds": 5.682,
+      "seconds": 5.314,
       "shapes": [
         [
           "plan",
@@ -4383,7 +4677,7 @@
       "case": "awkward_names",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.222,
+      "seconds": 1.233,
       "shapes": [
         [
           "K3",
@@ -4398,7 +4692,7 @@
       "case": "awkward_names",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.539,
+      "seconds": 5.069,
       "shapes": [
         [
           "plan",
@@ -4452,7 +4746,7 @@
       "case": "keyless_delete_one_of_three",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.087,
+      "seconds": 1.042,
       "shapes": [
         [
           "L1"
@@ -4466,7 +4760,7 @@
       "case": "keyless_delete_one_of_three",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.727,
+      "seconds": 2.464,
       "shapes": [
         [
           "plan",
@@ -4493,7 +4787,7 @@
       "case": "keyless_update_one_of_three",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.35,
+      "seconds": 1.247,
       "shapes": [
         [
           "L1",
@@ -4508,7 +4802,7 @@
       "case": "keyless_update_one_of_three",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.656,
+      "seconds": 2.558,
       "shapes": [
         [
           "plan",
@@ -4537,34 +4831,34 @@
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.046
+      "seconds": 1.031
     },
     {
       "case": "keyless_delete_more_than_present_raises",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 1.998
+      "seconds": 1.821
     },
     {
       "case": "keyless_delete_missing_row_raises_in_catch_up_too",
       "error": "invariant",
       "form": "local",
       "mode": "catch_up",
-      "seconds": 1.064
+      "seconds": 1.004
     },
     {
       "case": "keyless_delete_missing_row_raises_in_catch_up_too",
       "error": "invariant",
       "form": "relation",
       "mode": "catch_up",
-      "seconds": 1.994
+      "seconds": 1.816
     },
     {
       "case": "keyless_negative_zero_image_never_deletes_zero",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.194,
+      "seconds": 1.038,
       "shapes": [
         [
           "L1"
@@ -4578,7 +4872,7 @@
       "case": "keyless_negative_zero_image_never_deletes_zero",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.752,
+      "seconds": 2.533,
       "shapes": [
         [
           "plan",
@@ -4605,7 +4899,7 @@
       "case": "keyless_negative_zero_to_zero_does_not_net_to_nothing",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.364,
+      "seconds": 1.298,
       "shapes": [
         [
           "L1",
@@ -4620,7 +4914,7 @@
       "case": "keyless_negative_zero_to_zero_does_not_net_to_nothing",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.798,
+      "seconds": 2.617,
       "shapes": [
         [
           "plan",
@@ -4648,7 +4942,7 @@
       "case": "keyless_interval_forms_are_different_rows",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.117,
+      "seconds": 1.865,
       "shapes": [
         [
           "L1"
@@ -4662,7 +4956,7 @@
       "case": "keyless_interval_forms_are_different_rows",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.704,
+      "seconds": 2.49,
       "shapes": [
         [
           "plan",
@@ -4689,7 +4983,7 @@
       "case": "keyless_nan_equals_nan",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.172,
+      "seconds": 1.019,
       "shapes": [
         [
           "L1"
@@ -4703,7 +4997,7 @@
       "case": "keyless_nan_equals_nan",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.752,
+      "seconds": 2.511,
       "shapes": [
         [
           "plan",
@@ -4730,7 +5024,7 @@
       "case": "keyless_null_equals_null",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.144,
+      "seconds": 1.004,
       "shapes": [
         [
           "L1"
@@ -4744,7 +5038,7 @@
       "case": "keyless_null_equals_null",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.762,
+      "seconds": 2.461,
       "shapes": [
         [
           "plan",
@@ -4771,7 +5065,7 @@
       "case": "keyless_union_members_differ",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.119,
+      "seconds": 0.995,
       "shapes": [
         [
           "L1"
@@ -4785,7 +5079,7 @@
       "case": "keyless_union_members_differ",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.813,
+      "seconds": 2.553,
       "shapes": [
         [
           "plan",
@@ -4812,7 +5106,7 @@
       "case": "keyless_list_elements_compare_exactly",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.168,
+      "seconds": 1.003,
       "shapes": [
         [
           "L1"
@@ -4826,7 +5120,7 @@
       "case": "keyless_list_elements_compare_exactly",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.817,
+      "seconds": 2.484,
       "shapes": [
         [
           "plan",
@@ -4853,7 +5147,7 @@
       "case": "keyless_insert_then_delete_in_the_same_set",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.378,
+      "seconds": 1.24,
       "shapes": [
         [
           "L1",
@@ -4868,7 +5162,7 @@
       "case": "keyless_insert_then_delete_in_the_same_set",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.877,
+      "seconds": 2.548,
       "shapes": [
         [
           "plan",
@@ -4896,7 +5190,7 @@
       "case": "keyless_rows_inserted_by_the_same_transaction",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.606,
+      "seconds": 1.508,
       "shapes": [
         [
           "L2"
@@ -4915,7 +5209,7 @@
       "case": "keyless_rows_inserted_by_the_same_transaction",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.755,
+      "seconds": 4.181,
       "shapes": [
         [
           "plan",
@@ -4960,7 +5254,7 @@
       "case": "keyless_unchanged_value_comes_from_the_old_image",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.381,
+      "seconds": 1.228,
       "shapes": [
         [
           "L1",
@@ -4975,7 +5269,7 @@
       "case": "keyless_unchanged_value_comes_from_the_old_image",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.898,
+      "seconds": 2.648,
       "shapes": [
         [
           "plan",
@@ -5003,7 +5297,7 @@
       "case": "keyless_date_beyond_the_timestamp_range",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.076,
+      "seconds": 0.971,
       "shapes": [
         [
           "L1"
@@ -5017,7 +5311,7 @@
       "case": "keyless_date_beyond_the_timestamp_range",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.783,
+      "seconds": 2.458,
       "shapes": [
         [
           "plan",
@@ -5044,7 +5338,7 @@
       "case": "keyless_with_a_column_named_rowid",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.354,
+      "seconds": 1.239,
       "shapes": [
         [
           "R1",
@@ -5060,7 +5354,7 @@
       "case": "keyless_with_a_column_named_rowid",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.924,
+      "seconds": 2.623,
       "shapes": [
         [
           "plan",

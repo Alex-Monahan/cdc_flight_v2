@@ -1,7 +1,8 @@
 {
   "command": "CDC_V2_MD_PREFIX=cdc_v2_t_a_ tools/with-env uv run pytest -m md tests/apply/test_apply_md.py -k semantics",
   "differ": [
-    "DROP SCHEMA CASCADE error"
+    "DROP SCHEMA CASCADE error",
+    "STRUCT(a DOUBLE) {'a': CAST('-0' AS DOUBLE)} -> {'a': 0.0::DOUBLE}"
   ],
   "duckdb": "1.5.6",
   "local": {
@@ -50,7 +51,7 @@
     "STRUCT(a DOUBLE) {'a': CAST('-0' AS DOUBLE)} -> {'a': 0.0::DOUBLE}": {
       "sentinel_then_update_stores_new_value": true,
       "update_stores_new_value": false,
-      "update_through_null_stores_new_value": false
+      "update_through_null_stores_new_value": true
     },
     "any_value(double) keeps -0": true,
     "any_value(list) keeps -0": false,
