@@ -24,8 +24,11 @@ packages = ["src/cdc_v2"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q -m 'not flight_integration'"
+# The default run is hermetic and fast (tier T0). Suites that start local Postgres clusters or real Flights are
+# opt-in: select them with -m (the last -m on the command line wins over the one below).
+addopts = "-q -m 'not flight_integration and not localpg'"
 markers = [
     "flight_integration: creates, runs and deletes a real MotherDuck Flight (opt-in: -m flight_integration)",
+    "localpg: self-tests of tools/localpg; start local Postgres clusters on ports 55460-55467 (opt-in: -m localpg)",
 ]
 pythonpath = ["src"]
