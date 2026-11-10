@@ -704,7 +704,8 @@ def server_start(conn) -> int:
     """The start time of the server behind ``conn``, in microseconds since 1970: it names one server life.
 
     A cut records it (the statement that reads ``R0``, or the one that takes a primary's snapshot, reads it),
-    and ``valid_on`` compares it with the value read at the swap.  On a ``replication=database`` connection,
+    and ``valid_on`` compares it with the value read later on the same node, right after that node's
+    ``IDENTIFY_SYSTEM`` reading (:meth:`StandbyCut.valid_on` says when).  On a ``replication=database`` connection,
     where only the simple query protocol works, send :data:`SQL_SERVER_START` itself
     (``PgConnection.simple``) and pass ``int()`` of the one value.
     """

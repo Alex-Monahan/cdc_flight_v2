@@ -15,27 +15,36 @@ and the reading of the numbers. This file says what each file is, how it was mad
   (`tools/localpg … set all max_prepared_transactions=16`). All other runs had the default 0.
 - Seed 1 in every run. The seed fixes the keys and choices of the writers. It does not fix the interleaving;
   a repeated run gives other counts of the same order.
-- All runs are from 2026-11-10 (UTC). The first campaigns ran between 06:41 and 08:15 UTC. The runs made after
-  the coordinator's review ran between 10:24 and 10:47 UTC. Each `.json` file of a stress run carries its start
-  time (`started_utc`). The single scenarios carry no time.
+- All runs are from 2026-11-10 (UTC). The first campaigns ran between 06:41 and 08:15 UTC. The stress runs
+  made after the coordinator's review ran between 10:24 and 10:47 UTC. After a second review two primary
+  campaigns ran at 12:14 and 12:15 UTC. Each `.json` file of a stress run or campaign carries its start time
+  (`started_utc`). The single scenarios carry no time. By the time of the file, `export_defect.json`,
+  `keyless.json` and `standby_start.json` are from 10:24, `model.txt` from 11:11, and `promotion.json` and
+  `primary_crash.json` from 12:14 UTC.
 - Tool: `tools/cutstress` (modules `src/cdc_v2/testing/cutstress.py`, `cutprimary.py`, `cutmodel.py`); the
   rule under test is `src/cdc_v2/pg/cut.py`.
 
 ## What else was running
 
 The machine was shared the whole time with a throughput measurement and with other workers of the same build
-(their own Postgres clusters on other ports, test runs, Python processes). I did not control that load. Each
-stress run prints the load average (1, 5 and 15 minutes) right before it starts; the table below repeats it.
-The runs made after the review also print it at their end.
+(their own Postgres clusters on other ports, test runs, Python processes). I did not control that load. The
+`.txt` file of each stress run except `main` has the load average (1, 5 and 15 minutes) in its second line,
+read right before the run started; the table below repeats it. The runs made after the review also print it
+in their summary (line `load average at start …, at end …`), read by the tool itself. The two start values
+can differ a little, because they were read a moment apart: `v7b_exported_no_subxact.txt` has 4.32 5.70 6.50
+in line 2 and 4.05 5.62 6.47 in the summary.
 
 The load of the others was heaviest during the runs made after the review. `v1b_big_drop` started at 10.42 and
 ended at 42.64; read by hand with `uptime` at 10:30 UTC, in the middle of that run, the load average was 85.22
 24.31 13.04. That reading is in no file. `v3b_ddl_walswitch_pause` started at 42.64 and ended at 9.79. Before
 the review the highest value is 41.55, before `v6_slot_on_primary`.
 
-The main campaign does not print the load. I read it by hand: 5.25 5.67 5.16 before, 6.35 11.22 11.25 about
-halfway, 6.24 8.89 10.24 after. The primary campaigns and the single scenarios do not record it. The primary
-campaigns ran between 07:19 and 07:58 UTC, between the standby runs listed below.
+The main campaign does not print the load. I read it by hand with `uptime`: 5.25 5.67 5.16 before, 6.35 11.22
+11.25 about halfway, 6.24 8.89 10.24 after. **Two things in this file and in the document are in no evidence
+file: these three readings, and the reading of 85.22 above.** Everything else names its file.
+
+The primary campaigns and the single scenarios do not record the load. Four primary campaigns ran between
+07:19 and 07:58 UTC, between the standby runs listed below; two more ran at 12:14 and 12:15 UTC.
 
 My own load: at most 4 writer sessions, at most 4 cut-taking sessions and one session reading the stream.
 
@@ -44,9 +53,10 @@ what counts as a violation.
 
 ## Standby: stress runs
 
-Each run has two files: `NAME.txt` is what the tool printed (first line: the command), `NAME.json` is the full
-result, with the configuration, counters, the distribution of the unknown set, examples for every wrong rule
-and every violation.
+Each run has two files. `NAME.txt` is what the tool printed, with the command in the first line and the load
+average before the run in the second; `main.txt` has neither of the two lines and starts with the progress
+lines (its command is in the table below). `NAME.json` is the full result, with the configuration, counters,
+the distribution of the unknown set, examples for every wrong rule and every violation.
 
 ### The checker, and which runs had all of it
 
@@ -77,10 +87,14 @@ How to tell from a file. The result files written after the review (`v7b`, `v9`,
 `xc`) name the steps of their checker: key `checker_steps` in the `.json` file, line `checker steps:` in the
 `.txt` file; their `.txt` file also prints the number of missing rows, 0 included. The files of
 `main_recheck`, `v5b_restart_crash` and `x_exported_subxact` are older than that field, and a counter that
-stays at 0 is not written into them. That these three ran with step 3 follows from two facts:
-`x_exported_subxact`, the first of the three, has the counter `rows_missing_from_a_cut` (under `checker`,
-value 1), which only step 3 fills; and step 3 and the three outputs were committed together (`58c2c64`), the
-two others having run after it with the same code. The files of groups 2 and 3 are older than step 3.
+stays at 0 is not written into them. For `x_exported_subxact` the file shows that step 3 ran: it has the
+counter `rows_missing_from_a_cut` (under `checker`, value 1), which only step 3 fills. For `main_recheck` and
+`v5b_restart_crash` it is **inferred, not recorded**: they started after it (`x_exported_subxact` at 07:54,
+`main_recheck` at 08:00:59, `v5b_restart_crash` at 08:11:00 UTC) from the same working tree, and step 3 and
+the three outputs were committed together at 08:15:17 (`58c2c64`). The two runs were not repeated for this.
+Of the seven runs of group 1, the five that carry the claims about the exported way and about lost rows
+(`v7b`, `v9`, `qb`, `v1b`, `v3b`) record their checker steps. The files of groups 2 and 3 are older than
+step 3.
 
 Which runs were repeated after the review: variants 7, 1 and 3 and the quiet-only run (`v7b`, `v1b`, `v3b`,
 `qb`), each at its full length. Added: `v9_exported_open_no_subxact`, and two repeats of the expected failure
@@ -129,9 +143,10 @@ What each run is for:
 - `v3b_ddl_walswitch_pause`: DDL on the tables, `VACUUM FULL`, WAL segment switches, replay paused and resumed.
 - `v4_apply_delay`: `recovery_min_apply_delay = 300ms` on the standby.
 - `v5_restart_crash`, `v5b_restart_crash`: the standby is restarted or killed every 10 s (7 restarts and 7
-  kills in each run). `v5` has 6 cuts whose `R0` is below a position the stream had already delivered; `v5b`
-  has none.
-- `v6_slot_on_primary`: the slot is on the primary, the cuts on the standby. 4 cuts with `R0` below the stream.
+  kills in each run). `v5` has 6 cuts whose `R0` is below a position the stream had already delivered, and 20
+  pairs of such a cut and a key in which the snapshot lacks a delivered transaction; `v5b` has none.
+- `v6_slot_on_primary`: the slot is on the primary, the cuts on the standby. 4 cuts with `R0` below the stream,
+  6 such pairs.
 - `v7b_exported_no_subxact`: cuts taken the exported way, writers of one statement, no subtransactions. 72,533
   exported cuts; all but 58 of them were quiet, so this run says little about snapshots that are not quiet.
 - `v9_exported_open_no_subxact`: the same with a writer that holds its transaction open, so that most
@@ -206,27 +221,37 @@ sessions, a marker transaction every 0.02 s, the slot on the primary. With `--sy
 standby is a synchronous standby; with `--pause-period 2` its replay is paused every 2 s, so that commits are
 in the stream before snapshots see them.
 
-| Run | Options | Cuts | Answers checked | Wrong answers | Wrong rules caught (cuts) |
-|---|---|---:|---:|---:|---|
-| `primary_async` | `--seconds 60 --sync off` | 51,540 | 25,092,453 | 0 | `passed_flush` 10,130 |
-| `primary_remote_apply` | `--seconds 60 --sync remote_apply --pause-period 2` | 54,489 | 26,441,568 | 0 | `later_snapshot` 2,317, `status_check` 2,313, `xmax_ge_x` 2,346, `passed_flush` 11,938 |
-| `primary_sync_on` | `--seconds 40 --sync on` | 37,499 | 17,780,355 | 0 | `xmax_ge_x` 1, `passed_flush` 6,917 |
-| `primary_twophase` | `--seconds 60 --writers plain,subxact,twophase --sync remote_apply --pause-period 2` | 53,684 | 40,979,142 | 0 | `later_snapshot` 3,103, `status_check` 3,092, `xmax_ge_x` 3,277 |
+| Run | Start (UTC) | Options | Cuts | Transactions | Answers checked | Wrong answers | Checks of "has passed" | Wrong rules caught |
+|---|---|---|---:|---:|---:|---:|---:|---|
+| `primary_async` | 07:19 | `--seconds 60 --sync off` | 51,540 | 184,261 | 25,092,453 | 0 | not counted | `passed_flush` 10,130 |
+| `primary_remote_apply` | 07:20 | `--seconds 60 --sync remote_apply --pause-period 2` | 54,489 | 167,712 | 26,441,568 | 0 | not counted | `later_snapshot` 2,317, `status_check` 2,313, `xmax_ge_x` 2,346, `passed_flush` 11,938 |
+| `primary_sync_on` | 07:21 | `--seconds 40 --sync on` | 37,499 | 117,841 | 17,780,355 | 0 | not counted | `xmax_ge_x` 1, `passed_flush` 6,917 |
+| `primary_twophase` | 07:56 | `--seconds 60 --writers plain,subxact,twophase --sync remote_apply --pause-period 2` | 53,684 | 131,143 | 40,979,142 | 0 | not counted | `later_snapshot` 3,103, `status_check` 3,092, `xmax_ge_x` 3,277 |
+| `primary_passed_async` | 12:14 | `--seconds 60 --sync off` | 46,815 | 183,701 | 22,724,630 | 0 | 187,090, none wrong | `passed_flush` 8,757 |
+| `primary_passed_remote_apply` | 12:15 | `--seconds 60 --sync remote_apply --pause-period 2` | 52,787 | 167,809 | 25,643,355 | 0 | 210,895, none wrong | `later_snapshot` 2,392, `status_check` 2,384, `xmax_ge_x` 2,503, `passed_flush` 10,925 |
 
-Sum: 197,212 cuts, 110,293,518 answers, none wrong. The first three runs use the default writers
-`plain,async,subxact,long`. An "answer" is the library's `inside` or `outside` for one delivered transaction
-in one cut, compared with what the snapshot shows.
+Sum of the six: 296,814 cuts, 158,661,503 answers, none wrong. The first four: 197,212 cuts, 110,293,518
+answers. All but `primary_twophase` use the default writers `plain,async,subxact,long`. An "answer" is the
+library's `inside` or `outside` for one delivered transaction in one cut, compared with what the snapshot
+shows (`verdicts_checked` under `checker`).
 
 The wrong rules of the primary: `later_snapshot` (any snapshot taken after the stream delivered a transaction
 sees it), `status_check` (the same, after discarding snapshots whose in-progress list holds an id that
 `pg_xact_status` calls committed: the coordinator's proposal), `xmax_ge_x` (a snapshot with `xmax` above the
 id sees it), `passed_flush` (the stream has passed the snapshot when the applied position is above the flush
-position read after the snapshot). `primary_twophase.txt` is the printed summary of that run; the three others
-have the `.json` file only.
+position read after the snapshot). The first three count cuts. `passed_flush` counts pairs of a cut and a
+counter row. `primary_twophase.txt` is the printed summary of that run; the five others have the `.json` file
+only.
 
-The primary campaigns ran before the review and were not repeated. The review did not change the rule they
-test (the answer by 64-bit id). The live test `test_primary_rules_under_a_held_back_synchronous_standby` runs
-a short form of them with the present code.
+**"Has passed", and which campaigns judge it.** The four campaigns of the morning ran before the library kept
+the insert position of a primary cut (`PrimaryCut.insert_lsn`, `PrimaryCut.has_passed`). They compared the
+end of the last transaction each snapshot reads with an insert position the tool read itself, by a later
+statement; they do not count these comparisons. The two campaigns of 12:14 and 12:15 UTC have the present
+code. They judge the library's rule with the library's own position, once per pair of a cut and a counter row
+(`passed_rule_checked` under `checker`): 397,985 checks over 99,602 cuts, none wrong. They also repeat the
+checks of the answers and of the rules that replace `R0 ≥ P0`, with no violation. The four earlier campaigns
+were not repeated. The live test `test_primary_rules_under_a_held_back_synchronous_standby` runs a short form
+with the present code.
 
 ## Single scenarios
 
@@ -239,7 +264,8 @@ a short form of them with the present code.
 | `standby_start.json` | `tools/cutstress standby-start --out …` | A commit waits for a synchronous standby across a checkpoint; the standby restarts from that checkpoint. Its snapshot hides the transaction although the commit record ends before `R0` (`rule_violated: true`). The library's settle floor refuses every such cut and accepts a cut after the next replayed commit. The file is the run made after the review; three earlier runs had the same outcome |
 | `primary_gap.json` | `tools/cutstress primary-gap --out …` | The gap on a primary: a commit the stream delivers while snapshots do not see it yet, held for 3 s by a stopped or paused synchronous standby; plain, subtransaction and two-phase. What `pg_xact_status`, `pg_current_snapshot()` and the positions say during that time. Also `synchronized_standby_slots` with a failover slot |
 | `primary_gap_no2pc.json` | the same, with `max_prepared_transactions = 0` | The earlier run; the two-phase cases are skipped |
-| `promotion.json` | `tools/cutstress promotion --out …` | An open cut across a promotion: a second standby is added, a cut held open on it, the standby promoted, a row written on it, the standby removed again. The cut recorded timeline 1; the promoted node is on timeline 2, while its control file still says 1 right after the promotion; `valid_on` is false for the new timeline; the library refuses a new standby cut and a new settle floor on the promoted node; a primary cut taken there is valid on timeline 2 only. Made again after the review |
+| `promotion.json` | `tools/cutstress promotion --out …` | An open cut across a promotion: a second standby is added, a cut held open on it, the stream passes it and the readings of the swap are made (`valid_on` true; false if any one of the three is missing); the standby is promoted, a row written on it, the standby removed again. The cut recorded timeline 1; the promoted node is on timeline 2, while its control file still says 1 right after the promotion, and its start time is unchanged. With readings made after the promotion `valid_on` is false, with the stream on the old primary and with the stream on the promoted node. The library refuses a new standby cut and a new settle floor on the promoted node; a primary cut taken there has passed only after the next commit and is valid with the readings of its own node, not with those of the old primary. Made again after the second review |
+| `primary_crash.json` | `tools/cutstress primary-crash --out …` | A primary cut does not outlive a crash of its server. With a slow WAL writer (`wal_writer_delay = 10s`) a session with `synchronous_commit = off` commits twice; a cut reads the row (2) while the flush position is below the cut's insert position; the primary is killed and started again. The row reads 0 on the primary and on the standby: the commits are lost. After one more transaction the timeline is the same and the positions of the cut are reached again, so `has_passed` is true; the start time of the server differs, so `valid_on` is false (`valid_if_the_server_start_were_not_compared`: true, the negative control). The scenario makes up to three attempts, because the commit is lost only if nothing flushes the WAL before the kill; this file has one attempt, `shown: true`. New after the second review |
 
 ## Model check
 
@@ -268,6 +294,8 @@ tools/cutstress --home <home> --port-base 55600 primary-stress --label primary_r
     --sync remote_apply --pause-period 2 --out primary_remote_apply.json
 tools/cutstress --home <home> --port-base 55600 standby-start --out standby_start.json
 tools/cutstress --home <home> --port-base 55600 keyless --quiet-wait 1 --out keyless.json
+tools/cutstress --home <home> --port-base 55600 promotion --out promotion.json
+tools/cutstress --home <home> --port-base 55600 primary-crash --out primary_crash.json
 tools/localpg --home <home> --port-base 55600 down
 ```
 
