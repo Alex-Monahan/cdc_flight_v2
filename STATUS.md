@@ -87,6 +87,7 @@ Parts of the P3 gate items that need a later feature, and where they go (the lis
 | Date | Decision | By |
 |---|---|---|
 | 2026-11-09 | The build runs in the session that failed start checks 2 and 3; it uses the session's lowercase `motherduck_token` and a salt given in chat. Consequences are in PLAN §9 | owner |
+| 2026-11-10 | Usage limit: every 15 minutes the orchestrator reads the session's rate limits; when any of them reaches 60 % used, all work pauses gracefully (each worker commits and pushes what it has, stops its clusters and jobs, writes where it stopped) and resumes after that window has reset | owner |
 | 2026-11-10 | No Fable any more: every role that named Fable (orchestrator, core-correctness workers, second reviewers) is Opus 5.5 at the same effort; stopped Fable agents are continued by new Opus agents in their worktrees (PLAN §9) | owner |
 | 2026-11-09 | Values given in chat are kept in `~/.config/cdc_flight_v2/env.local`; local commands run through `tools/with-env` | orchestrator |
 | 2026-11-09 | `duckdb==1.5.6` pinned: MotherDuck refuses a 2.0.0 client | orchestrator |
