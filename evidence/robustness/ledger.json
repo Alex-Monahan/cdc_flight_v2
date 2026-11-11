@@ -1,0 +1,1807 @@
+{
+  "about": "Written by `tools/fuzz status --write` from runs.jsonl and git (docs/testing/fuzzers.md). Self-test runs (the toy) never count toward SPEC \u00a74.",
+  "exempt_commits": [],
+  "fuzzers": {
+    "fault": {
+      "affects": [
+        "src/cdc_v2/stream",
+        "src/cdc_v2/apply",
+        "src/cdc_v2/md",
+        "src/cdc_v2/pg",
+        "src/cdc_v2/transform",
+        "src/cdc_v2/backfill",
+        "src/cdc_v2/state",
+        "src/cdc_v2/leader",
+        "src/cdc_v2/supervisor.py",
+        "src/cdc_v2/pipeline.py",
+        "src/cdc_v2/config.py",
+        "src/cdc_v2/lsn.py",
+        "src/cdc_v2/deadline.py",
+        "src/cdc_v2/artifacts.py",
+        "jvm/src",
+        "flights/cdc_v2",
+        "jvm/debezium.lock.json",
+        "jvm/jdk.lock.json",
+        "uv.lock",
+        "pyproject.toml",
+        "src/cdc_v2/testing",
+        "src/cdc_v2/oracle",
+        "src/cdc_v2/crashpoints.py",
+        "src/cdc_v2/faultsites.py",
+        "src/cdc_v2/evidence.py",
+        "tools/fuzz"
+      ],
+      "against_minimum_total": {
+        "divergences": {
+          "maximum": 0,
+          "met": false,
+          "value": 0
+        },
+        "faults": {
+          "met": false,
+          "minimum": 10000,
+          "value": 0
+        },
+        "hours": {
+          "met": false,
+          "minimum": 100.0,
+          "value": 0.0
+        },
+        "per_kind": {
+          "below": {},
+          "kinds": 0,
+          "met": false,
+          "minimum": 100
+        },
+        "seeds": {
+          "met": false,
+          "minimum": 500,
+          "value": 0
+        }
+      },
+      "bar_met": false,
+      "combos": {
+        "all_met": false,
+        "fraction": 0.25,
+        "missing": [
+          "local/replica",
+          "local/primary",
+          "planetscale/replica",
+          "planetscale/primary"
+        ],
+        "per_combination": {
+          "local/primary": {
+            "faults": {
+              "met": false,
+              "minimum": 2500.0,
+              "value": 0
+            },
+            "hours": {
+              "met": false,
+              "minimum": 25.0,
+              "value": 0.0
+            },
+            "seeds": {
+              "met": false,
+              "minimum": 125.0,
+              "value": 0
+            }
+          },
+          "local/replica": {
+            "faults": {
+              "met": false,
+              "minimum": 2500.0,
+              "value": 0
+            },
+            "hours": {
+              "met": false,
+              "minimum": 25.0,
+              "value": 0.0
+            },
+            "seeds": {
+              "met": false,
+              "minimum": 125.0,
+              "value": 0
+            }
+          },
+          "planetscale/primary": {
+            "faults": {
+              "met": false,
+              "minimum": 2500.0,
+              "value": 0
+            },
+            "hours": {
+              "met": false,
+              "minimum": 25.0,
+              "value": 0.0
+            },
+            "seeds": {
+              "met": false,
+              "minimum": 125.0,
+              "value": 0
+            }
+          },
+          "planetscale/replica": {
+            "faults": {
+              "met": false,
+              "minimum": 2500.0,
+              "value": 0
+            },
+            "hours": {
+              "met": false,
+              "minimum": 25.0,
+              "value": 0.0
+            },
+            "seeds": {
+              "met": false,
+              "minimum": 125.0,
+              "value": 0
+            }
+          }
+        },
+        "required": [
+          "local/replica",
+          "local/primary",
+          "planetscale/replica",
+          "planetscale/primary"
+        ]
+      },
+      "counted_total": {
+        "divergences": 0,
+        "faults": 0,
+        "faults_per_kind": {},
+        "hours": 0.0,
+        "no_effect_per_kind": {},
+        "outcomes": {},
+        "rounds": 0,
+        "runs": 0,
+        "seeds": 0
+      },
+      "failures": [
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-ack_early-replica-s1-ffdd6f4",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-ack_early"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-ack_early-replica-s103-29f9c8f",
+          "outcome": "diverged",
+          "regression_test": "tests/fuzz/regressions/test_fault_toy_ack_early_replica_s103_29f9c8f.py",
+          "seed": 103,
+          "self_test": true,
+          "system": "toy-ack_early"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-ack_early-replica-s11-cd4c032",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 11,
+          "self_test": true,
+          "system": "toy-ack_early"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-ack_early-replica-s2-b09e06a",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 2,
+          "self_test": true,
+          "system": "toy-ack_early"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-ack_early-replica-s3-5bd69ae",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 3,
+          "self_test": true,
+          "system": "toy-ack_early"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-ack_early-replica-s5-d1acecf",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 5,
+          "self_test": true,
+          "system": "toy-ack_early"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-ack_early-replica-s8-b09e06a",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 8,
+          "self_test": true,
+          "system": "toy-ack_early"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-position_apart-replica-s1-ffdd6f4",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-position_apart"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-position_apart-replica-s13-d1acecf",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 13,
+          "self_test": true,
+          "system": "toy-position_apart"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-position_apart-replica-s2-b09e06a",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 2,
+          "self_test": true,
+          "system": "toy-position_apart"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-position_apart-replica-s3-5bd69ae",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 3,
+          "self_test": true,
+          "system": "toy-position_apart"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-position_apart-replica-s5-d1acecf",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 5,
+          "self_test": true,
+          "system": "toy-position_apart"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-position_apart-replica-s9-b09e06a",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 9,
+          "self_test": true,
+          "system": "toy-position_apart"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-skip_on_reconnect-replica-s1-ffdd6f4",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-skip_on_reconnect"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-skip_on_reconnect-replica-s2-b09e06a",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 2,
+          "self_test": true,
+          "system": "toy-skip_on_reconnect"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-skip_on_reconnect-replica-s3-d1acecf",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 3,
+          "self_test": true,
+          "system": "toy-skip_on_reconnect"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-swallow-replica-s2-b09e06a",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 2,
+          "self_test": true,
+          "system": "toy-swallow"
+        },
+        {
+          "fixed_commit": null,
+          "id": "fault-toy-swallow-replica-s3-d1acecf",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 3,
+          "self_test": true,
+          "system": "toy-swallow"
+        }
+      ],
+      "failures_fixed": 0,
+      "failures_open": 0,
+      "groups": [
+        {
+          "all_runs": {
+            "divergences": 7,
+            "faults": 40,
+            "faults_per_kind": {
+              "dest_error": 1,
+              "hang_point": 1,
+              "kill_group": 14,
+              "kill_point": 17,
+              "kill_point_later": 5,
+              "net_drop": 1,
+              "spill_full": 1
+            },
+            "hours": 0.1073,
+            "no_effect_per_kind": {
+              "kill_group": 1,
+              "kill_point": 6,
+              "kill_point_later": 3,
+              "spill_full": 1
+            },
+            "outcomes": {
+              "diverged": 5,
+              "pass": 3,
+              "violation": 2
+            },
+            "rounds": 897,
+            "runs": 10,
+            "seeds": 10
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-ack_early",
+          "tier": "local",
+          "weights": {
+            "not_attacked": [
+              "dest_delay",
+              "dest_error",
+              "dest_hang",
+              "freeze",
+              "hang_point",
+              "net_blackhole",
+              "net_drop",
+              "net_latency",
+              "net_reset",
+              "replica_promote",
+              "replica_restart",
+              "slot_drop",
+              "slot_invalidate",
+              "spill_full",
+              "src_cancel",
+              "src_lock",
+              "src_long_txn",
+              "src_restart_primary",
+              "src_terminate",
+              "src_wal_switch"
+            ],
+            "weights": {
+              "kill_group": 6,
+              "kill_point": 10,
+              "kill_point_later": 4
+            }
+          }
+        },
+        {
+          "all_runs": {
+            "divergences": 0,
+            "faults": 76,
+            "faults_per_kind": {
+              "kill_group": 26,
+              "kill_point": 32,
+              "kill_point_later": 18
+            },
+            "hours": 0.1904,
+            "no_effect_per_kind": {
+              "kill_group": 1,
+              "kill_point": 15,
+              "kill_point_later": 6
+            },
+            "outcomes": {
+              "pass": 10
+            },
+            "rounds": 1707,
+            "runs": 10,
+            "seeds": 10
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-correct",
+          "tier": "local",
+          "weights": {
+            "not_attacked": [
+              "dest_delay",
+              "dest_error",
+              "dest_hang",
+              "freeze",
+              "hang_point",
+              "net_blackhole",
+              "net_drop",
+              "net_latency",
+              "net_reset",
+              "replica_promote",
+              "replica_restart",
+              "slot_drop",
+              "slot_invalidate",
+              "spill_full",
+              "src_cancel",
+              "src_lock",
+              "src_long_txn",
+              "src_restart_primary",
+              "src_terminate",
+              "src_wal_switch"
+            ],
+            "weights": {
+              "kill_group": 6,
+              "kill_point": 10,
+              "kill_point_later": 4
+            }
+          }
+        },
+        {
+          "all_runs": {
+            "divergences": 6,
+            "faults": 50,
+            "faults_per_kind": {
+              "kill_group": 22,
+              "kill_point": 18,
+              "kill_point_later": 10
+            },
+            "hours": 0.1293,
+            "no_effect_per_kind": {
+              "kill_point": 10,
+              "kill_point_later": 2
+            },
+            "outcomes": {
+              "diverged": 6,
+              "pass": 3
+            },
+            "rounds": 1113,
+            "runs": 9,
+            "seeds": 9
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-position_apart",
+          "tier": "local",
+          "weights": {
+            "not_attacked": [
+              "dest_delay",
+              "dest_error",
+              "dest_hang",
+              "freeze",
+              "hang_point",
+              "net_blackhole",
+              "net_drop",
+              "net_latency",
+              "net_reset",
+              "replica_promote",
+              "replica_restart",
+              "slot_drop",
+              "slot_invalidate",
+              "spill_full",
+              "src_cancel",
+              "src_lock",
+              "src_long_txn",
+              "src_restart_primary",
+              "src_terminate",
+              "src_wal_switch"
+            ],
+            "weights": {
+              "kill_group": 6,
+              "kill_point": 10,
+              "kill_point_later": 4
+            }
+          }
+        },
+        {
+          "all_runs": {
+            "divergences": 3,
+            "faults": 7,
+            "faults_per_kind": {
+              "net_drop": 1,
+              "net_reset": 1,
+              "src_terminate": 5
+            },
+            "hours": 0.0117,
+            "no_effect_per_kind": {
+              "net_blackhole": 1
+            },
+            "outcomes": {
+              "diverged": 1,
+              "violation": 2
+            },
+            "rounds": 118,
+            "runs": 3,
+            "seeds": 3
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-skip_on_reconnect",
+          "tier": "local",
+          "weights": {
+            "not_attacked": [
+              "dest_delay",
+              "dest_error",
+              "dest_hang",
+              "freeze",
+              "hang_point",
+              "kill_group",
+              "kill_point",
+              "kill_point_later",
+              "net_latency",
+              "replica_promote",
+              "replica_restart",
+              "slot_drop",
+              "slot_invalidate",
+              "spill_full",
+              "src_cancel",
+              "src_lock",
+              "src_long_txn",
+              "src_restart_primary",
+              "src_wal_switch"
+            ],
+            "weights": {
+              "net_blackhole": 5,
+              "net_drop": 4,
+              "net_reset": 5,
+              "src_terminate": 5
+            }
+          }
+        },
+        {
+          "all_runs": {
+            "divergences": 2,
+            "faults": 13,
+            "faults_per_kind": {
+              "dest_error": 13
+            },
+            "hours": 0.0224,
+            "no_effect_per_kind": {
+              "dest_error": 2
+            },
+            "outcomes": {
+              "pass": 1,
+              "violation": 2
+            },
+            "rounds": 254,
+            "runs": 3,
+            "seeds": 3
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-swallow",
+          "tier": "local",
+          "weights": {
+            "not_attacked": [
+              "dest_delay",
+              "dest_hang",
+              "freeze",
+              "hang_point",
+              "kill_group",
+              "kill_point",
+              "kill_point_later",
+              "net_blackhole",
+              "net_drop",
+              "net_latency",
+              "net_reset",
+              "replica_promote",
+              "replica_restart",
+              "slot_drop",
+              "slot_invalidate",
+              "spill_full",
+              "src_cancel",
+              "src_lock",
+              "src_long_txn",
+              "src_restart_primary",
+              "src_terminate",
+              "src_wal_switch"
+            ],
+            "weights": {
+              "dest_error": 7
+            }
+          }
+        }
+      ],
+      "restart": {
+        "commit": "b6d45f0ae15661e314152234c1bcbe3a0597398b",
+        "subject": "src_cancel looks for a running statement of the system for up to 3 s (an idle session cannot be cancelled)",
+        "why": "touches src/cdc_v2/testing/fuzz/faultkinds.py"
+      }
+    },
+    "leadership": {
+      "affects": [
+        "src/cdc_v2/leader",
+        "src/cdc_v2/md",
+        "src/cdc_v2/state",
+        "src/cdc_v2/supervisor.py",
+        "src/cdc_v2/pipeline.py",
+        "src/cdc_v2/stream",
+        "flights/cdc_v2",
+        "jvm/debezium.lock.json",
+        "jvm/jdk.lock.json",
+        "uv.lock",
+        "pyproject.toml",
+        "src/cdc_v2/testing",
+        "src/cdc_v2/oracle",
+        "src/cdc_v2/crashpoints.py",
+        "src/cdc_v2/faultsites.py",
+        "src/cdc_v2/evidence.py",
+        "tools/fuzz"
+      ],
+      "against_minimum_total": {
+        "rounds": {
+          "met": false,
+          "minimum": 1000,
+          "value": 0
+        }
+      },
+      "bar_met": false,
+      "counted_total": {
+        "divergences": 0,
+        "faults": 0,
+        "faults_per_kind": {},
+        "hours": 0.0,
+        "no_effect_per_kind": {},
+        "outcomes": {},
+        "rounds": 0,
+        "runs": 0,
+        "seeds": 0
+      },
+      "failures": [
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-correct-replica-s1-ffdd6f4",
+          "outcome": "error",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-correct"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s1-ffdd6f4",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s101-1d9a3d9",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 101,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s102-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 102,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s103-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 103,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s104-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 104,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s105-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 105,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s106-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 106,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s107-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 107,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s108-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 108,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s109-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 109,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s110-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 110,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s111-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 111,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s112-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 112,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s113-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 113,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s114-4af4006",
+          "outcome": "error",
+          "regression_test": null,
+          "seed": 114,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s115-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 115,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s116-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 116,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s117-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 117,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s118-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 118,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s119-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 119,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s120-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 120,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s121-4af4006",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 121,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s122-d24ed79",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 122,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s123-d24ed79",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 123,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s124-d24ed79",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 124,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s125-d24ed79",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 125,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s2-4dffb64",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 2,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s5-b09e06a",
+          "outcome": "error",
+          "regression_test": null,
+          "seed": 5,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s8-5bd69ae",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 8,
+          "self_test": true,
+          "system": "toy-no_fence"
+        },
+        {
+          "fixed_commit": null,
+          "id": "leadership-toy-no_fence-replica-s9-d1acecf",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 9,
+          "self_test": true,
+          "system": "toy-no_fence"
+        }
+      ],
+      "failures_fixed": 0,
+      "failures_open": 0,
+      "groups": [
+        {
+          "all_runs": {
+            "divergences": 0,
+            "faults": 15,
+            "faults_per_kind": {
+              "dest_delay": 4,
+              "dest_error": 2,
+              "net_blackhole": 1,
+              "net_latency": 2,
+              "net_reset": 3,
+              "spill_full": 1,
+              "src_terminate": 2
+            },
+            "hours": 0.124,
+            "no_effect_per_kind": {
+              "dest_delay": 1,
+              "spill_full": 1,
+              "src_terminate": 1
+            },
+            "outcomes": {
+              "error": 1,
+              "pass": 8
+            },
+            "rounds": 34,
+            "runs": 9,
+            "seeds": 9
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-correct",
+          "tier": "local",
+          "weights": null
+        },
+        {
+          "all_runs": {
+            "divergences": 28,
+            "faults": 11,
+            "faults_per_kind": {
+              "dest_error": 2,
+              "net_blackhole": 1,
+              "net_drop": 1,
+              "net_latency": 2,
+              "net_reset": 2,
+              "spill_full": 2,
+              "src_terminate": 1
+            },
+            "hours": 0.2637,
+            "no_effect_per_kind": {
+              "dest_delay": 1,
+              "net_blackhole": 1,
+              "net_reset": 1,
+              "src_terminate": 1
+            },
+            "outcomes": {
+              "error": 2,
+              "pass": 4,
+              "violation": 28
+            },
+            "rounds": 22,
+            "runs": 34,
+            "seeds": 34
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-no_fence",
+          "tier": "local",
+          "weights": null
+        }
+      ],
+      "restart": {
+        "commit": "b6d45f0ae15661e314152234c1bcbe3a0597398b",
+        "subject": "src_cancel looks for a running statement of the system for up to 3 s (an idle session cannot be cancelled)",
+        "why": "touches src/cdc_v2/testing/fuzz/faultkinds.py"
+      }
+    },
+    "stream": {
+      "affects": [
+        "src/cdc_v2/stream",
+        "src/cdc_v2/transform",
+        "jvm/src",
+        "jvm/debezium.lock.json",
+        "jvm/jdk.lock.json",
+        "uv.lock",
+        "pyproject.toml",
+        "src/cdc_v2/testing",
+        "src/cdc_v2/oracle",
+        "src/cdc_v2/crashpoints.py",
+        "src/cdc_v2/faultsites.py",
+        "src/cdc_v2/evidence.py",
+        "tools/fuzz"
+      ],
+      "against_minimum_total": {},
+      "bar_met": null,
+      "counted_total": {
+        "divergences": 0,
+        "faults": 0,
+        "faults_per_kind": {},
+        "hours": 0.0,
+        "no_effect_per_kind": {},
+        "outcomes": {},
+        "rounds": 0,
+        "runs": 0,
+        "seeds": 0
+      },
+      "failures": [
+        {
+          "fixed_commit": null,
+          "id": "stream-toy-trust_frames-replica-s1-ffdd6f4",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-trust_frames"
+        },
+        {
+          "fixed_commit": null,
+          "id": "stream-toy-trust_frames-replica-s2-b09e06a",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 2,
+          "self_test": true,
+          "system": "toy-trust_frames"
+        },
+        {
+          "fixed_commit": null,
+          "id": "stream-toy-trust_frames-replica-s3-d1acecf",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 3,
+          "self_test": true,
+          "system": "toy-trust_frames"
+        }
+      ],
+      "failures_fixed": 0,
+      "failures_open": 0,
+      "groups": [
+        {
+          "against_minimum": {},
+          "all_runs": {
+            "divergences": 0,
+            "faults": 220000,
+            "faults_per_kind": {
+              "ack_regress": 11414,
+              "content_replaced_same_shape": 11326,
+              "cut_at_boundary": 11346,
+              "drop_begin": 11171,
+              "drop_end": 11192,
+              "dup_txn_same_life": 11245,
+              "end_count": 11276,
+              "flip_header_length": 11206,
+              "flip_header_seq": 11166,
+              "flip_header_type": 11301,
+              "flip_payload": 11202,
+              "foreign_rows": 11387,
+              "heartbeat_ahead": 11280,
+              "huge_length": 5981,
+              "new_life_replay": 11401,
+              "pipefault": 11253,
+              "raw_drop_frame": 11360,
+              "raw_dup_run": 11267,
+              "raw_swap": 11153,
+              "swap_records": 11073
+            },
+            "hours": 0.1894,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "pass": 3
+            },
+            "rounds": 0,
+            "runs": 3,
+            "seeds": 3
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "self_test": false,
+          "source_mode": "offline",
+          "system": "engine-reader",
+          "tier": "offline",
+          "weights": null
+        },
+        {
+          "all_runs": {
+            "divergences": 0,
+            "faults": 154,
+            "faults_per_kind": {
+              "stream_bytes": 154
+            },
+            "hours": 0.0351,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "pass": 3
+            },
+            "rounds": 398,
+            "runs": 3,
+            "seeds": 3
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-correct",
+          "tier": "local",
+          "weights": null
+        },
+        {
+          "all_runs": {
+            "divergences": 3,
+            "faults": 26,
+            "faults_per_kind": {
+              "stream_bytes": 26
+            },
+            "hours": 0.0094,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "diverged": 2,
+              "violation": 1
+            },
+            "rounds": 82,
+            "runs": 3,
+            "seeds": 3
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-trust_frames",
+          "tier": "local",
+          "weights": null
+        }
+      ],
+      "restart": {
+        "commit": "b6d45f0ae15661e314152234c1bcbe3a0597398b",
+        "subject": "src_cancel looks for a running statement of the system for up to 3 s (an idle session cannot be cancelled)",
+        "why": "touches src/cdc_v2/testing/fuzz/faultkinds.py"
+      }
+    },
+    "value": {
+      "affects": [
+        "src/cdc_v2/transform",
+        "src/cdc_v2/apply",
+        "src/cdc_v2/stream",
+        "jvm/src",
+        "jvm/debezium.lock.json",
+        "jvm/jdk.lock.json",
+        "uv.lock",
+        "pyproject.toml",
+        "src/cdc_v2/testing",
+        "src/cdc_v2/oracle",
+        "src/cdc_v2/crashpoints.py",
+        "src/cdc_v2/faultsites.py",
+        "src/cdc_v2/evidence.py",
+        "tools/fuzz"
+      ],
+      "against_minimum_total": {
+        "values_per_family": {
+          "met": false,
+          "minimum": 1000000,
+          "note": "the value fuzzer is built in the P4 type wave"
+        }
+      },
+      "bar_met": false,
+      "counted_total": {
+        "divergences": 0,
+        "faults": 0,
+        "faults_per_kind": {},
+        "hours": 0.0,
+        "no_effect_per_kind": {},
+        "outcomes": {},
+        "rounds": 0,
+        "runs": 0,
+        "seeds": 0
+      },
+      "failures": [],
+      "failures_fixed": 0,
+      "failures_open": 0,
+      "groups": [],
+      "note": "not built yet: the value fuzzer belongs to the P4 type wave (task of package F)",
+      "restart": {
+        "commit": "b6d45f0ae15661e314152234c1bcbe3a0597398b",
+        "subject": "src_cancel looks for a running statement of the system for up to 3 s (an idle session cannot be cancelled)",
+        "why": "touches src/cdc_v2/testing/fuzz/faultkinds.py"
+      }
+    },
+    "workload": {
+      "affects": [
+        "src/cdc_v2/stream",
+        "src/cdc_v2/apply",
+        "src/cdc_v2/md",
+        "src/cdc_v2/pg",
+        "src/cdc_v2/transform",
+        "src/cdc_v2/backfill",
+        "src/cdc_v2/state",
+        "src/cdc_v2/leader",
+        "src/cdc_v2/supervisor.py",
+        "src/cdc_v2/pipeline.py",
+        "src/cdc_v2/config.py",
+        "src/cdc_v2/lsn.py",
+        "src/cdc_v2/deadline.py",
+        "src/cdc_v2/artifacts.py",
+        "jvm/src",
+        "flights/cdc_v2",
+        "jvm/debezium.lock.json",
+        "jvm/jdk.lock.json",
+        "uv.lock",
+        "pyproject.toml",
+        "src/cdc_v2/testing",
+        "src/cdc_v2/oracle",
+        "src/cdc_v2/crashpoints.py",
+        "src/cdc_v2/faultsites.py",
+        "src/cdc_v2/evidence.py",
+        "tools/fuzz"
+      ],
+      "against_minimum_total": {
+        "hours": {
+          "met": false,
+          "minimum": 100.0,
+          "value": 0.0
+        },
+        "seeds": {
+          "met": false,
+          "minimum": 1000,
+          "value": 0
+        }
+      },
+      "bar_met": false,
+      "combos": {
+        "all_met": false,
+        "fraction": 0.25,
+        "missing": [
+          "local/replica",
+          "local/primary",
+          "planetscale/replica",
+          "planetscale/primary"
+        ],
+        "per_combination": {
+          "local/primary": {
+            "hours": {
+              "met": false,
+              "minimum": 25.0,
+              "value": 0.0
+            },
+            "seeds": {
+              "met": false,
+              "minimum": 250.0,
+              "value": 0
+            }
+          },
+          "local/replica": {
+            "hours": {
+              "met": false,
+              "minimum": 25.0,
+              "value": 0.0
+            },
+            "seeds": {
+              "met": false,
+              "minimum": 250.0,
+              "value": 0
+            }
+          },
+          "planetscale/primary": {
+            "hours": {
+              "met": false,
+              "minimum": 25.0,
+              "value": 0.0
+            },
+            "seeds": {
+              "met": false,
+              "minimum": 250.0,
+              "value": 0
+            }
+          },
+          "planetscale/replica": {
+            "hours": {
+              "met": false,
+              "minimum": 25.0,
+              "value": 0.0
+            },
+            "seeds": {
+              "met": false,
+              "minimum": 250.0,
+              "value": 0
+            }
+          }
+        },
+        "required": [
+          "local/replica",
+          "local/primary",
+          "planetscale/replica",
+          "planetscale/primary"
+        ]
+      },
+      "counted_total": {
+        "divergences": 0,
+        "faults": 0,
+        "faults_per_kind": {},
+        "hours": 0.0,
+        "no_effect_per_kind": {},
+        "outcomes": {},
+        "rounds": 0,
+        "runs": 0,
+        "seeds": 0
+      },
+      "failures": [
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-deferrable_by_key-replica-s1-b09e06a",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-deferrable_by_key"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-deferrable_by_key-replica-s2-d1acecf",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 2,
+          "self_test": true,
+          "system": "toy-deferrable_by_key"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-keyless_toast_null-replica-s1-b09e06a",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-keyless_toast_null"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-keyless_toast_null-replica-s2-d1acecf",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 2,
+          "self_test": true,
+          "system": "toy-keyless_toast_null"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-reorder-replica-s1-ffdd6f4",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-reorder"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-reorder-replica-s2-b09e06a",
+          "outcome": "diverged",
+          "regression_test": null,
+          "seed": 2,
+          "self_test": true,
+          "system": "toy-reorder"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-reorder-replica-s3-d1acecf",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 3,
+          "self_test": true,
+          "system": "toy-reorder"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-split-replica-s1-ffdd6f4",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-split"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-split-replica-s101-a6bc667",
+          "outcome": "violation",
+          "regression_test": "tests/fuzz/regressions/test_workload_toy_split_replica_s101_a6bc667.py",
+          "seed": 101,
+          "self_test": true,
+          "system": "toy-split"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-split-replica-s2-b09e06a",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 2,
+          "self_test": true,
+          "system": "toy-split"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-split-replica-s3-d1acecf",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 3,
+          "self_test": true,
+          "system": "toy-split"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-swallow-replica-s1-ffdd6f4",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 1,
+          "self_test": true,
+          "system": "toy-swallow"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-swallow-replica-s2-b09e06a",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 2,
+          "self_test": true,
+          "system": "toy-swallow"
+        },
+        {
+          "fixed_commit": null,
+          "id": "workload-toy-swallow-replica-s3-d1acecf",
+          "outcome": "violation",
+          "regression_test": null,
+          "seed": 3,
+          "self_test": true,
+          "system": "toy-swallow"
+        }
+      ],
+      "failures_fixed": 0,
+      "failures_open": 0,
+      "groups": [
+        {
+          "all_runs": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0347,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "pass": 3
+            },
+            "rounds": 394,
+            "runs": 3,
+            "seeds": 3
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-correct",
+          "tier": "local",
+          "weights": null
+        },
+        {
+          "all_runs": {
+            "divergences": 2,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0064,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "diverged": 2
+            },
+            "rounds": 71,
+            "runs": 2,
+            "seeds": 2
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-deferrable_by_key",
+          "tier": "local",
+          "weights": null
+        },
+        {
+          "all_runs": {
+            "divergences": 2,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0064,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "diverged": 2
+            },
+            "rounds": 71,
+            "runs": 2,
+            "seeds": 2
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-keyless_toast_null",
+          "tier": "local",
+          "weights": null
+        },
+        {
+          "all_runs": {
+            "divergences": 3,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0055,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "diverged": 1,
+              "violation": 2
+            },
+            "rounds": 38,
+            "runs": 3,
+            "seeds": 3
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-reorder",
+          "tier": "local",
+          "weights": null
+        },
+        {
+          "all_runs": {
+            "divergences": 4,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0018,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "violation": 4
+            },
+            "rounds": 4,
+            "runs": 4,
+            "seeds": 4
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-split",
+          "tier": "local",
+          "weights": null
+        },
+        {
+          "all_runs": {
+            "divergences": 3,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0085,
+            "no_effect_per_kind": {},
+            "outcomes": {
+              "violation": 3
+            },
+            "rounds": 93,
+            "runs": 3,
+            "seeds": 3
+          },
+          "counted": {
+            "divergences": 0,
+            "faults": 0,
+            "faults_per_kind": {},
+            "hours": 0.0,
+            "no_effect_per_kind": {},
+            "outcomes": {},
+            "rounds": 0,
+            "runs": 0,
+            "seeds": 0
+          },
+          "note": "self-test of the fuzzers: never counted toward the bar",
+          "self_test": true,
+          "source_mode": "replica",
+          "system": "toy-swallow",
+          "tier": "local",
+          "weights": null
+        }
+      ],
+      "restart": {
+        "commit": "b6d45f0ae15661e314152234c1bcbe3a0597398b",
+        "subject": "src_cancel looks for a running statement of the system for up to 3 s (an idle session cannot be cancelled)",
+        "why": "touches src/cdc_v2/testing/fuzz/faultkinds.py"
+      }
+    }
+  },
+  "minimums": {
+    "fault": {
+      "divergences": 0,
+      "faults": 10000,
+      "hours": 100.0,
+      "per_kind": 100,
+      "seeds": 500
+    },
+    "leadership": {
+      "rounds": 1000
+    },
+    "stream": {},
+    "value": {
+      "values_per_family": 1000000
+    },
+    "workload": {
+      "hours": 100.0,
+      "seeds": 1000
+    }
+  }
+}

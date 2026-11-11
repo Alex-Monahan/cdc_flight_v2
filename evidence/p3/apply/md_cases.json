@@ -1,0 +1,6678 @@
+{
+  "all_passed": true,
+  "cases": 232,
+  "command": "CDC_V2_MD_PREFIX=cdc_v2_t_a_ tools/with-env uv run pytest -m md tests/apply/test_apply_md.py",
+  "note": "every named case of tests/apply/apply_cases.py on MotherDuck, local form and relation form; statements = statements per change set (round trips); this machine to MotherDuck over the internet",
+  "runs": [
+    {
+      "case": "insert_update_delete",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.318,
+      "shapes": [
+        [
+          "K1",
+          "K6"
+        ]
+      ],
+      "statements": [
+        2
+      ]
+    },
+    {
+      "case": "insert_update_delete",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 5.782,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        35
+      ]
+    },
+    {
+      "case": "insert_only_two_statements",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.907,
+      "shapes": [
+        [
+          "K6"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "insert_only_two_statements",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.739,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        34
+      ]
+    },
+    {
+      "case": "stream_delete_of_a_missing_row_raises",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.982
+    },
+    {
+      "case": "stream_delete_of_a_missing_row_raises",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.455
+    },
+    {
+      "case": "catch_up_delete_of_a_missing_row",
+      "form": "local",
+      "mode": "catch_up",
+      "seconds": 0.915,
+      "shapes": [
+        [
+          "K1"
+        ]
+      ],
+      "statements": [
+        1
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "catch_up_delete_of_a_missing_row",
+      "form": "relation",
+      "mode": "catch_up",
+      "seconds": 4.455,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "lookup",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "plan",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        43
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "partial_update_from_destination",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.63,
+      "shapes": [
+        [
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3"
+        ]
+      ],
+      "statements": [
+        4
+      ]
+    },
+    {
+      "case": "partial_update_from_destination",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.009,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        37
+      ]
+    },
+    {
+      "case": "insert_then_partial_update",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.905,
+      "shapes": [
+        [
+          "K6"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "insert_then_partial_update",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.831,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        34
+      ]
+    },
+    {
+      "case": "consecutive_partial_updates",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.205,
+      "shapes": [
+        [
+          "K1",
+          "K6"
+        ]
+      ],
+      "statements": [
+        2
+      ]
+    },
+    {
+      "case": "consecutive_partial_updates",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.868,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        35
+      ]
+    },
+    {
+      "case": "key_change_takes_unchanged_from_destination",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.188,
+      "shapes": [
+        [
+          "K2",
+          "K3"
+        ]
+      ],
+      "statements": [
+        2
+      ]
+    },
+    {
+      "case": "key_change_takes_unchanged_from_destination",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.922,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K2",
+          "K3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        35
+      ]
+    },
+    {
+      "case": "chain_a_b_c_one_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.977,
+      "shapes": [
+        [
+          "K1",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3"
+        ]
+      ],
+      "statements": [
+        5
+      ]
+    },
+    {
+      "case": "chain_a_b_c_one_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.174,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        38
+      ]
+    },
+    {
+      "case": "chain_across_two_change_sets",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 2.752,
+      "shapes": [
+        [
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3"
+        ],
+        [
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3"
+        ]
+      ],
+      "statements": [
+        4,
+        4
+      ]
+    },
+    {
+      "case": "chain_across_two_change_sets",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 7.518,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        37,
+        37
+      ]
+    },
+    {
+      "case": "chain_across_two_change_sets_one_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 2.602,
+      "shapes": [
+        [
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3"
+        ],
+        [
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3"
+        ]
+      ],
+      "statements": [
+        4,
+        4
+      ]
+    },
+    {
+      "case": "chain_across_two_change_sets_one_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 7.547,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        37,
+        37
+      ]
+    },
+    {
+      "case": "workload_chain_b_new_then_a_b",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.637,
+      "shapes": [
+        [
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3"
+        ]
+      ],
+      "statements": [
+        4
+      ]
+    },
+    {
+      "case": "workload_chain_b_new_then_a_b",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.084,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        37
+      ]
+    },
+    {
+      "case": "swap_through_a_third_key",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.929,
+      "shapes": [
+        [
+          "K1",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3"
+        ]
+      ],
+      "statements": [
+        5
+      ]
+    },
+    {
+      "case": "swap_through_a_third_key",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.175,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        38
+      ]
+    },
+    {
+      "case": "rotation_through_a_free_key",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.916,
+      "shapes": [
+        [
+          "K1",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3"
+        ]
+      ],
+      "statements": [
+        5
+      ]
+    },
+    {
+      "case": "rotation_through_a_free_key",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.113,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        38
+      ]
+    },
+    {
+      "case": "chain_and_key_reuse_in_one_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 2.141,
+      "shapes": [
+        [
+          "K1",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        6
+      ]
+    },
+    {
+      "case": "chain_and_key_reuse_in_one_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.242,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        39
+      ]
+    },
+    {
+      "case": "direct_swap_is_not_a_keyed_history",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.994
+    },
+    {
+      "case": "direct_swap_is_not_a_keyed_history",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.487
+    },
+    {
+      "case": "direct_rotation_is_not_a_keyed_history",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.985
+    },
+    {
+      "case": "direct_rotation_is_not_a_keyed_history",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.491
+    },
+    {
+      "case": "review_A1_create_at_a_held_key",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.954
+    },
+    {
+      "case": "review_A1_create_at_a_held_key",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.484
+    },
+    {
+      "case": "review_A4_create_at_a_held_key",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.958
+    },
+    {
+      "case": "review_A4_create_at_a_held_key",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.575
+    },
+    {
+      "case": "review_SEG_create_at_a_held_key_across_a_cut",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.198
+    },
+    {
+      "case": "review_SEG_create_at_a_held_key_across_a_cut",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.561
+    },
+    {
+      "case": "delete_twice_is_not_a_history",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.632
+    },
+    {
+      "case": "delete_twice_is_not_a_history",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.405
+    },
+    {
+      "case": "delete_twice_is_not_a_history_catch_up",
+      "error": "invariant",
+      "form": "local",
+      "mode": "catch_up",
+      "seconds": 0.632
+    },
+    {
+      "case": "delete_twice_is_not_a_history_catch_up",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "catch_up",
+      "seconds": 2.79
+    },
+    {
+      "case": "update_after_delete_is_not_a_history",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.626
+    },
+    {
+      "case": "update_after_delete_is_not_a_history",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.42
+    },
+    {
+      "case": "key_change_back_to_the_same_key",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.724,
+      "shapes": [
+        [
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3"
+        ]
+      ],
+      "statements": [
+        4
+      ]
+    },
+    {
+      "case": "key_change_back_to_the_same_key",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.131,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        37
+      ]
+    },
+    {
+      "case": "key_change_onto_a_deleted_key",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.946,
+      "shapes": [
+        [
+          "K1",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3"
+        ]
+      ],
+      "statements": [
+        5
+      ]
+    },
+    {
+      "case": "key_change_onto_a_deleted_key",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.217,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        38
+      ]
+    },
+    {
+      "case": "key_change_onto_a_key_deleted_in_the_previous_set",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 2.137,
+      "shapes": [
+        [
+          "K1"
+        ],
+        [
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3"
+        ]
+      ],
+      "statements": [
+        1,
+        4
+      ]
+    },
+    {
+      "case": "key_change_onto_a_key_deleted_in_the_previous_set",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 7.448,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        34,
+        37
+      ]
+    },
+    {
+      "case": "insert_update_delete_in_one_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.991,
+      "shapes": [
+        [
+          "K1"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "insert_update_delete_in_one_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.929,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        34
+      ]
+    },
+    {
+      "case": "move_then_delete_in_one_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.014,
+      "shapes": [
+        [
+          "K1"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "move_then_delete_in_one_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.035,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        34
+      ]
+    },
+    {
+      "case": "stream_full_update_of_a_missing_row_raises",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.999
+    },
+    {
+      "case": "stream_full_update_of_a_missing_row_raises",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.569
+    },
+    {
+      "case": "catch_up_full_update_of_a_missing_row_upserts",
+      "form": "local",
+      "mode": "catch_up",
+      "seconds": 1.145,
+      "shapes": [
+        [
+          "K1",
+          "K6"
+        ]
+      ],
+      "statements": [
+        2
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "catch_up_full_update_of_a_missing_row_upserts",
+      "form": "relation",
+      "mode": "catch_up",
+      "seconds": 4.794,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "lookup",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K6",
+          "plan",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        44
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "stream_partial_update_of_a_missing_row_raises",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.216
+    },
+    {
+      "case": "stream_partial_update_of_a_missing_row_raises",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.655
+    },
+    {
+      "case": "stream_key_change_of_a_missing_row_raises",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.235
+    },
+    {
+      "case": "stream_key_change_of_a_missing_row_raises",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.693
+    },
+    {
+      "case": "stream_insert_twice_raises",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.631
+    },
+    {
+      "case": "stream_insert_twice_raises",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.452
+    },
+    {
+      "case": "insert_twice_raises_in_catch_up",
+      "error": "invariant",
+      "form": "local",
+      "mode": "catch_up",
+      "seconds": 0.642
+    },
+    {
+      "case": "insert_twice_raises_in_catch_up",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "catch_up",
+      "seconds": 2.929
+    },
+    {
+      "case": "stream_insert_at_a_held_key_raises",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.908
+    },
+    {
+      "case": "stream_insert_at_a_held_key_raises",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.554
+    },
+    {
+      "case": "truncate_record_is_refused",
+      "error": "changeset",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.623
+    },
+    {
+      "case": "truncate_record_is_refused",
+      "error": "changeset",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.493
+    },
+    {
+      "case": "catch_up_reports_a_key_it_cannot_resolve",
+      "form": "local",
+      "idempotent": true,
+      "mode": "catch_up",
+      "seconds": 3.588,
+      "shapes": [
+        [
+          "lookup",
+          "K1",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        7
+      ],
+      "unresolved": 1
+    },
+    {
+      "case": "catch_up_reports_a_key_it_cannot_resolve",
+      "form": "relation",
+      "idempotent": true,
+      "mode": "catch_up",
+      "seconds": 9.655,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "lookup",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3",
+          "K6",
+          "plan",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        48
+      ],
+      "unresolved": 1
+    },
+    {
+      "case": "catch_up_takes_the_value_under_the_new_key",
+      "form": "local",
+      "idempotent": true,
+      "mode": "catch_up",
+      "seconds": 3.234,
+      "shapes": [
+        [
+          "lookup",
+          "K1",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3"
+        ]
+      ],
+      "statements": [
+        6
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "catch_up_takes_the_value_under_the_new_key",
+      "form": "relation",
+      "idempotent": true,
+      "mode": "catch_up",
+      "seconds": 9.604,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "lookup",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3",
+          "plan",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        47
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "catch_up_chain_is_idempotent",
+      "form": "local",
+      "idempotent": true,
+      "mode": "catch_up",
+      "seconds": 3.204,
+      "shapes": [
+        [
+          "lookup",
+          "K1",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3"
+        ]
+      ],
+      "statements": [
+        6
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "catch_up_chain_is_idempotent",
+      "form": "relation",
+      "idempotent": true,
+      "mode": "catch_up",
+      "seconds": 9.696,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "lookup",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3",
+          "plan",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        47
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "catch_up_insert_and_delete_leave_nothing_unresolved",
+      "form": "local",
+      "idempotent": true,
+      "mode": "catch_up",
+      "seconds": 1.319,
+      "shapes": [
+        [
+          "K1"
+        ]
+      ],
+      "statements": [
+        1
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "catch_up_insert_and_delete_leave_nothing_unresolved",
+      "form": "relation",
+      "idempotent": true,
+      "mode": "catch_up",
+      "seconds": 8.995,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "lookup",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "plan",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        43
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "catch_up_chain_in_one_transaction_resolves",
+      "form": "local",
+      "idempotent": true,
+      "mode": "catch_up",
+      "seconds": 3.206,
+      "shapes": [
+        [
+          "lookup",
+          "K1",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3"
+        ]
+      ],
+      "statements": [
+        6
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "catch_up_chain_in_one_transaction_resolves",
+      "form": "relation",
+      "idempotent": true,
+      "mode": "catch_up",
+      "seconds": 9.588,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "lookup",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3",
+          "plan",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        47
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "catch_up_swap_through_a_free_key_after_the_swap",
+      "form": "local",
+      "mode": "catch_up",
+      "seconds": 3.047,
+      "shapes": [
+        [
+          "lookup",
+          "K1"
+        ]
+      ],
+      "statements": [
+        2
+      ],
+      "unresolved": 2
+    },
+    {
+      "case": "catch_up_swap_through_a_free_key_after_the_swap",
+      "form": "relation",
+      "mode": "catch_up",
+      "seconds": 4.809,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "lookup",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "plan",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        43
+      ],
+      "unresolved": 2
+    },
+    {
+      "case": "catch_up_snapshot_after_the_move",
+      "form": "local",
+      "idempotent": true,
+      "mode": "catch_up",
+      "seconds": 3.244,
+      "shapes": [
+        [
+          "lookup",
+          "K1",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3"
+        ]
+      ],
+      "statements": [
+        6
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "catch_up_snapshot_after_the_move",
+      "form": "relation",
+      "idempotent": true,
+      "mode": "catch_up",
+      "seconds": 9.764,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "lookup",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K2",
+          "K3",
+          "K4.3",
+          "K5.3",
+          "plan",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        47
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "negative_zero_and_interval_form_complete_image",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.242,
+      "shapes": [
+        [
+          "K1",
+          "K6"
+        ]
+      ],
+      "statements": [
+        2
+      ]
+    },
+    {
+      "case": "negative_zero_and_interval_form_complete_image",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.175,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        35
+      ]
+    },
+    {
+      "case": "negative_zero_and_interval_form_partial_image",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 2.542,
+      "shapes": [
+        [
+          "K2",
+          "K3",
+          "K4.4",
+          "K5.4",
+          "K4.5",
+          "K5.5",
+          "K5.6",
+          "K5.7"
+        ]
+      ],
+      "statements": [
+        8
+      ]
+    },
+    {
+      "case": "negative_zero_and_interval_form_partial_image",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.673,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K2",
+          "K3",
+          "K4.4",
+          "K5.4",
+          "K4.5",
+          "K5.5",
+          "K5.6",
+          "K5.7",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        41
+      ]
+    },
+    {
+      "case": "zero_to_negative_zero_partial_image",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 2.554,
+      "shapes": [
+        [
+          "K2",
+          "K3",
+          "K4.4",
+          "K5.4",
+          "K4.5",
+          "K5.5",
+          "K5.6",
+          "K5.7"
+        ]
+      ],
+      "statements": [
+        8
+      ]
+    },
+    {
+      "case": "zero_to_negative_zero_partial_image",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.662,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K2",
+          "K3",
+          "K4.4",
+          "K5.4",
+          "K4.5",
+          "K5.5",
+          "K5.6",
+          "K5.7",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        41
+      ]
+    },
+    {
+      "case": "null_then_zero_over_a_negative_zero_slot",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 4.425,
+      "shapes": [
+        [
+          "K2",
+          "K3",
+          "K4.4",
+          "K5.4",
+          "K4.5",
+          "K5.5",
+          "K5.6",
+          "K5.7"
+        ],
+        [
+          "K2",
+          "K3",
+          "K4.4",
+          "K5.4",
+          "K4.5",
+          "K5.5",
+          "K5.6",
+          "K5.7"
+        ]
+      ],
+      "statements": [
+        8,
+        8
+      ]
+    },
+    {
+      "case": "null_then_zero_over_a_negative_zero_slot",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 8.706,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K2",
+          "K3",
+          "K4.4",
+          "K5.4",
+          "K4.5",
+          "K5.5",
+          "K5.6",
+          "K5.7",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K2",
+          "K3",
+          "K4.4",
+          "K5.4",
+          "K4.5",
+          "K5.5",
+          "K5.6",
+          "K5.7",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        41,
+        41
+      ]
+    },
+    {
+      "case": "null_then_zero_catch_up",
+      "form": "local",
+      "idempotent": true,
+      "mode": "catch_up",
+      "seconds": 4.587,
+      "shapes": [
+        [
+          "lookup",
+          "K2",
+          "K3",
+          "K4.4",
+          "K5.4",
+          "K4.5",
+          "K5.5",
+          "K5.6",
+          "K5.7"
+        ]
+      ],
+      "statements": [
+        9
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "null_then_zero_catch_up",
+      "form": "relation",
+      "idempotent": true,
+      "mode": "catch_up",
+      "seconds": 10.489,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "lookup",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K2",
+          "K3",
+          "K4.4",
+          "K5.4",
+          "K4.5",
+          "K5.5",
+          "K5.6",
+          "K5.7",
+          "plan",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        50
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "double_key_negative_zero_to_zero_with_unchanged",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.273,
+      "shapes": [
+        [
+          "C0",
+          "K7",
+          "K8"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "double_key_negative_zero_to_zero_with_unchanged",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.413,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "C0",
+          "C0",
+          "K7",
+          "K8",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        38
+      ]
+    },
+    {
+      "case": "double_key_negative_zero_to_zero_complete",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.313,
+      "shapes": [
+        [
+          "K1",
+          "K6"
+        ]
+      ],
+      "statements": [
+        2
+      ]
+    },
+    {
+      "case": "double_key_negative_zero_to_zero_complete",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.18,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        35
+      ]
+    },
+    {
+      "case": "interval_key_change_of_form_with_unchanged",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.231,
+      "shapes": [
+        [
+          "C0",
+          "K7",
+          "K8"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "interval_key_change_of_form_with_unchanged",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.547,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "C0",
+          "C0",
+          "K7",
+          "K8",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        38
+      ]
+    },
+    {
+      "case": "interval_key_delete_removes_only_its_form",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.012,
+      "shapes": [
+        [
+          "K1"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "interval_key_delete_removes_only_its_form",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.108,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        34
+      ]
+    },
+    {
+      "case": "composite_key_with_a_double_part_changing_form",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.244,
+      "shapes": [
+        [
+          "C0",
+          "K7",
+          "K8"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "composite_key_with_a_double_part_changing_form",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.467,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "C0",
+          "C0",
+          "K7",
+          "K8",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        38
+      ]
+    },
+    {
+      "case": "composite_key_changed_form_then_updated",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.837,
+      "shapes": [
+        [
+          "C0",
+          "K7",
+          "K8"
+        ],
+        [
+          "K1",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3,
+        2
+      ]
+    },
+    {
+      "case": "composite_key_changed_form_then_updated",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 8.181,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "C0",
+          "C0",
+          "K7",
+          "K8",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        38,
+        35
+      ]
+    },
+    {
+      "case": "date_key_beyond_the_timestamp_range",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.519,
+      "shapes": [
+        [
+          "K1",
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "date_key_beyond_the_timestamp_range",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.249,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        36
+      ]
+    },
+    {
+      "case": "review_B_two_forms_of_one_key_held_at_once",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.635
+    },
+    {
+      "case": "review_B_two_forms_of_one_key_held_at_once",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.585
+    },
+    {
+      "case": "double_keys_negative_zero_and_zero_are_two_keys",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.218,
+      "shapes": [
+        [
+          "K1",
+          "K6"
+        ]
+      ],
+      "statements": [
+        2
+      ]
+    },
+    {
+      "case": "double_keys_negative_zero_and_zero_are_two_keys",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.223,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        35
+      ]
+    },
+    {
+      "case": "key_type_int",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.51,
+      "shapes": [
+        [
+          "K1",
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "key_type_int",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.884,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        36
+      ]
+    },
+    {
+      "case": "key_type_bigint",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.506,
+      "shapes": [
+        [
+          "K1",
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "key_type_bigint",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.265,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        36
+      ]
+    },
+    {
+      "case": "key_type_decimal",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.493,
+      "shapes": [
+        [
+          "K1",
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "key_type_decimal",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.268,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        36
+      ]
+    },
+    {
+      "case": "key_type_double",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.501,
+      "shapes": [
+        [
+          "K1",
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "key_type_double",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.307,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        36
+      ]
+    },
+    {
+      "case": "key_type_varchar",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.537,
+      "shapes": [
+        [
+          "K1",
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "key_type_varchar",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.289,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        36
+      ]
+    },
+    {
+      "case": "key_type_blob",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.502,
+      "shapes": [
+        [
+          "K1",
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "key_type_blob",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.314,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        36
+      ]
+    },
+    {
+      "case": "key_type_uuid",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.512,
+      "shapes": [
+        [
+          "K1",
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "key_type_uuid",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.348,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        36
+      ]
+    },
+    {
+      "case": "key_type_date",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.505,
+      "shapes": [
+        [
+          "K1",
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "key_type_date",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.305,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        36
+      ]
+    },
+    {
+      "case": "key_type_ts",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.499,
+      "shapes": [
+        [
+          "K1",
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "key_type_ts",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.484,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        36
+      ]
+    },
+    {
+      "case": "key_type_timetz",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.673,
+      "shapes": [
+        [
+          "K1",
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "key_type_timetz",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 5.011,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        36
+      ]
+    },
+    {
+      "case": "key_type_interval",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.693,
+      "shapes": [
+        [
+          "K1",
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "key_type_interval",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 5.021,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        36
+      ]
+    },
+    {
+      "case": "composite_key_move_onto_deleted",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.442,
+      "shapes": [
+        [
+          "K1",
+          "K3"
+        ]
+      ],
+      "statements": [
+        2
+      ]
+    },
+    {
+      "case": "composite_key_move_onto_deleted",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.969,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        35
+      ]
+    },
+    {
+      "case": "infinite_date_keys_in_one_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.458,
+      "shapes": [
+        [
+          "K6"
+        ],
+        [
+          "K1",
+          "K3"
+        ]
+      ],
+      "statements": [
+        1,
+        2
+      ]
+    },
+    {
+      "case": "infinite_date_keys_in_one_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 8.813,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        34,
+        35
+      ]
+    },
+    {
+      "case": "infinite_timestamp_keys_in_one_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.463,
+      "shapes": [
+        [
+          "K6"
+        ],
+        [
+          "K1",
+          "K3"
+        ]
+      ],
+      "statements": [
+        1,
+        2
+      ]
+    },
+    {
+      "case": "infinite_timestamp_keys_in_one_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 8.828,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        34,
+        35
+      ]
+    },
+    {
+      "case": "infinite_timestamptz_keys_in_one_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.435,
+      "shapes": [
+        [
+          "K6"
+        ],
+        [
+          "K1",
+          "K3"
+        ]
+      ],
+      "statements": [
+        1,
+        2
+      ]
+    },
+    {
+      "case": "infinite_timestamptz_keys_in_one_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 8.779,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        34,
+        35
+      ]
+    },
+    {
+      "case": "uuid_keys_in_one_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.509,
+      "shapes": [
+        [
+          "K6"
+        ],
+        [
+          "K1",
+          "K3"
+        ]
+      ],
+      "statements": [
+        1,
+        2
+      ]
+    },
+    {
+      "case": "uuid_keys_in_one_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 8.882,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        34,
+        35
+      ]
+    },
+    {
+      "case": "json_keys_in_one_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.462,
+      "shapes": [
+        [
+          "K6"
+        ],
+        [
+          "K1",
+          "K3"
+        ]
+      ],
+      "statements": [
+        1,
+        2
+      ]
+    },
+    {
+      "case": "json_keys_in_one_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 8.969,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        34,
+        35
+      ]
+    },
+    {
+      "case": "keyless_json_uuid_in_one_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.092,
+      "shapes": [
+        [
+          "L2"
+        ],
+        [
+          "L1"
+        ]
+      ],
+      "statements": [
+        1,
+        1
+      ]
+    },
+    {
+      "case": "keyless_json_uuid_in_one_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.306,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L2",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L1",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        14,
+        14
+      ]
+    },
+    {
+      "case": "timetz_key_lookup_keeps_the_offset",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.112,
+      "shapes": [
+        [
+          "K1"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "timetz_key_lookup_keeps_the_offset",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 5.012,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        34
+      ]
+    },
+    {
+      "case": "timetz_key_unresolved_comes_back_with_its_offset",
+      "form": "local",
+      "mode": "catch_up",
+      "seconds": 1.107,
+      "shapes": [
+        [
+          "lookup",
+          "K1"
+        ]
+      ],
+      "statements": [
+        2
+      ],
+      "unresolved": 1
+    },
+    {
+      "case": "timetz_key_unresolved_comes_back_with_its_offset",
+      "form": "relation",
+      "mode": "catch_up",
+      "seconds": 5.856,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "lookup",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "plan",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        43
+      ],
+      "unresolved": 1
+    },
+    {
+      "case": "awkward_names",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.364,
+      "shapes": [
+        [
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        2
+      ]
+    },
+    {
+      "case": "awkward_names",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 5.21,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        35
+      ]
+    },
+    {
+      "case": "keyless_delete_one_of_three",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.136,
+      "shapes": [
+        [
+          "L1"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "keyless_delete_one_of_three",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.797,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L1",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        14
+      ]
+    },
+    {
+      "case": "keyless_update_one_of_three",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.362,
+      "shapes": [
+        [
+          "L1",
+          "L2"
+        ]
+      ],
+      "statements": [
+        2
+      ]
+    },
+    {
+      "case": "keyless_update_one_of_three",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.887,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L1",
+          "L2",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        15
+      ]
+    },
+    {
+      "case": "keyless_delete_more_than_present_raises",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.115
+    },
+    {
+      "case": "keyless_delete_more_than_present_raises",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.037
+    },
+    {
+      "case": "keyless_delete_missing_row_raises_in_catch_up_too",
+      "error": "invariant",
+      "form": "local",
+      "mode": "catch_up",
+      "seconds": 1.113
+    },
+    {
+      "case": "keyless_delete_missing_row_raises_in_catch_up_too",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "catch_up",
+      "seconds": 2.075
+    },
+    {
+      "case": "keyless_negative_zero_image_never_deletes_zero",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.181,
+      "shapes": [
+        [
+          "L1"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "keyless_negative_zero_image_never_deletes_zero",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.819,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L1",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        14
+      ]
+    },
+    {
+      "case": "keyless_negative_zero_to_zero_does_not_net_to_nothing",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.332,
+      "shapes": [
+        [
+          "L1",
+          "L2"
+        ]
+      ],
+      "statements": [
+        2
+      ]
+    },
+    {
+      "case": "keyless_negative_zero_to_zero_does_not_net_to_nothing",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.894,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L1",
+          "L2",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        15
+      ]
+    },
+    {
+      "case": "keyless_interval_forms_are_different_rows",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.155,
+      "shapes": [
+        [
+          "L1"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "keyless_interval_forms_are_different_rows",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.832,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L1",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        14
+      ]
+    },
+    {
+      "case": "keyless_nan_equals_nan",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.146,
+      "shapes": [
+        [
+          "L1"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "keyless_nan_equals_nan",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.804,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L1",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        14
+      ]
+    },
+    {
+      "case": "keyless_null_equals_null",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.134,
+      "shapes": [
+        [
+          "L1"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "keyless_null_equals_null",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.78,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L1",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        14
+      ]
+    },
+    {
+      "case": "keyless_union_members_differ",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.138,
+      "shapes": [
+        [
+          "L1"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "keyless_union_members_differ",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.862,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L1",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        14
+      ]
+    },
+    {
+      "case": "keyless_list_elements_compare_exactly",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.085,
+      "shapes": [
+        [
+          "L1"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "keyless_list_elements_compare_exactly",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.835,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L1",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        14
+      ]
+    },
+    {
+      "case": "keyless_insert_then_delete_in_the_same_set",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.394,
+      "shapes": [
+        [
+          "L1",
+          "L2"
+        ]
+      ],
+      "statements": [
+        2
+      ]
+    },
+    {
+      "case": "keyless_insert_then_delete_in_the_same_set",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.895,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L1",
+          "L2",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        15
+      ]
+    },
+    {
+      "case": "keyless_rows_inserted_by_the_same_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.672,
+      "shapes": [
+        [
+          "L2"
+        ],
+        [
+          "L1",
+          "L2"
+        ]
+      ],
+      "statements": [
+        1,
+        2
+      ]
+    },
+    {
+      "case": "keyless_rows_inserted_by_the_same_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 4.886,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L2",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L1",
+          "L2",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        14,
+        15
+      ]
+    },
+    {
+      "case": "keyless_unchanged_value_comes_from_the_old_image",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.365,
+      "shapes": [
+        [
+          "L1",
+          "L2"
+        ]
+      ],
+      "statements": [
+        2
+      ]
+    },
+    {
+      "case": "keyless_unchanged_value_comes_from_the_old_image",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.905,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L1",
+          "L2",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        15
+      ]
+    },
+    {
+      "case": "keyless_date_beyond_the_timestamp_range",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.082,
+      "shapes": [
+        [
+          "L1"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "keyless_date_beyond_the_timestamp_range",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.775,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L1",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        14
+      ]
+    },
+    {
+      "case": "keyless_with_a_column_named_rowid",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.326,
+      "shapes": [
+        [
+          "R1",
+          "L1",
+          "R2"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "keyless_with_a_column_named_rowid",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.975,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "R1",
+          "L1",
+          "R2",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        16
+      ]
+    },
+    {
+      "case": "round2_X1_form_change_then_move_onto_its_old_form",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.654,
+      "shapes": [
+        [
+          "C0",
+          "K3",
+          "K7",
+          "K8"
+        ]
+      ],
+      "statements": [
+        4
+      ]
+    },
+    {
+      "case": "round2_X1_form_change_then_move_onto_its_old_form",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 5.646,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "C0",
+          "C0",
+          "K3",
+          "K7",
+          "K8",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        39
+      ]
+    },
+    {
+      "case": "round2_X1_two_change_sets_one_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.77,
+      "shapes": [
+        [
+          "C0",
+          "K7",
+          "K8"
+        ],
+        [
+          "K3"
+        ]
+      ],
+      "statements": [
+        3,
+        1
+      ]
+    },
+    {
+      "case": "round2_X1_two_change_sets_one_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 9.918,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "C0",
+          "C0",
+          "K7",
+          "K8",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        38,
+        34
+      ]
+    },
+    {
+      "case": "round2_form_change_second_onto_a_moved_root",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.717,
+      "shapes": [
+        [
+          "C0",
+          "K3",
+          "K7",
+          "K8"
+        ]
+      ],
+      "statements": [
+        4
+      ]
+    },
+    {
+      "case": "round2_form_change_second_onto_a_moved_root",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 5.737,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "C0",
+          "C0",
+          "K3",
+          "K7",
+          "K8",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        39
+      ]
+    },
+    {
+      "case": "round2_two_form_changes_in_a_chain",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 2.054,
+      "shapes": [
+        [
+          "C0",
+          "K7",
+          "K8"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "round2_two_form_changes_in_a_chain",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 5.602,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "C0",
+          "C0",
+          "K7",
+          "K8",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        38
+      ]
+    },
+    {
+      "case": "round2_three_keys_in_a_ring_with_a_form_change",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 2.008,
+      "shapes": [
+        [
+          "K1",
+          "C0",
+          "K3",
+          "K7",
+          "K8"
+        ]
+      ],
+      "statements": [
+        5
+      ]
+    },
+    {
+      "case": "round2_three_keys_in_a_ring_with_a_form_change",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 5.814,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "C0",
+          "C0",
+          "K3",
+          "K7",
+          "K8",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        40
+      ]
+    },
+    {
+      "case": "round3_copy_root_inserted_earlier_in_the_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 2.287,
+      "shapes": [
+        [
+          "K6"
+        ],
+        [
+          "K1",
+          "C0",
+          "K3",
+          "K7",
+          "K8"
+        ]
+      ],
+      "statements": [
+        1,
+        5
+      ]
+    },
+    {
+      "case": "round3_copy_root_inserted_earlier_in_the_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 10.122,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "C0",
+          "C0",
+          "K3",
+          "K7",
+          "K8",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        34,
+        40
+      ]
+    },
+    {
+      "case": "round2_X1_interval_key_part",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.699,
+      "shapes": [
+        [
+          "C0",
+          "K3",
+          "K7",
+          "K8"
+        ]
+      ],
+      "statements": [
+        4
+      ]
+    },
+    {
+      "case": "round2_X1_interval_key_part",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 5.781,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "C0",
+          "C0",
+          "K3",
+          "K7",
+          "K8",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        39
+      ]
+    },
+    {
+      "case": "round2_4b_moves_of_a_doubled_and_a_missing_key_raise",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.111
+    },
+    {
+      "case": "round2_4b_moves_of_a_doubled_and_a_missing_key_raise",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.192
+    },
+    {
+      "case": "round2_4b_deletes_of_a_doubled_and_a_missing_key_raise",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.142
+    },
+    {
+      "case": "round2_4b_deletes_of_a_doubled_and_a_missing_key_raise",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.247
+    },
+    {
+      "case": "round2_4b_updates_of_a_doubled_and_a_missing_key_raise",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.118
+    },
+    {
+      "case": "round2_4b_updates_of_a_doubled_and_a_missing_key_raise",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.183
+    },
+    {
+      "case": "round2_copy_of_a_doubled_root_raises",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.875
+    },
+    {
+      "case": "round2_copy_of_a_doubled_root_raises",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.334
+    },
+    {
+      "case": "round2_insert_at_a_held_key_raises",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.024
+    },
+    {
+      "case": "round2_insert_at_a_held_key_raises",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.158
+    },
+    {
+      "case": "round2_insert_at_a_held_key_unchecked_with_the_switch_off",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.078,
+      "shapes": [
+        [
+          "K6"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "round2_insert_at_a_held_key_unchecked_with_the_switch_off",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 5.268,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        34
+      ]
+    },
+    {
+      "case": "round2_move_onto_a_held_free_key_raises",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.133
+    },
+    {
+      "case": "round2_move_onto_a_held_free_key_raises",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.253
+    },
+    {
+      "case": "round2_move_onto_a_held_free_key_unchecked_with_the_switch_off",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.097,
+      "shapes": [
+        [
+          "K3"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "round2_move_onto_a_held_free_key_unchecked_with_the_switch_off",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 5.238,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        34
+      ]
+    },
+    {
+      "case": "round2_copy_onto_a_held_free_key_raises",
+      "error": "invariant",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.303
+    },
+    {
+      "case": "round2_copy_onto_a_held_free_key_raises",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.515
+    },
+    {
+      "case": "round2_insert_only_is_one_statement",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.991,
+      "shapes": [
+        [
+          "K6"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "round2_insert_only_is_one_statement",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 5.231,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        34
+      ]
+    },
+    {
+      "case": "round2_catch_up_self_key_change_resolves",
+      "form": "local",
+      "idempotent": true,
+      "mode": "catch_up",
+      "seconds": 1.745,
+      "shapes": [
+        [
+          "lookup",
+          "K3"
+        ]
+      ],
+      "statements": [
+        2
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "round2_catch_up_self_key_change_resolves",
+      "form": "relation",
+      "idempotent": true,
+      "mode": "catch_up",
+      "seconds": 11.888,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "lookup",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K3",
+          "plan",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        43
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "round2_catch_up_self_key_change_loaded_after_the_pair_resolves",
+      "form": "local",
+      "mode": "catch_up",
+      "seconds": 1.111,
+      "shapes": [
+        [
+          "lookup",
+          "K3"
+        ]
+      ],
+      "statements": [
+        2
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "round2_catch_up_self_key_change_loaded_after_the_pair_resolves",
+      "form": "relation",
+      "mode": "catch_up",
+      "seconds": 6.533,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "lookup",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K3",
+          "plan",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        43
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "round2_catch_up_back_through_another_key_resolves",
+      "form": "local",
+      "mode": "catch_up",
+      "seconds": 1.433,
+      "shapes": [
+        [
+          "lookup",
+          "K1",
+          "K3"
+        ]
+      ],
+      "statements": [
+        3
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "round2_catch_up_back_through_another_key_resolves",
+      "form": "relation",
+      "mode": "catch_up",
+      "seconds": 6.395,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "lookup",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "plan",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        44
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "round2_catch_up_full_update_between_self_key_changes",
+      "form": "local",
+      "mode": "catch_up",
+      "seconds": 1.403,
+      "shapes": [
+        [
+          "K1",
+          "K6"
+        ]
+      ],
+      "statements": [
+        2
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "round2_catch_up_full_update_between_self_key_changes",
+      "form": "relation",
+      "mode": "catch_up",
+      "seconds": 6.516,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "lookup",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K6",
+          "plan",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        44
+      ],
+      "unresolved": 0
+    },
+    {
+      "case": "round2_catch_up_two_self_key_changes_stay_unresolved",
+      "form": "local",
+      "mode": "catch_up",
+      "seconds": 1.141,
+      "shapes": [
+        [
+          "lookup",
+          "K1"
+        ]
+      ],
+      "statements": [
+        2
+      ],
+      "unresolved": 1
+    },
+    {
+      "case": "round2_catch_up_two_self_key_changes_stay_unresolved",
+      "form": "relation",
+      "mode": "catch_up",
+      "seconds": 6.314,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "lookup",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "plan",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        43
+      ],
+      "unresolved": 1
+    }
+  ]
+}

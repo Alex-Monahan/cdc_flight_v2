@@ -1,0 +1,260 @@
+{
+ "actions": [
+  {
+   "action": "pause",
+   "round": 0,
+   "run": "r1",
+   "seconds": 2.96,
+   "t": 1.359
+  },
+  {
+   "action": "kill",
+   "round": 0,
+   "run": "r1",
+   "t": 2.179
+  },
+  {
+   "action": "start",
+   "round": 0,
+   "runs": [
+    "r4"
+   ],
+   "t": 3.07
+  },
+  {
+   "action": "fault",
+   "fault": "spill_full",
+   "round": 0,
+   "t": 3.67
+  },
+  {
+   "action": "fault",
+   "fault": "dest_delay",
+   "round": 0,
+   "t": 4.899
+  },
+  {
+   "action": "start",
+   "round": 1,
+   "runs": [
+    "r13"
+   ],
+   "t": 10.776
+  },
+  {
+   "action": "cancel",
+   "round": 1,
+   "run": "r4",
+   "t": 11.642
+  },
+  {
+   "action": "kill",
+   "round": 1,
+   "run": "r15",
+   "t": 12.902
+  },
+  {
+   "action": "pause",
+   "round": 1,
+   "skipped": "no run alive",
+   "t": 13.704
+  },
+  {
+   "action": "pause",
+   "round": 1,
+   "run": "r16",
+   "seconds": 4.01,
+   "t": 13.934
+  },
+  {
+   "action": "cancel",
+   "round": 2,
+   "run": "r17",
+   "t": 21.151
+  },
+  {
+   "action": "start",
+   "round": 2,
+   "runs": [
+    "r24"
+   ],
+   "t": 21.508
+  },
+  {
+   "action": "fault",
+   "fault": "net_latency",
+   "round": 2,
+   "t": 23.058
+  },
+  {
+   "action": "kill",
+   "round": 2,
+   "run": "r26",
+   "t": 23.63
+  },
+  {
+   "action": "pause",
+   "round": 2,
+   "skipped": "no run alive",
+   "t": 24.981
+  },
+  {
+   "action": "pause",
+   "round": 3,
+   "run": "r28",
+   "seconds": 3.69,
+   "t": 29.392
+  },
+  {
+   "action": "pause",
+   "round": 3,
+   "run": "r28",
+   "seconds": 4.78,
+   "t": 30.628
+  },
+  {
+   "action": "pause",
+   "round": 3,
+   "run": "r28",
+   "seconds": 0.61,
+   "t": 30.97
+  },
+  {
+   "action": "pause",
+   "round": 3,
+   "run": "r28",
+   "seconds": 0.6,
+   "t": 31.69
+  },
+  {
+   "action": "kill",
+   "round": 3,
+   "run": "r28",
+   "t": 31.965
+  },
+  {
+   "action": "pause",
+   "round": 3,
+   "run": "r34",
+   "seconds": 0.34,
+   "t": 32.463
+  },
+  {
+   "action": "pause",
+   "round": 3,
+   "run": "r34",
+   "seconds": 4.02,
+   "t": 33.039
+  },
+  {
+   "action": "start",
+   "round": 3,
+   "runs": [
+    "r37"
+   ],
+   "t": 33.562
+  }
+ ],
+ "campaign": "20261110T120811-c5aa",
+ "clean": false,
+ "commit": "ffdd6f4d03642758ebcff34819b9decba821113e",
+ "config": {
+  "catch_up_s": 60.0,
+  "newcomer_exit_s": 10.0,
+  "round_s": 6.0,
+  "rounds": 4,
+  "tick_s": 1.0
+ },
+ "counts": {
+  "actions": 23,
+  "rounds": 3,
+  "runs_started": 47,
+  "transactions": 2420,
+  "workload_rounds": 121
+ },
+ "duration_s": 46.366,
+ "failure_id": "leadership-toy-no_fence-replica-s1-ffdd6f4",
+ "faults": {
+  "net_latency": 1,
+  "spill_full": 1
+ },
+ "first_failure_s": 44.047,
+ "fuzzer": "leadership",
+ "no_effect": {
+  "dest_delay": 1
+ },
+ "observers": [
+  {
+   "check": "transfers",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "expected": 24000,
+    "sum": 24000
+   },
+   "longest_gap_s": 4.477,
+   "observations": 1560,
+   "seconds": 43.303,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "parent_child",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "orphan_parent_ids": 0,
+    "parents": 10,
+    "parents_with_wrong_count": 0,
+    "sample_orphans": [],
+    "sample_parent_id_count_children": []
+   },
+   "longest_gap_s": 4.476,
+   "observations": 1551,
+   "seconds": 43.305,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "debit_credit",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "credit_rows": 166,
+    "credits": 532728,
+    "debit_rows": 108,
+    "debits": 532728
+   },
+   "longest_gap_s": 4.476,
+   "observations": 1560,
+   "seconds": 43.305,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "large_marked",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "batches": 5,
+    "batches_partial_or_unmarked": 0,
+    "sample_batch_rows_marked": []
+   },
+   "longest_gap_s": 4.476,
+   "observations": 1559,
+   "seconds": 43.304,
+   "unavailable": 0,
+   "violations": 0
+  }
+ ],
+ "options": {},
+ "outcome": "violation",
+ "reason": "round 3: writer log: [{'two_writers': True, 'order': 1721, 'epoch': 6, 'after_epoch': 7, 'run': 'run34-43fd9b'}, {'two_writers': True, 'order': 1722, 'epoch': 6, 'after_epoch': 7, 'run': 'run34-43fd9b'}, {'two_writers': True, 'order': 1723, 'epoch': 6, 'after_epoch': 7, 'run': 'run34-43fd9b'}]",
+ "seed": 1,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T12:08:11Z",
+ "system": "toy-no_fence",
+ "system_spec": "toy:no_fence",
+ "tier": "local"
+}

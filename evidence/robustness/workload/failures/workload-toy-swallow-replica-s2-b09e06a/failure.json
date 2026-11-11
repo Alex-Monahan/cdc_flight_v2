@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+  "first_failure_s": 14.451,
+  "fixed_commit": null,
+  "fuzzer": "workload",
+  "id": "workload-toy-swallow-replica-s2-b09e06a",
+  "local_bundle": {
+    "campaign": "20261110T142020-5a63",
+    "dir": "bundle-workload-toy-swallow-replica-s2-b09e06a"
+  },
+  "outcome": "violation",
+  "reason": "consumer loop: parent_child 4 of 497 ([{\"parents_with_wrong_count\": 1, \"orphan_parent_ids\": 0, \"sample_parent_id_count_children\": [[3441, 2, 1]], \"sample_orphans\": [], \"parents\": 18, \"observation\": 494, \"t\": 13.595}])",
+  "regression_test": null,
+  "seed": 2,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-swallow",
+  "system_spec": "toy:swallow"
+}

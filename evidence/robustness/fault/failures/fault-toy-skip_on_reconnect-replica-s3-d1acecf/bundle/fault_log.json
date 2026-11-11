@@ -1,0 +1,47 @@
+[
+ {
+  "effect": true,
+  "error": null,
+  "kind": "src_terminate",
+  "params": {},
+  "proof": {
+   "backends": 1,
+   "nodes": [
+    "primary",
+    "replica"
+   ]
+  },
+  "t_heal": 7.1,
+  "t_inject": 6.976
+ },
+ {
+  "effect": true,
+  "error": null,
+  "kind": "src_terminate",
+  "params": {},
+  "proof": {
+   "backends": 1,
+   "nodes": [
+    "primary",
+    "replica"
+   ]
+  },
+  "t_heal": 0.587,
+  "t_inject": 0.462
+ },
+ {
+  "effect": true,
+  "error": null,
+  "kind": "src_terminate",
+  "params": {},
+  "proof": {
+   "backends": 1,
+   "nodes": [
+    "primary",
+    "replica"
+   ]
+  },
+  "t_heal": 2.299,
+  "t_inject": 2.173
+ }
+]

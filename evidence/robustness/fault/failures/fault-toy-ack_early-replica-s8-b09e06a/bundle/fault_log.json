@@ -1,0 +1,46 @@
+[
+ {
+  "effect": false,
+  "error": null,
+  "kind": "kill_point",
+  "params": {
+   "hang_s": 1.6917382341461134,
+   "hit": "seed:216734028946555:3",
+   "point": "toyrep.position_written"
+  },
+  "proof": {
+   "exit": {
+    "code": null,
+    "signal": 9,
+    "signal_name": "SIGKILL"
+   },
+   "fired": null,
+   "hit": null,
+   "instance": "i2"
+  },
+  "t_heal": 3.698,
+  "t_inject": 2.622
+ },
+ {
+  "effect": true,
+  "error": null,
+  "kind": "kill_point_later",
+  "params": {
+   "delay_ms": 1,
+   "hit": "seed:158970683029389:3",
+   "point": "toyrep.commit_sent"
+  },
+  "proof": {
+   "exit": {
+    "code": null,
+    "signal": 9,
+    "signal_name": "SIGKILL"
+   },
+   "fired": "toyrep.commit_sent",
+   "hit": 2,
+   "instance": "i3"
+  },
+  "t_heal": 5.883,
+  "t_inject": 3.638
+ }
+]

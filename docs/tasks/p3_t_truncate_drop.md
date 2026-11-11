@@ -65,6 +65,14 @@ or contract C7 says elsewhere, these points and that document hold.
 - Publication membership is decided when a transaction is decoded: a transaction that wrote a table before it
   joined the publication and committed after is delivered with all its rows (`source.md` section 7).
 
+## From the cut as built (package X)
+
+`catalog.observe` is a cut. On a standby its bracket comes from the takers of `cdc_v2.pg.cut` with the connection's
+settle floor, and `b ≥ group_end` is the `R0 ≥ P0` check. On a primary an observation is usable for `group_end` only
+if the `GapMark` that package S hands you at `group_end` admits it (a DDL can be decoded before snapshots see it).
+An observation made on a node other than the stream's is used only if `valid_on` holds. (Contract C9,
+`docs/design/cut.md` 13.4.)
+
 ## What may be missing when you start
 
 Packages S and B are merged, and with them X, E, D, A, P, Y, O and H. Packages V, L and F may or may not be.

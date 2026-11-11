@@ -1,0 +1,17 @@
+{"epoch": 1, "kind": "took_over", "pid": 1748, "previous_age_ms": 847652441804, "previous_state": "released", "run": "i1-1748", "t": 1794337241.806345, "tag": "i1"}
+{"epoch": 1, "kind": "started", "pid": 1748, "run": "i1-1748", "t": 1794337241.808467, "tag": "i1", "variant": "swallow"}
+{"kind": "resync_start", "pid": 1748, "run": "i1-1748", "t": 1794337241.831229, "tag": "i1", "why": "pending"}
+{"kind": "resync_done", "pid": 1748, "position": "0/4FB4CC50", "rows": 24, "run": "i1-1748", "t": 1794337242.079317, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 1748, "position": 1337348016, "run": "i1-1748", "t": 1794337242.192115, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 1748, "position": 1337453184, "run": "i1-1748", "t": 1794337242.509636, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 1748, "position": 1337500368, "run": "i1-1748", "t": 1794337242.787371, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 1748, "position": 1337678448, "run": "i1-1748", "t": 1794337243.330801, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 1748, "position": 1337813992, "run": "i1-1748", "t": 1794337243.89599, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 1748, "position": 1338161896, "run": "i1-1748", "t": 1794337244.614077, "tag": "i1"}
+{"kind": "apply_error_ignored", "pid": 1748, "run": "i1-1748", "t": 1794337244.815623, "table": "public.w_k0", "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 1748, "position": 1338344408, "run": "i1-1748", "t": 1794337245.213498, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 1748, "position": 1338787208, "run": "i1-1748", "t": 1794337245.57916, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 1748, "position": 1338964128, "run": "i1-1748", "t": 1794337245.717012, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 1748, "position": 1339036608, "run": "i1-1748", "t": 1794337245.918648, "tag": "i1"}
+{"kind": "apply_error_ignored", "pid": 1748, "run": "i1-1748", "t": 1794337246.165292, "table": "public.w_xfer_0", "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 1748, "position": 1339145392, "run": "i1-1748", "t": 1794337246.178177, "tag": "i1"}

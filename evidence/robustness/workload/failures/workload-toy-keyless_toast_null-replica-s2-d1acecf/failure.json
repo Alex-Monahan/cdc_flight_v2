@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "d1acecfb2f0696a8a4a6701242d459d4c75e301a",
+  "first_failure_s": 11.299,
+  "fixed_commit": null,
+  "fuzzer": "workload",
+  "id": "workload-toy-keyless_toast_null-replica-s2-d1acecf",
+  "local_bundle": {
+    "campaign": "20261110T190147-f075",
+    "dir": "bundle-workload-toy-keyless_toast_null-replica-s2-d1acecf"
+  },
+  "outcome": "diverged",
+  "reason": "oracle: public.w_nkt missing 23 extra 2 different 0",
+  "regression_test": null,
+  "seed": 2,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-keyless_toast_null",
+  "system_spec": "toy:keyless_toast_null"
+}

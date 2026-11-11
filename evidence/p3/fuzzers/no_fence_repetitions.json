@@ -1,0 +1,250 @@
+{
+  "about": "no_fence under the leadership fuzzer with the fence drill in every seed (fix round 2, item 4): one seed per run, one round after the drill; found = a violation of the writer log in that first seed.",
+  "command": "tools/fuzz run --fuzzer leadership --system toy:no_fence --seeds 101..125 --rounds 1 --workers 2",
+  "found_by": {
+    "drill toyrep.commit_sent": 2,
+    "drill toyrep.fenced": 10,
+    "drill toyrep.slot_advanced": 12
+  },
+  "found_in_first_seed": 24,
+  "harness_errors": [
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 11.888,
+      "found_in": null,
+      "outcome": "error",
+      "reason": "PermissionError: [Errno 1] Operation not permitted | ip.py\", line 251, in _drill /     r.proc.kill_tree() /     ~~~~~~~~~~~~~~~~^^ /   File \"<repo>/src/cdc_v2/testing/procs.py\", line 198, in kill_tree",
+      "seed": 114
+    }
+  ],
+  "not_found": [],
+  "repetitions": [
+    {
+      "clean": true,
+      "commit": "1d9a3d9",
+      "first_failure_s": 12.684,
+      "found_in": "drill toyrep.fenced",
+      "outcome": "violation",
+      "reason": "drill toyrep.fenced: writer log: [{'two_writers': True, 'order': 307, 'epoch': 2, 'after_epoch': 3, 'run': 'run2-8570c3'}, {'two_writers': True, 'order': 308, 'epoch': 2, 'after_epoch': 3, 'run': 'run",
+      "seed": 101
+    },
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 34.533,
+      "found_in": "drill toyrep.slot_advanced",
+      "outcome": "violation",
+      "reason": "drill toyrep.slot_advanced: writer log: [{'two_writers': True, 'order': 799, 'epoch': 4, 'after_epoch': 5, 'run': 'run18-6f8bc5'}, {'two_writers': True, 'order': 800, 'epoch': 4, 'after_epoch': 5, 'ru",
+      "seed": 102
+    },
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 23.744,
+      "found_in": "drill toyrep.commit_sent",
+      "outcome": "violation",
+      "reason": "drill toyrep.commit_sent: writer log: [{'two_writers': True, 'order': 492, 'epoch': 3, 'after_epoch': 4, 'run': 'run10-fb6435'}, {'two_writers': True, 'order': 493, 'epoch': 3, 'after_epoch': 4, 'run'",
+      "seed": 103
+    },
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 12.797,
+      "found_in": "drill toyrep.fenced",
+      "outcome": "violation",
+      "reason": "drill toyrep.fenced: writer log: [{'two_writers': True, 'order': 76, 'epoch': 2, 'after_epoch': 3, 'run': 'run2-146ed6'}, {'two_writers': True, 'order': 77, 'epoch': 2, 'after_epoch': 3, 'run': 'run2-",
+      "seed": 104
+    },
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 12.866,
+      "found_in": "drill toyrep.fenced",
+      "outcome": "violation",
+      "reason": "drill toyrep.fenced: writer log: [{'two_writers': True, 'order': 94, 'epoch': 2, 'after_epoch': 3, 'run': 'run2-a2526e'}, {'two_writers': True, 'order': 95, 'epoch': 2, 'after_epoch': 3, 'run': 'run2-",
+      "seed": 105
+    },
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 35.39,
+      "found_in": "drill toyrep.slot_advanced",
+      "outcome": "violation",
+      "reason": "drill toyrep.slot_advanced: writer log: [{'two_writers': True, 'order': 956, 'epoch': 4, 'after_epoch': 5, 'run': 'run20-34107b'}, {'two_writers': True, 'order': 957, 'epoch': 4, 'after_epoch': 5, 'ru",
+      "seed": 106
+    },
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 23.963,
+      "found_in": "drill toyrep.commit_sent",
+      "outcome": "violation",
+      "reason": "drill toyrep.commit_sent: writer log: [{'two_writers': True, 'order': 451, 'epoch': 3, 'after_epoch': 4, 'run': 'run11-c41418'}, {'two_writers': True, 'order': 452, 'epoch': 3, 'after_epoch': 4, 'run'",
+      "seed": 107
+    },
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 34.8,
+      "found_in": "drill toyrep.slot_advanced",
+      "outcome": "violation",
+      "reason": "drill toyrep.slot_advanced: writer log: [{'two_writers': True, 'order': 887, 'epoch': 4, 'after_epoch': 5, 'run': 'run20-d4fe27'}, {'two_writers': True, 'order': 888, 'epoch': 4, 'after_epoch': 5, 'ru",
+      "seed": 108
+    },
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 13.123,
+      "found_in": "drill toyrep.fenced",
+      "outcome": "violation",
+      "reason": "drill toyrep.fenced: writer log: [{'two_writers': True, 'order': 244, 'epoch': 2, 'after_epoch': 3, 'run': 'run2-4bcee4'}, {'two_writers': True, 'order': 245, 'epoch': 2, 'after_epoch': 3, 'run': 'run",
+      "seed": 109
+    },
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 33.528,
+      "found_in": "drill toyrep.slot_advanced",
+      "outcome": "violation",
+      "reason": "drill toyrep.slot_advanced: writer log: [{'two_writers': True, 'order': 767, 'epoch': 4, 'after_epoch': 5, 'run': 'run20-45a54a'}, {'two_writers': True, 'order': 768, 'epoch': 4, 'after_epoch': 5, 'ru",
+      "seed": 110
+    },
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 34.916,
+      "found_in": "drill toyrep.slot_advanced",
+      "outcome": "violation",
+      "reason": "drill toyrep.slot_advanced: writer log: [{'two_writers': True, 'order': 836, 'epoch': 4, 'after_epoch': 5, 'run': 'run19-fb350b'}, {'two_writers': True, 'order': 837, 'epoch': 4, 'after_epoch': 5, 'ru",
+      "seed": 111
+    },
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 34.523,
+      "found_in": "drill toyrep.slot_advanced",
+      "outcome": "violation",
+      "reason": "drill toyrep.slot_advanced: writer log: [{'two_writers': True, 'order': 1062, 'epoch': 4, 'after_epoch': 5, 'run': 'run19-455b61'}, {'two_writers': True, 'order': 1063, 'epoch': 4, 'after_epoch': 5, '",
+      "seed": 112
+    },
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 12.454,
+      "found_in": "drill toyrep.fenced",
+      "outcome": "violation",
+      "reason": "drill toyrep.fenced: writer log: [{'two_writers': True, 'order': 100, 'epoch': 2, 'after_epoch': 3, 'run': 'run2-0ae2c8'}, {'two_writers': True, 'order': 101, 'epoch': 2, 'after_epoch': 3, 'run': 'run",
+      "seed": 113
+    },
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 11.888,
+      "found_in": null,
+      "outcome": "error",
+      "reason": "PermissionError: [Errno 1] Operation not permitted | ip.py\", line 251, in _drill /     r.proc.kill_tree() /     ~~~~~~~~~~~~~~~~^^ /   File \"<repo>/src/cdc_v2/testing/procs.py\", line 198, in kill_tree",
+      "seed": 114
+    },
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 33.389,
+      "found_in": "drill toyrep.slot_advanced",
+      "outcome": "violation",
+      "reason": "drill toyrep.slot_advanced: writer log: [{'two_writers': True, 'order': 810, 'epoch': 4, 'after_epoch': 5, 'run': 'run18-edfd5f'}, {'two_writers': True, 'order': 811, 'epoch': 4, 'after_epoch': 5, 'ru",
+      "seed": 115
+    },
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 13.51,
+      "found_in": "drill toyrep.fenced",
+      "outcome": "violation",
+      "reason": "drill toyrep.fenced: writer log: [{'two_writers': True, 'order': 190, 'epoch': 2, 'after_epoch': 3, 'run': 'run2-5adf78'}, {'two_writers': True, 'order': 191, 'epoch': 2, 'after_epoch': 3, 'run': 'run",
+      "seed": 116
+    },
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 33.4,
+      "found_in": "drill toyrep.slot_advanced",
+      "outcome": "violation",
+      "reason": "drill toyrep.slot_advanced: writer log: [{'two_writers': True, 'order': 845, 'epoch': 4, 'after_epoch': 5, 'run': 'run19-d17fb6'}, {'two_writers': True, 'order': 846, 'epoch': 4, 'after_epoch': 5, 'ru",
+      "seed": 117
+    },
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 12.59,
+      "found_in": "drill toyrep.fenced",
+      "outcome": "violation",
+      "reason": "drill toyrep.fenced: writer log: [{'two_writers': True, 'order': 96, 'epoch': 2, 'after_epoch': 3, 'run': 'run2-61f653'}, {'two_writers': True, 'order': 97, 'epoch': 2, 'after_epoch': 3, 'run': 'run2-",
+      "seed": 118
+    },
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 12.334,
+      "found_in": "drill toyrep.fenced",
+      "outcome": "violation",
+      "reason": "drill toyrep.fenced: writer log: [{'two_writers': True, 'order': 92, 'epoch': 2, 'after_epoch': 3, 'run': 'run2-212318'}, {'two_writers': True, 'order': 93, 'epoch': 2, 'after_epoch': 3, 'run': 'run2-",
+      "seed": 119
+    },
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 34.705,
+      "found_in": "drill toyrep.slot_advanced",
+      "outcome": "violation",
+      "reason": "drill toyrep.slot_advanced: writer log: [{'two_writers': True, 'order': 972, 'epoch': 4, 'after_epoch': 5, 'run': 'run19-055a87'}, {'two_writers': True, 'order': 973, 'epoch': 4, 'after_epoch': 5, 'ru",
+      "seed": 120
+    },
+    {
+      "clean": true,
+      "commit": "4af4006",
+      "first_failure_s": 34.606,
+      "found_in": "drill toyrep.slot_advanced",
+      "outcome": "violation",
+      "reason": "drill toyrep.slot_advanced: writer log: [{'two_writers': True, 'order': 827, 'epoch': 4, 'after_epoch': 5, 'run': 'run20-c0bb68'}, {'two_writers': True, 'order': 828, 'epoch': 4, 'after_epoch': 5, 'ru",
+      "seed": 121
+    },
+    {
+      "clean": true,
+      "commit": "d24ed79",
+      "first_failure_s": 13.355,
+      "found_in": "drill toyrep.fenced",
+      "outcome": "violation",
+      "reason": "drill toyrep.fenced: writer log: [{'two_writers': True, 'order': 115, 'epoch': 2, 'after_epoch': 3, 'run': 'run2-df527e'}, {'two_writers': True, 'order': 116, 'epoch': 2, 'after_epoch': 3, 'run': 'run",
+      "seed": 122
+    },
+    {
+      "clean": true,
+      "commit": "d24ed79",
+      "first_failure_s": 33.616,
+      "found_in": "drill toyrep.slot_advanced",
+      "outcome": "violation",
+      "reason": "drill toyrep.slot_advanced: writer log: [{'two_writers': True, 'order': 911, 'epoch': 4, 'after_epoch': 5, 'run': 'run18-7e5070'}, {'two_writers': True, 'order': 912, 'epoch': 4, 'after_epoch': 5, 'ru",
+      "seed": 123
+    },
+    {
+      "clean": true,
+      "commit": "d24ed79",
+      "first_failure_s": 34.823,
+      "found_in": "drill toyrep.slot_advanced",
+      "outcome": "violation",
+      "reason": "drill toyrep.slot_advanced: writer log: [{'two_writers': True, 'order': 709, 'epoch': 4, 'after_epoch': 5, 'run': 'run18-dc36c4'}, {'two_writers': True, 'order': 710, 'epoch': 4, 'after_epoch': 5, 'ru",
+      "seed": 124
+    },
+    {
+      "clean": true,
+      "commit": "d24ed79",
+      "first_failure_s": 13.708,
+      "found_in": "drill toyrep.fenced",
+      "outcome": "violation",
+      "reason": "drill toyrep.fenced: writer log: [{'two_writers': True, 'order': 112, 'epoch': 2, 'after_epoch': 3, 'run': 'run2-596579'}, {'two_writers': True, 'order': 113, 'epoch': 2, 'after_epoch': 3, 'run': 'run",
+      "seed": 125
+    }
+  ],
+  "runs": 25
+}

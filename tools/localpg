@@ -316,6 +316,97 @@ def postmaster_of(cfg, name):
     return Postmaster(pid, start, port, status)
 
 
+# --------------------------------------------------------------------------------------------------- shared memory
+#
+# Postgres keeps one small System V shared-memory segment per running server (the kernel allows few:
+# kern.sysv.shmmni, 32 on macOS). A clean stop removes it; a killed server leaves it, and only the next start in the
+# same data directory removes it. So before a data directory is deleted, the segment named in its postmaster.pid is
+# released here. The only way to a segment is the pid file of a data directory of this home (never "what looks like
+# ours"), and it is removed only if the postmaster named there is dead, the segment with that id has that key, no
+# process is attached and its creator is that postmaster.
+
+KEEP_SEGMENTS_ENV = "CDC_V2_LOCALPG_KEEP_SEGMENTS"     # test only: the old behaviour (negative control)
+
+
+def segment_of(data):
+    """(pid, key, id) from a data directory's postmaster.pid, or None."""
+    try:
+        with open(os.path.join(data, "postmaster.pid")) as f:
+            lines = f.read().splitlines()
+        pid = int(lines[0])
+        key, shmid = (int(x) for x in lines[6].split())
+    except (OSError, ValueError, IndexError):
+        return None
+    return pid, key, shmid
+
+
+def segment_row(shmid):
+    """{key, nattch, cpid} of the segment with this id (one `ipcs` call), or None when it does not exist."""
+    p = run(["/usr/bin/ipcs", "-m", "-a"], T_QUICK, check=False)
+    header = None
+    for line in p.stdout.splitlines():
+        parts = line.split()
+        if parts and parts[0] == "T":
+            header = parts
+            continue
+        if header and parts and parts[0] == "m" and len(parts) >= len(header) and parts[1] == str(shmid):
+            row = dict(zip(header, parts))
+            try:
+                return {"key": int(row["KEY"], 16), "nattch": int(row["NATTCH"]), "cpid": int(row["CPID"])}
+            except (KeyError, ValueError):
+                return None
+    return None
+
+
+def segment_count():
+    p = run(["/usr/bin/ipcs", "-m"], T_QUICK, check=False)
+    return sum(1 for line in p.stdout.splitlines() if line.startswith("m "))
+
+
+def segment_limit():
+    p = run(["/usr/sbin/sysctl", "-n", "kern.sysv.shmmni"], T_QUICK, check=False)
+    return p.stdout.strip() or "unknown"
+
+
+def release_segment(cfg, name, wait=10.0):
+    """Release the segment of a node whose postmaster is dead. Returns a short description, or None when there was
+    nothing to release. Raises Fail when a process stays attached (the directory must then not be deleted)."""
+    if os.environ.get(KEEP_SEGMENTS_ENV) == "1":
+        return None
+    data = cfg.data_dir(name)
+    seg = segment_of(data)
+    if seg is None or postmaster_of(cfg, name) is not None:
+        return None                              # no pid file, or the server runs: it owns its segment
+    pid, key, shmid = seg
+    deadline = time.time() + wait
+    while True:
+        row = segment_row(shmid)
+        if row is None or row["key"] != key or row["cpid"] != pid:
+            return None                          # gone, or not the segment this pid file names
+        if row["nattch"] == 0:
+            break
+        if time.time() >= deadline:
+            raise Fail("%s: shared-memory segment %d still has %d attached processes; refusing to delete the data "
+                       "directory" % (name, shmid, row["nattch"]))
+        time.sleep(0.2)                          # backends notice the death of the postmaster
+    p = run(["/usr/bin/ipcrm", "-m", str(shmid)], T_QUICK, check=False)
+    if p.returncode != 0:
+        raise Fail("%s: ipcrm -m %d failed: %s" % (name, shmid, (p.stderr or p.stdout).strip()))
+    return "released shared-memory segment %d of %s" % (shmid, name)
+
+
+def release_dead_segments(cfg):
+    """For every data directory of this home whose postmaster is dead: release its segment."""
+    out = []
+    if os.path.isdir(cfg.nodes_dir):
+        for n in sorted(os.listdir(cfg.nodes_dir)):
+            if os.path.isdir(cfg.data_dir(n)):
+                r = release_segment(cfg, n)
+                if r:
+                    out.append(r)
+    return out
+
+
 def process_stopped(pid):
     st = run(["/bin/ps", "-o", "stat=", "-p", str(pid)], T_QUICK, check=False).stdout.strip()
     return not st or st.startswith("T")
@@ -588,7 +679,11 @@ def start_node(cfg, name, wait=True):
     cmd = [cfg.bin("pg_ctl"), "start", "-D", data, "-l", log, "-t", "60"] + (["-w"] if wait else ["-W"])
     p = run(cmd, T_CTL, cfg=cfg, check=False)
     if p.returncode != 0:
-        raise Fail("%s did not start: %s (log: %s)" % (name, last_log_error(log, size), log))
+        err = last_log_error(log, size)
+        if "could not create shared memory segment" in err:
+            err += " [%d System V shared-memory segments exist; the limit kern.sysv.shmmni is %s]" % (
+                segment_count(), segment_limit())
+        raise Fail("%s did not start: %s (log: %s)" % (name, err, log))
     return True
 
 
@@ -706,6 +801,7 @@ def current_primary(cfg, st, explicit=None):
 def init_primary(cfg, st, name, port):
     creds = load_passwords(cfg)
     data = cfg.data_dir(name)
+    release_segment(cfg, name)
     shutil.rmtree(os.path.dirname(data), ignore_errors=True)
     os.makedirs(os.path.dirname(data), mode=0o700)
     pwfile = os.path.join(cfg.secrets_dir, "initdb.pw")
@@ -748,6 +844,7 @@ def create_standby(cfg, st, name, port, upstream):
     psql(cfg, upport, "select pg_create_physical_replication_slot({s}, true) where not exists "
                       "(select 1 from pg_replication_slots where slot_name = {s});".format(s=lit(slot)))
     data = cfg.data_dir(name)
+    release_segment(cfg, name)
     shutil.rmtree(os.path.dirname(data), ignore_errors=True)
     os.makedirs(os.path.dirname(data), mode=0o700)
     run([cfg.bin("pg_basebackup"), "-h", cfg.run_dir, "-p", str(upport), "-U", BOOT, "-w", "-D", data,
@@ -775,6 +872,7 @@ def remove_node(cfg, st, name):
     stop_node(cfg, name)
     if node.get("slot"):
         drop_slot_on(cfg, st, node.get("upstream"), node["slot"])
+    release_segment(cfg, name)
     shutil.rmtree(os.path.join(cfg.nodes_dir, name), ignore_errors=True)
     del st["nodes"][name]
     save_state(cfg, st)
@@ -790,6 +888,8 @@ def stop_everything_found(cfg, kill=False):
         if os.path.isdir(cfg.data_dir(n)):
             if (hard_kill(cfg, n) if kill else stop_node(cfg, n)):
                 stopped.append(n)
+    for r in release_dead_segments(cfg):        # killed nodes too: their pid files name their segments
+        note(r)
     return stopped
 
 

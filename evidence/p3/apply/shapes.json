@@ -1,0 +1,69 @@
+{
+  "change_sets": 120,
+  "one_text_per_shape": true,
+  "shape_bound": 13,
+  "shapes": {
+    "K1": "DELETE FROM \"s\".\"t\" AS t USING cdc_v2_apply_del AS n WHERE t.\"id\" = n.x0 AND (NOT EXISTS (SELECT 1 FROM (SELECT m.x0, m.p, count(t2.\"id\") AS c FROM cdc_v2_apply_del AS m LEFT JOIN \"s\".\"t\" AS t2 ON t2.\"id\" = m.x0 GROUP BY ALL) AS q WHERE q.c <> q.p) OR NOT EXISTS (SELECT 1 FROM cdc_v2_apply_del AS m3 WHERE m3.p = 1))",
+    "K2": "UPDATE \"s\".\"t\" AS t SET \"d\" = CASE WHEN (n.a5 IS NOT NULL AND (CASE WHEN isnan(t.\"d\") THEN 9221120237041090560 ELSE CAST(CAST(t.\"d\" AS BIT) AS BIGINT) END) IS DISTINCT FROM (CASE WHEN isnan(n.a5) THEN 9221120237041090560 ELSE CAST(CAST(n.a5 AS BIT) AS BIGINT) END)) THEN CAST(CASE WHEN n.a5 = 1 THEN 2 ELSE 1 END AS DOUBLE) ELSE t.\"d\" END, \"w\" = CASE WHEN (n.a6 IS NOT NULL AND CAST(t.\"w\" AS VARCHAR) IS DISTINCT FROM CAST(n.a6 AS VARCHAR)) THEN (CASE WHEN n.a6 = INTERVAL '1 microsecond' THEN INTERVAL '2 microseconds' ELSE INTERVAL '1 microsecond' END) ELSE t.\"w\" END FROM cdc_v2_apply_upd AS n WHERE t.\"id\" = n.rx0 AND ((n.a5 IS NOT NULL AND (CASE WHEN isnan(t.\"d\") THEN 9221120237041090560 ELSE CAST(CAST(t.\"d\" AS BIT) AS BIGINT) END) IS DISTINCT FROM (CASE WHEN isnan(n.a5) THEN 9221120237041090560 ELSE CAST(CAST(n.a5 AS BIT) AS BIGINT) END)) OR (n.a6 IS NOT NULL AND CAST(t.\"w\" AS VARCHAR) IS DISTINCT FROM CAST(n.a6 AS VARCHAR)))",
+    "K3": "UPDATE \"s\".\"t\" AS t SET \"id\" = n.a0, \"d\" = n.a5, \"w\" = n.a6 FROM (SELECT n.* FROM (SELECT n.* FROM cdc_v2_apply_upd AS n WHERE n.xp = 1 UNION ALL SELECT n.* FROM cdc_v2_apply_upd AS n ANTI JOIN \"s\".\"t\" AS t3 ON t3.\"id\" = n.x0 WHERE n.xp = 0) AS n JOIN (SELECT m.rx0, count(t2.\"id\") AS c FROM cdc_v2_apply_upd AS m JOIN \"s\".\"t\" AS t2 ON t2.\"id\" = m.rx0 GROUP BY ALL) AS q ON n.rx0 = q.rx0 WHERE q.c = 1) AS n WHERE t.\"id\" = n.rx0",
+    "K4.2": "UPDATE \"s\".\"t\" AS t SET \"iv\" = (CASE WHEN n.a2 = INTERVAL '1 microsecond' THEN INTERVAL '2 microseconds' ELSE INTERVAL '1 microsecond' END) FROM cdc_v2_apply_upd AS n WHERE t.\"id\" = n.x0 AND n.h2 AND (n.a2 IS NOT NULL AND CAST(t.\"iv\" AS VARCHAR) IS DISTINCT FROM CAST(n.a2 AS VARCHAR))",
+    "K4.3": "UPDATE \"s\".\"t\" AS t SET \"st\" = (CASE WHEN n.a3 IS NULL THEN NULL ELSE CAST(struct_pack(\"a\" := CAST(CASE WHEN struct_extract(n.a3, 'a') = 1 THEN 2 ELSE 1 END AS DOUBLE), \"b\" := struct_extract(n.a3, 'b')) AS STRUCT(\"a\" DOUBLE, \"b\" VARCHAR)) END) FROM cdc_v2_apply_upd AS n WHERE t.\"id\" = n.x0 AND n.h3 AND (n.a3 IS NOT NULL AND (CASE WHEN t.\"st\" IS NULL THEN NULL ELSE struct_pack(\"a\" := (CASE WHEN isnan(struct_extract(t.\"st\", 'a')) THEN 9221120237041090560 ELSE CAST(CAST(struct_extract(t.\"st\", 'a') AS BIT) AS BIGINT) END), \"b\" := struct_extract(t.\"st\", 'b')) END) IS DISTINCT FROM (CASE WHEN n.a3 IS NULL THEN NULL ELSE struct_pack(\"a\" := (CASE WHEN isnan(struct_extract(n.a3, 'a')) THEN 9221120237041090560 ELSE CAST(CAST(struct_extract(n.a3, 'a') AS BIT) AS BIGINT) END), \"b\" := struct_extract(n.a3, 'b')) END))",
+    "K5.1": "UPDATE \"s\".\"t\" AS t SET \"big\" = n.a1 FROM cdc_v2_apply_upd AS n WHERE t.\"id\" = n.x0 AND n.h1 AND t.\"big\" IS DISTINCT FROM n.a1",
+    "K5.2": "UPDATE \"s\".\"t\" AS t SET \"iv\" = n.a2 FROM cdc_v2_apply_upd AS n WHERE t.\"id\" = n.x0 AND n.h2 AND CAST(t.\"iv\" AS VARCHAR) IS DISTINCT FROM CAST(n.a2 AS VARCHAR)",
+    "K5.3": "UPDATE \"s\".\"t\" AS t SET \"st\" = n.a3 FROM cdc_v2_apply_upd AS n WHERE t.\"id\" = n.x0 AND n.h3 AND (CASE WHEN t.\"st\" IS NULL THEN NULL ELSE struct_pack(\"a\" := (CASE WHEN isnan(struct_extract(t.\"st\", 'a')) THEN 9221120237041090560 ELSE CAST(CAST(struct_extract(t.\"st\", 'a') AS BIT) AS BIGINT) END), \"b\" := struct_extract(t.\"st\", 'b')) END) IS DISTINCT FROM (CASE WHEN n.a3 IS NULL THEN NULL ELSE struct_pack(\"a\" := (CASE WHEN isnan(struct_extract(n.a3, 'a')) THEN 9221120237041090560 ELSE CAST(CAST(struct_extract(n.a3, 'a') AS BIT) AS BIGINT) END), \"b\" := struct_extract(n.a3, 'b')) END)",
+    "K5.4": "UPDATE \"s\".\"t\" AS t SET \"l\" = n.a4 FROM cdc_v2_apply_upd AS n WHERE t.\"id\" = n.x0 AND n.h4 AND t.\"l\" IS DISTINCT FROM n.a4",
+    "K6": "INSERT INTO \"s\".\"t\" (\"id\", \"big\", \"iv\", \"st\", \"l\", \"d\", \"w\") SELECT n.a0, n.a1, n.a2, n.a3, n.a4, n.a5, n.a6 FROM cdc_v2_apply_ins AS n ANTI JOIN \"s\".\"t\" AS t ON t.\"id\" = n.x0"
+  },
+  "shapes_used": 10,
+  "table": [
+    {
+      "key": true,
+      "name": "id",
+      "position": 0,
+      "type": "BIGINT",
+      "unchanged_possible": false
+    },
+    {
+      "key": false,
+      "name": "big",
+      "position": 1,
+      "type": "VARCHAR",
+      "unchanged_possible": true
+    },
+    {
+      "key": false,
+      "name": "iv",
+      "position": 2,
+      "type": "INTERVAL",
+      "unchanged_possible": true
+    },
+    {
+      "key": false,
+      "name": "st",
+      "position": 3,
+      "type": "STRUCT(a DOUBLE, b VARCHAR)",
+      "unchanged_possible": true
+    },
+    {
+      "key": false,
+      "name": "l",
+      "position": 4,
+      "type": "INTEGER[]",
+      "unchanged_possible": true
+    },
+    {
+      "key": false,
+      "name": "d",
+      "position": 5,
+      "type": "DOUBLE",
+      "unchanged_possible": false
+    },
+    {
+      "key": false,
+      "name": "w",
+      "position": 6,
+      "type": "INTERVAL",
+      "unchanged_possible": false
+    }
+  ]
+}

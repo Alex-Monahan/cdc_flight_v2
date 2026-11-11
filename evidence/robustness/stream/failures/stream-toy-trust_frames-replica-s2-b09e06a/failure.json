@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+  "first_failure_s": 4.041,
+  "fixed_commit": null,
+  "fuzzer": "stream",
+  "id": "stream-toy-trust_frames-replica-s2-b09e06a",
+  "local_bundle": {
+    "campaign": "20261110T142155-8161",
+    "dir": "bundle-stream-toy-trust_frames-replica-s2-b09e06a"
+  },
+  "outcome": "violation",
+  "reason": "consumer loop: large_marked 11 of 158 ([{\"batches_partial_or_unmarked\": 1, \"batches\": 1, \"sample_batch_rows_marked\": [[213, 299, 300]], \"observation\": 148, \"t\": 2.928}])",
+  "regression_test": null,
+  "seed": 2,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-trust_frames",
+  "system_spec": "toy:trust_frames"
+}

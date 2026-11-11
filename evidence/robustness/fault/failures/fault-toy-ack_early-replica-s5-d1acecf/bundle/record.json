@@ -1,0 +1,222 @@
+{
+ "campaign": "20261110T185322-df0b",
+ "checkpoints": [
+  {
+   "catch_up_s": 2.964,
+   "compare_s": 0.023,
+   "equal": true,
+   "final": false,
+   "q": "0/46ACED98",
+   "t": 10.795
+  },
+  {
+   "catch_up_s": 0.007,
+   "compare_s": 0.026,
+   "equal": true,
+   "final": false,
+   "q": "0/46E71BB0",
+   "t": 23.952
+  },
+  {
+   "catch_up_s": 2.817,
+   "compare_s": 0.031,
+   "equal": true,
+   "final": false,
+   "q": "0/471CDBE0",
+   "t": 34.108
+  },
+  {
+   "catch_up_s": 2.003,
+   "final": false,
+   "q": "0/47539DF0",
+   "t": 47.154
+  }
+ ],
+ "clean": true,
+ "commit": "d1acecfb2f0696a8a4a6701242d459d4c75e301a",
+ "config": {
+  "budget_s": 60.0,
+  "catch_up_s": 90.0,
+  "episode_s": 10.0,
+  "fuzzer": "fault",
+  "ignore_self_report": false,
+  "keep_workdir": false,
+  "observer_interval_s": 0.005,
+  "observers": true,
+  "pace_s": 0.25,
+  "schedule": {
+   "not_attacked": [
+    "dest_delay",
+    "dest_error",
+    "dest_hang",
+    "freeze",
+    "hang_point",
+    "net_blackhole",
+    "net_drop",
+    "net_latency",
+    "net_reset",
+    "replica_promote",
+    "replica_restart",
+    "slot_drop",
+    "slot_invalidate",
+    "spill_full",
+    "src_cancel",
+    "src_lock",
+    "src_long_txn",
+    "src_restart_primary",
+    "src_terminate",
+    "src_wal_switch"
+   ],
+   "per_episode": [
+    1,
+    3
+   ],
+   "weights": {
+    "kill_group": 6,
+    "kill_point": 10,
+    "kill_point_later": 4
+   }
+  },
+  "start_timeout_s": 120.0
+ },
+ "counts": {
+  "checkpoints": 4,
+  "final_rows": 1684,
+  "observations": 6537,
+  "rolled_back": 169,
+  "rounds": 144,
+  "transactions": 2880
+ },
+ "duration_s": 50.032,
+ "failure_id": "fault-toy-ack_early-replica-s5-d1acecf",
+ "faults": {
+  "kill_group": 2,
+  "kill_point": 4,
+  "kill_point_later": 1
+ },
+ "faults_without_effect": [
+  {
+   "error": null,
+   "kind": "kill_point",
+   "params": {
+    "hang_s": 1.04474008971661,
+    "hit": "seed:244835840599086:3",
+    "point": "toyrep.commit_sent"
+   },
+   "proof": {
+    "exit": {
+     "code": null,
+     "signal": 9,
+     "signal_name": "SIGKILL"
+    },
+    "fired": null,
+    "hit": null,
+    "instance": "i2"
+   }
+  },
+  {
+   "error": null,
+   "kind": "kill_point",
+   "params": {
+    "hang_s": 2.058463919370414,
+    "hit": "seed:42780117176683:3",
+    "point": "toyrep.commit_sent"
+   },
+   "proof": {
+    "exit": {
+     "code": null,
+     "signal": 9,
+     "signal_name": "SIGKILL"
+    },
+    "fired": null,
+    "hit": null,
+    "instance": "i10"
+   }
+  }
+ ],
+ "first_failure_s": 49.272,
+ "fuzzer": "fault",
+ "instances": {
+  "exits": {
+   "SIGKILL": 13
+  },
+  "started": 14
+ },
+ "no_effect": {
+  "kill_point": 2
+ },
+ "observers": [
+  {
+   "check": "transfers",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "expected": 24000,
+    "sum": 24000
+   },
+   "longest_gap_s": 0.683,
+   "observations": 1635,
+   "seconds": 48.528,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "parent_child",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "orphan_parent_ids": 0,
+    "parents": 22,
+    "parents_with_wrong_count": 0,
+    "sample_orphans": [],
+    "sample_parent_id_count_children": []
+   },
+   "longest_gap_s": 0.683,
+   "observations": 1632,
+   "seconds": 48.528,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "debit_credit",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "credit_rows": 131,
+    "credits": 488432,
+    "debit_rows": 89,
+    "debits": 488432
+   },
+   "longest_gap_s": 0.683,
+   "observations": 1636,
+   "seconds": 48.527,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "large_marked",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "batches": 5,
+    "batches_partial_or_unmarked": 0,
+    "sample_batch_rows_marked": []
+   },
+   "longest_gap_s": 0.683,
+   "observations": 1634,
+   "seconds": 48.527,
+   "unavailable": 0,
+   "violations": 0
+  }
+ ],
+ "options": {},
+ "outcome": "diverged",
+ "reason": "the system reports that the destination diverged from the source (3 times ApplyInvariantError, last: keyless public.w_dk found 0 rows to remove), stopped short of 0/47539DF0",
+ "seed": 5,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T18:54:27Z",
+ "system": "toy-ack_early",
+ "system_spec": "toy:ack_early",
+ "tier": "local"
+}

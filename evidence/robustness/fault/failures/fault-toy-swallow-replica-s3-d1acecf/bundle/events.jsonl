@@ -1,0 +1,11 @@
+{"epoch": 1, "kind": "took_over", "pid": 1883, "previous_age_ms": 847652448364, "previous_state": "released", "run": "i1-1883", "t": 1794337248.366534, "tag": "i1"}
+{"epoch": 1, "kind": "started", "pid": 1883, "run": "i1-1883", "t": 1794337248.368787, "tag": "i1", "variant": "swallow"}
+{"kind": "resync_start", "pid": 1883, "run": "i1-1883", "t": 1794337248.391236, "tag": "i1", "why": "pending"}
+{"kind": "resync_done", "pid": 1883, "position": "0/501C36F8", "rows": 24, "run": "i1-1883", "t": 1794337248.574517, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 1883, "position": 1344125696, "run": "i1-1883", "t": 1794337248.737012, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 1883, "position": 1344230304, "run": "i1-1883", "t": 1794337248.999684, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 1883, "position": 1344277488, "run": "i1-1883", "t": 1794337249.314932, "tag": "i1"}
+{"kind": "apply_error_ignored", "pid": 1883, "run": "i1-1883", "t": 1794337249.688756, "table": "public.w_bulk", "tag": "i1"}
+{"kind": "apply_error_ignored", "pid": 1883, "run": "i1-1883", "t": 1794337249.688893, "table": "public.w_bulk_mark", "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 1883, "position": 1344455592, "run": "i1-1883", "t": 1794337249.74396, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 1883, "position": 1344590848, "run": "i1-1883", "t": 1794337250.338355, "tag": "i1"}

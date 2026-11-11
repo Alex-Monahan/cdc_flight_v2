@@ -1,0 +1,136 @@
+{
+ "campaign": "20261110T190147-f075",
+ "checkpoints": [
+  {
+   "catch_up_s": 0.083,
+   "compare_s": 0.033,
+   "equal": false,
+   "final": false,
+   "q": "0/50B76788",
+   "t": 11.042
+  }
+ ],
+ "clean": true,
+ "commit": "d1acecfb2f0696a8a4a6701242d459d4c75e301a",
+ "config": {
+  "budget_s": 40.0,
+  "catch_up_s": 90.0,
+  "episode_s": 10.0,
+  "fuzzer": "workload",
+  "ignore_self_report": false,
+  "keep_workdir": false,
+  "observer_interval_s": 0.005,
+  "observers": true,
+  "pace_s": 0.25,
+  "schedule": null,
+  "start_timeout_s": 120.0
+ },
+ "counts": {
+  "checkpoints": 1,
+  "final_rows": null,
+  "observations": 1501,
+  "rolled_back": 48,
+  "rounds": 35,
+  "transactions": 700
+ },
+ "duration_s": 11.571,
+ "failure_id": "workload-toy-keyless_toast_null-replica-s2-d1acecf",
+ "faults": {},
+ "faults_without_effect": [],
+ "first_failure_s": 11.299,
+ "fuzzer": "workload",
+ "instances": {
+  "exits": {},
+  "started": 1
+ },
+ "no_effect": {},
+ "observers": [
+  {
+   "check": "transfers",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "expected": 24000,
+    "sum": 24000
+   },
+   "longest_gap_s": 0.561,
+   "observations": 376,
+   "seconds": 10.351,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "parent_child",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "orphan_parent_ids": 0,
+    "parents": 16,
+    "parents_with_wrong_count": 0,
+    "sample_orphans": [],
+    "sample_parent_id_count_children": []
+   },
+   "longest_gap_s": 0.561,
+   "observations": 375,
+   "seconds": 10.352,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "debit_credit",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "credit_rows": 35,
+    "credits": 123297,
+    "debit_rows": 24,
+    "debits": 123297
+   },
+   "longest_gap_s": 0.561,
+   "observations": 375,
+   "seconds": 10.352,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "large_marked",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "batches": 2,
+    "batches_partial_or_unmarked": 0,
+    "sample_batch_rows_marked": []
+   },
+   "longest_gap_s": 0.561,
+   "observations": 375,
+   "seconds": 10.352,
+   "unavailable": 0,
+   "violations": 0
+  }
+ ],
+ "options": {},
+ "oracle": {
+  "equal": false,
+  "tables": [
+   {
+    "destination_rows": 2,
+    "different_rows": 0,
+    "equal": false,
+    "extra_rows": 2,
+    "missing_on_destination": false,
+    "missing_rows": 23,
+    "source": "public.w_nkt",
+    "source_rows": 23
+   }
+  ]
+ },
+ "outcome": "diverged",
+ "reason": "oracle: public.w_nkt missing 23 extra 2 different 0",
+ "seed": 2,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T19:01:47Z",
+ "system": "toy-keyless_toast_null",
+ "system_spec": "toy:keyless_toast_null",
+ "tier": "local"
+}

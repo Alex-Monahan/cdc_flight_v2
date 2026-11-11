@@ -1,0 +1,64 @@
+{
+ "attempts": [
+  {
+   "row_before": 0,
+   "the_cut_reads": 2,
+   "cut": {
+    "timeline": 1,
+    "insert_position": "3/1A04BC70",
+    "flush_position_read_under_the_cut": "3/1A04BB28",
+    "wal_not_flushed_when_the_cut_was_taken": true,
+    "sealed_as_taken": false,
+    "seal_before_the_kill": "not within 0.2 s: the primary has flushed its WAL up to 3/1A04BB28; the cut's insert position is 3/1A04BC70 (nothing has committed since; is the heartbeat write running?)"
+   },
+   "after_the_restart_the_row_reads": 0,
+   "the_commit_was_lost": true,
+   "after_the_restart": {
+    "timeline": 1,
+    "transactions_committed": 1,
+    "stream_reading_at_the_swap": {
+     "timeline": 1,
+     "position": "3/1A055858"
+    },
+    "same_timeline": true,
+    "positions_of_the_cut_reached_again": true,
+    "server_start_differs": true,
+    "has_passed": true,
+    "seal_after_the_restart": "refused: this connection is not to the server the cut was taken on: its start time is another one",
+    "valid_at_the_swap": false,
+    "valid_if_the_server_start_were_not_compared": true
+   },
+   "the_standby_reads": 0
+  }
+ ],
+ "server_version_num": 180006,
+ "sealed_before_the_crash": {
+  "row_before": 0,
+  "taker_waited_s": 1.05,
+  "the_cut_reads": 2,
+  "cut": {
+   "timeline": 1,
+   "insert_position": "3/1A055998",
+   "flush_position_before_the_cut": "3/1A055858",
+   "wal_not_flushed_before_the_cut": true,
+   "sealed": true,
+   "reading_on_the_cut": {
+    "timeline": 1,
+    "position": "3/1A055A20"
+   }
+  },
+  "after_the_restart_the_row_reads": 2,
+  "after_the_restart": {
+   "stream_reading_at_the_swap": {
+    "timeline": 1,
+    "position": "3/1A05C278"
+   },
+   "server_start_differs": true,
+   "has_passed": true,
+   "valid_at_the_swap": true
+  },
+  "ok": true
+ },
+ "shown": true,
+ "ok": true
+}

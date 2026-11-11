@@ -175,9 +175,19 @@ them; take the names of the fields from there).
   path of a table without a key and must come out equal under the oracle. And one keyed table with a key that
   changes only its form (`float8` `-0` to `0`: the engine sends a key change).
 
+## From the cut as built (package X) — build on it
+
+Contract C9 (`docs/design/cut.md` 13.4). In primary mode the stream lane keeps the tracker: at each engine start
+`GapTracker(unknown_below=next_xid_marker(primary))`; for each applied `END` `delivered_xid32(txId)`; once per group
+`probe(probe_snapshot(conn))` on a primary connection of the stream lane (one statement); hand `mark()` to the
+backfill (`backfill.on_group`) at every `P0` and `caught_up_lsn`, and to `tables.confirm` at `group_end`. The source
+heartbeat write is also what settles a restarted standby (a standby that has just started can hide a commit until
+it replays the next one; the takers refuse a cut until then). If the decoding replica is promoted, the stream
+switches to the primary rule and the tracker starts again with `unknown_below`.
+
 ## What may be missing when you start
 
-Packages E, D, A, P, Y and K are merged. Others are not. Build to their contracts and join when they arrive
+Packages E, D, A, P, Y, K and X are merged. Others are not. Build to their contracts and join when they arrive
 (`git merge origin/main` into your branch):
 
 - **L (leadership, C12).** If `cdc_v2.leader` is not on `main`, your tests take the epoch from a helper that
@@ -412,8 +422,11 @@ Package F points its fuzzers at your pipeline after you are merged. It must be a
   `state.transition` has no place for such facts, say so at once; do not build a second log.
 - The applied position only through `stream.applied_position` (C8).
 - **The spill area can be made tiny by a setting** (the transform connection's and apply's planning database's
-  `max_temp_directory_size`), and "spill area full" is an alert through `alerts.emit`: the alert row is the
-  fuzzer's proof that the fault had an effect. Apply raises `ApplySpillFull` for its part; it is the same wait.
+  `max_temp_directory_size`), and "spill area full" is an alert through `alerts.emit`: the alert row is the fuzzer's
+  proof that the fault had an effect. `ApplySpillFull` (apply's part): roll the group back. It is not a table failure:
+  no attempt is counted and the table is never quarantined. Alert once. If the spill area holds nothing else, stage
+  that table's change set and apply it in the relation form; otherwise wait (a declared wait) and run the group again.
+  The transform connection and each planning thread get shares of one `max_temp_directory_size`.
 - **Every source address is a setting, per node** (primary, replica, the engine's replication connection), so
   that each link can pass through package H's proxy. MotherDuck is reached only through the `md.*` fault sites.
 - **Crash points** for every durable step (section 5), declared through `cdc_v2.crashpoints`; a point that is

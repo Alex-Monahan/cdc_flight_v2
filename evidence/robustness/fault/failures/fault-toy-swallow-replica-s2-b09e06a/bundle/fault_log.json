@@ -1,0 +1,53 @@
+[
+ {
+  "effect": true,
+  "error": null,
+  "kind": "dest_error",
+  "params": {
+   "hits": 1,
+   "seconds": 1.6,
+   "site": "md.connect",
+   "skip": 3
+  },
+  "proof": {
+   "fired": 1,
+   "site": "md.connect"
+  },
+  "t_heal": 5.665,
+  "t_inject": 1.973
+ },
+ {
+  "effect": true,
+  "error": null,
+  "kind": "dest_error",
+  "params": {
+   "hits": 2,
+   "seconds": 1.91,
+   "site": "md.commit",
+   "skip": 1
+  },
+  "proof": {
+   "fired": 2,
+   "site": "md.commit"
+  },
+  "t_heal": 6.277,
+  "t_inject": 3.059
+ },
+ {
+  "effect": true,
+  "error": null,
+  "kind": "dest_error",
+  "params": {
+   "hits": 3,
+   "seconds": 0.43,
+   "site": "md.connect",
+   "skip": 5
+  },
+  "proof": {
+   "fired": 3,
+   "site": "md.connect"
+  },
+  "t_heal": 9.255,
+  "t_inject": 5.615
+ }
+]

@@ -1,0 +1,11 @@
+{"epoch": 1, "kind": "took_over", "pid": 35925, "previous_age_ms": 847635702534, "previous_state": "released", "run": "i1-35925", "t": 1794320502.537145, "tag": "i1"}
+{"epoch": 1, "kind": "started", "pid": 35925, "run": "i1-35925", "t": 1794320502.53939, "tag": "i1", "variant": "swallow"}
+{"kind": "resync_start", "pid": 35925, "run": "i1-35925", "t": 1794320502.563956, "tag": "i1", "why": "pending"}
+{"kind": "resync_done", "pid": 35925, "position": "0/332F0530", "rows": 24, "run": "i1-35925", "t": 1794320502.660458, "tag": "i1"}
+{"detail": "injected", "error": "IOException", "kind": "retry", "pid": 35925, "run": "i1-35925", "t": 1794320504.862207, "tag": "i1"}
+{"detail": "injected", "error": "IOException", "kind": "retry", "pid": 35925, "run": "i1-35925", "t": 1794320506.331071, "tag": "i1"}
+{"detail": "injected", "error": "IOException", "kind": "retry", "pid": 35925, "run": "i1-35925", "t": 1794320506.419759, "tag": "i1"}
+{"detail": "injected", "error": "IOException", "kind": "retry", "pid": 35925, "run": "i1-35925", "t": 1794320509.092152, "tag": "i1"}
+{"detail": "injected", "error": "IOException", "kind": "retry", "pid": 35925, "run": "i1-35925", "t": 1794320509.143939, "tag": "i1"}
+{"detail": "injected", "error": "IOException", "kind": "retry", "pid": 35925, "run": "i1-35925", "t": 1794320509.248913, "tag": "i1"}
+{"kind": "apply_error_ignored", "pid": 35925, "run": "i1-35925", "t": 1794320513.524189, "table": "public.w_credit", "tag": "i1"}

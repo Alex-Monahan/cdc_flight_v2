@@ -1,0 +1,195 @@
+{
+  "after": {
+    "batch": 10000,
+    "command": "apply_checkcost.py --target md --rows 1000000 --batch 10000 --reps 5",
+    "label": "after",
+    "reps": 5,
+    "rows": 1000000,
+    "runs": [
+      {
+        "change_set": "insert",
+        "check": false,
+        "keys": "increasing",
+        "round_trips": 1,
+        "seconds_all": [
+          0.4277,
+          0.3676,
+          0.3668,
+          0.3683,
+          0.366
+        ],
+        "seconds_median": 0.3676,
+        "shapes": [
+          "K6"
+        ]
+      },
+      {
+        "change_set": "insert",
+        "check": true,
+        "keys": "increasing",
+        "round_trips": 1,
+        "seconds_all": [
+          0.3667,
+          0.3679,
+          0.3568,
+          0.3573,
+          0.3593
+        ],
+        "seconds_median": 0.3593,
+        "shapes": [
+          "K6"
+        ]
+      },
+      {
+        "change_set": "insert",
+        "check": false,
+        "keys": "random_uuid",
+        "round_trips": 1,
+        "seconds_all": [
+          0.379,
+          0.8841,
+          0.3754,
+          0.3842,
+          0.3787
+        ],
+        "seconds_median": 0.379,
+        "shapes": [
+          "K6"
+        ]
+      },
+      {
+        "change_set": "insert",
+        "check": true,
+        "keys": "random_uuid",
+        "round_trips": 1,
+        "seconds_all": [
+          0.3766,
+          0.3803,
+          0.3751,
+          0.3796,
+          0.3777
+        ],
+        "seconds_median": 0.3777,
+        "shapes": [
+          "K6"
+        ]
+      },
+      {
+        "change_set": "update",
+        "check": true,
+        "keys": "increasing",
+        "round_trips": 1,
+        "seconds_all": [
+          0.3863,
+          0.3949,
+          0.3846,
+          0.3822,
+          0.3858
+        ],
+        "seconds_median": 0.3858,
+        "shapes": [
+          "K3"
+        ]
+      }
+    ],
+    "target": "md"
+  },
+  "before": {
+    "batch": 10000,
+    "command": "apply_checkcost.py --target md --rows 1000000 --batch 10000 --reps 5",
+    "label": "before",
+    "reps": 5,
+    "rows": 1000000,
+    "runs": [
+      {
+        "change_set": "insert",
+        "check": false,
+        "keys": "increasing",
+        "round_trips": 1,
+        "seconds_all": [
+          0.4912,
+          0.3624,
+          0.3612,
+          0.3548,
+          0.3548
+        ],
+        "seconds_median": 0.3612,
+        "shapes": [
+          "K6"
+        ]
+      },
+      {
+        "change_set": "insert",
+        "check": true,
+        "keys": "increasing",
+        "round_trips": 2,
+        "seconds_all": [
+          0.574,
+          0.5707,
+          0.5641,
+          0.5673,
+          0.5643
+        ],
+        "seconds_median": 0.5673,
+        "shapes": [
+          "K1",
+          "K6"
+        ]
+      },
+      {
+        "change_set": "insert",
+        "check": false,
+        "keys": "random_uuid",
+        "round_trips": 1,
+        "seconds_all": [
+          0.3693,
+          0.3663,
+          0.3597,
+          0.3653,
+          0.3597
+        ],
+        "seconds_median": 0.3653,
+        "shapes": [
+          "K6"
+        ]
+      },
+      {
+        "change_set": "insert",
+        "check": true,
+        "keys": "random_uuid",
+        "round_trips": 2,
+        "seconds_all": [
+          0.5931,
+          0.579,
+          0.6015,
+          0.5774,
+          0.5685
+        ],
+        "seconds_median": 0.579,
+        "shapes": [
+          "K1",
+          "K6"
+        ]
+      },
+      {
+        "change_set": "update",
+        "check": true,
+        "keys": "increasing",
+        "round_trips": 1,
+        "seconds_all": [
+          0.3761,
+          0.3692,
+          0.3652,
+          0.3697,
+          0.3671
+        ],
+        "seconds_median": 0.3692,
+        "shapes": [
+          "K3"
+        ]
+      }
+    ],
+    "target": "md"
+  },
+  "note": "MotherDuck, a database of its own (dropped); 1,000,000 rows; change sets of 10,000 records; medians of 5. before = 68df804 (K1 runs as the check), after = this branch (the check inside K6/K3/K7; per-key count inside K3)"
+}

@@ -1,0 +1,189 @@
+{
+ "campaign": "20261110T185737-59df",
+ "checkpoints": [],
+ "clean": true,
+ "commit": "d1acecfb2f0696a8a4a6701242d459d4c75e301a",
+ "config": {
+  "budget_s": 40.0,
+  "catch_up_s": 90.0,
+  "episode_s": 10.0,
+  "fuzzer": "workload",
+  "ignore_self_report": false,
+  "keep_workdir": false,
+  "observer_interval_s": 0.005,
+  "observers": true,
+  "pace_s": 0.25,
+  "schedule": null,
+  "start_timeout_s": 120.0
+ },
+ "counts": {
+  "checkpoints": 0,
+  "final_rows": null,
+  "observations": 69,
+  "rolled_back": 1,
+  "rounds": 1,
+  "transactions": 20
+ },
+ "duration_s": 1.319,
+ "failure_id": "workload-toy-split-replica-s3-d1acecf",
+ "faults": {},
+ "faults_without_effect": [],
+ "first_failure_s": 0.995,
+ "fuzzer": "workload",
+ "instances": {
+  "exits": {},
+  "started": 1
+ },
+ "no_effect": {},
+ "observers": [
+  {
+   "check": "transfers",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "expected": 24000,
+    "sum": 24000
+   },
+   "longest_gap_s": 0.025,
+   "observations": 17,
+   "seconds": 0.279,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "parent_child",
+   "errors": [],
+   "first_violations": [
+    {
+     "observation": 12,
+     "orphan_parent_ids": 0,
+     "parents": 1,
+     "parents_with_wrong_count": 1,
+     "sample_orphans": [],
+     "sample_parent_id_count_children": [
+      [
+       14,
+       2,
+       0
+      ]
+     ],
+     "t": 0.203
+    },
+    {
+     "observation": 13,
+     "orphan_parent_ids": 0,
+     "parents": 1,
+     "parents_with_wrong_count": 1,
+     "sample_orphans": [],
+     "sample_parent_id_count_children": [
+      [
+       14,
+       2,
+       0
+      ]
+     ],
+     "t": 0.217
+    },
+    {
+     "observation": 14,
+     "orphan_parent_ids": 0,
+     "parents": 1,
+     "parents_with_wrong_count": 1,
+     "sample_orphans": [],
+     "sample_parent_id_count_children": [
+      [
+       14,
+       2,
+       0
+      ]
+     ],
+     "t": 0.234
+    }
+   ],
+   "last": {
+    "orphan_parent_ids": 0,
+    "parents": 1,
+    "parents_with_wrong_count": 1,
+    "sample_orphans": [],
+    "sample_parent_id_count_children": [
+     [
+      14,
+      2,
+      0
+     ]
+    ]
+   },
+   "longest_gap_s": 0.025,
+   "observations": 17,
+   "seconds": 0.279,
+   "unavailable": 0,
+   "violations": 6
+  },
+  {
+   "check": "debit_credit",
+   "errors": [],
+   "first_violations": [
+    {
+     "credit_rows": 1,
+     "credits": 6411,
+     "debit_rows": 0,
+     "debits": 0,
+     "observation": 8,
+     "t": 0.128
+    },
+    {
+     "credit_rows": 1,
+     "credits": 6411,
+     "debit_rows": 0,
+     "debits": 0,
+     "observation": 9,
+     "t": 0.141
+    },
+    {
+     "credit_rows": 0,
+     "credits": 0,
+     "debit_rows": 1,
+     "debits": 6411,
+     "observation": 10,
+     "t": 0.163
+    }
+   ],
+   "last": {
+    "credit_rows": 0,
+    "credits": 0,
+    "debit_rows": 0,
+    "debits": 0
+   },
+   "longest_gap_s": 0.024,
+   "observations": 17,
+   "seconds": 0.279,
+   "unavailable": 0,
+   "violations": 4
+  },
+  {
+   "check": "large_marked",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "batches": 0,
+    "batches_partial_or_unmarked": 0,
+    "sample_batch_rows_marked": []
+   },
+   "longest_gap_s": 0.025,
+   "observations": 18,
+   "seconds": 0.286,
+   "unavailable": 0,
+   "violations": 0
+  }
+ ],
+ "options": {},
+ "outcome": "violation",
+ "reason": "consumer loop: parent_child 1 of 12 ([{\"parents_with_wrong_count\": 1, \"orphan_parent_ids\": 0, \"sample_parent_id_count_children\": [[14, 2, 0]], \"sample_orphans\": [], \"parents\": 1, \"observation\": 12, \"t\": 0.203}]); debit_credit 4 of 12 ([{\"debits\": 0, \"credits\": 6411, \"debit_rows\": 0, \"credit_rows\": 1, \"observation\": 8, \"t\": 0.128}])",
+ "seed": 3,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T18:57:37Z",
+ "system": "toy-split",
+ "system_spec": "toy:split",
+ "tier": "local"
+}

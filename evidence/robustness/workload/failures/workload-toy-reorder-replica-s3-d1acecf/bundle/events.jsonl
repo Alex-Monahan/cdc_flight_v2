@@ -1,0 +1,8 @@
+{"epoch": 1, "kind": "took_over", "pid": 96994, "previous_age_ms": 847652300933, "previous_state": "released", "run": "i1-96994", "t": 1794337100.936541, "tag": "i1"}
+{"epoch": 1, "kind": "started", "pid": 96994, "run": "i1-96994", "t": 1794337100.940758, "tag": "i1", "variant": "reorder"}
+{"kind": "resync_start", "pid": 96994, "run": "i1-96994", "t": 1794337100.965377, "tag": "i1", "why": "pending"}
+{"kind": "resync_done", "pid": 96994, "position": "0/4BAB2338", "rows": 24, "run": "i1-96994", "t": 1794337101.159556, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 96994, "position": 1269582312, "run": "i1-96994", "t": 1794337101.221318, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 96994, "position": 1269606040, "run": "i1-96994", "t": 1794337101.281044, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 96994, "position": 1269711208, "run": "i1-96994", "t": 1794337101.611429, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 96994, "position": 1269758368, "run": "i1-96994", "t": 1794337101.889362, "tag": "i1"}

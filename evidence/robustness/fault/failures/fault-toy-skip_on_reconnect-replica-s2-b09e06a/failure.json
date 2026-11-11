@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "b09e06a0dd0d938ef0e0ca38ec52acb46eca5d81",
+  "first_failure_s": 15.223,
+  "fixed_commit": null,
+  "fuzzer": "fault",
+  "id": "fault-toy-skip_on_reconnect-replica-s2-b09e06a",
+  "local_bundle": {
+    "campaign": "20261110T142003-1b13",
+    "dir": "bundle-fault-toy-skip_on_reconnect-replica-s2-b09e06a"
+  },
+  "outcome": "violation",
+  "reason": "consumer loop: transfers 32 of 950 ([{\"sum\": 23931, \"expected\": 24000, \"observation\": 919, \"t\": 13.793}]); parent_child 32 of 947 ([{\"parents_with_wrong_count\": 2, \"orphan_parent_ids\": 0, \"sample_parent_id_count_children\": [[19, 5, 3], [128, 7, 5]], \"sample_orphans\": [], \"parents\": 9, \"observation\": 916, \"t\": 13.796}]); debit_credit 32 of 950 ([{\"debits\": 71546, \"credits\": 68718, \"debit_rows\": 19, \"credit_rows\": 23, \"observation\": 919, \"t\": 13.793}])",
+  "regression_test": null,
+  "seed": 2,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-skip_on_reconnect",
+  "system_spec": "toy:skip_on_reconnect"
+}

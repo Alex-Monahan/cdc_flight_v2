@@ -1,0 +1,5 @@
+{"epoch": 1, "kind": "took_over", "pid": 96151, "previous_age_ms": 847652257737, "previous_state": "released", "run": "i1-96151", "t": 1794337057.739475, "tag": "i1"}
+{"epoch": 1, "kind": "started", "pid": 96151, "run": "i1-96151", "t": 1794337057.742001, "tag": "i1", "variant": "split"}
+{"kind": "resync_start", "pid": 96151, "run": "i1-96151", "t": 1794337057.765205, "tag": "i1", "why": "pending"}
+{"kind": "resync_done", "pid": 96151, "position": "0/4A1A04B8", "rows": 24, "run": "i1-96151", "t": 1794337057.855709, "tag": "i1"}
+{"detail": "write-write conflict on public.w_debit", "error": "ToyConflict", "kind": "retry", "pid": 96151, "run": "i1-96151", "t": 1794337058.113567, "tag": "i1"}

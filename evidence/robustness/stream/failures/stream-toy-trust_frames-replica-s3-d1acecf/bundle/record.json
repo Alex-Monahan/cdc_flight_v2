@@ -1,0 +1,175 @@
+{
+ "campaign": "20261110T190051-dcda",
+ "checkpoints": [
+  {
+   "catch_up_s": 2.999,
+   "compare_s": 0.041,
+   "equal": false,
+   "final": false,
+   "q": "0/50B09310",
+   "t": 11.003
+  }
+ ],
+ "clean": true,
+ "commit": "d1acecfb2f0696a8a4a6701242d459d4c75e301a",
+ "config": {
+  "budget_s": 40.0,
+  "catch_up_s": 90.0,
+  "episode_s": 10.0,
+  "fuzzer": "stream",
+  "ignore_self_report": false,
+  "keep_workdir": false,
+  "observer_interval_s": 0.005,
+  "observers": true,
+  "pace_s": 0.25,
+  "schedule": null,
+  "start_timeout_s": 120.0
+ },
+ "counts": {
+  "checkpoints": 1,
+  "final_rows": null,
+  "observations": 2021,
+  "rolled_back": 44,
+  "rounds": 35,
+  "transactions": 700
+ },
+ "duration_s": 14.423,
+ "failure_id": "stream-toy-trust_frames-replica-s3-d1acecf",
+ "faults": {
+  "stream_bytes": 12
+ },
+ "faults_without_effect": [],
+ "first_failure_s": 14.088,
+ "fuzzer": "stream",
+ "instances": {
+  "exits": {
+   "code 1": 1
+  },
+  "started": 2
+ },
+ "no_effect": {},
+ "observers": [
+  {
+   "check": "transfers",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "expected": 24000,
+    "sum": 24000
+   },
+   "longest_gap_s": 0.555,
+   "observations": 507,
+   "seconds": 13.206,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "parent_child",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "orphan_parent_ids": 0,
+    "parents": 8,
+    "parents_with_wrong_count": 0,
+    "sample_orphans": [],
+    "sample_parent_id_count_children": []
+   },
+   "longest_gap_s": 0.555,
+   "observations": 504,
+   "seconds": 13.206,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "debit_credit",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "credit_rows": 23,
+    "credits": 100277,
+    "debit_rows": 17,
+    "debits": 100277
+   },
+   "longest_gap_s": 0.555,
+   "observations": 505,
+   "seconds": 13.206,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "large_marked",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "batches": 2,
+    "batches_partial_or_unmarked": 0,
+    "sample_batch_rows_marked": []
+   },
+   "longest_gap_s": 0.555,
+   "observations": 505,
+   "seconds": 13.206,
+   "unavailable": 0,
+   "violations": 0
+  }
+ ],
+ "options": {
+  "toy": {
+   "stream_fault_rate": 0.35
+  }
+ },
+ "oracle": {
+  "equal": false,
+  "tables": [
+   {
+    "destination_rows": 23,
+    "different_rows": 0,
+    "equal": false,
+    "extra_rows": 0,
+    "missing_on_destination": false,
+    "missing_rows": 2,
+    "source": "public.w_credit",
+    "source_rows": 25
+   },
+   {
+    "destination_rows": 17,
+    "different_rows": 0,
+    "equal": false,
+    "extra_rows": 0,
+    "missing_on_destination": false,
+    "missing_rows": 1,
+    "source": "public.w_debit",
+    "source_rows": 18
+   },
+   {
+    "destination_rows": 16,
+    "different_rows": 0,
+    "equal": false,
+    "extra_rows": 5,
+    "missing_on_destination": false,
+    "missing_rows": 12,
+    "source": "public.w_nkt",
+    "source_rows": 23
+   },
+   {
+    "destination_rows": 17,
+    "different_rows": 5,
+    "equal": false,
+    "extra_rows": 1,
+    "missing_on_destination": false,
+    "missing_rows": 9,
+    "source": "public.w_toast",
+    "source_rows": 25
+   }
+  ]
+ },
+ "outcome": "diverged",
+ "reason": "oracle: public.w_credit missing 2 extra 0 different 0; public.w_debit missing 1 extra 0 different 0; public.w_nkt missing 12 extra 5 different 0; public.w_toast missing 9 extra 1 different 5",
+ "seed": 3,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T19:00:51Z",
+ "stream_detected": 0,
+ "system": "toy-trust_frames",
+ "system_spec": "toy:trust_frames",
+ "tier": "local"
+}

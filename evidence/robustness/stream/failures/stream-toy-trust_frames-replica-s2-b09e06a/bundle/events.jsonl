@@ -1,0 +1,7 @@
+{"epoch": 1, "kind": "took_over", "pid": 36129, "previous_age_ms": 847635715735, "previous_state": "released", "run": "i1-36129", "t": 1794320515.738089, "tag": "i1"}
+{"epoch": 1, "kind": "started", "pid": 36129, "run": "i1-36129", "t": 1794320515.740639, "tag": "i1", "variant": "trust_frames"}
+{"kind": "resync_start", "pid": 36129, "run": "i1-36129", "t": 1794320515.765273, "tag": "i1", "why": "pending"}
+{"kind": "resync_done", "pid": 36129, "position": "0/33C12730", "rows": 24, "run": "i1-36129", "t": 1794320516.038446, "tag": "i1"}
+{"kind": "stream_fault", "kinds": ["flip", "dup", "truncate"], "pid": 36129, "run": "i1-36129", "t": 1794320517.613218, "tag": "i1"}
+{"kind": "stream_fault", "kinds": ["flip", "cut"], "pid": 36129, "run": "i1-36129", "t": 1794320518.716897, "tag": "i1"}
+{"kind": "stream_fault", "kinds": ["flip", "truncate"], "pid": 36129, "run": "i1-36129", "t": 1794320519.090762, "tag": "i1"}

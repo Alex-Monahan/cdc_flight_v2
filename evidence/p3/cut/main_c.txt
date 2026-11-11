@@ -1,0 +1,40 @@
+$ tools/cutstress run --label main_c --seconds 600 --writers plain,async,subxact,abort --takers-own 3 --takers-exported 0 --out evidence/p3/cut/main_c.json
+load average before: 11.76 8.96 7.96
+   30s cuts=29076 transactions=121414 violations=0 waiting=123
+   60s cuts=53332 transactions=238531 violations=0 waiting=62
+   90s cuts=74540 transactions=355369 violations=0 waiting=109
+  120s cuts=94339 transactions=469160 violations=0 waiting=98
+  150s cuts=114652 transactions=586038 violations=0 waiting=55
+  180s cuts=136916 transactions=702384 violations=0 waiting=124
+  210s cuts=158156 transactions=819132 violations=0 waiting=56
+  240s cuts=179430 transactions=934589 violations=0 waiting=31
+  270s cuts=205087 transactions=1050862 violations=0 waiting=80
+  300s cuts=229626 transactions=1167158 violations=0 waiting=147
+  330s cuts=248985 transactions=1281501 violations=0 waiting=39
+  360s cuts=272148 transactions=1397453 violations=0 waiting=64
+  390s cuts=292728 transactions=1512414 violations=0 waiting=124
+  420s cuts=310908 transactions=1625481 violations=0 waiting=94
+  450s cuts=331692 transactions=1740151 violations=0 waiting=72
+  480s cuts=353892 transactions=1854997 violations=0 waiting=123
+  510s cuts=375559 transactions=1971159 violations=0 waiting=27
+  540s cuts=395949 transactions=2085519 violations=0 waiting=99
+  570s cuts=417062 transactions=2199894 violations=0 waiting=9
+main_c: OK
+  Postgres 18.6 (Homebrew), 600 s, writers plain,async,subxact,abort, disturbances none, slot on replica
+  cuts checked 440905 (not checked 0), transactions delivered 2315571
+  violations of the sound rules: none
+  stream out of E order: 0
+  wrong rules caught (cuts): stmt_as_r0=8046, r1_inside=8046, r1_outside=3, naive_sharp=0, xmax_inside=170345, xmin_outside=209264
+  unknown set (transactions per cut)   empty     mean   max
+    base                                 0.00%    3.842   499
+    xid                                 60.65%    2.046   385
+    sharp                               60.49%    2.851   498
+    xid+sharp                           67.61%    1.971   385
+    really_visible                      61.03%    2.801   498
+  cuts_with_r0_below_received: 0
+  cuts_that_miss_a_received_transaction: 0
+  cuts_with_r0_eq_r1: 267562
+  cuts taken the own way: 440905, of them quiet (xmin = xmax): 231581 (52.5%), with a violation: 0
+  snapshots dropped because the standby had not settled: 0
+  checker steps: unknown_window, per_key_boundary, missing_rows; rows missing from a cut: 0
+  load average at start [11.76, 8.96, 7.96], at end [17.42, 19.53, 16.29]

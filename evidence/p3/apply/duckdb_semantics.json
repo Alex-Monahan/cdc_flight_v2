@@ -1,0 +1,67 @@
+{
+  "command": "CDC_V2_MD_PREFIX=cdc_v2_t_a_ tools/with-env uv run pytest -m md tests/apply/test_apply_md.py -k semantics",
+  "differ": [
+    "DROP SCHEMA CASCADE error"
+  ],
+  "duckdb": "1.5.6",
+  "local": {
+    "DOUBLE CAST('-0' AS DOUBLE) -> 0.0::DOUBLE": {
+      "sentinel_then_update_stores_new_value": true,
+      "update_stores_new_value": false,
+      "update_through_null_stores_new_value": false
+    },
+    "DROP SCHEMA CASCADE error": "TransactionContext Error: Failed to commit: Attempting to modify table t2 but another transaction has dropped this table",
+    "DROP SCHEMA CASCADE of tables created in the same transaction commits": false,
+    "INTERVAL INTERVAL '1 month' -> INTERVAL '30 days'": {
+      "sentinel_then_update_stores_new_value": true,
+      "update_stores_new_value": false,
+      "update_through_null_stores_new_value": false
+    },
+    "STRUCT(a DOUBLE) {'a': CAST('-0' AS DOUBLE)} -> {'a': 0.0::DOUBLE}": {
+      "sentinel_then_update_stores_new_value": true,
+      "update_stores_new_value": false,
+      "update_through_null_stores_new_value": false
+    },
+    "any_value(double) keeps -0": true,
+    "any_value(list) keeps -0": false,
+    "arg_max(struct) keeps -0": false,
+    "join keeps -0 in a list": true,
+    "rename of a rowid column inside a transaction": true,
+    "rowid deletes exactly 4 of 5 identical rows, 2 of them inserted by the transaction": true,
+    "update of INTEGER[] rewrites the row": true,
+    "update of MAP(INT, INT) rewrites the row": true,
+    "update of STRUCT(a INT) rewrites the row": false,
+    "update of UNION(i INT, s VARCHAR) rewrites the row": true,
+    "update of VARCHAR rewrites the row": false
+  },
+  "motherduck": {
+    "DOUBLE CAST('-0' AS DOUBLE) -> 0.0::DOUBLE": {
+      "sentinel_then_update_stores_new_value": true,
+      "update_stores_new_value": false,
+      "update_through_null_stores_new_value": false
+    },
+    "DROP SCHEMA CASCADE error": "TransactionContext Error: Failed to commit: MotherDuck transaction statement failed: TransactionContext Error: Failed to commit: Attempting to modify table t2 b",
+    "DROP SCHEMA CASCADE of tables created in the same transaction commits": false,
+    "INTERVAL INTERVAL '1 month' -> INTERVAL '30 days'": {
+      "sentinel_then_update_stores_new_value": true,
+      "update_stores_new_value": false,
+      "update_through_null_stores_new_value": false
+    },
+    "STRUCT(a DOUBLE) {'a': CAST('-0' AS DOUBLE)} -> {'a': 0.0::DOUBLE}": {
+      "sentinel_then_update_stores_new_value": true,
+      "update_stores_new_value": false,
+      "update_through_null_stores_new_value": false
+    },
+    "any_value(double) keeps -0": true,
+    "any_value(list) keeps -0": false,
+    "arg_max(struct) keeps -0": false,
+    "join keeps -0 in a list": true,
+    "rename of a rowid column inside a transaction": true,
+    "rowid deletes exactly 4 of 5 identical rows, 2 of them inserted by the transaction": true,
+    "update of INTEGER[] rewrites the row": true,
+    "update of MAP(INT, INT) rewrites the row": true,
+    "update of STRUCT(a INT) rewrites the row": false,
+    "update of UNION(i INT, s VARCHAR) rewrites the row": true,
+    "update of VARCHAR rewrites the row": false
+  }
+}

@@ -302,8 +302,10 @@ Rules that follow from the measurements:
 
 - Arrow data is handed to DuckDB in bounded record batches, never as one reader over an unbounded stream (a
   reader over 12M rows grew to 2 GB of client memory).
-- `net` (6.2) and `delta` (6.3) are computed once per table and group on the client; the statements that follow
-  read that result, so the rows are uploaded once per statement that needs them.
+- Apply plans once per table and segment on the client, in a private DuckDB with a memory limit and a spill limit
+  inside the pipeline's one spill area (`docs/design/apply.md` 3.1); the statements that follow read that plan, so
+  the rows are uploaded once per statement that needs them. No value of a row passes through an aggregate, a
+  window or `QUALIFY` on the way: they do not keep every form of a value (6.3).
 - The memory a group may hold is `apply.max_group_bytes`. The buffer in front of it has a byte limit; when it is
   full the pipeline stops reading the engine's pipe, which stops the engine's queue and then the slot read
   (back-pressure, SPEC 5.4).
@@ -317,44 +319,66 @@ statements of 6.2–6.3 are the same for both inputs; only the input relation di
 
 ### 6.2 Tables with a key
 
-For one table and one segment, with `net` = the last record per key by `_seq`:
+Only a table with a key by rule K takes this path, so in the stream no two rows hold one key after any record. A
+key's first record in the change set therefore fixes its start state (`c`: the key was free; `u`, `d`: it held one
+row), and after every record a key holds at most one row. A change set that breaks this is not a history of the
+source: `ApplyInvariantError` in both modes, never a best effort.
 
-1. `DELETE FROM t USING net WHERE t.key = net.key` for keys whose net record is a delete or a complete image.
-2. `INSERT INTO t SELECT … FROM net` for complete images.
-3. Partial images (some column unchanged) are applied with `UPDATE … FROM net`, never by delete and insert, and
-   never write a column whose value is unchanged. A column that is unchanged in the last record takes the newest
-   changed value from earlier records of the same key in the group, if there is one.
+For one table and one segment the plan gives, per key, the final row if there is one and where each of its values
+comes from. `docs/design/apply.md` section 3 names the statements and says why their order is right: K1 deletes;
+C0 reads the row ids of the copy roots before any row moves; K2 and K3 move and update the roots of key changes
+in one statement (a swap or a rotation is a parallel assignment); K7 and K8 copy a root whose key changes only in
+form, found by its row id; K4 and K5 write, per column that can be unchanged, the values the change set supplies;
+K6 inserts complete final images. A column whose value is unchanged is never written and never read into the
+client (SPEC 2.6). The destination has no keys or indexes, so no intermediate state can violate a constraint.
+Apply relies on `rowid` staying the same within one transaction, from C0 to K7 and K8, also for a row inserted
+earlier in that transaction (tested locally and on MotherDuck).
 
-Chains and swaps of key values (SPEC 1.4): the delete and the create of each key change are ordinary records, and
-the last record per key decides. One case needs more. The create of a key change can be a partial image; its
-unchanged values belong to the row that had the old key. The engine therefore copies the old key onto the create
-record (Debezium links the two records with the headers `__debezium.oldkey` and `__debezium.newkey` **[test]**),
-and the applier resolves a chain of key changes inside a group back to the key the row had before the group, and
-takes the unchanged values from that row before it deletes it. The destination has no keys or indexes, so no intermediate
-state can violate a constraint.
+In stream mode the destination equals the source at the start of the change set, and apply checks the start state
+it relies on, per key and inside the statements: K1 removes exactly one row per held key and none per new key, or
+nothing; K3 moves a root only if it is alone at its key, and onto a free target where the source did not hold it;
+K6 inserts through an anti join, so its count is short exactly when a new key is already held (`check_new_keys`,
+default on; an insert-only change set is one statement: 359 ms against 567 ms before, at 10,000 records on
+MotherDuck). Two final keys that the source's equality merges raise. A difference is `ApplyInvariantError` (a
+double apply, a table wrongly taken as keyed, a lost row). With `check_new_keys` off, inserts at held keys and
+moves onto held free keys go unchecked.
 
-An unchanged value is never lost silently (H-003). It is resolved in this order: from an earlier record of the
-same row in the change set; from the destination row that has the key the row had before the change set; and,
-only when a log is replayed onto a table that was loaded separately (catch-up, 7.3), from the destination row
-with the new key if no earlier record of the set addressed that key. A value that is still unresolved is an
-invariant violation in the stream (`ApplyInvariantError`: the destination has diverged), and a key for a repair
-read in catch-up (7.3). Applying a change set a second time gives the same table, except for keys reported as
-unresolved.
+Chains and swaps of key values (SPEC 1.4): a key change is a `d` of the old key directly followed by a `c` of the
+new key that carries the old key (`k<i>`: Debezium links the two records with the headers `__debezium.oldkey` and
+`__debezium.newkey`, and the engine copies the old key onto the create record). The unchanged values of a partial
+create follow these links back to the *root*: the destination row with the key the row had before the change set.
+A key that changes only in form (`-0` to `0` in a `float8` key, `1 month` to `30 days`) is a key change like any
+other; its root is copied, because an update to an equal value stores nothing (below).
 
-DuckDB does not write an `UPDATE` whose new value compares equal to the stored one, and keeps the old
-representation: after `SET x = 0` a stored `-0` is still `-0`, and after `SET i = INTERVAL '30 days'` a stored `1
-mon` is still `1 mon`, also through `UPDATE … FROM`, locally and on MotherDuck (package O,
-`evidence/p3/oracle/duckdb_equal_update.json`). The source and the oracle tell these values apart. For columns whose
-types have such values (real, double precision, interval, and what package A's list adds), step 3 must therefore use
-a shape that always writes the changed column; the rule that an unchanged column is never written stays. Package A
-chooses the shape and proves it against the oracle.
+An unchanged value is never lost silently (H-003). It comes from an earlier record of the same row in the change
+set, else from the root. In the stream, a value without a source, or a root that the destination lacks, is
+`ApplyInvariantError`: the destination has diverged. When a log is replayed onto a table that was loaded under
+several snapshots (catch-up, 7.3), a destination row is some version of its row, older or newer than the start of
+the change set. Catch-up uses the root if the destination holds exactly one row for it and no `c` of the change
+set lands on its key (this also resolves a root whose only create is the final row's own `d(K) c(K, k=K)`).
+Otherwise it uses the row with the final key, if that key's first record in the change set is this row's `c` and
+the destination holds exactly one row for it. Otherwise the key is *unresolved*: its destination row is deleted
+and the key is reported for a repair read (7.3), which covers every reported key, including keys the source no
+longer holds. Only the immediate repeat of a call is safe: a call repeated after a later call can leave a wrong
+row and report nothing. A repair deletes the key's rows by the source's equality and inserts, in one transaction
+(`apply.repair_keys`); a plain insert would duplicate a row that a later call resolved. The preconditions of a
+catch-up call are in the plan (C10).
+
+DuckDB does not write an `UPDATE` whose new value compares equal to the stored one, and keeps the old representation:
+after `SET x = 0` a stored `-0` is still `-0`, and after `SET i = INTERVAL '30 days'` a stored `1 mon` is still `1
+mon`, also through `UPDATE … FROM`, locally and on MotherDuck (package O,
+`evidence/p3/oracle/duckdb_equal_update.json`). The source and the oracle tell these values apart. For FLOAT, DOUBLE,
+INTERVAL and STRUCTs that hold them, apply therefore writes a sentinel first (a value unequal to the new one) and then
+the value, only for rows where the stored and the new value differ exactly; the rule that an unchanged column is never
+written stays (`docs/design/apply.md` 3.3).
 
 The number of statement shapes per table depends on the table's columns, not on the data (SPEC 2.6).
 
 ### 6.3 Tables without a key
 
-Every record carries the full old and new image. For one table and one segment, `delta` = per distinct row image
-the sum of +1 for every new image and −1 for every old image (`GROUP BY` all columns, which treats NULLs as equal).
+Every record carries the full old and new image. For one table and one segment, `delta` = per distinct row image the
+sum of +1 for every new image and −1 for every old image (grouped by each column's exact form, `types.exact`; NULLs
+are equal).
 
 1. Images with a negative sum: delete exactly `-sum` rows among the identical rows, chosen by `rowid` through
    `row_number() OVER (PARTITION BY <all columns>)`.
@@ -364,13 +388,14 @@ A delete that finds fewer rows than it must remove is an invariant violation: th
 the table goes to quarantine handling (SPEC 4.0); it is never ignored.
 
 The grouping key must keep apart every pair of values that the source tells apart. DuckDB's `GROUP BY`, `PARTITION
-BY`, `DISTINCT` and `=` do not: `-0` and `0` form one group, NaN and −NaN one, and `1 mon`, `30 days` and `720
-hours` one; UNION values of different members compare unequal although they can stand for the same source value
-(package O, `docs/oracle.md` 1.5). The delta and the choice of rows to delete therefore use an exact key for columns
-of such types — the canonical form the oracle compares by (`docs/oracle.md` 1.2: a UNION value by its member and
-that member's rule, NaN equal to NaN, `-0` different from `0`, an interval by its three fields) — and the value
-itself elsewhere. Package A writes down the full list of destination types that need it. A source NULL in a UNION
-column is written as a real NULL: a UNION whose member holds NULL is not NULL in DuckDB. This settles open point 3.
+BY`, `DISTINCT` and `=` do not: `-0` and `0` form one group, NaN and −NaN one, and `1 mon`, `30 days` and `720 hours`
+one; UNION values of different members compare unequal although they can stand for the same source value (package O,
+`docs/oracle.md` 1.5). The delta and the choice of rows to delete therefore use an exact key for columns of such types
+— the canonical form the oracle compares by (`docs/oracle.md` 1.2: a UNION value by its member and that member's rule,
+NaN equal to NaN, `-0` different from `0`, an interval by its three fields) — and the value itself elsewhere. Apply
+compares a UNION by member and value (`docs/design/apply.md` 5.1 has the list of types). A source NULL in a UNION
+column is written as a real NULL: a UNION whose member holds NULL is not NULL in DuckDB, and a change set staged by
+SQL must keep that. This settles open point 3.
 
 The stream path and the backfill path must produce identical destination values for identical source values; the
 type fuzzer checks this for every type, because a keyless delete can only find a row that was written the same way.
@@ -388,7 +413,8 @@ becomes visible, until that commit. Nothing is ever applied from an unfinished s
 A TRUNCATE (all relations named in the message, so CASCADE needs nothing extra) or a schema change cuts the group
 into segments. Inside the one destination transaction: apply segment 1, execute the truncate or the DDL, apply
 segment 2, and so on, in commit order. DDL in MotherDuck is transactional, so a rolled-back group leaves no
-half-changed schema.
+half-changed schema. A segment is a contiguous run of records. It may start and end inside a source transaction,
+but never between the `d` and the `c` of one key change.
 
 ## 7. Snapshot and stream
 
@@ -420,10 +446,21 @@ re-backfill and a resumed backfill (SPEC 3.3). The stream never stops for it.
    - a table with a key: every chunk transaction takes its own snapshot and its own cut (7.2, 7.3). Nothing is
      held between chunks, so the backfill holds back no cleanup on the primary and has no connection whose loss
      ends it; a resume is nothing special;
-   - a table without a key needs one snapshot for the whole table (7.4). It is held by an **exporter** connection
-     that never touches the table (it holds no relation lock); readers import it per chunk with
-     `SET TRANSACTION SNAPSHOT`. While it lives it holds back cleanup on the primary through
-     `hot_standby_feedback`; its age is reported and has an alert threshold;
+   - a table without a key needs one snapshot for the whole table (7.4). It is held by an **exporter** connection that
+     never touches the table (it holds no relation lock); readers import it per chunk with `SET TRANSACTION SNAPSHOT`.
+     While it lives it holds back cleanup on the primary through `hot_standby_feedback`; its age is reported and has
+     an alert threshold. On a standby whose server has the exported-snapshot defect (7.2) the exported snapshot must
+     be quiet. The exporter takes snapshots until one is quiet, within a bounded, declared wait (4.3; default 60 s).
+     If none comes, the table is read by one reader with its own snapshot, in one transaction: waiting for a quiet
+     snapshot without a bound would never complete while a write transaction stays open on the primary. The one reader
+     is the fallback and not the rule, because it holds its lock on the table for the whole read: a replayed `ACCESS
+     EXCLUSIVE` lock cancels it after `max_standby_streaming_delay` and stalls replay, and with it the slot, until
+     then. On a server with the fix a plain exported snapshot is used. `take_keyless_standby_cut` in
+     `src/cdc_v2/pg/cut.py` does all three. No other program may import snapshots on the standby we read: on a server
+     with the defect an importer leaves wrong hint bits, which every later reader of those rows inherits (runbook,
+     P5). Every standby the backfill reads must accept a replication connection from the runtime role: the function
+     that takes a cut there reads `IDENTIFY_SYSTEM` on it right after the cut (7.2). So the backfill needs a
+     replication connection to every node it reads, next to its SQL connections; on a primary none is needed.;
    - a chunk that fails with a recovery conflict (SQLSTATE 40001) is read again.
 3. **Catch up.** The backfill lane applies pending changes to the new table in rounds (statements of section 6,
    mode `catch_up`), recording `caught_up_lsn` each time, until the rest is small. Then it moves the backfill to
@@ -442,49 +479,108 @@ A crash anywhere leaves either the old version with a resumable backfill, or the
 
 ### 7.2 Where a snapshot lies in the stream
 
-Each snapshot has a **cut**: a function that answers, for a source transaction, `inside`, `outside` or `unknown`.
-The stream identifies a transaction by the end of its commit record (`E`, section 2), so the cut is stated in `E`.
+Each snapshot has a **cut**: a function that answers, for a source transaction, `inside`, `outside` or
+`unknown`. The stream identifies a transaction by the end of its commit record (`E`, section 2), so the cut is
+stated in `E`. The argument and the measurements are in `docs/design/cut.md`. `src/cdc_v2/pg/cut.py`
+is the only code that takes or judges a cut.
 
-**On a standby** (replica mode) the cut is a pair of replay positions around the moment the snapshot is taken:
-`R0` = `pg_last_wal_replay_lsn()` read by a statement that has finished before the snapshot is taken, and `R1` =
-the same function read after the snapshot exists. Two ways to get them:
+**On a standby** (replica mode) the cut is a pair of replay positions around the moment the snapshot is
+taken: `R0` = `pg_last_wal_replay_lsn()` read by a statement that has finished before the snapshot is taken,
+and `R1` = the same function read after the snapshot exists. Two ways to get them:
 
 - a reader's own snapshot: `SELECT pg_last_wal_replay_lsn()` in autocommit (`R0`), then
   `BEGIN ISOLATION LEVEL REPEATABLE READ`, whose first statement takes the snapshot and reads `R1`;
-- an exported snapshot: one read-committed transaction with three statements: `R0`, `pg_export_snapshot()`, `R1`.
+- an exported snapshot: one read-committed transaction with three statements: `R0`, `pg_export_snapshot()`,
+  `R1`. On a standby whose server has the defect of cut.md section 7, an exported snapshot is used
+  only if it is **quiet** (`xmin = xmax` in `pg_current_snapshot()`). A session that imports a snapshot that
+  is not quiet can see transactions the exporter does not see, and can lose rows. The fix is expected in
+  16.16, 17.12 and 18.7; `export_defect(server_version_num)` in the library is the one place that knows the
+  versions. What a table without a key does when no quiet snapshot comes is in 7.1.
 
 A value read by the statement that takes the snapshot is an upper bound only, never `R0`.
 
-Replay is serial, and a commit becomes visible to snapshots during the replay of its commit record, before the
-replay position moves past that record. Therefore, with `E1` = the `E` of the first transaction in the stream with
-`E > R1`:
+Replay is serial, and a commit becomes visible to snapshots during the replay of its commit record, before
+the replay position moves past that record. Therefore, with `E1` = the `E` of the first transaction in the
+stream with `E > R1`:
 
 - `E ≤ R0` ⇒ `inside`;
 - `E > E1` ⇒ `outside`;
-- otherwise `unknown`: the commits in `(R0, R1]`, and the one at `E1`, whose record may have been in replay while
-  the snapshot was taken.
+- otherwise `unknown`: the commits in `(R0, R1]`, and the one at `E1`, whose record may have been in replay
+  while the snapshot was taken.
 
-The stream **has passed** a snapshot when its applied position is greater than `R1`; the transaction at `E1` is
-then applied. The heartbeat write guarantees that such a transaction arrives.
+The first line holds only on a **settled** standby. A standby that has just started can hide a
+transaction whose commit record lies before its restart point until it replays the next commit or abort
+(cut.md section 8). A cut is therefore used only if the snapshot's `xmax` is at or above the next transaction
+id named in the standby's control file (`next_xid` of `pg_control_checkpoint()`). This value, the settle
+floor, is read once per connection before its first cut and is used with that connection only: the floor of
+one standby says nothing about another. No cut is taken without it. The heartbeat write settles a standby
+within one heartbeat interval plus the replay lag. The pre-flight check calls `pg_control_checkpoint()` with
+the runtime role.
 
-A snapshot is used only if `R0 ≥ P0`: everything the stream applied before the table entered `backfilling` is then
-inside. This matters when backfill reads use a different replica than the slot. The wait for it has a deadline
-(the replica may be stalled); past it the backfill reports and keeps waiting as a declared wait (4.3), it does
-not spin and does not read.
+The stream **has passed** a snapshot when its applied position is greater than `R1`; the transaction at `E1`
+is then applied. The heartbeat write guarantees that such a transaction arrives.
 
-`pg_current_snapshot()` cannot give the answer on a standby: its in-progress list is empty there. Its `xmin` and
-`xmax` can still turn `unknown` into an answer (transaction id below `xmin` ⇒ `inside`, at or above `xmax` ⇒
-`outside`), which helps 7.4.
+A snapshot is used only if `R0 ≥ P0`: everything the stream applied before the table entered `backfilling` is
+then inside. The check is made for every snapshot. It matters when backfill reads use a
+different replica than the slot, and also on the slot's own replica: after a restart a standby answers
+queries from a replay position that can lie before what the slot has already delivered. The wait for it, and
+for a settled standby, has a deadline (the replica may be stalled); past it the backfill reports and keeps
+waiting as a declared wait (4.3), it does not spin and does not read.
 
-**On a primary** (primary mode, or reads from the primary) there is no such pair of positions: a commit record is
-written, and can be decoded by the slot, before the transaction becomes visible to snapshots; with synchronous
-replication that gap can be long. The cut is `pg_current_snapshot()` together with the transaction id of each
-stream transaction, and it never answers `unknown`. What replaces `R0 ≥ P0` there, so that no transaction the
-stream applied before `P0` is still invisible to the snapshot, is open point 12.
+`pg_current_snapshot()` cannot give the answer on a standby: its in-progress list is empty there. Its `xmin`
+and `xmax` can still turn `unknown` into an answer (transaction id below `xmin` ⇒ `inside`, at or above `xmax`
+⇒ `outside`; the 32-bit id of the stream is widened with the snapshot's own `xmax`). A
+quiet snapshot has no `unknown` transaction at all. Both help 7.4. (The start of the commit record
+would narrow `unknown` further, but stock Debezium does not deliver it.)
 
-**[test]** P3 proves all of 7.2 with a stress test before anything depends on it (`docs/design/cut.md`): very many
-cuts while writers commit counted rows; the rows visible in each snapshot must equal the commits `inside`, plus
-some of the `unknown` ones, and none of the `outside` ones; a deliberately wrong rule must be caught.
+**On a primary** (primary mode, or reads from the primary) there is no such pair of positions: a commit record
+is written, and can be decoded by the slot, before the transaction becomes visible to snapshots; with
+synchronous replication that gap can be long. The cut is `pg_current_snapshot()` together with the
+transaction id of each stream transaction, widened to 64 bits: `inside` if the id is below `xmax`
+and not in the in-progress list, otherwise `outside`. It never answers `unknown`. The stream has
+passed the snapshot when its applied position is at or above the WAL insert position
+(`pg_current_wal_insert_lsn()`, not the flush position) that the statement taking the snapshot reads once
+the snapshot exists.
+
+In place of `R0 ≥ P0`, the stream lane keeps the ids of
+the transactions it has delivered and that no snapshot of its own has seen yet. It takes a snapshot for this
+once per group (one statement, `pg_current_snapshot()`, on a primary connection of the stream lane; delivered
+ids are widened with that snapshot's `xmax`) and drops the ids that snapshot sees; the set is nearly always
+empty. The set as it is at `P0` belongs to the table's backfill. A snapshot taken later is used only if it
+sees every id of that set. After an engine start the set is unknown: the lane reads
+`X = pg_current_xact_id()`, and until one of its own snapshots has `xmin ≥ X`, a snapshot is used only if it
+also has `xmin ≥ X`. The wait has the deadline of the `R0 ≥ P0` wait and reports the transaction ids it waits
+for. The same rule stands in for every other condition of the form `R0 ≥ position` (7.3). `pg_xact_status`
+cannot be used for this: it answers `in progress` for as long as snapshots do not see the transaction.
+`synchronized_standby_slots` does not close the gap either.
+
+A cut belongs to the timeline it was taken on. After a promotion of the node the stream reads from,
+or a slot finding, open cuts are abandoned and their backfills start again. A cut also belongs to the server
+life it was taken in: the function that takes it reads the cut's node right after the cut, before it gives
+the cut out, and keeps that reading on the cut (on a standby `IDENTIFY_SYSTEM`, over a replication
+connection, and the server's start time; on a primary the start time and the flush position, once that has
+reached the insert position of the cut). At the swap, after "has passed", the cut is used only if that reading
+shows the cut's timeline and start time, and `IDENTIFY_SYSTEM` on the node the stream reads from, read then
+and not earlier, shows the same timeline beyond `R1` (on a primary: at or beyond the insert position).
+
+**[test]** P3 has tested 7.2 (`docs/design/cut.md`, `evidence/p3/cut/`). On a standby: a model
+check over every interleaving of small histories, and stress runs that compare the rows visible in each
+snapshot with the commits of the stream; every deliberately wrong rule was caught. Seven runs recorded the
+complete checker (the window of `unknown`, the boundary of every key, rows missing from the snapshot):
+`main_c`, `v5c_restart_crash`, `v7b_exported_no_subxact`, `v9_exported_open_no_subxact`, `qb_quiet_exported`,
+`v1b_big_drop` and `v3b_ddl_walswitch_pause`, together 984,387 cuts over 4,854,224 transactions
+(subtransactions, aborts, asynchronous commits, big transactions, dropped tables, DDL, WAL switches, replay
+pauses, standby restarts and kills, exported and quiet exported snapshots), with no violation and no missing
+row. Seven earlier runs had the first two steps only, all with a reader's own snapshot: `main`,
+`v2_twophase_subxact`, `v4_apply_delay`, `v5_restart_crash`, `v6_slot_on_primary`, `v8_idle` and
+`nc_mid_redo`, together 2,982,523 cuts over 9,353,889 transactions (also two-phase commit, apply delay, the
+slot on the primary, an idle source), with no violation; a row that a snapshot lost would not have been
+counted in them. On a primary: 296,814 cuts and 159 million answers, none wrong; in 99,602 of these cuts
+"has passed" was judged with the position the library reads (397,985 checks, none wrong). A promotion and a
+crash of a primary with asynchronous commits were run as single scenarios, through the readings the takers
+make; the other timeline cases are argued and tested without a server. The tests stay in the repository:
+`tests/cut/` (hermetic, in the default run) and `tests/cut/test_cut_live.py` (marker `localpg`), and
+`tools/cutstress` repeats every campaign.
 
 ### 7.3 Tables with a key
 
@@ -500,12 +596,13 @@ therefore treats the keys of the log like this, before the statements of 6.2 run
 1. Several versions of a key are reduced to one; which one does not matter, because every column that differs
    between them was changed by a record in the log, and the log supplies that value.
 2. If the last record of a key is a partial image (unchanged TOAST values) and a column is still unresolved after
-   looking at the earlier records of the key in the log, the value is taken from the row in the new table. If the
-   new table has no row for the key, the key goes to a **repair read**: one statement per round reads the missing
-   rows by key from the source under a new snapshot (`WHERE key = ANY(…)`; no temporary table, the standby is
-   read-only), and they are loaded like a chunk. The repair snapshot must have `R0 ≥ caught_up_lsn`, so that a
-   repaired row is never older than what catch-up has already applied to the new table. This is a backfill read, not a re-read of an unchanged value in
-   the stream (SPEC 2.6); it counts towards the row bound of SPEC 3.7.
+   looking at the earlier records of the key in the log, the value is taken from the row in the new table. If the new
+   table has no row for the key, the key goes to a **repair read**: one statement per round reads the missing rows by
+   key from the source under a new snapshot (`WHERE key = ANY(…)`; no temporary table, the standby is read-only), and
+   they are loaded like a chunk. The repair snapshot must have `R0 ≥ caught_up_lsn`, so that a repaired row is never
+   older than what catch-up has already applied to the new table. On a primary: the rule of 7.2 that stands in for `R0
+   ≥ P0`, with the set taken at `caught_up_lsn`. This is a backfill read, not a re-read of an unchanged value in the
+   stream (SPEC 2.6); it counts towards the row bound of SPEC 3.7.
 3. Then every key of the log ends as exactly one row, or none after a delete.
 
 The swap waits until the stream position has passed the upper bound of every snapshot the table used, repair
@@ -518,10 +615,12 @@ differs from the value of the table's first chunk, the loaded chunks are discard
 
 ### 7.4 Tables without a key
 
-A change cannot be attributed to a `ctid` range, and replaying a change twice changes a row count. So the whole
-table is read under **one** snapshot whose cut has no `unknown` transaction that touches the table. The backfill
-opens a snapshot, waits until the stream has passed `R1`, and checks; if a touching transaction is `unknown`, it
-opens another snapshot before reading anything. The pending log is replayed from that exact cut.
+A change cannot be attributed to a `ctid` range, and replaying a change twice changes a row count. So the whole table
+is read under **one** snapshot whose cut has no `unknown` transaction that touches the table. The backfill opens a
+snapshot, waits until the stream has passed `R1`, and checks; if a touching transaction is `unknown`, it opens another
+snapshot before reading anything. The pending log is replayed from that exact cut. A quiet snapshot has none. With the
+narrowing of 7.2 by transaction id, about two of three cuts under load (66.93% in the main campaign) and every cut on
+an idle source have no `unknown` transaction at all (cut.md section 5.2).
 
 If the snapshot is lost (crash, hand-over, standby conflict), the chunks already loaded are discarded and the
 table's backfill starts again. Consequence: the row bound of SPEC 3.7 holds for tables with a key; a table without
@@ -646,7 +745,7 @@ src/cdc_v2/oracle/          source/destination comparison used by every test tie
 
 | # | Point | Decided by |
 |---|---|---|
-| 1 | Cut on a standby (7.2) is exact as described | P3 stress test |
+| 1 | Cut on a standby (7.2) | Closed by P3 (`docs/design/cut.md`). Exact as described, with two conditions now in 7.2: the standby is settled; an exported snapshot is quiet or the server carries the fix |
 | 2 | `rowid` is usable to delete exactly k identical rows (6.3) | P3 test on MotherDuck |
 | 3 | Canonical comparison form for UNION and NaN (6.3) | settled by the oracle (package O, `docs/oracle.md` 1.2); the keyless grouping key uses the same form (6.3) |
 | 4 | Staging tables versus direct apply (6.1) | decided by the Flight measurement in P2: direct for groups, staging tables only for 6.4 |
@@ -657,9 +756,11 @@ src/cdc_v2/oracle/          source/destination comparison used by every test tie
 | 9 | Key change with unchanged TOAST values: old key on the create record, chains resolved (6.2) | P3 (1.4) and P4 (2.6) tests |
 | 10 | Several versions and missing rows after loading under several snapshots; repair read (7.3) | P3 handoff tests, workload fuzzer with TOAST values |
 | 11 | A schema change of a table during its own backfill | P4 schema wave; first rule: the table's backfill starts again |
-| 12 | Cut on a primary: a transaction decoded before `P0` that a later snapshot does not see yet (7.2) | P3 cut stress test proposes and proves the rule |
+| 12 | Cut on a primary (7.2) | Closed by P3 (`docs/design/cut.md` section 10). Exact by transaction id; `R0 ≥ P0` is replaced by the rule in 7.2 |
 | 13 | Catch-up that never converges (changes with unchanged values arrive faster than repair reads resolve them) | P4: bound the rounds, alert; P6 fuzzers |
 | 14 | Can a status update with a lower flush position move `confirmed_flush_lsn` backwards (8)? | Measured in P3 (package E): yes on a server without the guard (16.6), no on one with it (18.6); the guard is in 13.22, 14.19, 15.14, 16.10, 17.6, 18.0. The attach rule does not depend on it; the limit on a server without the guard is stated in 8. Package V shows the negative control on the 16.6 binaries. Carried: preflight warning (P4), runbook rule (P5), the provider's version (stage 2); 17 where a 17 server is available |
 | 15 | SPEC 1.3 during a re-backfill: a table that streams stays in the guarantee (7.1, "without a gap"); after a gap each table swaps on its own (SPEC 3.6) and is outside the guarantee until then, like a first backfill | decided here; reported to the owner |
 | 16 | Leader tables created by several first runs at once end as one row set (4) | P3, package L, on MotherDuck |
 | 17 | SPEC 4.2 "a newcomer exits within 10 s": measured from the first line of `main.py`; the platform's own start time varies (p95 7 s, max 21 s in the spike) and is outside our control | reported to the owner |
+| 18 | A table without a key on a standby whose server has the exported-snapshot defect (7.1, 7.4) | Decided by the coordinator, reported to the owner: a quiet exported snapshot within a bounded, declared wait (default 60 s); if none comes, one reader with its own snapshot; on a server with the fix a plain exported snapshot (cut.md 7.1) |
+| 19 | Two Postgres defects found in P3: exported snapshots on a standby (fixed upstream, not released), a standby that hides a commit after a restart (cut.md 8, not reported) | Owner decides whether to report the second upstream; re-check the first when 16.16, 17.12, 18.7 appear |

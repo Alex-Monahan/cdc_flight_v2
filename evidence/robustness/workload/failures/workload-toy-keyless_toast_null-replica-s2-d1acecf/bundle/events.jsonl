@@ -1,0 +1,39 @@
+{"epoch": 1, "kind": "took_over", "pid": 3013, "previous_age_ms": 847652508222, "previous_state": "released", "run": "i1-3013", "t": 1794337308.225832, "tag": "i1"}
+{"epoch": 1, "kind": "started", "pid": 3013, "run": "i1-3013", "t": 1794337308.227993, "tag": "i1", "variant": "keyless_toast_null"}
+{"kind": "resync_start", "pid": 3013, "run": "i1-3013", "t": 1794337308.252842, "tag": "i1", "why": "pending"}
+{"kind": "resync_done", "pid": 3013, "position": "0/5074C0E0", "rows": 24, "run": "i1-3013", "t": 1794337308.443022, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1349909640, "run": "i1-3013", "t": 1794337308.60409, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1350010120, "run": "i1-3013", "t": 1794337308.874567, "tag": "i1"}
+{"detail": "keyless public.w_nkt found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 3013, "run": "i1-3013", "t": 1794337309.061966, "tag": "i1"}
+{"detail": "keyless public.w_nkt found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 3013, "run": "i1-3013", "t": 1794337309.15569, "tag": "i1"}
+{"detail": "keyless public.w_nkt found 0 rows to remove", "error": "ApplyInvariantError", "kind": "retry", "pid": 3013, "run": "i1-3013", "t": 1794337309.306935, "tag": "i1"}
+{"kind": "quarantined", "pid": 3013, "run": "i1-3013", "t": 1794337309.32635, "table": "public.w_nkt", "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1350147240, "run": "i1-3013", "t": 1794337309.700759, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1350260232, "run": "i1-3013", "t": 1794337309.792131, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1350342392, "run": "i1-3013", "t": 1794337310.031937, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1350437912, "run": "i1-3013", "t": 1794337310.27438, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1350488744, "run": "i1-3013", "t": 1794337310.605843, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1350582216, "run": "i1-3013", "t": 1794337310.892627, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1350679088, "run": "i1-3013", "t": 1794337311.39366, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1350951000, "run": "i1-3013", "t": 1794337312.027465, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1351200456, "run": "i1-3013", "t": 1794337312.22243, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1351291008, "run": "i1-3013", "t": 1794337312.311518, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1351362760, "run": "i1-3013", "t": 1794337312.634542, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1351463104, "run": "i1-3013", "t": 1794337312.90713, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1351584576, "run": "i1-3013", "t": 1794337313.177192, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1351587520, "run": "i1-3013", "t": 1794337313.404606, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1351632248, "run": "i1-3013", "t": 1794337313.462645, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1351674520, "run": "i1-3013", "t": 1794337313.66161, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1351851320, "run": "i1-3013", "t": 1794337313.989934, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1351940640, "run": "i1-3013", "t": 1794337314.105577, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1352071512, "run": "i1-3013", "t": 1794337314.865643, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1352173976, "run": "i1-3013", "t": 1794337315.489961, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1352427120, "run": "i1-3013", "t": 1794337316.193435, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1352754008, "run": "i1-3013", "t": 1794337316.917367, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1353228984, "run": "i1-3013", "t": 1794337317.212008, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1353415536, "run": "i1-3013", "t": 1794337317.878467, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1353598336, "run": "i1-3013", "t": 1794337318.062374, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1353663296, "run": "i1-3013", "t": 1794337318.127011, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1353678376, "run": "i1-3013", "t": 1794337318.212947, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1353767384, "run": "i1-3013", "t": 1794337318.462305, "tag": "i1"}
+{"epoch": 1, "kind": "committed", "pid": 3013, "position": 1354197008, "run": "i1-3013", "t": 1794337318.687325, "tag": "i1"}

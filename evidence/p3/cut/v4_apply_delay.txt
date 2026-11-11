@@ -1,0 +1,21 @@
+$ tools/cutstress run --label v4_apply_delay --seconds 120 --writers plain,async,subxact --takers-own 2 --takers-exported 0 --apply-delay-ms 300 --out evidence/p3/cut/v4_apply_delay.json
+load average before: 6.10 6.33 6.98
+   30s cuts=26885 transactions=90192 violations=0 waiting=88
+   60s cuts=51911 transactions=181447 violations=0 waiting=24
+   90s cuts=75404 transactions=271520 violations=0 waiting=51
+v4_apply_delay: OK
+  Postgres 18.6 (Homebrew), 122 s, writers plain,async,subxact, disturbances none, slot on replica
+  cuts checked 100763 (not checked 0), transactions delivered 363741
+  violations of the sound rules: none
+  stream out of E order: 0
+  wrong rules caught (cuts): stmt_as_r0=366, r1_inside=366, r1_outside=1, naive_sharp=0, xmax_inside=38657, xmin_outside=46332
+  unknown set (transactions per cut)   empty     mean   max
+    base                                 0.00%    1.533   213
+    xid                                 76.02%    0.561   102
+    sharp                                0.54%    1.524   213
+    xid+sharp                           76.02%    0.561   102
+    really_visible                      86.37%    0.525   212
+  cuts_with_r0_below_received: 0
+  cuts_that_miss_a_received_transaction: 0
+  cuts_with_r0_eq_r1: 86309
+  cuts taken the own way: 100763, of them quiet (xmin = xmax): 54408 (54.0%), with a violation: 0

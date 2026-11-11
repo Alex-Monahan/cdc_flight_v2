@@ -1,0 +1,39 @@
+[
+ {
+  "effect": true,
+  "error": null,
+  "kind": "src_terminate",
+  "params": {},
+  "proof": {
+   "backends": 1,
+   "nodes": [
+    "primary",
+    "replica"
+   ]
+  },
+  "t_heal": 5.253,
+  "t_inject": 5.135
+ },
+ {
+  "effect": true,
+  "error": null,
+  "kind": "net_reset",
+  "params": {
+   "seconds": 0.081
+  },
+  "proof": {
+   "accept_closed": 0,
+   "accept_reset": 14,
+   "accepted": 14,
+   "active_at_inject": 1,
+   "bytes_down": 0,
+   "bytes_up": 0,
+   "closed_by_fault": 0,
+   "held_down": 0,
+   "held_up": 0,
+   "reset_by_fault": 1
+  },
+  "t_heal": 9.887,
+  "t_inject": 5.903
+ }
+]

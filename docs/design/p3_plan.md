@@ -306,9 +306,10 @@ Per destination table and segment, in one of two forms:
 **Local form** (a group in memory):
 
 - `rows`: an Arrow table with the columns of C2 `ROWS` in destination types (`seq`, `op`, `a<i>`, `b<i>`, `u<i>`,
-  `k<i>`) plus `txn` (index into `transactions`, in commit order). It contains only whole source transactions,
-  its order is (`txn`, `seq`), and it is **not reduced**: every change is there.
-- `transactions`: per `txn`: `xid` (the transaction id as an integer), `commit_lsn`, `commit_ts`.
+  `k<i>`) plus `txn` (index into `transactions`, in commit order). It is a contiguous run of records in stream
+  order: it may start and end inside a source transaction, but never between the `d` and the `c` of one key
+  change. Its order is (`txn`, `seq`), and it is **not reduced**: every change is there.
+- `transactions`: per `txn`: `xid` (the transaction id as an integer), `commit_lsn`, `commit_ts`; it may be `None`.
 
 **Relation form** (rows that are already in MotherDuck: the staging of an oversized transaction, a pending log):
 
@@ -329,7 +330,16 @@ apply_group(tx, target, change_set, mode="stream") -> ApplyCounts      # mode: "
 truncate(tx, target)
 ```
 
-`tx` is an open lane transaction (C4). `apply_group` executes the statements of 6.2 or 6.3; it never commits.
+`tx` is an open lane transaction (C4). `apply_group` executes the statements of 6.2 or 6.3; it never commits. As built
+(`docs/design/apply.md`): `apply_group(tx, target, change_set, mode=…, settings=ApplySettings(…))`
+(`local_temp_directory` is required: a setting without a safe default raises `ApplySettingsError`),
+`reduce_duplicates(tx, target, change_set)` (catch-up, design 7.3 step 1), `repair_keys(tx, target, meta, rows, …)` (a
+repair read: deletes the key's rows by the source's equality, then inserts), `check_new_keys` (default on, inside the
+statements). Errors: `ApplyInvariantError` for a keyed change set that is not a source history, for a start state that
+differs (stream mode) and for two final keys the source calls equal; `ApplySpillFull` when the spill area is full.
+Apply calls only `tx.execute`, `tx.fetch_arrow` and `tx.register`; its relation form creates and drops
+`_cdc_apply_<random>` inside the caller's transaction (about 40 statements per call), the one exception to the
+migration rule.
 
 Unchanged values (tables with a key). A record that carries "unchanged" for a column needs the value from
 somewhere. The order is: (1) the nearest earlier record of the same row in the change set, following key changes;
@@ -343,9 +353,14 @@ them gives the value, the key is **unresolved**:
   keys are not applied, everything else is, and the keys are returned in `ApplyCounts.unresolved` for the repair
   read.
 
-Applying the same change set twice in mode `catch_up` gives the same table, except for keys returned as
-unresolved. Mode `stream` makes no such promise and needs none: a group is applied exactly once because of the
-position check of the run-again rule (C4).
+Only the immediate repeat of a catch-up call is safe: a call repeated after a later call can leave a wrong row and
+report nothing. Preconditions of a catch-up call (`docs/design/apply.md` 2.6, word for word there): it starts at or
+before the lower bound of every snapshot not yet passed, and its change set reaches at least `R1` of every snapshot
+whose rows the table holds, repair reads included; the row of an unresolved key is deleted, and the repair read covers
+every reported key, including keys the source no longer holds, through `repair_keys`. Once a catch-up call has passed
+`R1` of every snapshot (repairs included) and reported nothing, the table equals the source; later rounds and the swap
+group use mode `stream`. Mode `stream` makes no such promise and needs none: a group is applied exactly once because
+of the position check of the run-again rule (C4).
 
 `ApplyInvariantError` is also raised, in both modes, when a delete or update on a table without a key finds fewer
 rows than it must remove.
@@ -409,6 +424,12 @@ compares (design section 4). Every other `_cdc` table is created by migration st
 package, run only by a leader after its take-over, in fenced `control`-lane transactions.
 
 `_cdc` schema: created and migrated by `cdc_v2.md.schema` only; every package adds its tables there.
+
+From apply: `tx.fetch_arrow(sql, params)` returns a complete Arrow table; `tx.register(name, table)` takes lower-case
+names, registering again replaces, and names are released when the transaction ends. Apply relies on `rowid` staying
+the same within one transaction. Every private DuckDB of the pipeline (the transform connection, apply's planning
+database, `reduce_duplicates`) spills only into the run's one spill area, its cursors use `SET SESSION`, and the sum
+of their limits is the area's limit.
 
 Alerts: `alerts.emit(tx, kind, severity, fields)` records an alert in `_cdc.alerts` inside the caller's transaction
 (delivery to Slack is built in the operations wave and reads that table). Packages raise alerts only this way.
@@ -531,7 +552,26 @@ Details in `docs/oracle.md`. What binds every package that writes a gate test:
 
 ### C9 Cut (package X)
 
-As delivered by package X; its report defines the interface, and this section is completed when it merges.
+`cdc_v2.pg.cut` is the only code that takes or judges a cut (`docs/design/cut.md`). Standby: on each
+connection that takes cuts, read `floor = settle_floor(conn)` once; it serves that connection only. Every taker
+also needs `repl`, a second connection to the same standby opened with `replication=database`
+(`connect(target, deadline, replication=True).raw`): B needs a replication connection to every node it reads,
+and every standby we read must accept one from the runtime role. Keyed tables:
+`take_standby_cut_after(conn, repl, p0, deadline, floor)` returns a settled and sealed `StandbyCut` with
+`R0 ≥ P0`, its read-only REPEATABLE READ transaction left open. Tables without a key (rule K):
+`take_keyless_standby_cut(conn, repl, p0, deadline, floor)`; if `cut.way == "exported"` readers call
+`import_snapshot(c, cut.snapshot_id)`, if `"own"` this connection is the one reader. For every `END`, in
+stream order: `cut.observe(E)`, then `cut.classify(E, xid32)`. Primary: `take_primary_cut_after(conn, X,
+deadline)`, or `take_primary_cut` until `mark.admits(cut)` and then `cut = seal_primary_cut(conn, cut,
+deadline)`; either way the cut is sealed (its server has flushed the WAL up to the cut's insert position) and
+its transaction is left open; `classify(xid32)`. The stream lane (package S) starts a
+`GapTracker(unknown_below=next_xid_marker(primary))` at each engine start, calls `delivered_xid32(txId)` for
+each applied `END` and `probe(probe_snapshot(conn))` once per group, and hands `mark()` to B at every `P0` and
+`caught_up_lsn`. At the swap, for every cut the table used: `has_passed(applied)`, then `valid_on(stream)`; if
+false, the backfill starts again. `stream` is `slot.timeline_history` of the stream's node, read at the swap.
+The caller reads nothing about the cut's own node: the taker read it right after the cut and keeps it on the
+cut (`cut.sealed`). A cut from a one-attempt function (`take_standby_cut_own`, `take_standby_cut_exported`,
+`take_primary_cut` without `seal_primary_cut`) is valid nowhere.
 
 ### C10 Stream and backfill (packages S, B, V, T)
 
@@ -596,6 +636,7 @@ As delivered by package X; its report defines the interface, and this section is
   `replica_identity_problem` is `None` again.
 - S runs a group again after `Conflict`, a bounded number of times, building its statements again when the
   conflict came from a DDL (a swap changes the catalog).
+- `ApplySpillFull` is not a failure of a table: it never counts towards `apply.max_table_attempts` (task S).
 - A table that fails to apply `apply.max_table_attempts` times (default 3) leaves the stream: state `quarantined`,
   routing `skip`, alert, in a stream-lane transaction; the group is then applied without it (design section 3).
 

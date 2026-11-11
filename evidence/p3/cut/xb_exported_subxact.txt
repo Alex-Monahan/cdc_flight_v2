@@ -1,0 +1,24 @@
+$ tools/cutstress run --label xb_exported_subxact --seconds 90 --writers plain,subxact,abort --takers-own 1 --takers-exported 2 --out evidence/p3/cut/xb_exported_subxact.json
+load average before: 9.79 16.39 11.85
+   30s cuts=32280 transactions=73970 violations=569 waiting=170
+   60s cuts=61834 transactions=144633 violations=1330 waiting=83
+xb_exported_subxact: FAILED
+  Postgres 18.6 (Homebrew), 91 s, writers plain,subxact,abort, disturbances none, slot on replica
+  cuts checked 95173 (not checked 0), transactions delivered 217987
+  violations of the sound rules: {'outside': 384, 'library': 472, 'sharp': 858, 'inside': 90, 'evidence': 1}  by way of taking the cut: {'exported': 1731, 'own': 74}
+  stream out of E order: 0
+  wrong rules caught (cuts): stmt_as_r0=18072, r1_inside=21073, r1_outside=671, naive_sharp=668, xmax_inside=34269, xmin_outside=42745
+  unknown set (transactions per cut)   empty     mean   max
+    base                                 0.00%    1.996   144
+    xid                                 64.30%    0.529    58
+    sharp                               63.29%    0.998   143
+    xid+sharp                           74.87%    0.420    58
+    really_visible                      70.50%    0.503    58
+  cuts_with_r0_below_received: 0
+  cuts_that_miss_a_received_transaction: 0
+  cuts_with_r0_eq_r1: 60015
+  cuts taken the own way: 38107, of them quiet (xmin = xmax): 20862 (54.7%), with a violation: 37
+  cuts taken the exported way: 57066, of them quiet (xmin = xmax): 31553 (55.3%), with a violation: 724
+  snapshots dropped because the standby had not settled: 0
+  checker steps: unknown_window, per_key_boundary, missing_rows; rows missing from a cut: 1
+  load average at start [9.79, 16.39, 11.85], at end [9.33, 14.51, 11.58]

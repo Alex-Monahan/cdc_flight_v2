@@ -1,0 +1,9 @@
+#!/bin/sh
+# The fuzz campaigns (docs/testing/fuzzers.md): a thin wrapper around `uv run python -m cdc_v2.testing.fuzz`,
+# run through tools/with-env (the environment of the build; it supplies PGPORT and the MotherDuck token).
+#   tools/fuzz run --fuzzer workload|fault|stream|leadership --system toy[:variant] --source-node replica|primary \
+#                  [--seeds A..B | --hours H] --workers N
+#   tools/fuzz status [--write] | suite-1.7 --system toy | variants | stream-offline --cases N | reduce ID | clean
+set -eu
+here="$(cd "$(dirname "$0")" && pwd)"
+exec "$here/with-env" uv run --project "$here/.." python -m cdc_v2.testing.fuzz "$@"

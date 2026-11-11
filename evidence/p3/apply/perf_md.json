@@ -1,0 +1,286 @@
+{
+  "machine": {
+    "cpus": 10,
+    "platform": "arm64",
+    "where": "laptop over the internet"
+  },
+  "note": "Speed indications for package A (not results: SPEC says performance comes from Flight runs).\n\nA lineitem-width table (16 columns, TPC-H names) with a key; change sets of n records: one third inserts of new\nkeys, one third complete updates, one third deletes (\"full\"), or the updates leave the comment column unchanged\n(\"unchanged\"); and the same table without a key (deletes and updates carry the old image). Each change set is\napplied in one stand-in transaction; the time is from apply_group's call to COMMIT returning.",
+  "runs": [
+    {
+      "client_cpu_seconds": 0.0762,
+      "keyed": true,
+      "peak_rss_mb_process": 166.4,
+      "records": 1,
+      "row_count_ok": true,
+      "rows_per_second": 3,
+      "seconds_all": [
+        0.3368,
+        0.3585,
+        0.3701,
+        0.3884,
+        0.3929
+      ],
+      "seconds_median": 0.3701,
+      "setup_seconds": 0.43,
+      "shape": "full",
+      "statements": [
+        "K6"
+      ],
+      "table_rows": 1000
+    },
+    {
+      "client_cpu_seconds": 0.0805,
+      "keyed": true,
+      "peak_rss_mb_process": 198.4,
+      "records": 100,
+      "row_count_ok": true,
+      "rows_per_second": 174,
+      "seconds_all": [
+        0.5455,
+        0.5638,
+        0.5747,
+        0.5757,
+        0.6013
+      ],
+      "seconds_median": 0.5747,
+      "setup_seconds": 0.34,
+      "shape": "full",
+      "statements": [
+        "K1",
+        "K6"
+      ],
+      "table_rows": 1000
+    },
+    {
+      "client_cpu_seconds": 0.447,
+      "keyed": true,
+      "peak_rss_mb_process": 358.1,
+      "records": 100000,
+      "row_count_ok": true,
+      "rows_per_second": 77226,
+      "seconds_all": [
+        1.2949
+      ],
+      "seconds_median": 1.2949,
+      "setup_seconds": 1.1,
+      "shape": "full",
+      "statements": [
+        "K1",
+        "K6"
+      ],
+      "table_rows": 300000
+    },
+    {
+      "client_cpu_seconds": 3.9305,
+      "keyed": true,
+      "peak_rss_mb_process": 1658.4,
+      "records": 1000000,
+      "row_count_ok": true,
+      "rows_per_second": 196832,
+      "seconds_all": [
+        5.0805
+      ],
+      "seconds_median": 5.0805,
+      "setup_seconds": 5.79,
+      "shape": "full",
+      "statements": [
+        "K1",
+        "K6"
+      ],
+      "table_rows": 3000000
+    },
+    {
+      "client_cpu_seconds": 0.0871,
+      "keyed": true,
+      "peak_rss_mb_process": 1658.9,
+      "records": 1,
+      "row_count_ok": true,
+      "rows_per_second": 3,
+      "seconds_all": [
+        0.3407,
+        0.3469,
+        0.3481,
+        0.3615,
+        0.3745
+      ],
+      "seconds_median": 0.3481,
+      "setup_seconds": 0.35,
+      "shape": "unchanged",
+      "statements": [
+        "K6"
+      ],
+      "table_rows": 1000
+    },
+    {
+      "client_cpu_seconds": 0.2919,
+      "keyed": true,
+      "peak_rss_mb_process": 1659.2,
+      "records": 100,
+      "row_count_ok": true,
+      "rows_per_second": 37,
+      "seconds_all": [
+        2.5816,
+        2.6238,
+        2.6738,
+        2.6981,
+        2.7513
+      ],
+      "seconds_median": 2.6738,
+      "setup_seconds": 0.33,
+      "shape": "unchanged",
+      "statements": [
+        "K1",
+        "K3",
+        "K5.4",
+        "K5.5",
+        "K5.6",
+        "K5.7",
+        "K5.8",
+        "K5.9",
+        "K5.13",
+        "K5.14",
+        "K6"
+      ],
+      "table_rows": 1000
+    },
+    {
+      "client_cpu_seconds": 0.7701,
+      "keyed": true,
+      "peak_rss_mb_process": 1659.2,
+      "records": 100000,
+      "row_count_ok": true,
+      "rows_per_second": 30141,
+      "seconds_all": [
+        3.3178
+      ],
+      "seconds_median": 3.3178,
+      "setup_seconds": 1.86,
+      "shape": "unchanged",
+      "statements": [
+        "K1",
+        "K3",
+        "K5.4",
+        "K5.5",
+        "K5.6",
+        "K5.7",
+        "K5.8",
+        "K5.9",
+        "K5.13",
+        "K5.14",
+        "K6"
+      ],
+      "table_rows": 300000
+    },
+    {
+      "client_cpu_seconds": 4.4478,
+      "keyed": true,
+      "peak_rss_mb_process": 1825.0,
+      "records": 1000000,
+      "row_count_ok": true,
+      "rows_per_second": 124522,
+      "seconds_all": [
+        8.0307
+      ],
+      "seconds_median": 8.0307,
+      "setup_seconds": 5.82,
+      "shape": "unchanged",
+      "statements": [
+        "K1",
+        "K3",
+        "K5.4",
+        "K5.5",
+        "K5.6",
+        "K5.7",
+        "K5.8",
+        "K5.9",
+        "K5.13",
+        "K5.14",
+        "K6"
+      ],
+      "table_rows": 3000000
+    },
+    {
+      "client_cpu_seconds": 0.0646,
+      "keyed": false,
+      "peak_rss_mb_process": 1825.0,
+      "records": 1,
+      "row_count_ok": true,
+      "rows_per_second": 3,
+      "seconds_all": [
+        0.3431,
+        0.3453,
+        0.346,
+        0.361,
+        0.3661
+      ],
+      "seconds_median": 0.346,
+      "setup_seconds": 0.33,
+      "shape": "full",
+      "statements": [
+        "L2"
+      ],
+      "table_rows": 1000
+    },
+    {
+      "client_cpu_seconds": 0.0917,
+      "keyed": false,
+      "peak_rss_mb_process": 1825.0,
+      "records": 100,
+      "row_count_ok": true,
+      "rows_per_second": 171,
+      "seconds_all": [
+        0.5716,
+        0.5836,
+        0.5841,
+        0.5932,
+        0.6028
+      ],
+      "seconds_median": 0.5841,
+      "setup_seconds": 0.33,
+      "shape": "full",
+      "statements": [
+        "L1",
+        "L2"
+      ],
+      "table_rows": 1000
+    },
+    {
+      "client_cpu_seconds": 0.3484,
+      "keyed": false,
+      "peak_rss_mb_process": 1825.0,
+      "records": 100000,
+      "row_count_ok": true,
+      "rows_per_second": 80497,
+      "seconds_all": [
+        1.2423
+      ],
+      "seconds_median": 1.2423,
+      "setup_seconds": 1.14,
+      "shape": "full",
+      "statements": [
+        "L1",
+        "L2"
+      ],
+      "table_rows": 300000
+    },
+    {
+      "client_cpu_seconds": 2.6285,
+      "keyed": false,
+      "peak_rss_mb_process": 2339.7,
+      "records": 1000000,
+      "row_count_ok": true,
+      "rows_per_second": 218713,
+      "seconds_all": [
+        4.5722
+      ],
+      "seconds_median": 4.5722,
+      "setup_seconds": 5.97,
+      "shape": "full",
+      "statements": [
+        "L1",
+        "L2"
+      ],
+      "table_rows": 3000000
+    }
+  ]
+}

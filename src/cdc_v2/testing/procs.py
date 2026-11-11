@@ -164,6 +164,14 @@ class Proc:
             if self.popen.poll() is not None:
                 self.group_gone = True
             return False
+        except PermissionError:
+            # macOS answers EPERM (not ESRCH) for a group whose leader has just exited and whose members are
+            # zombies. Gone only if the process table shows no living member of the group that we started.
+            self.popen.poll()
+            if self.popen.returncode is not None and not self.group_members(process_table()):
+                self.group_gone = True
+                return False
+            raise
 
     def stop(self):
         return self.signal(signal.SIGSTOP)
@@ -187,7 +195,10 @@ class Proc:
         """SIGKILL to the group and to every descendant that left it (found through parent pids)."""
         table = process_table()
         self._remember(table)
-        self.signal_group(signal.SIGKILL, table)
+        try:
+            self.signal_group(signal.SIGKILL, table)
+        except PermissionError:
+            pass            # macOS EPERM for a group in transition: the process and its known descendants follow
         for pid in self._known_alive(table):
             try:
                 os.kill(pid, signal.SIGKILL)

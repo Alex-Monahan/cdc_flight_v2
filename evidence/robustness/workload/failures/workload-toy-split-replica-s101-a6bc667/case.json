@@ -1,0 +1,26 @@
+{
+  "entries": [
+    {
+      "end": "commit",
+      "round": 0,
+      "seq": 2,
+      "shape": "transfer",
+      "statements": [
+        "BEGIN",
+        "UPDATE \"public\".\"w_xfer_0\" SET balance = balance + (-21) WHERE id = 4",
+        "UPDATE \"public\".\"w_xfer_2\" SET balance = balance + (3) WHERE id = 3",
+        "UPDATE \"public\".\"w_xfer_2\" SET balance = balance + (18) WHERE id = 5",
+        "COMMIT"
+      ],
+      "type": "txn",
+      "writer": 1
+    }
+  ],
+  "faults": [],
+  "fuzzer": "workload",
+  "options": {},
+  "outcome": "violation",
+  "seed": 101,
+  "source_mode": "replica",
+  "system": "toy:split"
+}

@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "ffdd6f4d03642758ebcff34819b9decba821113e",
+  "first_failure_s": 0.964,
+  "fixed_commit": null,
+  "fuzzer": "workload",
+  "id": "workload-toy-split-replica-s1-ffdd6f4",
+  "local_bundle": {
+    "campaign": "20261110T120727-d460",
+    "dir": "bundle-workload-toy-split-replica-s1-ffdd6f4"
+  },
+  "outcome": "violation",
+  "reason": "consumer loop: debit_credit 3 of 12 ([{\"debits\": 8256, \"credits\": 0, \"debit_rows\": 1, \"credit_rows\": 0, \"observation\": 4, \"t\": 0.061}])",
+  "regression_test": null,
+  "seed": 1,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-split",
+  "system_spec": "toy:split"
+}

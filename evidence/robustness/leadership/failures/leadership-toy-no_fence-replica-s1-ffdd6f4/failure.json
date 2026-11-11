@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "ffdd6f4d03642758ebcff34819b9decba821113e",
+  "first_failure_s": 44.047,
+  "fixed_commit": null,
+  "fuzzer": "leadership",
+  "id": "leadership-toy-no_fence-replica-s1-ffdd6f4",
+  "local_bundle": {
+    "campaign": "20261110T120811-c5aa",
+    "dir": "bundle-leadership-toy-no_fence-replica-s1-ffdd6f4"
+  },
+  "outcome": "violation",
+  "reason": "round 3: writer log: [{'two_writers': True, 'order': 1721, 'epoch': 6, 'after_epoch': 7, 'run': 'run34-43fd9b'}, {'two_writers': True, 'order': 1722, 'epoch': 6, 'after_epoch': 7, 'run': 'run34-43fd9b'}, {'two_writers': True, 'order': 1723, 'epoch': 6, 'after_epoch': 7, 'run': 'run34-43fd9b'}]",
+  "regression_test": null,
+  "seed": 1,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-no_fence",
+  "system_spec": "toy:no_fence"
+}

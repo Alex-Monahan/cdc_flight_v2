@@ -1,0 +1,25 @@
+$ tools/cutstress run --label v7b_exported_no_subxact --seconds 120 --writers plain,async,abort --takers-own 1 --takers-exported 2 --out evidence/p3/cut/v7b_exported_no_subxact.json
+load average before: 4.32 5.70 6.50
+   30s cuts=31042 transactions=121684 violations=0 waiting=100
+   60s cuts=59206 transactions=240832 violations=0 waiting=95
+   90s cuts=89778 transactions=362829 violations=0 waiting=40
+v7b_exported_no_subxact: OK
+  Postgres 18.6 (Homebrew), 120 s, writers plain,async,abort, disturbances none, slot on replica
+  cuts checked 120737 (not checked 0), transactions delivered 485205
+  violations of the sound rules: none
+  stream out of E order: 0
+  wrong rules caught (cuts): stmt_as_r0=23160, r1_inside=25591, r1_outside=0, naive_sharp=0, xmax_inside=83, xmin_outside=100
+  unknown set (transactions per cut)   empty     mean   max
+    base                                 0.00%    2.540   306
+    xid                                 99.92%    0.001     3
+    sharp                               64.38%    1.558   305
+    xid+sharp                           99.92%    0.001     3
+    really_visible                      72.22%    0.723   221
+  cuts_with_r0_below_received: 0
+  cuts_that_miss_a_received_transaction: 0
+  cuts_with_r0_eq_r1: 79273
+  cuts taken the own way: 48204, of them quiet (xmin = xmax): 48162 (99.9%), with a violation: 0
+  cuts taken the exported way: 72533, of them quiet (xmin = xmax): 72475 (99.9%), with a violation: 0
+  snapshots dropped because the standby had not settled: 0
+  checker steps: unknown_window, per_key_boundary, missing_rows; rows missing from a cut: 0
+  load average at start [4.05, 5.62, 6.47], at end [6.0, 5.94, 6.49]

@@ -1,0 +1,63 @@
+{"epoch": 1, "kind": "took_over", "pid": 17507, "previous_age_ms": 847627692373, "previous_state": "released", "run": "run1-3ca05b", "t": 1794312492.375387, "tag": "r1"}
+{"epoch": 1, "kind": "started", "pid": 17507, "run": "run1-3ca05b", "t": 1794312492.37755, "tag": "r1", "variant": "no_fence"}
+{"kind": "resync_start", "pid": 17507, "run": "run1-3ca05b", "t": 1794312492.399902, "tag": "r1", "why": "pending"}
+{"kind": "resync_done", "pid": 17507, "position": "0/746AA28", "rows": 24, "run": "run1-3ca05b", "t": 1794312492.550633, "tag": "r1"}
+{"detail": "write-write conflict on public.w_k0", "error": "ToyConflict", "kind": "retry", "pid": 17507, "run": "run1-3ca05b", "t": 1794312492.854467, "tag": "r1"}
+{"age_ms": 1157, "epoch": 1, "kind": "healthy_leader_found", "pid": 17518, "run": "run2-6e9899", "t": 1794312494.078363, "tag": "r2"}
+{"age_ms": 1525, "epoch": 1, "kind": "healthy_leader_found", "pid": 17532, "run": "run3-798df0", "t": 1794312494.445815, "tag": "r3"}
+{"epoch": 2, "kind": "took_over", "pid": 17539, "previous_age_ms": 2215, "previous_state": "leading", "run": "run4-d8159d", "t": 1794312495.138553, "tag": "r4"}
+{"epoch": 2, "kind": "started", "pid": 17539, "run": "run4-d8159d", "t": 1794312495.142125, "tag": "r4", "variant": "no_fence"}
+{"detail": "write-write conflict on public.w_xfer_1", "error": "ToyConflict", "kind": "retry", "pid": 17539, "run": "run4-d8159d", "t": 1794312495.418574, "tag": "r4"}
+{"age_ms": 379, "epoch": 2, "kind": "healthy_leader_found", "pid": 17546, "run": "run5-46b1ec", "t": 1794312495.514626, "tag": "r5"}
+{"kind": "spill_full", "need": 547242, "pid": 17539, "quota": 8388608, "run": "run4-d8159d", "t": 1794312495.571538, "tag": "r4", "used": 8388608}
+{"age_ms": 274, "epoch": 2, "kind": "healthy_leader_found", "pid": 17562, "run": "run6-444598", "t": 1794312496.531476, "tag": "r6"}
+{"age_ms": 230, "epoch": 2, "kind": "healthy_leader_found", "pid": 17572, "run": "run7-d81cc7", "t": 1794312497.567709, "tag": "r7"}
+{"kind": "spill_free", "pid": 17539, "run": "run4-d8159d", "t": 1794312498.316596, "tag": "r4"}
+{"age_ms": 14, "epoch": 2, "kind": "healthy_leader_found", "pid": 17584, "run": "run8-5d138a", "t": 1794312498.883859, "tag": "r8"}
+{"age_ms": 510, "epoch": 2, "kind": "healthy_leader_found", "pid": 17596, "run": "run9-a6ac63", "t": 1794312499.953391, "tag": "r9"}
+{"age_ms": 427, "epoch": 2, "kind": "healthy_leader_found", "pid": 17613, "run": "run10-e1e82b", "t": 1794312500.679008, "tag": "r10"}
+{"age_ms": 706, "epoch": 2, "kind": "healthy_leader_found", "pid": 17618, "run": "run11-55e57b", "t": 1794312501.941727, "tag": "r11"}
+{"age_ms": 38, "epoch": 2, "kind": "healthy_leader_found", "pid": 17632, "run": "run12-29cbe2", "t": 1794312503.07931, "tag": "r12"}
+{"age_ms": 49, "epoch": 2, "kind": "healthy_leader_found", "pid": 17634, "run": "run13-b1a3ba", "t": 1794312503.089975, "tag": "r13"}
+{"age_ms": 118, "epoch": 2, "kind": "healthy_leader_found", "pid": 17644, "run": "run14-9b6c60", "t": 1794312503.797115, "tag": "r14"}
+{"epoch": 3, "kind": "took_over", "pid": 17689, "previous_age_ms": 3228, "previous_state": "leading", "run": "run17-2d7673", "t": 1794312506.90925, "tag": "r17"}
+{"epoch": 3, "kind": "started", "pid": 17689, "run": "run17-2d7673", "t": 1794312506.912988, "tag": "r17", "variant": "no_fence"}
+{"age_ms": 501, "epoch": 3, "kind": "healthy_leader_found", "pid": 17700, "run": "run18-3f730b", "t": 1794312507.957374, "tag": "r18"}
+{"age_ms": 16, "epoch": 3, "kind": "healthy_leader_found", "pid": 17712, "run": "run19-761876", "t": 1794312509.069878, "tag": "r19"}
+{"age_ms": 328, "epoch": 3, "kind": "healthy_leader_found", "pid": 17730, "run": "run20-11255c", "t": 1794312510.238938, "tag": "r20"}
+{"age_ms": 341, "epoch": 3, "kind": "healthy_leader_found", "pid": 17672, "run": "run16-5d52ae", "t": 1794312510.252105, "tag": "r16"}
+{"age_ms": 691, "epoch": 3, "kind": "healthy_leader_found", "pid": 17735, "run": "run21-e48b9b", "t": 1794312511.224016, "tag": "r21"}
+{"age_ms": 509, "epoch": 3, "kind": "healthy_leader_found", "pid": 17739, "run": "run22-1cf1a9", "t": 1794312512.359154, "tag": "r22"}
+{"detail": "write-write conflict on public.w_xfer_2", "error": "ToyConflict", "kind": "retry", "pid": 17689, "run": "run17-2d7673", "t": 1794312513.09823, "tag": "r17"}
+{"age_ms": 514, "epoch": 3, "kind": "healthy_leader_found", "pid": 17747, "run": "run23-05a816", "t": 1794312513.153903, "tag": "r23"}
+{"age_ms": 408, "epoch": 3, "kind": "healthy_leader_found", "pid": 17754, "run": "run24-351716", "t": 1794312513.567011, "tag": "r24"}
+{"age_ms": 1041, "epoch": 3, "kind": "healthy_leader_found", "pid": 17765, "run": "run25-23166d", "t": 1794312514.200011, "tag": "r25"}
+{"epoch": 4, "kind": "took_over", "pid": 17778, "previous_age_ms": 2058, "previous_state": "leading", "run": "run26-59049d", "t": 1794312515.22007, "tag": "r26"}
+{"epoch": 4, "kind": "started", "pid": 17778, "run": "run26-59049d", "t": 1794312515.223917, "tag": "r26", "variant": "no_fence"}
+{"age_ms": 1037, "epoch": 4, "kind": "healthy_leader_found", "pid": 17792, "run": "run27-7b84bb", "t": 1794312516.253984, "tag": "r27"}
+{"epoch": 5, "kind": "took_over", "pid": 17804, "previous_age_ms": 2110, "previous_state": "leading", "run": "run28-96bd41", "t": 1794312517.330064, "tag": "r28"}
+{"epoch": 5, "kind": "started", "pid": 17804, "run": "run28-96bd41", "t": 1794312517.333962, "tag": "r28", "variant": "no_fence"}
+{"age_ms": 57, "epoch": 5, "kind": "healthy_leader_found", "pid": 17816, "run": "run29-3d1e1d", "t": 1794312518.723277, "tag": "r29"}
+{"age_ms": 59, "epoch": 5, "kind": "healthy_leader_found", "pid": 17828, "run": "run30-8d5d07", "t": 1794312519.359758, "tag": "r30"}
+{"age_ms": 328, "epoch": 5, "kind": "healthy_leader_found", "pid": 17833, "run": "run31-760309", "t": 1794312520.572695, "tag": "r31"}
+{"age_ms": 586, "epoch": 5, "kind": "healthy_leader_found", "pid": 17841, "run": "run32-68dc8a", "t": 1794312521.446304, "tag": "r32"}
+{"age_ms": 1616, "epoch": 5, "kind": "healthy_leader_found", "pid": 17854, "run": "run33-1a3d99", "t": 1794312522.476381, "tag": "r33"}
+{"epoch": 6, "kind": "took_over", "pid": 17867, "previous_age_ms": 3013, "previous_state": "leading", "run": "run34-43fd9b", "t": 1794312523.874887, "tag": "r34"}
+{"epoch": 6, "kind": "started", "pid": 17867, "run": "run34-43fd9b", "t": 1794312523.878882, "tag": "r34", "variant": "no_fence"}
+{"age_ms": 681, "epoch": 6, "kind": "healthy_leader_found", "pid": 17881, "run": "run35-409ee6", "t": 1794312524.554586, "tag": "r35"}
+{"epoch": 7, "kind": "took_over", "pid": 17930, "previous_age_ms": 4635, "previous_state": "leading", "run": "run39-7c87a1", "t": 1794312529.264789, "tag": "r39"}
+{"epoch": 7, "kind": "started", "pid": 17930, "run": "run39-7c87a1", "t": 1794312529.269031, "tag": "r39", "variant": "no_fence"}
+{"age_ms": 11, "epoch": 7, "kind": "healthy_leader_found", "pid": 17914, "run": "run38-045883", "t": 1794312529.273061, "tag": "r38"}
+{"age_ms": 38, "epoch": 7, "kind": "healthy_leader_found", "pid": 17941, "run": "run40-f580e1", "t": 1794312529.329412, "tag": "r40"}
+{"age_ms": 44, "epoch": 7, "kind": "healthy_leader_found", "pid": 17900, "run": "run37-7937cc", "t": 1794312529.33492, "tag": "r37"}
+{"age_ms": 66, "epoch": 7, "kind": "healthy_leader_found", "pid": 17898, "run": "run36-73b91c", "t": 1794312529.356794, "tag": "r36"}
+{"age_ms": 39, "epoch": 7, "kind": "healthy_leader_found", "pid": 17954, "run": "run41-82ec73", "t": 1794312529.901254, "tag": "r41"}
+{"detail": "write-write conflict on public.w_k1", "error": "ToyConflict", "kind": "retry", "pid": 17867, "run": "run34-43fd9b", "t": 1794312530.315324, "tag": "r34"}
+{"age_ms": 281, "epoch": 7, "kind": "healthy_leader_found", "pid": 17959, "run": "run42-8a1f99", "t": 1794312531.039259, "tag": "r42"}
+{"age_ms": 42, "epoch": 7, "kind": "healthy_leader_found", "pid": 17963, "run": "run43-ec4ff0", "t": 1794312532.01366, "tag": "r43"}
+{"detail": "write-write conflict on public.w_k1", "error": "ToyConflict", "kind": "retry", "pid": 17930, "run": "run39-7c87a1", "t": 1794312532.135353, "tag": "r39"}
+{"detail": "write-write conflict on public.w_child", "error": "ToyConflict", "kind": "retry", "pid": 17867, "run": "run34-43fd9b", "t": 1794312532.183775, "tag": "r34"}
+{"age_ms": 44, "epoch": 7, "kind": "healthy_leader_found", "pid": 17966, "run": "run44-4d5e92", "t": 1794312532.893995, "tag": "r44"}
+{"age_ms": 42, "epoch": 7, "kind": "healthy_leader_found", "pid": 17970, "run": "run45-7c0055", "t": 1794312534.359606, "tag": "r45"}
+{"age_ms": 65, "epoch": 7, "kind": "healthy_leader_found", "pid": 17973, "run": "run46-afb762", "t": 1794312535.148888, "tag": "r46"}
+{"age_ms": 233, "epoch": 7, "kind": "healthy_leader_found", "pid": 17977, "run": "run47-66faf2", "t": 1794312536.001169, "tag": "r47"}

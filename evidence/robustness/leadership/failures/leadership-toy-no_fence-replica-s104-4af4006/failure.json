@@ -1,0 +1,20 @@
+{
+  "bundle": "bundle/",
+  "commit": "4af40069e63bf7fa81f84110703429cfa468c0e3",
+  "first_failure_s": 12.797,
+  "fixed_commit": null,
+  "fuzzer": "leadership",
+  "id": "leadership-toy-no_fence-replica-s104-4af4006",
+  "local_bundle": {
+    "campaign": "20261110T184717-a6f1",
+    "dir": "bundle-leadership-toy-no_fence-replica-s104-4af4006"
+  },
+  "outcome": "violation",
+  "reason": "drill toyrep.fenced: writer log: [{'two_writers': True, 'order': 76, 'epoch': 2, 'after_epoch': 3, 'run': 'run2-146ed6'}, {'two_writers': True, 'order': 77, 'epoch': 2, 'after_epoch': 3, 'run': 'run2-146ed6'}, {'two_writers': True, 'order': 78, 'epoch': 2, 'after_epoch': 3, 'run': 'run2-146ed6'}]",
+  "regression_test": null,
+  "seed": 104,
+  "self_test": true,
+  "source_mode": "replica",
+  "system": "toy-no_fence",
+  "system_spec": "toy:no_fence"
+}

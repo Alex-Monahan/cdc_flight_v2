@@ -1,0 +1,162 @@
+{
+ "campaign": "20261110T120809-5822",
+ "checkpoints": [],
+ "clean": false,
+ "commit": "ffdd6f4d03642758ebcff34819b9decba821113e",
+ "config": {
+  "budget_s": 40.0,
+  "catch_up_s": 90.0,
+  "episode_s": 10.0,
+  "fuzzer": "workload",
+  "keep_workdir": false,
+  "observer_interval_s": 0.005,
+  "pace_s": 0.25,
+  "schedule": null,
+  "start_timeout_s": 120.0
+ },
+ "counts": {
+  "checkpoints": 0,
+  "final_rows": null,
+  "observations": 192,
+  "rolled_back": 7,
+  "rounds": 3,
+  "transactions": 60
+ },
+ "duration_s": 1.903,
+ "failure_id": "workload-toy-reorder-replica-s1-ffdd6f4",
+ "faults": {},
+ "faults_without_effect": [],
+ "first_failure_s": 1.639,
+ "fuzzer": "workload",
+ "instances": {
+  "exits": {},
+  "started": 1
+ },
+ "no_effect": {},
+ "observers": [
+  {
+   "check": "transfers",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "expected": 24000,
+    "sum": 24000
+   },
+   "longest_gap_s": 0.119,
+   "observations": 48,
+   "seconds": 0.833,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "parent_child",
+   "errors": [],
+   "first_violations": [
+    {
+     "observation": 41,
+     "orphan_parent_ids": 0,
+     "parents": 3,
+     "parents_with_wrong_count": 1,
+     "sample_orphans": [],
+     "sample_parent_id_count_children": [
+      [
+       14,
+       1,
+       4
+      ]
+     ],
+     "t": 0.741
+    },
+    {
+     "observation": 42,
+     "orphan_parent_ids": 0,
+     "parents": 3,
+     "parents_with_wrong_count": 1,
+     "sample_orphans": [],
+     "sample_parent_id_count_children": [
+      [
+       14,
+       1,
+       4
+      ]
+     ],
+     "t": 0.754
+    },
+    {
+     "observation": 43,
+     "orphan_parent_ids": 0,
+     "parents": 3,
+     "parents_with_wrong_count": 1,
+     "sample_orphans": [],
+     "sample_parent_id_count_children": [
+      [
+       14,
+       1,
+       4
+      ]
+     ],
+     "t": 0.769
+    }
+   ],
+   "last": {
+    "orphan_parent_ids": 0,
+    "parents": 3,
+    "parents_with_wrong_count": 1,
+    "sample_orphans": [],
+    "sample_parent_id_count_children": [
+     [
+      14,
+      1,
+      4
+     ]
+    ]
+   },
+   "longest_gap_s": 0.12,
+   "observations": 48,
+   "seconds": 0.833,
+   "unavailable": 0,
+   "violations": 8
+  },
+  {
+   "check": "debit_credit",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "credit_rows": 7,
+    "credits": 22283,
+    "debit_rows": 4,
+    "debits": 22283
+   },
+   "longest_gap_s": 0.12,
+   "observations": 48,
+   "seconds": 0.833,
+   "unavailable": 0,
+   "violations": 0
+  },
+  {
+   "check": "large_marked",
+   "errors": [],
+   "first_violations": [],
+   "last": {
+    "batches": 0,
+    "batches_partial_or_unmarked": 0,
+    "sample_batch_rows_marked": []
+   },
+   "longest_gap_s": 0.12,
+   "observations": 48,
+   "seconds": 0.833,
+   "unavailable": 0,
+   "violations": 0
+  }
+ ],
+ "options": {},
+ "outcome": "violation",
+ "reason": "consumer loop: parent_child 6 of 46 ([{\"parents_with_wrong_count\": 1, \"orphan_parent_ids\": 0, \"sample_parent_id_count_children\": [[14, 1, 4]], \"sample_orphans\": [], \"parents\": 3, \"observation\": 41, \"t\": 0.741}])",
+ "seed": 1,
+ "self_test": true,
+ "source_mode": "replica",
+ "start": "2026-11-10T12:08:09Z",
+ "system": "toy-reorder",
+ "system_spec": "toy:reorder",
+ "tier": "local"
+}
