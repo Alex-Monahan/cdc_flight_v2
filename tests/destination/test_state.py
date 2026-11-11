@@ -173,7 +173,7 @@ def test_keys(ex):
 
 
 def test_two_rows_for_one_key_fail_the_transaction(ex):
-    ex.look.execute("INSERT INTO _cdc_example.job VALUES (1, 1, 'queued'), (1, 1, 'queued')")
+    ex.run("INSERT INTO _cdc_example.job (batch, part, status) VALUES (1, 1, 'queued'), (1, 1, 'queued')")
     with pytest.raises(state.StateError, match="not unique"):
         with ex.stream.transaction() as tx:
             try:
@@ -295,7 +295,9 @@ def test_every_pair_of_the_example_machines(ex, which):
         return
     with ex.stream.transaction() as tx:
         state.create(tx, ex.job, (1, 1), "queued", "new")
-    job = tm.check_machine(ex.stream, "example_job", (1, 1), unknown=("no_such_state", "DONE"))
+    tries = iter(range(1, 1000))
+    job = tm.check_machine(ex.stream, "example_job", (1, 1), unknown=("no_such_state", "DONE"),
+                           self_values=lambda: {"attempts": next(tries)})
     assert job == {"stored_states": 6, "attempts": 216, "legal": 5, "illegal": 211}
     assert state.read(ex.look, ex.job, (1, 1)) == "queued"
     assert len(log_rows(ex.look, "example_job")) == 1 + 5

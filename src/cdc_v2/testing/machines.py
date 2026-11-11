@@ -39,11 +39,17 @@ def _force(tx, m, key, value):
     assert n == 1, "machine %s: the row for key %r does not exist (create it before check_machine)" % (m.name, key)
 
 
-def check_machine(lane, machine, key=(), unknown=("no_such_state",), restore=True):
+def check_machine(lane, machine, key=(), unknown=("no_such_state",), restore=True, self_values=None):
     """Enumerate every transition of ``machine`` on the row ``key`` (see the module text). ``lane`` is a lane of
     the leading epoch on the destination that holds the machine's table and `_cdc.transitions`. With ``restore``
-    the row is put back into the state it had. Returns ``{"stored_states", "attempts", "legal", "illegal"}``."""
+    the row is put back into the state it had. Returns ``{"stored_states", "attempts", "legal", "illegal"}``.
+
+    A transition from a state to itself needs ``values`` (`state.transition`); ``self_values()`` gives them for
+    each such call (a dict of columns whose value it changes). A machine with a declared self-transition needs
+    it."""
     m = state.get(machine) if isinstance(machine, str) else machine
+    if any(a == b for a, b in m.transitions) and self_values is None:
+        raise ValueError("machine %s has a transition from a state to itself: pass self_values" % m.name)
     key = tuple(key) if isinstance(key, (tuple, list)) else (key,)
     names = list(m.states) + [u for u in unknown if u not in m.states]
     counts = {"stored_states": 0, "attempts": 0, "legal": 0, "illegal": 0}
@@ -62,7 +68,8 @@ def check_machine(lane, machine, key=(), unknown=("no_such_state",), restore=Tru
                     legal = m.allows(a, b) and a == stored
                     counts["attempts"] += 1
                     try:
-                        state.transition(tx, m, key, a, b, "enumeration")
+                        extra = {"values": self_values()} if a == b and self_values is not None else {}
+                        state.transition(tx, m, key, a, b, "enumeration", **extra)
                     except state.IllegalTransition as e:
                         assert not legal, "%s: refused, but it is declared" % case
                         assert e.declared == m.allows(a, b), "%s: wrong 'declared' on the error" % case
@@ -117,7 +124,7 @@ EXAMPLE_JOB = state.Machine(
 EXAMPLE_TABLES = (
     "CREATE SCHEMA IF NOT EXISTS _cdc_example",
     "CREATE TABLE IF NOT EXISTS _cdc_example.door (door_id VARCHAR, state VARCHAR, opened BIGINT)",
-    "CREATE TABLE IF NOT EXISTS _cdc_example.job (batch BIGINT, part BIGINT, status VARCHAR)",
+    "CREATE TABLE IF NOT EXISTS _cdc_example.job (batch BIGINT, part BIGINT, status VARCHAR, attempts BIGINT)",
 )
 
 

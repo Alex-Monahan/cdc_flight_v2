@@ -17,10 +17,9 @@ GRACE = td.FAST["grace_s"]
 
 def counter(dest):
     """A table with one counter row; returns a connection to look at it."""
-    c = dest.connect("look")
-    c.execute("CREATE TABLE t (k INTEGER, v BIGINT)")
-    c.execute("INSERT INTO t VALUES (1, 0)")
-    return c
+    dest.run("CREATE TABLE t (k INTEGER, v BIGINT)")
+    dest.run("INSERT INTO t VALUES (1, 0)")
+    return dest.connect("look")
 
 
 def value(c):
@@ -46,13 +45,14 @@ def test_commit_runs_the_fence_statement_and_registers_the_connection(led):
         assert tx.lane == "stream" and tx.epoch == led.epoch
         assert value(c) == 0                                    # not visible before the commit
     assert value(c) == 11
-    assert fence(c) == (1, 1)
-    assert fence(c, "control")[1] >= 1 and fence(c, "backfill.3") == (1, 0)     # control ran the migrations
+    # the counter only grows (fix round 2): the take-over, the registration and the commit raised it by one each
+    assert fence(c) == (1, 3)
+    assert fence(c, "control")[1] >= 3 and fence(c, "backfill.3") == (1, 1)     # control ran the migrations
     rows = c.fetchall("SELECT epoch, lane, connection_id::VARCHAR FROM _cdc.connections WHERE lane = 'stream'")
     assert rows == [(1, "stream", lane.conn.server_id)]
     with lane.transaction() as tx:
         tx.execute(BUMP)
-    assert fence(c) == (1, 2) and value(c) == 12
+    assert fence(c) == (1, 4) and value(c) == 12
     assert c.fetchone("SELECT count(*) FROM _cdc.connections WHERE lane = 'stream'") == (1,)   # registered once
 
 
@@ -61,7 +61,7 @@ def test_empty_transaction_still_runs_the_fence(led):
     lane = led.lane("backfill.15", led.epoch)
     with lane.transaction():
         pass
-    assert fence(c, "backfill.15") == (1, 1)
+    assert fence(c, "backfill.15") == (1, 3)                   # take-over, registration, the empty commit
 
 
 def test_stale_epoch_gets_fence_lost_and_changes_nothing(led):
@@ -73,14 +73,14 @@ def test_stale_epoch_gets_fence_lost_and_changes_nothing(led):
     with pytest.raises(md.FenceLost):
         with old.transaction() as tx:
             tx.execute(BUMP)                                    # the statement works; the fence at the end does not
-    assert value(c) == 1 and fence(c) == (2, 1)                 # a take-over raises the epoch and keeps the count
+    assert value(c) == 1 and fence(c) == (2, 4)                 # a take-over raises the epoch and the count
     with pytest.raises(md.FenceLost):                           # and again: the lane stays fenced out
         with old.transaction() as tx:
             tx.execute(BUMP)
     new = led.lane("stream", 2)
     with new.transaction() as tx:
         tx.execute(BUMP)
-    assert value(c) == 2 and fence(c) == (2, 2)
+    assert value(c) == 2 and fence(c) == (2, 6)                 # the new connection's registration, its commit
 
 
 def test_new_connection_of_a_stale_epoch_is_refused_at_registration(led):
@@ -101,7 +101,7 @@ def test_take_over_between_begin_and_the_fence_statement(led):
         with lane.transaction() as tx:
             tx.execute(BUMP)
             assert led.take_over(interrupt=False) == 2          # commits while the transaction is open
-    assert value(c) == 0 and fence(c) == (2, 0)
+    assert value(c) == 0 and fence(c) == (2, 3)                 # take-overs and the registration raised n
 
 
 def test_conflicts_are_per_column_which_is_why_the_fence_statement_writes_the_epoch(led):
@@ -121,7 +121,7 @@ def test_conflicts_are_per_column_which_is_why_the_fence_statement_writes_the_ep
         assert led.take_over(interrupt=False, as_designed=True) == 2
         assert old.execute(design_fence, ["stream", 1]).fetchone()[0] == 1      # the old snapshot still sees epoch 1
         old.execute("COMMIT")
-        assert value(c) == 1 and fence(c) == (2, 1)             # committed after the take-over: the hazard
+        assert value(c) == 1 and fence(c) == (2, 2)             # committed after the take-over: the hazard
         old.execute("BEGIN")
         old.execute(BUMP)
         assert led.take_over(interrupt=False, as_designed=True) == 3
@@ -129,7 +129,7 @@ def test_conflicts_are_per_column_which_is_why_the_fence_statement_writes_the_ep
             old.execute(lane_module.FENCE_SQL, [2, "stream", 2])
         assert "Conflict on update" in str(info.value)
         old.execute("ROLLBACK")
-        assert value(c) == 1 and fence(c) == (3, 1)
+        assert value(c) == 1 and fence(c) == (3, 2)
     finally:
         old.close()
 
@@ -169,7 +169,7 @@ def test_a_commit_that_hangs_holds_the_fence_row_until_the_take_over_interrupts_
         t.join(10)
     assert not t.is_alive()
     assert len(seen) == 1 and isinstance(seen[0], md.CommitUnknown)
-    assert value(c) == 0 and fence(c) == (2, 1)                 # only the first, empty transaction counted
+    assert value(c) == 0 and fence(c) == (2, 4)                 # take-overs, registration, the first empty commit
 
 
 def test_same_lane_same_epoch_twice_never_commits_both(led):
@@ -183,12 +183,12 @@ def test_same_lane_same_epoch_twice_never_commits_both(led):
             with b.transaction() as tx2:
                 tx2.execute("INSERT INTO t VALUES (3, 0)")
     assert c.fetchall("SELECT k FROM t ORDER BY k") == [(1,), (3,)]
-    assert fence(c) == (1, 1)
+    assert fence(c) == (1, 4)                                   # take-over, two registrations, one commit
 
 
 def test_execute_one_needs_exactly_one_row(led):
     c = counter(led)
-    c.execute("INSERT INTO t VALUES (2, 0), (2, 0)")
+    led.run("INSERT INTO t VALUES (2, 0), (2, 0)")
     lane = led.lane("stream", led.epoch)
     for sql in ("UPDATE t SET v = 5 WHERE k = 99", "UPDATE t SET v = 5 WHERE k = 2"):
         with pytest.raises(md.Conflict):
@@ -196,7 +196,7 @@ def test_execute_one_needs_exactly_one_row(led):
                 tx.execute(BUMP)
                 tx.execute_one(sql)
         assert c.fetchall("SELECT k, v FROM t ORDER BY k") == [(1, 0), (2, 0), (2, 0)]     # all rolled back
-    assert fence(c) == (1, 0)
+    assert fence(c) == (1, 2)
     with pytest.raises(md.LaneMisuse):
         with lane.transaction() as tx:
             tx.execute_one("SELECT 1")
@@ -212,7 +212,7 @@ def test_an_exception_rolls_back_and_is_passed_on(led):
         with lane.transaction() as tx:
             tx.execute(BUMP)
             raise KeyError("boom")
-    assert value(c) == 0 and fence(c) == (1, 0)
+    assert value(c) == 0 and fence(c) == (1, 2)
     with pytest.raises(md.StatementError) as info:              # an error of the statement itself: its class
         with lane.transaction() as tx:
             tx.execute(BUMP)
@@ -310,7 +310,7 @@ def test_misuse_is_refused(led):
     with pytest.raises(md.LaneMisuse):
         with tx:
             pass
-    assert value(c) == 1 and fence(c) == (1, 1)
+    assert value(c) == 1 and fence(c) == (1, 3)
 
 
 def test_leader_rows_cannot_be_deleted_or_inserted(led):
@@ -320,7 +320,10 @@ def test_leader_rows_cannot_be_deleted_or_inserted(led):
            "insert into _cdc.heartbeat (epoch) values (1)", "TRUNCATE _cdc.fence", "DROP TABLE _cdc.leader",
            "DROP TABLE IF EXISTS _cdc.heartbeat", "ALTER TABLE _cdc.fence ADD COLUMN x INT", "DROP SCHEMA _cdc CASCADE",
            'DELETE FROM "_cdc"."leader"', "CREATE OR REPLACE TABLE _cdc.fence AS SELECT 1",
-           "INSERT OR REPLACE INTO _cdc.fence VALUES ('stream', 1, 1)"]
+           "INSERT OR REPLACE INTO _cdc.fence VALUES ('stream', 1, 1)",
+           # fix round 2, N2: an update of the leader tables by a caller, also the old run's way back
+           "UPDATE _cdc.heartbeat SET phase = 'ok' WHERE epoch = 1", "UPDATE _cdc.fence SET epoch = 1",
+           'update "_cdc"."leader" set state = \'leading\'']
     for sql in bad:
         with pytest.raises(md.LaneMisuse):
             conn.execute(sql)
@@ -328,7 +331,7 @@ def test_leader_rows_cannot_be_deleted_or_inserted(led):
         for sql in bad:
             with pytest.raises(md.LaneMisuse):
                 tx.execute(sql)
-        tx.execute("UPDATE _cdc.heartbeat SET phase = 'ok' WHERE epoch = ?", [led.epoch])   # updates are the way
+    md.schema.heartbeat(conn, led.epoch, "ok")                 # the layer's own statements are the way
     assert conn.fetchone("SELECT phase FROM _cdc.heartbeat") == ("ok",)
     md.schema.check_leader_tables(conn)
 
@@ -342,7 +345,9 @@ def test_open_transaction_of_an_old_run_blocks_a_take_over_until_it_is_interrupt
     with pytest.raises(md.ConnectionLost):
         with old.transaction() as tx:
             tx.execute(BUMP)
-            tx.execute("UPDATE _cdc.heartbeat SET phase = 'busy' WHERE epoch = ?", [led.epoch])
+            # the old run holds its lane's fence row (its fence statement ran early; callers cannot write the
+            # leader tables since fix round 2, so the layer's own entry is used)
+            tx._layer_execute_one(md.FENCE_SQL, [led.epoch, "control", led.epoch], "the fence statement")
             rep = {}
             with pytest.raises(td.TakeoverFailed):
                 led.take_over(interrupt=False, timeout_s=0.3, pause_s=0.02, report=rep)
@@ -585,9 +590,9 @@ def test_an_unclassified_error_after_commit_was_sent_is_commit_unknown(led, faul
     lane = led.lane("stream", led.epoch)
     # An error that this layer does not know (FaultInjected) before COMMIT was sent: rolled back, and its class
     # and the kind of statement are named. A lane's first transaction starts with the transaction that registers
-    # its connection (BEGIN, the INSERT, two UPDATEs of the fence row, COMMIT), then BEGIN and the caller's
+    # its connection (BEGIN, the INSERT, the UPDATE of the fence row, COMMIT), then BEGIN and the caller's
     # statement. The registration is not repeated once it worked.
-    for skip, kind in ((0, "BEGIN"), (1, "INSERT"), (2, "UPDATE"), (3, "UPDATE"), (4, "BEGIN"), (1, "UPDATE")):
+    for skip, kind in ((0, "BEGIN"), (1, "INSERT"), (2, "UPDATE"), (3, "BEGIN"), (1, "UPDATE")):
         faults.raise_at("md.execute", skip=skip, hits=1)
         with pytest.raises(md.StatementError) as info:
             with lane.transaction() as tx:
@@ -672,8 +677,8 @@ def test_times_are_read_as_integer_microseconds(led):
     """The client needs the module `pytz` to hand out a TIMESTAMPTZ value, and `pytz` is not a dependency. So the
     layer reads the clock as integer microseconds, and a caller reads a time column with `epoch_us` or a cast."""
     c = led.connect("look")
-    c.execute("CREATE TABLE seen (k INTEGER, seen_at TIMESTAMPTZ)")
-    c.execute("INSERT INTO seen SELECT 1, %s" % md.clock_sql)
+    led.run("CREATE TABLE seen (k INTEGER, seen_at TIMESTAMPTZ)")
+    led.run("INSERT INTO seen SELECT 1, %s" % md.clock_sql)
     us = c.fetchone("SELECT epoch_us(seen_at) FROM seen")[0]
     assert isinstance(us, int) and us > 1_600_000_000_000_000
     assert isinstance(c.clock_us(), int) and abs(c.clock_us() - us) < 60_000_000

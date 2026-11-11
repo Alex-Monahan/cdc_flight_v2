@@ -26,10 +26,9 @@ LOG = ("SELECT machine, key, from_state, to_state, cause, epoch, lane, seq, deta
 
 
 def counter(dest):
-    c = dest.connect("look")
-    c.execute("CREATE TABLE t (k INTEGER, v BIGINT)")
-    c.execute("INSERT INTO t VALUES (1, 0)")
-    return c
+    dest.run("CREATE TABLE t (k INTEGER, v BIGINT)")
+    dest.run("INSERT INTO t VALUES (1, 0)")
+    return dest.connect("look")
 
 
 def value(c):
@@ -74,10 +73,10 @@ def test_a_transition_row_carries_its_lane_epoch_seq_and_detail(ex):
             state.create(object(), ex.door, "d9", "closed", "cause", detail=bad)
 
 
-def test_seq_has_no_gaps_and_equals_the_fence_counter_on_two_lanes_and_two_epochs(ex):
-    """Item 1. Two lanes, two epochs, one transition per transaction: per lane the values of `seq` are the
-    numbers 1 to n without a gap, and the last is the lane's fence counter n (the take-over and a registration
-    do not move n)."""
+def test_seq_is_strictly_increasing_per_lane_with_gaps_only_at_take_overs_and_registrations(ex):
+    """Items 1 and fix round 2. Two lanes, two epochs, one transition per transaction: per lane the values of
+    `seq` strictly increase, the last is the lane's fence counter n, and the only gaps are where a take-over or
+    the registration of a new connection raised n (the counter only grows; it is never put back)."""
     with ex.stream.transaction() as tx:
         state.create(tx, ex.door, "d1", "closed", "installed")
     control = ex.lane("control", ex.epoch)
@@ -101,13 +100,31 @@ def test_seq_has_no_gaps_and_equals_the_fence_counter_on_two_lanes_and_two_epoch
     for lane in ("stream", "control"):
         seqs = sorted({int(s) for (ln, e, s) in rows if ln == lane})
         n = fence_n(ex.look, lane)
-        assert seqs == list(range(seqs[0], n + 1)) and seqs[-1] == n, (lane, seqs, n)
+        assert seqs[-1] == n, (lane, seqs, n)
+        gaps = [b - a - 1 for a, b in zip(seqs, seqs[1:]) if b - a > 1]
+        assert gaps == [2], (lane, seqs)                 # at the epoch change: the take-over and one registration
         assert {int(e) for (ln, e, s) in rows if ln == lane} >= set(epochs)
     # one transaction of the control lane wrote three rows: they share one seq
     per_seq = {}
     for ln, e, s in rows:
         per_seq.setdefault((ln, s), set()).add(e)
     assert all(len(es) == 1 for es in per_seq.values())               # one epoch per (lane, seq): one writer
+
+
+def test_the_take_over_and_the_registration_never_put_the_counter_back(led):
+    """Fix round 2, item 1. The take-over and the registration raised `n` and put it back in the same
+    transaction (net zero). The change is recorded today, but no documented DuckDB rule keeps a change that its
+    own transaction undoes recorded. Now both leave `n` one higher: the counter only grows."""
+    look = led.connect("look")
+
+    def n(lane):
+        return fence_n(look, lane)
+    before = {lane: n(lane) for lane in ("stream", "backfill.7")}
+    epoch = led.take_over()
+    assert all(n(lane) == before[lane] + 1 for lane in before)             # the take-over raised every lane
+    lane = led.lane("backfill.7", epoch)
+    registry.register(lane.conn, "backfill.7", epoch)
+    assert n("backfill.7") == before["backfill.7"] + 2                      # and so did the registration
 
 
 def test_a_rolled_back_transaction_leaves_no_transition_row(ex):
@@ -124,7 +141,7 @@ def test_a_rolled_back_transaction_leaves_no_transition_row(ex):
     with pytest.raises(md.StatementError):
         with ex.stream.transaction() as tx:
             state.transition(tx, ex.door, "d1", "closed", "open", "then a statement fails")
-            tx.execute("INSERT INTO _cdc_example.job VALUES ('not a number', 1, 'queued')")
+            tx.execute("INSERT INTO _cdc_example.job (batch, part, status) VALUES ('not a number', 1, 'queued')")
     twin = ex.lane("stream", ex.epoch)
     with twin.transaction():
         pass                    # registered (a registration writes the fence row too: before, not in between)
@@ -153,7 +170,7 @@ def test_a_run_that_bypasses_the_fence_shows_a_duplicate_seq(ex, monkeypatch):
     twin = ex.lane("stream", ex.epoch)
     with twin.transaction():
         pass                    # registered (a registration writes the fence row too: before, not in between)
-    created = fence_n(ex.look, "stream") - 1                            # the transaction of the two creates
+    created = fence_n(ex.look, "stream") - 2          # the creates; then the twin's registration and empty commit
     with pytest.raises(md.Conflict):                                    # with the fence: the second one is refused
         with ex.stream.transaction() as tx1:
             state.transition(tx1, ex.door, "a", "closed", "open", "first")
@@ -192,7 +209,7 @@ def test_values_and_expect_in_the_same_conditional_update(ex):
     assert ex.look.fetchall("SELECT state, opened FROM _cdc_example.door") == [("open", 1)]
     with pytest.raises(md.Conflict, match="opened"):
         with ex.stream.transaction() as tx:
-            tx.execute("INSERT INTO _cdc_example.job VALUES (5, 5, 'queued')")
+            tx.execute("INSERT INTO _cdc_example.job (batch, part, status) VALUES (5, 5, 'queued')")
             state.transition(tx, ex.door, "d1", "open", "closed", "stale read", values={"opened": 2},
                              expect={"opened": 0})
     assert ex.look.fetchall("SELECT state, opened FROM _cdc_example.door") == [("open", 1)]
@@ -200,21 +217,39 @@ def test_values_and_expect_in_the_same_conditional_update(ex):
     with ex.stream.transaction() as tx:                       # NULL is expected with IS NOT DISTINCT FROM
         tx.execute("UPDATE _cdc_example.door SET opened = NULL WHERE door_id = 'd1'")
     with ex.stream.transaction() as tx:
-        state.transition(tx, ex.door, "d1", "open", "closed", "null expected", expect={"opened": None})
+        state.transition(tx, ex.door, "d1", "open", "closed", "null expected", values={"opened": 5},
+                         expect={"opened": None})
     # a writer of an expected column conflicts with the transition that changes it
     control = ex.lane("control", ex.epoch)
     with pytest.raises(md.Conflict):
         with ex.stream.transaction() as tx1:
             state.transition(tx1, ex.door, "d1", "closed", "open", "moves opened", values={"opened": 3},
-                             expect={"opened": None})
+                             expect={"opened": 5})
             with control.transaction() as tx2:
                 tx2.execute("UPDATE _cdc_example.door SET opened = 7 WHERE door_id = 'd1'")
-    assert ex.look.fetchall("SELECT state, opened FROM _cdc_example.door") == [("closed", None)]
+    assert ex.look.fetchall("SELECT state, opened FROM _cdc_example.door") == [("closed", 5)]
     for bad in ({"door_id": 1}, {"state": "x"}, {"bad col": 1}):
         with pytest.raises(state.StateError):
             state.transition(object(), ex.door, "d1", "closed", "open", "cause", expect=bad)
         with pytest.raises(state.StateError):
             state.transition(object(), ex.door, "d1", "closed", "open", "cause", values=bad)
+
+
+def test_a_condition_on_a_column_the_transition_does_not_change_is_refused(ex):
+    """Fix round 2, items 2 and 6 (N3). `expect` on a column that is not in `values` was written as `col = col`,
+    and a transition from a state to itself without `values` wrote the unchanged state. Neither write is recorded
+    after a checkpoint, so neither excluded a concurrent writer (the second review: both committed, 5 of 5
+    rounds each, across two lanes of one epoch). Both are refused now, before the database is touched; a caller
+    that must exclude another writer puts a column whose value it changes into `values`."""
+    with pytest.raises(md.LaneMisuse, match="expect on opened"):
+        state.transition(object(), ex.door, "d1", "closed", "open", "cause", expect={"opened": 0})
+    with pytest.raises(md.LaneMisuse, match="to itself"):
+        state.transition(object(), ex.job, (1, 1), "running", "running", "cause")
+    with ex.stream.transaction() as tx:                     # with values that change a column, both are allowed
+        state.create(tx, ex.job, (1, 1), "running", "new", values={"attempts": 0})
+        state.transition(tx, ex.job, (1, 1), "running", "running", "again", values={"attempts": 1},
+                         expect={"attempts": 0})
+    assert ex.look.fetchone("SELECT status, attempts FROM _cdc_example.job")[0:2] == ("running", 1)
 
 
 # ------------------------------------------------------------------------------ item 2: registration
@@ -230,7 +265,6 @@ def test_a_registration_while_a_take_over_is_open_does_not_commit(led):
         raw.execute("BEGIN")
         raw.execute(td.TAKEOVER_LEADER_SQL, ["f", 1, "newcomer", led.epoch])
         raw.execute(td.TAKEOVER_FENCE_SQL, [led.epoch])
-        raw.execute(td.TAKEOVER_FENCE_RESTORE_SQL)
         raw.execute(td.TAKEOVER_HEARTBEAT_SQL, [led.epoch])
         with pytest.raises(md.Conflict, match="registration"):
             with lane.transaction() as tx:
@@ -428,6 +462,146 @@ def test_a_take_over_at_every_point_of_a_lane_transaction_keeps_the_fence(dest, 
         assert rec["verdict"] == "pass", rec
 
 
+# ------------------------------------------------------------------------------ fix round 2, N1: the local interrupt
+class _RollbackInterruptedOnce:
+    """Stands for a client connection whose first ROLLBACK is interrupted, as by a second caller's interrupt that
+    lands in it (the second review: `d1_three_debug.py`, 9 of 30 local rounds)."""
+
+    def __init__(self, raw):
+        self._raw = raw
+        self.interrupted = 0
+
+    def execute(self, sql, *args):
+        if sql == "ROLLBACK" and not self.interrupted:
+            self.interrupted = 1
+            import duckdb
+            raise duckdb.InterruptException("INTERRUPT Error: Interrupted!")
+        return self._raw.execute(sql, *args)
+
+    def __getattr__(self, name):
+        return getattr(self._raw, name)
+
+
+def test_an_interrupt_that_lands_in_the_local_roll_back_does_not_leave_the_transaction_open(led):
+    """Fix round 2, N1. The local stand-in of the server's interrupt swallowed an error of its ROLLBACK and marked
+    the transaction as rolled back, so it stayed open, held its rows, and every later interrupt skipped it (two
+    simultaneous take-overs then both failed after their deadline). It now retries an interrupted ROLLBACK and
+    marks the transaction rolled back only after the ROLLBACK succeeded; interrupts of one connection run one at
+    a time."""
+    import duckdb
+    c = counter(led)
+    lane = led.lane("stream", led.epoch)
+    with lane.transaction():
+        pass                                                    # registered
+    block = lane.transaction()
+    tx = block.__enter__()
+    tx.execute(BUMP)                                            # holds the counter row
+    sess = lane.conn._session
+    proxy = _RollbackInterruptedOnce(sess.raw)
+    sess.raw = proxy
+    assert mdc._interrupt_local(sess.server_id) is True
+    assert proxy.interrupted == 1 and sess.in_tx is False
+    raw = led.raw()
+    try:
+        raw.execute("UPDATE t SET v = v + 100 WHERE k = 1")     # the row is free: the transaction was rolled back
+    except duckdb.TransactionException as e:
+        raise AssertionError("the interrupted transaction is still open: %s" % e)
+    finally:
+        raw.close()
+    with pytest.raises(md.ConnectionLost):
+        tx.execute(BUMP)                                        # the old transaction learns it at its next statement
+    with pytest.raises(md.ConnectionLost):
+        block.__exit__(None, None, None)
+    assert value(c) == 100
+
+
+@pytest.mark.d_full
+def test_two_simultaneous_take_overs_while_an_old_run_stands_at_its_fence_have_one_winner(file_dest):
+    """Fix round 2, N1, the reviewer's shape (`d1_three_debug.py`): an old run stands at `stream.fenced`, two
+    take-overs start at once. One wins, the other raises `AnotherRunLeads`; before the fix both failed after
+    their deadline in about one round of three. (It depends on timing; the deterministic test is the one above.)"""
+    epoch = file_dest.lead()
+    for rnd in range(6):
+        old_epoch = file_dest.take_over(run_id="old%d" % rnd)
+        lane = file_dest.lane("stream", old_epoch)
+        with lane.transaction():
+            pass
+        box = {}
+
+        def take(k):
+            try:
+                box[k] = file_dest.take_over(run_id="%s-%d" % (k, rnd), timeout_s=4.0, pause_s=0.2)
+            except td.TakeoverFailed as e:
+                box[k] = type(e).__name__
+
+        def at_point():
+            ts = [threading.Thread(target=take, args=(k,)) for k in ("n1", "n2")]
+            for t in ts:
+                t.start()
+            for t in ts:
+                t.join(10)
+
+        with fence_campaign.Hooks() as hooks:
+            hooks.at("stream.fenced", at_point)
+            with pytest.raises(md.DestinationError):
+                with lane.transaction():
+                    pass
+        results = sorted(str(v) for v in box.values())
+        assert len(results) == 2 and "AnotherRunLeads" in results and "TakeoverFailed" not in results, (rnd, box)
+    assert epoch >= 1
+
+
+# ------------------------------------------------------------------------------ fix round 2, N2: autocommit writes
+def test_an_old_runs_plain_connection_cannot_write_after_a_take_over(led):
+    """Fix round 2, N2 (the second reviewer's case). After a take-over, an old run's plain `md.Connection`
+    inserted data, set its lane's fence row back to its own epoch and changed the leader row, in autocommit:
+    no fence, and all three committed. Outside a lane transaction only reads run now, and no caller may update
+    the leader tables; nothing is written."""
+    led.run("CREATE TABLE d (a INTEGER)")
+    old = led.connect("old")
+    new_epoch = led.take_over()
+    leader_before = td.read_leader(led.settings)
+    for sql, params in (("INSERT INTO d VALUES (1)", None),
+                        ("UPDATE _cdc.fence SET epoch = ? WHERE lane = 'stream'", [led.epoch]),
+                        ("UPDATE _cdc.leader SET state = 'released'", None),
+                        ("UPDATE _cdc.heartbeat SET phase = 'old'", None)):
+        with pytest.raises(md.LaneMisuse):
+            old.execute(sql, params)
+    look = led.connect("look")
+    assert look.fetchone("SELECT count(*) FROM d")[0] == 0
+    assert look.fetchall("SELECT DISTINCT epoch FROM _cdc.fence") == [(new_epoch,)]
+    assert td.read_leader(led.settings) == leader_before
+    assert look.fetchone("SELECT phase FROM _cdc.heartbeat")[0] == "starting"
+
+
+def test_the_heartbeat_and_the_release_are_statements_of_the_layer(led):
+    """Fix round 2, N2: since callers may not update the leader tables, package L's heartbeat (design 4.3) and
+    release (design 4.6) are the layer's: `schema.heartbeat` in autocommit, `schema.release` in a control-lane
+    transaction. Both refuse an epoch that no longer leads."""
+    look = led.connect("look")
+    beat = led.connect("heartbeat")
+    md.schema.heartbeat(beat, led.epoch, "streaming", progress_age_us=2_000_000)
+    phase, age = look.fetchone("SELECT phase, epoch_us(beat_at) - epoch_us(progress_at) FROM _cdc.heartbeat")
+    assert phase == "streaming" and age == 2_000_000
+    for bad in ("Bad", "", "a" * 40, 7):
+        with pytest.raises(ValueError):
+            md.schema.heartbeat(beat, led.epoch, bad)
+    control = led.lane("control", led.epoch)
+    with pytest.raises(md.LaneMisuse):
+        with led.lane("stream", led.epoch).transaction() as tx:
+            md.schema.release(tx)
+    with control.transaction() as tx:
+        md.schema.release(tx)
+    assert td.read_leader(led.settings)["state"] == "released"
+    with pytest.raises(md.FenceLost):                           # released already: no row in 'leading'
+        with control.transaction() as tx:
+            md.schema.release(tx)
+    new_epoch = led.take_over()
+    with pytest.raises(md.FenceLost):
+        md.schema.heartbeat(beat, led.epoch, "streaming")       # the old epoch
+    md.schema.heartbeat(beat, new_epoch, "streaming")
+
+
 # ------------------------------------------------------------------------------ item 8 (F0): the cause, on a local file
 @pytest.fixture
 def file_dest(tmp_path, no_leftovers):
@@ -492,9 +666,9 @@ def test_a_take_over_right_after_a_checkpoint_keeps_the_fence(file_dest, faults)
     the fence statement changes: the old transaction cannot commit. The negative control is the take-over as
     design 4.5 writes it."""
     epoch = file_dest.lead()
+    file_dest.run("CREATE TABLE t (k INTEGER, v BIGINT)")
+    file_dest.run("INSERT INTO t VALUES (1, 0)")
     c = file_dest.connect("look")
-    c.execute("CREATE TABLE t (k INTEGER, v BIGINT)")
-    c.execute("INSERT INTO t VALUES (1, 0)")
     results = {}
     with fence_campaign.Hooks() as hooks:
         for as_designed in (True, False):
@@ -575,13 +749,12 @@ def test_ddl_on_one_lane_while_another_lane_writes_is_a_conflict_and_runs_again(
     """Item 9 (F1). `Transaction conflict: attempting to insert into/update table ... altered by a different
     transaction` was a `StatementError`, which counts as a failure of the table. It is a `Conflict`: run again,
     it succeeds (after a DROP the table is gone, and that is a `StatementError`)."""
-    c = led.connect("setup")
-    c.execute("CREATE SCHEMA rv")
+    led.run("CREATE SCHEMA rv")
     a, b = led.lane("stream", led.epoch), led.lane("backfill.0", led.epoch)
     for name, op_a, op_b, again in review_cases.CONFLICT_SHAPES:
         t = "t_" + name
         for sql in review_cases.fmt(review_cases.SETUP, t):
-            c.execute(sql)
+            led.run(sql)
         with pytest.raises(md.Conflict):
             with b.transaction() as tb:
                 tb.fetchall("SELECT count(*) FROM rv.%s" % t)       # B's snapshot starts here
@@ -607,8 +780,8 @@ def test_a_missing_file_is_refused_and_not_a_lost_connection(led):
     """Item 11 (F3). An `IOException` counted as a lost connection by its class: a missing file gave
     `ConnectionLost` five times out of five, with a new connection each time, and an autocommit INSERT from it
     `CommitUnknown` with nothing applied. It is a refused statement."""
+    led.run("CREATE TABLE rv_io (a INTEGER)")
     c = led.connect("setup")
-    c.execute("CREATE TABLE rv_io (a INTEGER)")
     lane = led.lane("backfill.0", led.epoch)
     sql = review_cases.MISSING_FILE.replace("rv.io", "rv_io")
     for _ in range(5):
@@ -617,10 +790,11 @@ def test_a_missing_file_is_refused_and_not_a_lost_connection(led):
                 tx.execute(sql)
         assert (info.value.error_class, info.value.statement) == ("IOException", "INSERT")
     assert lane.conn.generation == 1
-    with pytest.raises(md.StatementError):
+    with pytest.raises(md.LaneMisuse):                         # outside a lane: a write is refused (round 2, N2)
         c.execute(sql)
-    with pytest.raises(md.StatementError):
+    with pytest.raises(md.StatementError) as info:
         c.fetchall(review_cases.MISSING_FILE_READ)
+    assert info.value.error_class == "IOException"
     assert c.fetchone("SELECT count(*) FROM rv_io")[0] == 0 and c.generation == 1
 
 
@@ -632,14 +806,15 @@ def test_the_misleading_statements_through_the_layer_are_refused(led):
     refused = 0
     for label, planted, setup, stmt in review_cases.misleading_statements():
         for sql in setup:
-            c.execute(sql)
+            led.run(sql)
         try:
             with lane.transaction() as tx:
                 tx.fetchall(stmt) if not stmt.startswith("INSERT") else tx.execute(stmt)
         except md.StatementError:
             refused += 1
-            with pytest.raises(md.StatementError):
-                c.fetchall(stmt) if not stmt.startswith("INSERT") else c.execute(stmt)
+            if not stmt.startswith("INSERT"):                  # in autocommit only reads run (round 2, N2)
+                with pytest.raises(md.StatementError):
+                    c.fetchall(stmt)
     assert refused >= 150
     assert lane.conn.generation == 1 and c.generation == 1
 
@@ -741,14 +916,14 @@ def test_a_returning_column_named_count_that_holds_text_is_no_count(led):
     """Item 16 (F8). `INSERT ... RETURNING b AS "Count"` with a text value became `StatementError(ValueError)`
     and was rolled back: the layer read the returned value as a count. A statement with RETURNING is never read
     as a count: `execute` returns None and the row is committed."""
+    led.run("CREATE TABLE rv_t (a INTEGER, b VARCHAR)")
     c = led.connect("look")
-    c.execute("CREATE TABLE rv_t (a INTEGER, b VARCHAR)")
     lane = led.lane("stream", led.epoch)
     with lane.transaction() as tx:
         assert tx.execute('INSERT INTO rv_t VALUES (1, ?) RETURNING b AS "Count"', ["some text"]) is None
         assert tx.execute('UPDATE rv_t SET b = b || ? RETURNING b AS "Count"', ["!"]) is None
-    assert c.execute('INSERT INTO rv_t VALUES (2, ?) RETURNING b AS "Count"', ["more text"]) is None
-    assert c.fetchall("SELECT a, b FROM rv_t ORDER BY a") == [(1, "some text!"), (2, "more text")]
+    assert c.execute('SELECT ? AS "Count"', ["more text"]) is None          # a read with that name: no count
+    assert c.fetchall("SELECT a, b FROM rv_t ORDER BY a") == [(1, "some text!")]
     with pytest.raises(md.LaneMisuse):                         # and execute_one still needs a count
         with lane.transaction() as tx:
             tx.execute_one('UPDATE rv_t SET b = ? WHERE a = 1 RETURNING b AS "Count"', ["x"])

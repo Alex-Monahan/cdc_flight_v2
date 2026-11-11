@@ -5,8 +5,9 @@ The second review found one case (1 of 30, `e1d_shapes.py`) in which the take-ov
 empty block then reported a successful `COMMIT`. Either both transactions committed (a breach of SPEC 4.2), or
 MotherDuck answered OK for a transaction that it had rolled back. This program repeats that shape and its
 neighbours and tells the two apart by the fence row's counter `n`: only a committed transaction of the lane
-`stream` raises it, and the take-over never writes it. So between the read before the old block and the read
-after it, ``n`` grows by one exactly when the old block committed.
+`stream` raises it, and a take-over raises it by one too (it never goes back). So between the read before the old
+block and the read after it, ``n`` grows by one more than the take-over's own raise exactly when the old block
+committed.
 
 One round:
 
@@ -262,7 +263,9 @@ def one_round(dest, probe, hooks, shape, point, rnd, door, probe_before_commit=F
 
 
 def committed_by_counter(rec):
-    return rec["after"]["fence_stream"]["n"] - rec["before"]["fence_stream"]["n"]
+    """How many commits of the old lane the counter shows: its growth less the take-over's own raise."""
+    took = 1 if rec.get("new_epoch") is not None else 0
+    return rec["after"]["fence_stream"]["n"] - rec["before"]["fence_stream"]["n"] - took
 
 
 def check_round(rec):

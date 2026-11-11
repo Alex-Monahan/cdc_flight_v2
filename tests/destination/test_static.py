@@ -213,7 +213,7 @@ def statements(source):
 
 _WRITES = re.compile(r"\b(?:INSERT\s+(?:OR\s+\w+\s+)?INTO|UPDATE\s+[\w\".{}%]+\s+SET|DELETE\s+FROM|MERGE\s+INTO|"
                      r"TRUNCATE|CREATE\s+(?:OR\s+REPLACE\s+)?(?:TEMP\w*\s+)?(?:TABLE|SCHEMA|DATABASE|VIEW|MACRO)|"
-                     r"DROP\s+(?:TABLE|SCHEMA|DATABASE|VIEW)|ALTER\s+(?:TABLE|DATABASE)|COPY\s|ATTACH\s|COMMIT)\b",
+                     r"DROP\s+(?:TABLE|SCHEMA|DATABASE|VIEW)|ALTER\s+(?:TABLE|DATABASE)|COPY\s|ATTACH\s|(?<![\w ])COMMIT)\b",
                      re.IGNORECASE)
 
 
@@ -226,6 +226,7 @@ def test_the_oracle_only_reads():
               "DROP TABLE t", "DELETE FROM t", "create or replace view v as select 1", "ALTER TABLE t ADD COLUMN c INT"):
         assert _WRITES.search(s), s
     for s in ("SELECT count(*) FROM t", "BEGIN TRANSACTION", "ROLLBACK", "the last update of the row",
+              "snapshot xmax stays below the next transaction id (no commit or abort replayed since)",
               "BEGIN ISOLATION LEVEL REPEATABLE READ, READ ONLY"):
         assert not _WRITES.search(s), s
     assert all(allowed(p, MAY_CONNECT) for p in READ_ONLY)
@@ -245,6 +246,22 @@ def test_only_the_layer_holds_the_fence_statement():
     holders = [rel for rel, text in sources() for line, s in statements(text)
                if re.search(r"UPDATE\s+_cdc\.fence\s+SET\s+n\s*=\s*n\s*\+\s*1\s*,\s*epoch", s)]
     assert holders == ["md/lane.py"]
+
+
+_LEADER_UPDATE = re.compile(r"\bUPDATE\s+\"?_cdc\"?\s*\.\s*\"?(?:leader|heartbeat)\"?(?![\w\"])", re.IGNORECASE)
+
+
+def test_no_text_outside_the_layer_updates_the_leader_or_heartbeat_row():
+    """Fix round 2, N2: callers do not update the leader tables (the layer refuses it at run time too). The
+    fence row is covered by `test_only_the_layer_holds_the_fence_statement`; here the leader and heartbeat rows,
+    which only the layer (`schema.heartbeat`, `schema.release`) and the stand-in take-over write."""
+    assert _LEADER_UPDATE.search("UPDATE _cdc.leader SET state = 'released'")
+    assert _LEADER_UPDATE.search('update "_cdc"."heartbeat" set phase = 1')
+    assert not _LEADER_UPDATE.search("UPDATE _cdc.leaders SET a = 1") and not _LEADER_UPDATE.search(
+        "SELECT epoch FROM _cdc.leader")
+    found = [(rel, line) for rel, text in sources() for line, s in statements(text)
+             if _LEADER_UPDATE.search(s) and not allowed(rel, MAY_WRITE_FENCE)]
+    assert found == [], "text that updates _cdc.leader or _cdc.heartbeat outside the layer: %r" % (found,)
 
 
 def test_no_text_deletes_or_inserts_leader_rows():

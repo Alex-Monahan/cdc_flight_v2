@@ -56,8 +56,8 @@ log = logging.getLogger("cdc_v2.md")
 #: checkpointed. After a checkpoint the `epoch` of this statement is such a write, a take-over that writes `epoch`
 #: alone does not conflict with it, and both commit (8 of 681 rounds of `tests/destination/fence_campaign.py` on
 #: MotherDuck). The counter `n` is always written with a changed value, so a take-over must also write `n` of
-#: every fence row (it adds one and takes it away again: `cdc_v2.testing.destination.take_over`); then the two meet
-#: on `n` in every order.
+#: every fence row (it raises it by one and never puts it back: `cdc_v2.testing.destination.take_over`); then the
+#: two meet on `n` in every order.
 FENCE_SQL = "UPDATE _cdc.fence SET n = n + 1, epoch = ? WHERE lane = ? AND epoch = ?"
 FENCE_EPOCH_SQL = "SELECT epoch FROM _cdc.fence WHERE lane = ?"
 
@@ -243,6 +243,19 @@ class Transaction:
             raise self._fail(LaneMisuse("execute_one needs a statement that reports its changed rows"))
         raise self._fail(Conflict("lane %s: a statement that must change exactly one row changed %d"
                                   % (self.lane, n)))
+
+    def _layer_execute_one(self, sql, params, what):
+        """One of the layer's own statements on the leader tables (`schema.release`), which callers may not send:
+        it must change exactly one row, else the transaction is rolled back and `FenceLost` is raised."""
+        self._check()
+        out = self._on(self._sess.statement(SITE_EXECUTE, sql, params, "count"), self._stmt_deadline(None))
+        if not (out.ok and not out.late):
+            raise self._fail(self._failure(out, what, "UPDATE"))
+        if out.result != 1:
+            self._rollback()
+            raise self._fail(FenceLost("lane %s: epoch %d no longer leads (%s changed %s rows)"
+                                       % (self.lane, self.epoch, what, out.result)))
+        return 1
 
     def fetchall(self, sql, params=None, deadline=None):
         return self._call(sql, params, "all", deadline)

@@ -148,7 +148,8 @@ def test_initialising_again_changes_nothing(dest):
     for _ in range(3):
         assert md.ensure_leader_tables(c) == 0
     assert everything(c) == before
-    assert c.fetchone("SELECT epoch, n FROM _cdc.fence WHERE lane = 'stream'") == (1, 1)
+    # the take-over, the lane's registration and its commit raised the counter (it only grows)
+    assert c.fetchone("SELECT epoch, n FROM _cdc.fence WHERE lane = 'stream'") == (1, 3)
 
 
 def test_a_missing_row_is_reported_not_repaired(dest):
@@ -209,8 +210,8 @@ def test_a_fresh_database_gets_the_tables_of_this_package(dest, lists):
     assert schema.versions(look) == {"state": (1, "transitions_table"), "alerts": (1, "alerts_table")}
     assert look.fetchall("SELECT DISTINCT epoch FROM _cdc.schema_version") == [(epoch,)]
     assert look.fetchone("SELECT count(*) FROM _cdc.schema_version WHERE updated_at IS NULL")[0] == 0
-    # one fenced transaction for the version table and one for each step
-    assert look.fetchone("SELECT epoch, n FROM _cdc.fence WHERE lane = 'control'") == (epoch, 3)
+    # the take-over, the registration, one fenced transaction for the version table and one for each step
+    assert look.fetchone("SELECT epoch, n FROM _cdc.fence WHERE lane = 'control'") == (epoch, 5)
 
 
 def test_running_again_does_nothing_and_writes_nothing(led, lists):
@@ -232,7 +233,8 @@ def test_steps_run_in_order_each_in_its_own_transaction(led, lists):
     before = look.fetchone("SELECT n FROM _cdc.fence WHERE lane = 'control'")[0]
     assert md.migrate(lane) == [("aa_a", 1, "s1"), ("aa_a", 2, "s2"), ("zz_b", 1, "s1"), ("zz_b", 2, "s2"),
                                 ("zz_b", 3, "s3")]
-    assert look.fetchone("SELECT n FROM _cdc.fence WHERE lane = 'control'")[0] == before + 5
+    # five steps, five fenced transactions, and the registration of the lane's new connection
+    assert look.fetchone("SELECT n FROM _cdc.fence WHERE lane = 'control'")[0] == before + 6
     assert logged(look, "aa_a") == ["s1", "s2"] and logged(look, "zz_b") == ["s1", "s2", "s3"]
     assert schema.versions(look)["zz_b"] == (3, "s3") and schema.versions(look)["aa_a"] == (2, "s2")
     assert md.migrate(lane) == []

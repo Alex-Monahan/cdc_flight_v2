@@ -325,6 +325,7 @@ def test_two_processes_with_the_same_epoch(scene, evidence):
         w.add("stream", 9)
         t1, t2 = "c1." + point, "c2." + point
         c1 = scene.frozen(t1, point, 2, epoch=epoch, exit_idle=3.0)
+        frozen_at = time.monotonic()
         n1 = len(events(c1))
         c2 = scene.start(t2, epoch=epoch, exit_idle=3.0)
         holds = point in ("sut.moved", "stream.fenced", "stream.commit_sent")     # the first holds the position row
@@ -332,10 +333,12 @@ def test_two_processes_with_the_same_epoch(scene, evidence):
             wait_for("three conflicts of the second process", lambda: len(events(c2, "error")) >= 3, 120, proc=c2)
             blocked = events(c2)
             assert not data_dones(blocked) and set(error_kinds(blocked)) == {"Conflict"}, (point, story(blocked))
+            frozen_s = round(time.monotonic() - frozen_at, 1)
             c1.cont()
         else:
             assert ended(c2, 150).code == 0, (point, tail(c2))
             blocked = []
+            frozen_s = round(time.monotonic() - frozen_at, 1)
             c1.cont()
         assert ended(c1, 150).code == 0 and ended(c2, 150).code == 0, (point, tail(c1), tail(c2))
         c = scene.check()
@@ -351,12 +354,14 @@ def test_two_processes_with_the_same_epoch(scene, evidence):
         if point == "stream.committed":
             assert not kinds1 and rows[t1] == 6 and rows[t2] == 3, (point, kinds1, rows)
         if holds:
-            # the frozen transaction commits after it went on, unless MotherDuck ended it while it was frozen (its
-            # lease, about 29 s, section 8.3): then it got an error and the second process applied its events. The
-            # run of 2026-11-10 19:21 UTC saw the second (sut.moved); exactly-once held in both (checked above)
-            assert rows.get(t1, 0) >= 6 or (kinds1 and rows.get(t2, 0) >= 6), (point, kinds1, rows)
+            # the frozen transaction commits after it went on, unless MotherDuck ended it while it was frozen: then
+            # it got an error and the second process applied its events. That is allowed only when the freeze
+            # lasted as long as MotherDuck keeps a frozen transaction (about 29 s, test_takeover_in_the_middle_..);
+            # the run of 2026-11-10 19:21 UTC saw it at sut.moved. Exactly-once held in both (checked above)
+            assert rows.get(t1, 0) >= 6 or (kinds1 and rows.get(t2, 0) >= 6 and frozen_s >= 25.0), (
+                point, kinds1, rows, frozen_s)
         by_point[point] = {
-            "first_holds_the_position_row": holds,
+            "first_holds_the_position_row": holds, "first_frozen_for_s": frozen_s,
             "second_while_the_first_is_frozen": {"errors": counts(error_kinds(blocked)),
                                                  "data_transactions": len(data_dones(blocked))} if holds else
                                                 "applied everything and ended",
@@ -371,6 +376,9 @@ def test_two_processes_with_the_same_epoch(scene, evidence):
 # ---------------------------------------------------------------------------- take-over, open transaction
 SLOW_S = 15.0                 # how long the slow old run keeps its transaction open
 TAKEOVER_LIMIT_S = 100.0      # how long the newcomer tries to take over
+#: The take-over's deadline (design 4.5, `leader.takeover_timeout`): MotherDuck must end a frozen or dead client's
+#: open transaction before it, or a take-over that cannot interrupt (nothing listed) would give up.
+LEASE_BOUND_S = 45.0
 HOLDS = {"position_row": "sut.moved", "fence_row": "stream.fenced"}
 FATES = ("frozen", "killed", "slow")
 
@@ -455,7 +463,18 @@ def test_takeover_in_the_middle_of_an_open_transaction(scene, evidence, interrup
         for fate in FATES:
             n += 1
             out["%s.%s" % (hold, fate)] = takeover_case(scene, n, hold, fate, interrupt)
+    kept = {}
+    if not interrupt:
+        # nothing interrupts the old run: MotherDuck itself ends the open transaction of a frozen or killed client.
+        # How long it keeps it is the take-over's wait (fence row) or the newcomer's wait for its first commit
+        # (position row). It must stay below the take-over's deadline (fix round 2, item 3)
+        for fate in ("frozen", "killed"):
+            kept["fence_row.%s" % fate] = out["fence_row.%s" % fate]["newcomer"]["takeover"]["seconds"]
+            ms = out["position_row.%s" % fate]["newcomer"]["ms_from_takeover_to_first_commit"]
+            kept["position_row.%s" % fate] = round(ms / 1000.0, 2) if ms is not None else None
+        assert all(v is not None and 5.0 < v < LEASE_BOUND_S for v in kept.values()), kept
     evidence("takeover_open_tx.json", "with_interrupt" if interrupt else "without_interrupt", {
+        "frozen_transaction_kept_s": kept or None, "bound_s": LEASE_BOUND_S if kept else None,
         "newcomer_interrupts_the_connections_of_earlier_epochs": interrupt,
         "slow_old_run_keeps_its_transaction_open_for_s": SLOW_S,
         "newcomer_tries_to_take_over_for_s": TAKEOVER_LIMIT_S,

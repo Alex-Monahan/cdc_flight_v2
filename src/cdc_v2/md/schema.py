@@ -29,7 +29,7 @@ from dataclasses import dataclass
 
 from . import registry
 from .connection import clock_sql, as_deadline
-from .errors import CommitUnknown, Conflict, ConnectionLost, DestinationError, LaneMisuse
+from .errors import CommitUnknown, Conflict, ConnectionLost, DestinationError, FenceLost, LaneMisuse
 from .lane import FENCE_SQL
 from .settings import LANES
 
@@ -94,6 +94,17 @@ CHECK_LEADER_TABLES_SQL = (
     "(SELECT count(DISTINCT lane) FROM _cdc.fence), (SELECT count(*) FROM _cdc.heartbeat)"
 )
 
+#: The heartbeat of package L (design 4.3), a statement of the layer because callers may not update the leader
+#: tables (fix round 2, N2). `beat_at` changes at every beat, so it conflicts with a take-over, which changes it
+#: too. Parameters: the age of the last progress in microseconds, the phase, the epoch.
+HEARTBEAT_SQL = (
+    "UPDATE _cdc.heartbeat SET beat_at = uuid_extract_timestamp(uuidv7()), "
+    "progress_at = uuid_extract_timestamp(uuidv7()) - to_microseconds(CAST(? AS BIGINT)), phase = ? WHERE epoch = ?"
+)
+#: The release of package L (design 4.6), inside a fenced `control`-lane transaction. Parameter: the epoch.
+RELEASE_SQL = "UPDATE _cdc.leader SET state = 'released' WHERE epoch = ? AND state = 'leading'"
+_PHASE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
+
 #: Every statement of this package that a bootstrap may need a copy of, by name.
 NAMED_STATEMENTS = {
     "create_schema": CREATE_SCHEMA_SQL,
@@ -102,11 +113,12 @@ NAMED_STATEMENTS = {
     "create_heartbeat": CREATE_HEARTBEAT_SQL,
     "create_connections": CREATE_CONNECTIONS_SQL,
     "check_leader_tables": CHECK_LEADER_TABLES_SQL,
+    "heartbeat": HEARTBEAT_SQL,
+    "release": RELEASE_SQL,
     "fence": FENCE_SQL,
     "clock": clock_sql,
     "register_connection": registry.REGISTER_SQL,
     "register_fence": registry.REGISTER_FENCE_SQL,
-    "register_fence_restore": registry.REGISTER_FENCE_RESTORE_SQL,
     "list_earlier_connections": registry.LIST_EARLIER_SQL,
     "interrupt_earlier_connections": registry.INTERRUPT_EARLIER_SQL,
     "cleanup_connections": registry.CLEANUP_SQL,
@@ -163,6 +175,27 @@ def check_leader_tables(conn, deadline=None):
         raise SchemaError("the fence rows are not the 18 lanes")
 
 
+def heartbeat(conn, epoch, phase, progress_age_us=0, deadline=None):
+    """One beat of package L's heartbeat (design 4.3), in autocommit on its own connection: `beat_at` is
+    MotherDuck's clock, `progress_at` that clock less ``progress_age_us``. No row changed: `FenceLost` (another run
+    took over). A lost connection is `CommitUnknown` (a write outside a lane transaction)."""
+    if not isinstance(phase, str) or not _PHASE.match(phase):
+        raise ValueError("a heartbeat phase is a short lower-case identifier")
+    if isinstance(progress_age_us, bool) or not isinstance(progress_age_us, int) or progress_age_us < 0:
+        raise ValueError("progress_age_us is an integer >= 0")
+    n = conn._layer_execute(HEARTBEAT_SQL, [progress_age_us, phase, epoch], deadline)
+    if n != 1:
+        raise FenceLost("heartbeat: epoch %d no longer leads (the heartbeat row has another epoch)" % epoch)
+
+
+def release(tx):
+    """Package L's release (design 4.6) inside the fenced `control`-lane transaction ``tx``: the leader row of its
+    epoch goes from `leading` to `released`. Anything else is `FenceLost`."""
+    if getattr(tx, "lane", None) != "control":
+        raise LaneMisuse("the release runs in a control-lane transaction")
+    return tx._layer_execute_one(RELEASE_SQL, [tx.epoch], "the release")
+
+
 def ensure_leader_tables(conn, deadline=None):
     """Create the leader tables with all their rows if they are not there, then check them. Safe to call from any
     number of processes at once and any number of times: a starter that loses the creation to another one gets a
@@ -172,7 +205,7 @@ def ensure_leader_tables(conn, deadline=None):
     for sql in LEADER_TABLE_STATEMENTS:
         while True:
             try:
-                conn.execute(sql, None, d.within(conn.settings.statement_deadline_s))
+                conn._layer_execute(sql, None, d.within(conn.settings.statement_deadline_s))
                 break
             except (Conflict, CommitUnknown, ConnectionLost):
                 # all three are safe to repeat: the statement creates everything or nothing, and only if absent
@@ -415,7 +448,7 @@ def applied_steps(conn_or_tx, package, deadline=None):
     return [tuple(x) for x in json.loads(row[0])] if row is not None else []
 
 
-__all__ = ["SchemaError", "Step", "step_hash", "register_migrations", "registered_migrations", "migrate", "versions",
+__all__ = ["SchemaError", "Step", "step_hash", "heartbeat", "release", "HEARTBEAT_SQL", "RELEASE_SQL", "register_migrations", "registered_migrations", "migrate", "versions",
            "applied_steps",
            "ensure_leader_tables", "check_leader_tables", "compare_statements", "LEADER_TABLE_STATEMENTS",
            "NAMED_STATEMENTS"]

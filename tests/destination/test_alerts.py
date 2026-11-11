@@ -93,7 +93,8 @@ def test_emit_now_uses_a_transaction_of_its_own(al):
     alert_id = alerts.emit_now(control, "lag_high", "warning", {"lag_seconds": 3.5})
     assert [tuple(r) for r in al.look.fetchall("SELECT alert_id, lane, state FROM _cdc.alerts")] == [
         (alert_id, "control", "open")]
-    assert al.look.fetchone("SELECT n FROM _cdc.fence WHERE lane = 'control'")[0] == before + 1
+    # one commit, and the registration of the lane's new connection: each raises the counter by one
+    assert al.look.fetchone("SELECT n FROM _cdc.fence WHERE lane = 'control'")[0] == before + 2
 
 
 @pytest.mark.parametrize("site,skip", [("md.execute", 0), ("md.execute", 1), ("md.fence", 0)])

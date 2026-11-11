@@ -450,12 +450,9 @@ def test_a_statement_that_runs_long_on_the_server_is_ended_at_its_deadline(led, 
     assert value(c) == 2 and lane.conn.generation == 2 and lane.conn.server_id != first
     assert md.wait_idle(Deadline.after(20.0))                   # the abandoned connection is closed by now
 
-    conn = led.connect("auto")                                  # the same outside a transaction: a write is unknown
-    t0 = time.monotonic()
-    with pytest.raises(md.CommitUnknown):
+    conn = led.connect("auto")                                  # outside a transaction a write is refused (round 2)
+    with pytest.raises(md.LaneMisuse):
         conn.execute(SLOW % 30000, None, Deadline.after(1.0))
-    auto = time.monotonic() - t0
-    assert auto < 1.0 + grace + 2.0
     t0 = time.monotonic()
     with pytest.raises(md.DeadlineExceeded):
         conn.fetchall("SELECT sleep_ms(30000) FROM t", None, Deadline.after(1.0))
@@ -466,7 +463,7 @@ def test_a_statement_that_runs_long_on_the_server_is_ended_at_its_deadline(led, 
     evidence("deadlines.json", "long_statement_on_the_server", {
         "what": "an UPDATE that sleeps 30 s on the server, deadline 1.0 s, grace %.1f s" % grace,
         "caller_got_its_error_after_s": {"in_a_lane_transaction": round(in_block, 2),
-                                         "write_outside_a_transaction": round(auto, 2),
+                                         "write_outside_a_transaction": "refused before it is sent (fix round 2, N2)",
                                          "read_outside_a_transaction": round(read, 2)},
         "errors": {"in_a_lane_transaction": "DeadlineExceeded", "write_outside_a_transaction": "CommitUnknown",
                    "read_outside_a_transaction": "DeadlineExceeded"},
@@ -630,14 +627,16 @@ def won_after_conflicts_only(report):
 
 def test_an_open_transaction_of_the_old_run_blocks_a_take_over_until_it_is_interrupted(led, evidence):
     """Task: "a transaction left open on an abandoned connection blocks a take-over without this and does not
-    with it". The old run's transaction has changed the heartbeat row, which the take-over writes."""
+    with it". The old run's transaction holds its lane's fence row, which the take-over writes (its fence
+    statement ran early, through the layer's own entry: callers cannot write the leader tables since fix round 2;
+    until then this case held the heartbeat row)."""
     c = counter(led)
     old = led.lane("control", led.epoch)
     without, with_ = {}, {}
     with pytest.raises(md.ConnectionLost) as info:
         with old.transaction() as tx:
             tx.execute(BUMP)
-            tx.execute("UPDATE _cdc.heartbeat SET phase = 'busy' WHERE epoch = ?", [led.epoch])
+            tx._layer_execute_one(md.FENCE_SQL, [led.epoch, "control", led.epoch], "the fence statement")
             with pytest.raises(td.TakeoverFailed):
                 led.take_over(interrupt=False, timeout_s=6.0, report=without)
             assert without["conflicts"] >= 3 and without["interrupted"] == 0

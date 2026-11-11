@@ -29,13 +29,12 @@ TAKEOVER_LEADER_SQL = (
     "UPDATE _cdc.leader SET epoch = epoch + 1, flight_id = ?, run_number = ?, run_id = ?, state = 'leading', "
     "taken_at = uuid_extract_timestamp(uuidv7()) WHERE epoch = ?"
 )
-#: Every fence row: the new epoch, and the counter `n` written with a changed value and put back by
-#: `TAKEOVER_FENCE_RESTORE_SQL` in the same transaction. Writing `n` is what makes an open transaction of an old
-#: run that has run its fence statement conflict with the take-over in every case: DuckDB 1.5.6 and MotherDuck do
-#: not record the fence statement's write of the unchanged `epoch` when that column has had no update since it was
-#: last checkpointed (fix round, F0; `docs/design/destination.md` section 14.4).
+#: Every fence row: the new epoch, and the counter `n` raised by one (never put back: the counter only grows).
+#: Writing `n` with a changed value is what makes an open transaction of an old run that has run its fence
+#: statement conflict with the take-over in every case: DuckDB 1.5.6 and MotherDuck do not record the fence
+#: statement's write of the unchanged `epoch` when that column has had no update since it was last checkpointed
+#: (fix round, F0; `docs/design/destination.md` section 14.4).
 TAKEOVER_FENCE_SQL = "UPDATE _cdc.fence SET epoch = ? + 1, n = n + 1"
-TAKEOVER_FENCE_RESTORE_SQL = "UPDATE _cdc.fence SET n = n - 1"
 #: The fence statement of the take-over as design 4.5 writes it: the negative control of the tests of F0.
 TAKEOVER_FENCE_AS_DESIGNED_SQL = "UPDATE _cdc.fence SET epoch = ? + 1"
 TAKEOVER_HEARTBEAT_SQL = (
@@ -82,7 +81,7 @@ def take_over(settings, run_id=None, flight_id="test-flight", run_number=1, time
     ``timeout_s`` has passed, then raises `TakeoverFailed`. An unknown commit outcome is not repeated blindly: the
     record is read again after more than 2 s and ``run_id`` decides.
 
-    The fence rows get the new epoch and their counter `n` is written and put back (`TAKEOVER_FENCE_SQL`).
+    The fence rows get the new epoch and their counter `n` grows by one (`TAKEOVER_FENCE_SQL`).
     ``as_designed=True`` writes only the epoch, as design 4.5 does: a negative control for tests (F0).
 
     ``report``, a dict, receives what happened: ``attempts``, ``conflicts``, ``interrupted``, ``seconds``, the text
@@ -127,7 +126,6 @@ def take_over(settings, run_id=None, flight_id="test-flight", run_number=1, time
                     raw.execute(TAKEOVER_FENCE_AS_DESIGNED_SQL, [seen])
                 else:
                     raw.execute(TAKEOVER_FENCE_SQL, [seen])
-                    raw.execute(TAKEOVER_FENCE_RESTORE_SQL)
                 raw.execute(TAKEOVER_HEARTBEAT_SQL, [seen])
                 sent_commit = True
                 raw.execute("COMMIT")
@@ -193,6 +191,7 @@ class Destination:
         self._drop = drop
         self._conns = []
         self._keeper = None
+        self._setup = None
 
     @property
     def database(self):
@@ -224,6 +223,18 @@ class Destination:
     def raw(self):
         return raw_connect(self.settings)
 
+    def run(self, sql, params=None):
+        """Test set-up and inspection outside the layer: one statement on a plain client connection of this test,
+        in autocommit. (The layer's connections take reads only outside a lane transaction.) Returns the rows of a
+        statement that has any, else None."""
+        if self._setup is None:
+            self._setup = raw_connect(self.settings)
+        cur = self._setup.execute(sql, params) if params is not None else self._setup.execute(sql)
+        try:
+            return cur.fetchall()
+        except duckdb.Error:
+            return None
+
     def close(self):
         """Close what the test opened; wait for the background threads of the layer; drop the database."""
         for conn in self._conns:
@@ -231,6 +242,10 @@ class Destination:
                 conn.close()
         self._conns = []
         md.wait_idle(Deadline.after(max(10.0, 4 * self.settings.grace_s)))
+        if self._setup is not None:
+            with contextlib.suppress(duckdb.Error):
+                self._setup.close()
+            self._setup = None
         if self._keeper is not None:
             with contextlib.suppress(duckdb.Error):
                 self._keeper.close()

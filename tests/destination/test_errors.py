@@ -121,7 +121,7 @@ def test_a_value_that_holds_a_phrase_does_not_look_like_a_conflict_or_a_lost_con
     runs a transaction again after both, for ever. The error of the data is a `StatementError` that names the
     client's class; the transaction is rolled back and no connection is given up."""
     c = led.connect("look")
-    c.execute("CREATE TABLE t (k INTEGER, v BIGINT)")
+    led.run("CREATE TABLE t (k INTEGER, v BIGINT)")
     lane = led.lane("stream", led.epoch)
     for phrase in ("Conflict on update", "write-write conflict", "Connection Error: interrupted by user"):
         with pytest.raises(md.StatementError) as info:
@@ -130,9 +130,9 @@ def test_a_value_that_holds_a_phrase_does_not_look_like_a_conflict_or_a_lost_con
                 tx.execute("INSERT INTO t SELECT 2, CAST(? AS BIGINT)", [phrase])
         assert (info.value.error_class, info.value.statement) == ("ConversionException", "INSERT")
         assert phrase not in str(info.value)
-        with pytest.raises(md.StatementError) as info:
-            c.execute("INSERT INTO t SELECT 3, CAST(? AS BIGINT)", [phrase])
-        assert (info.value.error_class, info.value.statement) == ("ConversionException", "INSERT")
+        with pytest.raises(md.StatementError) as info:                  # in autocommit, a read
+            c.fetchall("SELECT 3, CAST(? AS BIGINT)", [phrase])
+        assert (info.value.error_class, info.value.statement) == ("ConversionException", "SELECT")
         assert phrase not in str(info.value)
     assert c.fetchone("SELECT count(*) FROM t")[0] == 0           # rolled back
     assert lane.conn.generation == 1 and c.generation == 1        # no connection was given up for it

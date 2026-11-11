@@ -355,12 +355,13 @@ def transition(tx, machine, key, from_state, to_state, cause, *, detail=None, va
     On success the change and its row in `_cdc.transitions` are part of ``tx``.
 
     ``values`` (column -> value; `NOW` for MotherDuck's clock) sets more columns of the row in the same UPDATE.
-    ``expect`` (column -> value) adds a condition ``column IS NOT DISTINCT FROM value`` for each, and the UPDATE
-    writes those columns too (with their new value from ``values``, or with themselves). A concurrent writer of
-    an expected column conflicts with the transition when the transition changes that column: DuckDB 1.5.6 does
-    not always record a write of an unchanged value (`docs/design/destination.md` section 14.4), so a column
-    that must exclude another writer gets its new value in ``values``. The same holds for a transition from a
-    state to itself. With ``expect`` a count of 0 rolls the transaction back and raises `md.Conflict`:
+    ``expect`` (column -> value) adds a condition ``column IS NOT DISTINCT FROM value`` for each; every expected
+    column must also be in ``values``, and a transition from a state to itself needs ``values``, else
+    `md.LaneMisuse` before the database is touched. A condition excludes a concurrent writer only through a
+    column that the transition changes: DuckDB 1.5.6 and MotherDuck do not record a write of an unchanged value
+    into a column without updates since its last checkpoint (`docs/design/destination.md` section 14.4), so
+    ``SET col = col`` excludes nothing (fix round 2, N3). The caller puts into ``values`` a column whose value
+    it changes. With ``expect`` a count of 0 rolls the transaction back and raises `md.Conflict`:
     what the caller read has changed, so it runs the transaction again (contract C4). ``detail`` goes into the
     log row (`check_fields`). ``tx`` must be an `md.Transaction`, else `md.LaneMisuse`."""
     m = _resolve(machine)
@@ -371,12 +372,19 @@ def transition(tx, machine, key, from_state, to_state, cause, *, detail=None, va
     detail = _detail(detail)
     values = _columns(m, values, "values")
     expect = _columns(m, expect, "expect")
+    unwritten = sorted(c for c in expect if c not in values)
+    if unwritten:
+        raise LaneMisuse("machine %s: expect on %s needs the column in values with its new value: a condition "
+                         "excludes a concurrent writer only through a column the transition changes"
+                         % (m.name, ", ".join(unwritten)))
+    if from_state == to_state and not values:
+        raise LaneMisuse("machine %s: a transition from %r to itself changes nothing and excludes nothing; give "
+                         "values that change a column" % (m.name, from_state))
     _transaction(tx, "transition")
     params = [to_state]
     sets = ["%s = ?" % m.state_column]
     for col, value in values.items():
         sets.append("%s = %s" % (col, _value_sql(value, params)))
-    sets += ["%s = %s" % (col, col) for col in expect if col not in values]
     params += [*key, from_state]
     conds = [_where(m), "%s = ?" % m.state_column]
     for col, value in expect.items():

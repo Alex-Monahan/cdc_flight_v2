@@ -41,6 +41,7 @@ import logging
 import queue
 import re
 import threading
+import time
 import uuid
 
 import duckdb
@@ -54,10 +55,13 @@ from .settings import Settings
 
 log = logging.getLogger("cdc_v2.md")
 
-SITE_CONNECT = declare_site("md.connect", "opening a destination connection")
-SITE_EXECUTE = declare_site("md.execute", "a destination statement (BEGIN, the caller's statements, ROLLBACK)")
-SITE_FENCE = declare_site("md.fence", "the fence statement of a lane transaction")
-SITE_COMMIT = declare_site("md.commit", "COMMIT of a lane transaction, immediately before it is sent")
+# The texts are those of the toy system of package F (`tests/fuzz/toy/toy.py`), which declares the same sites: a
+# site declared twice must have one text (`cdc_v2.faultsites`). `md.execute` covers BEGIN, the caller's statements
+# and ROLLBACK; `md.commit` lies immediately before COMMIT is sent.
+SITE_CONNECT = declare_site("md.connect", "open a destination connection")
+SITE_EXECUTE = declare_site("md.execute", "one destination statement")
+SITE_FENCE = declare_site("md.fence", "the fence statement of a data transaction")
+SITE_COMMIT = declare_site("md.commit", "COMMIT of a destination transaction")
 SITE_COMMIT_REPLY = declare_site("md.commit_reply", "the answer to COMMIT, after the destination executed it")
 
 #: The expression for MotherDuck's clock (design 4.1). It is the server's clock only inside a statement that runs on
@@ -89,6 +93,10 @@ _LEADER_ROWS = re.compile(
     r"""(?:"?\w+"?\s*\.\s*)?"?_cdc"?\s*\.\s*"?(?:leader|fence|heartbeat)"?(?![\w"])""", re.IGNORECASE)
 _DROP_CDC = re.compile(r"""\bdrop\s+schema\s+(?:if\s+exists\s+)?(?:"?\w+"?\s*\.\s*)?"?_cdc"?(?![\w"])""",
                        re.IGNORECASE)
+# A caller's UPDATE of the leader tables (fix round 2, N2): only the layer's own statements write them (the fence
+# statement, the registration, `schema.heartbeat`, `schema.release`) and the bootstrap's take-over.
+_LEADER_UPDATE = re.compile(
+    r"""\bupdate\s+(?:"?\w+"?\s*\.\s*)?"?_cdc"?\s*\.\s*"?(?:leader|fence|heartbeat)"?(?![\w"])""", re.IGNORECASE)
 
 _default_settings = None
 _registry_lock = threading.Lock()
@@ -141,6 +149,9 @@ def _parse(sql):
     if _LEADER_ROWS.search(sql) or _DROP_CDC.search(sql):
         raise LaneMisuse("the rows of _cdc.leader, _cdc.fence and _cdc.heartbeat are only ever updated, and the "
                          "tables keep their shape (design 4.1)")
+    if _LEADER_UPDATE.search(sql):
+        raise LaneMisuse("only the destination layer's own statements update _cdc.leader, _cdc.fence and "
+                         "_cdc.heartbeat (md.schema.heartbeat, md.schema.release)")
     return kind.name, kind in (duckdb.StatementType.SELECT, duckdb.StatementType.EXPLAIN), None
 
 
@@ -292,6 +303,7 @@ class Session:
         self.lock = threading.Lock()       # held while a statement runs on the client connection
         self._current = None               # the job handed to the worker last
         self._side_busy = False            # an interrupt through a side connection is in flight for it
+        self._local_interrupts = threading.Lock()   # local stand-in: one interrupt and its ROLLBACK at a time
         self._q = queue.SimpleQueue()
         self._thread = threading.Thread(target=self._loop, name="cdc_v2-md-%s" % role, daemon=True)
         with _registry_lock:
@@ -475,26 +487,47 @@ class Session:
         raw = self.raw
         if self.state not in ("open", "retired") or raw is None:
             return False
-        try:
-            raw.interrupt()
-        except Exception:                            # noqa: BLE001
-            return False
         wait_s = self.settings.interrupt_deadline_s
         if deadline is not None:
             wait_s = min(wait_s, max(0.0, deadline.remaining()))
-        if not self.lock.acquire(timeout=wait_s):
-            return True                              # still inside a statement: the interrupt is on its way
+        end = Deadline.after(wait_s)
+        # One interrupt and its ROLLBACK at a time (fix round 2, N1): a second caller's interrupt that landed in the
+        # first caller's ROLLBACK made it fail; the error was swallowed and the transaction stayed open, marked as
+        # rolled back, so every later interrupt skipped it.
+        if not self._local_interrupts.acquire(timeout=wait_s):
+            return True                              # another interrupt of this connection is at work
         try:
-            if self.raw is not None and self.in_tx:
-                try:
-                    self.raw.execute("ROLLBACK")
-                except duckdb.Error:
-                    pass
-                self.in_tx = False
-                self.kill_text = INTERRUPTED_TEXT
+            try:
+                raw.interrupt()
+            except Exception:                        # noqa: BLE001
+                return False
+            if not self.lock.acquire(timeout=end.remaining()):
+                return True                          # still inside a statement: the interrupt is on its way
+            try:
+                if self.raw is not None and self.in_tx:
+                    if not self._rollback_locked(end):
+                        return True                  # not rolled back: in_tx stays, the next interrupt tries again
+                    self.in_tx = False
+                    self.kill_text = INTERRUPTED_TEXT
+            finally:
+                self.lock.release()
         finally:
-            self.lock.release()
+            self._local_interrupts.release()
         return True
+
+    def _rollback_locked(self, end):
+        """ROLLBACK for the local stand-in, with ``self.lock`` held. An interrupt from elsewhere (the watchdog, the
+        reaper) can land in it; it is tried again until ``end``. True when no transaction is open afterwards."""
+        while True:
+            try:
+                self.raw.execute("ROLLBACK")
+                return True
+            except duckdb.Error as e:
+                if _NO_TX.search(str(e)):
+                    return True
+                if end.expired:
+                    return False
+            time.sleep(0.005)
 
     def abort(self):
         """From any thread: fail the call in flight at once and retire the connection."""
@@ -781,12 +814,28 @@ class Connection:
         if self._in_block:
             raise LaneMisuse("this connection is inside a lane transaction; use the transaction object")
         reads = check_sql(sql, "connection %s" % self.role)
+        if not reads:
+            # a write outside a lane transaction carries no fence: after a take-over an old run's write would
+            # commit (fix round 2, N2). Writes go through a lane; the layer's own statements use `_layer_execute`
+            raise LaneMisuse("connection %s: a statement that writes runs in a lane transaction (contract C4); "
+                             "outside one only reads are allowed" % self.role)
         return self._run(site, sql, params, fetch, as_deadline(deadline, self.settings.statement_deadline_s),
-                         writes=not reads)
+                         writes=False)
+
+    def _layer_execute(self, sql, params=None, deadline=None):
+        """One of the layer's own named statements in autocommit (the leader tables' creation, the clean-up of
+        `_cdc.connections`, the heartbeat). Returns the changed rows of an INSERT, UPDATE or DELETE, else None."""
+        if self._in_block:
+            raise LaneMisuse("this connection is inside a lane transaction; use the transaction object")
+        # the kind straight from the parser: `statement_kind` refuses the layer's own statements on leader tables
+        counted = duckdb.extract_statements(sql)[0].type.name in COUNTED and not returns_rows(sql)
+        n = self._run(SITE_EXECUTE, sql, params, "count" if counted else None,
+                      as_deadline(deadline, self.settings.statement_deadline_s), writes=True)
+        return n if counted else None
 
     def execute(self, sql, params=None, deadline=None):
-        """Run one statement in autocommit. Returns the number of rows an INSERT, UPDATE or DELETE changed, else
-        None (also for a statement with RETURNING)."""
+        """Run one statement that only reads, in autocommit; it returns None. A statement that writes raises
+        `LaneMisuse`: writes run in a lane transaction, behind the fence (fix round 2, N2)."""
         n = self._autocommit(sql, params, count_fetch(sql), deadline)
         return n if counts_rows(sql) else None
 

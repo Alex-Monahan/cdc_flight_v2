@@ -26,10 +26,9 @@ WATCHDOG = "cdc_v2-md-watchdog"
 
 def counter(dest):
     """A table with one counter row; returns a connection to look at it."""
-    c = dest.connect("look")
-    c.execute("CREATE TABLE t (k INTEGER, v BIGINT)")
-    c.execute("INSERT INTO t VALUES (1, 0)")
-    return c
+    dest.run("CREATE TABLE t (k INTEGER, v BIGINT)")
+    dest.run("INSERT INTO t VALUES (1, 0)")
+    return dest.connect("look")
 
 
 def value(c):
@@ -202,10 +201,10 @@ def test_a_key_value_that_commit_reports_does_not_travel_on(led, faults):
         with lane.transaction() as tx:
             tx.execute(BUMP)
     clean(info.value, "lane stream: connection lost during a statement: IOException (Request failed)")
-    # the same in autocommit: a writing statement, so the outcome is unknown
+    # the same for the layer's own write in autocommit (the heartbeat of package L): the outcome is unknown
     faults.raise_at("md.execute", "duckdb.IOException", message=lost, hits=1)
     with pytest.raises(md.CommitUnknown) as info:
-        c.execute(BUMP)
+        md.schema.heartbeat(c, led.epoch, "test")
     clean(info.value, "connection lost during a writing statement outside a transaction (look): "
                       "IOException (Request failed)")
     faults.raise_at("md.execute", "duckdb.IOException", message=lost, hits=1)

@@ -70,11 +70,9 @@ class Child:
 def test_a_black_holed_path_bounds_every_call_and_the_calls_left_waiting(md_dest, evidence):
     dest = md_dest
     epoch = dest.lead()
-    c = dest.connect("setup")
     for sql in ("CREATE SCHEMA IF NOT EXISTS bh", "CREATE TABLE bh.hold (k INTEGER, v BIGINT)",
                 "INSERT INTO bh.hold VALUES (1, 0)"):
-        c.execute(sql)
-    c.close()
+        dest.run(sql)
     rec = []
     t0 = time.monotonic()
 

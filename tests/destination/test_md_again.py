@@ -21,6 +21,9 @@ from test_alerts import (al,  # noqa: F401 - a fixture
                          test_nothing_is_written_when_an_alert_is_refused, test_resolve,
                          test_the_table_carries_what_delivery_needs, test_two_alerts_in_one_transaction_and_defaults)
 from test_fix_round import (test_a_changed_or_renamed_applied_step_refuses_to_start,
+                            test_a_condition_on_a_column_the_transition_does_not_change_is_refused,
+                            test_an_old_runs_plain_connection_cannot_write_after_a_take_over,
+                            test_the_heartbeat_and_the_release_are_statements_of_the_layer,
                             test_a_connection_that_is_not_a_lane_registers_under_control_and_retries_a_conflict,
                             test_a_missing_file_is_refused_and_not_a_lost_connection,
                             test_a_registration_frozen_between_its_check_and_its_commit_and_a_take_over_in_between,
@@ -30,9 +33,10 @@ from test_fix_round import (test_a_changed_or_renamed_applied_step_refuses_to_st
                             test_a_run_that_bypasses_the_fence_shows_a_duplicate_seq,
                             test_a_transition_row_carries_its_lane_epoch_seq_and_detail,
                             test_ddl_on_one_lane_while_another_lane_writes_is_a_conflict_and_runs_again,
-                            test_seq_has_no_gaps_and_equals_the_fence_counter_on_two_lanes_and_two_epochs,
+                            test_seq_is_strictly_increasing_per_lane_with_gaps_only_at_take_overs_and_registrations,
                             test_the_misleading_statements_through_the_layer_are_refused,
                             test_the_state_module_and_alerts_write_only_inside_a_lane_transaction,
+                            test_the_take_over_and_the_registration_never_put_the_counter_back,
                             test_three_simultaneous_starters_have_exactly_one_leader,
                             test_values_and_expect_in_the_same_conditional_update)
 from test_from_apply import (test_a_registered_name_is_checked,

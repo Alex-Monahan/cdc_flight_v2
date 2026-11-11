@@ -37,10 +37,9 @@ def measured():
 
 def counter(dest):
     """A table with one counter row; returns a connection to look at it."""
-    c = dest.connect("look")
-    c.execute("CREATE TABLE t (k INTEGER, v BIGINT)")
-    c.execute("INSERT INTO t VALUES (1, 0)")
-    return c
+    dest.run("CREATE TABLE t (k INTEGER, v BIGINT)")
+    dest.run("INSERT INTO t VALUES (1, 0)")
+    return dest.connect("look")
 
 
 def value(c):
@@ -98,10 +97,13 @@ def test_execute_returns_a_count_for_insert_update_and_delete_only(led):
             assert got == expected and type(got) is type(expected), sql
         assert tx.fetchall("SELECT k, v FROM c1 ORDER BY k") == AFTER_COUNTS
     assert look.fetchall("SELECT k, v FROM c1 ORDER BY k") == AFTER_COUNTS
-    look.execute("DROP TABLE c1")
-    for sql, params, expected in COUNTS:                        # the same rule outside a lane transaction
-        got = look.execute(sql, params)
-        assert got == expected and type(got) is type(expected), sql
+    # outside a lane transaction a statement that writes is refused (fix round 2, N2); a read returns None
+    for sql, params, expected in COUNTS:
+        if md.statement_kind(sql) in ("SELECT", "EXPLAIN"):
+            assert look.execute(sql, params) is None, sql
+        else:
+            with pytest.raises(md.LaneMisuse, match="lane transaction"):
+                look.execute(sql, params)
     assert look.fetchall("SELECT k, v FROM c1 ORDER BY k") == AFTER_COUNTS
 
 
@@ -156,7 +158,7 @@ def test_execute_one_never_takes_a_returned_value_for_a_count(led):
     """Seeded: the UPDATE changes two rows and returns ``k`` (1 and 1) under the name ``Count``. `execute_one`
     took the first returned value for "one row changed" and the transaction committed."""
     c = counter(led)
-    c.execute("INSERT INTO t VALUES (1, 100)")                  # a second row with k = 1
+    led.run("INSERT INTO t VALUES (1, 100)")                    # a second row with k = 1
     lane = led.lane("stream", led.epoch)
     with pytest.raises(md.LaneMisuse, match="reports its changed rows"):
         with lane.transaction() as tx:
@@ -399,8 +401,8 @@ def test_the_two_settings_belong_to_the_connections_of_the_layer_only(led, measu
     session: another connection keeps its values and cannot change those of the layer."""
     read = "SELECT current_setting('TimeZone'), current_setting('arrow_lossless_conversion')"
     c = led.connect("look")
-    c.execute("CREATE TABLE u (u UUID)")
-    c.execute("INSERT INTO u VALUES ('6f1c2a44-0b7e-4c1d-9a55-1f2e3d4c5b6a')")
+    led.run("CREATE TABLE u (u UUID)")
+    led.run("INSERT INTO u VALUES ('6f1c2a44-0b7e-4c1d-9a55-1f2e3d4c5b6a')")
     lane = led.lane("stream", led.epoch)
     with lane.transaction() as tx:
         assert tx.fetchone(read) == ("UTC", True)
@@ -498,8 +500,8 @@ def test_a_value_in_a_destination_error_never_travels_on(led, caplog, measured):
     statement, and nothing else: not in the exception, not in a log line, not in the alert a caller writes."""
     caplog.set_level(logging.DEBUG, logger="cdc_v2")
     c = counter(led)
-    c.execute("CREATE TABLE names (name VARCHAR PRIMARY KEY)")
-    c.execute("INSERT INTO names VALUES (?)", [MARKER])
+    led.run("CREATE TABLE names (name VARCHAR PRIMARY KEY)")
+    led.run("INSERT INTO names VALUES (?)", [MARKER])
     lane = led.lane("stream", led.epoch)
     raw = led.raw()
     premise = []
@@ -512,14 +514,22 @@ def test_a_value_in_a_destination_error_never_travels_on(led, caplog, measured):
                 name, text = type(e).__name__, str(e)
             premise.append([kind, name, bool(found_in([text]))])
             assert name == error_class and found_in([text]), (sql, name)
-            reads = kind == "SELECT"
+            reads = kind in ("SELECT", "UNPARSED")             # text that does not parse is refused alike
             with pytest.raises(md.StatementError) as in_lane:
                 with lane.transaction() as tx:
                     tx.execute(BUMP)
                     tx.fetch_arrow(sql, params) if reads else tx.execute(sql, params)
+            if not reads:                                       # outside a lane only reads run (round 2, N2)
+                with pytest.raises(md.LaneMisuse):
+                    c.execute(sql, params)
             with pytest.raises(md.StatementError) as outside:
-                c.fetchall(sql, params) if reads else c.execute(sql, params)
-            for err, where in ((in_lane.value, "lane stream"), (outside.value, "connection look")):
+                with lane.transaction() as tx:                  # the same statement once more, on its own
+                    tx.fetch_arrow(sql, params) if reads else tx.execute(sql, params)
+            if reads:
+                with pytest.raises(md.StatementError) as outside:
+                    c.fetchall(sql, params)
+            for err, where in ((in_lane.value, "lane stream"),
+                               (outside.value, "connection look" if reads else "lane stream")):
                 assert (err.where, err.error_class, err.statement) == (where, error_class, kind)
                 assert str(err) == "%s: the destination refused a statement (%s in %s)" % (where, error_class, kind)
                 assert err.__cause__ is None and err.__context__ is None        # the client's error is not attached
