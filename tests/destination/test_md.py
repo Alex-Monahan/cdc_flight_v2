@@ -24,6 +24,8 @@ from cdc_v2.testing import destination as td
 from cdc_v2.testing import procs
 from conftest import MD_PREFIX
 from test_lane import BUMP, counter, fence, value
+# fence(c)[1] counts commits of the lane, the take-overs and the registrations of new connections: the counter
+# only grows (fix round 2)
 
 pytestmark = pytest.mark.md
 
@@ -132,7 +134,7 @@ def test_timings_of_a_lane_transaction(led, evidence):
                 parts[name].append(time.monotonic() - t0)
     finally:
         raw.close()
-    assert value(c) == 25 and fence(c)[1] == 51
+    assert value(c) == 25 and fence(c)[1] == 53
     evidence("timings.json", "lane_transaction", {
         "what": "one process, one connection, 25 repetitions each; an empty lane transaction is BEGIN, the fence "
                 "statement and COMMIT; the parts were measured on a plain client connection with the same texts",
@@ -352,10 +354,10 @@ def test_an_open_transaction_interrupted_on_the_server_is_connection_lost(led, e
             assert c.interrupt_server_connection(lane.conn.server_id) is True
             if then == "statement":
                 tx.execute(BUMP)
-    assert value(c) == 0 and fence(c)[1] == 0
+    assert value(c) == 0 and fence(c)[1] == 2
     with lane.transaction() as tx:
         tx.execute(BUMP)
-    assert value(c) == 1 and fence(c) == (led.epoch, 1)
+    assert value(c) == 1 and fence(c) == (led.epoch, 4)
     evidence("error_mapping.json", "open_transaction_interrupted_then_" + then, {
         "what": "a lane transaction that has run one UPDATE; its server connection is interrupted; then the "
                 "block " + ("runs another statement" if then == "statement" else "ends (the fence statement)"),
@@ -385,7 +387,7 @@ def test_a_connection_interrupted_between_the_fence_statement_and_commit_is_comm
     t.join(30)
     assert not t.is_alive() and isinstance(box.get("error"), md.CommitUnknown), box
     time.sleep(LATE)
-    assert value(c) == 0 and fence(c) == (led.epoch, 1)         # nothing landed
+    assert value(c) == 0 and fence(c) == (led.epoch, 3)         # nothing landed
     with lane.transaction() as tx:
         tx.execute(BUMP)
     assert value(c) == 1
@@ -518,7 +520,7 @@ def test_an_expired_deadline_stops_the_block_before_commit(led):
         with lane.transaction(Deadline.after(1.0)) as tx:
             tx.execute(BUMP)
             time.sleep(1.2)
-    assert value(c) == 0 and fence(c) == (led.epoch, 1)
+    assert value(c) == 0 and fence(c) == (led.epoch, 3)
     with pytest.raises(md.DeadlineExceeded):
         with lane.transaction(Deadline.after(1.0)) as tx:
             time.sleep(1.2)
@@ -688,7 +690,7 @@ def test_an_open_transaction_that_holds_only_data_rows_does_not_block_the_take_o
             free_s = time.monotonic() - t0
             assert value(c) == 1
             tx.execute(BUMP)
-    assert value(c) == 1 and fence(c) == (new_epoch, 1)
+    assert value(c) == 1 and fence(c) == (new_epoch, 5)
     evidence("registry_takeover.json", "open_transaction_holds_only_data_rows", {
         "what": "the old run's stream-lane transaction has updated a data row and stays open",
         "take_over": dict(rep, result="won without a conflict"),
@@ -725,7 +727,7 @@ def test_a_commit_that_hangs_holds_the_fence_row_until_the_take_over_interrupts_
     t.join(60)
     assert not t.is_alive() and isinstance(box.get("error"), md.CommitUnknown), box
     time.sleep(LATE)
-    assert value(c) == 0 and fence(c) == (led.epoch + 1, 1)
+    assert value(c) == 0 and fence(c) == (led.epoch + 1, 4)
     evidence("registry_takeover.json", "old_run_stands_before_commit", {
         "what": "the old run's stream-lane transaction has run its fence statement and stands before COMMIT",
         "take_over_without_the_interrupt": dict(without, result="TakeoverFailed after 5 s"),

@@ -90,17 +90,17 @@ A `Connection` has `role`, `settings`, `generation` (counts the client connectio
 | Method | What |
 |---|---|
 | `ensure(deadline)` | take a client connection now if there is none |
-| `execute`, `fetchall`, `fetchone(sql, params=None, deadline=None)` | one statement in autocommit. `execute` returns the number of rows an `INSERT`, `UPDATE` or `DELETE` changed, else `None`, as `tx.execute` does (section 2.2) |
+| `execute`, `fetchall`, `fetchone(sql, params=None, deadline=None)` | one statement **that only reads**, in autocommit; `execute` returns `None`. A statement that writes is `LaneMisuse` (fix round 2, N2): outside a lane transaction it would carry no fence, and after a take-over an old run's insert, its update of its fence row and of the leader row all committed (the second reviewer's case; `test_fix_round.py::test_an_old_runs_plain_connection_cannot_write_after_a_take_over`) |
 | `clock_us(deadline=None)` | MotherDuck's clock as integer microseconds (section 10) |
 | `interrupt_server_connection(server_id, deadline=None)` | interrupt another connection by id; refuses its own id |
 | `abort()` | from any thread: end the call in flight now (section 4) |
 | `close(deadline=None)` | close; also a context manager |
 
 Errors of the autocommit methods: `Conflict` (nothing applied), `StatementError` for a statement that the
-destination refused (nothing applied; section 5), `ConnectionLost` and `DeadlineExceeded` for a read,
-`CommitUnknown` for a write whose outcome is unknown (a single statement in autocommit is its own commit). A
-write that did complete but late returns its result; only the connection is replaced.
-Evidence: `deadlines.json`, key `long_statement_on_the_server` (read: `DeadlineExceeded`, write: `CommitUnknown`).
+destination refused (section 5), `ConnectionLost` and `DeadlineExceeded`, and `LaneMisuse` for a statement that
+writes. The layer's own statements that write in autocommit (the creation of the leader tables, the clean-up of
+`_cdc.connections`, `md.schema.heartbeat`) give `CommitUnknown` when their outcome is unknown (a single statement
+in autocommit is its own commit). Evidence: `deadlines.json`, key `long_statement_on_the_server`.
 
 Every statement of a caller is checked (`check_sql`): exactly one statement; never `BEGIN`, `COMMIT` or
 `ROLLBACK`; never a statement that deletes, inserts, truncates, merges into, drops, alters or re-creates
@@ -213,12 +213,13 @@ apply (section 14.1). The tests named here without a file are in `tests/destinat
   BEGIN;
   INSERT INTO _cdc.connections (epoch, lane, connection_id, registered_at) VALUES (?, ?, ?::UUID, <md clock>);
   UPDATE _cdc.fence SET n = n + 1 WHERE lane = ? AND epoch = ?;          -- exactly one row, else FenceLost
-  UPDATE _cdc.fence SET n = n - 1 WHERE lane = ? AND epoch = ?;          -- the counter stays as it was
   COMMIT;
   ```
 
-  The `UPDATE`s write the counter `n` with a changed value, and a take-over writes `n` too (section 14.4), so a
-  registration and a take-over cannot both commit: a registration whose transaction began before the take-over committed gets `Conflict`, one that
+  The `UPDATE` writes the counter `n` with a changed value, and a take-over writes `n` too (section 14.4), so a
+  registration and a take-over cannot both commit. The counter only grows: until fix round 2 the registration
+  put it back (`n - 1`) in the same transaction, a net-zero write that no documented DuckDB rule keeps
+  recorded (`test_fix_round.py::test_the_take_over_and_the_registration_never_put_the_counter_back`): a registration whose transaction began before the take-over committed gets `Conflict`, one that
   begins after it gets `FenceLost`, and one that commits first is in the list when the new leader interrupts
   the earlier epochs. Until the fix round the registration was one `INSERT … SELECT … FROM _cdc.leader WHERE
   epoch = ?` in autocommit: it read the leader row and wrote only `_cdc.connections`, so on MotherDuck one that
@@ -359,11 +360,13 @@ state.read(conn_or_tx, CHUNK, (table_id, 0))        # the stored state, or None
 - **The facts of a group** (fix round, item 1): `transition(…, cause, *, detail=None, values=None,
   expect=None)` and `create(…, values=None, detail=None)`. `values` sets more columns in the same conditional
   `UPDATE` (`state.NOW` for MotherDuck's clock). `expect` adds `AND col IS NOT DISTINCT FROM ?` for each column,
-  and the `UPDATE` writes those columns too (with their new value, or with themselves). A concurrent writer of
-  an expected column conflicts only with a transition that changes the column: a write of an unchanged value is
-  not always recorded (section 14.4), so a column that must exclude another writer gets its new value in
-  `values` (the stream's position always does). With `expect` a count of 0 rolls the transaction back and
-  raises `Conflict` (the run-again rule of C4). `detail` follows the value rules of alert fields (`state.check_fields`; identifiers, positions,
+  and every expected column must be in `values` with its new value; a transition from a state to itself needs
+  `values` too. Both are refused with `LaneMisuse` otherwise (fix round 2, items 2 and 6): a write of an
+  unchanged value is not recorded after a checkpoint (section 14.4), so neither excluded a concurrent writer
+  (the second reviewer's N3: both committed, 5 of 5 rounds each, across two lanes of one epoch;
+  `test_fix_round.py::test_a_condition_on_a_column_the_transition_does_not_change_is_refused`). The caller
+  puts into `values` a column whose value it changes (the stream's position always changes). With `expect` a
+  count of 0 rolls the transaction back and raises `Conflict` (the run-again rule of C4). `detail` follows the value rules of alert fields (`state.check_fields`; identifiers, positions,
   counts and durations only) and is stored as JSON. The stream's group is then two statements: the `UPDATE` of
   its position with `expect` on the previous value, and the `INSERT` of the log row
   (`test_fix_round.py::test_values_and_expect_in_the_same_conditional_update`).
@@ -380,9 +383,11 @@ state.read(conn_or_tx, CHUNK, (table_id, 0))        # the stored state, or None
   transaction's fence statement, which is the last statement before `COMMIT`. Two transactions of one lane that
   read the same `n` conflict at the fence row, so `seq` orders the transactions of a lane exactly as they
   committed, and a duplicate (lane, `seq`) between two transactions shows a second writer. Every row of one
-  transaction carries the same `seq`; a transaction that writes no row leaves a gap
+  transaction carries the same `seq`. `seq` is **strictly increasing per lane, with gaps**: a take-over and the
+  registration of a new connection raise `n` too (the counter only grows, fix round 2), and so does a
+  transaction that writes no row
   (`test_fix_round.py::test_a_transition_row_carries_its_lane_epoch_seq_and_detail`,
-  `::test_seq_has_no_gaps_and_equals_the_fence_counter_on_two_lanes_and_two_epochs`,
+  `::test_seq_is_strictly_increasing_per_lane_with_gaps_only_at_take_overs_and_registrations`,
   `::test_a_rolled_back_transaction_leaves_no_transition_row`,
   `::test_a_run_that_bypasses_the_fence_shows_a_duplicate_seq`).
 - **`changed_at` does not give the order of commit.** It is MotherDuck's clock when the `INSERT` ran, not when
@@ -444,6 +449,8 @@ alerts.resolve(tx, alerts.dedup_key("table_quarantined", {"table_id": 16385}, ("
   `seen` at every attempt and took over again from the winner: with three simultaneous starters all three were
   returned as leader, 5 rounds of 5 (F6; `test_fix_round.py::test_three_simultaneous_starters_have_exactly_one_leader`,
   also on MotherDuck). Package L copies this stand-in.
+- `Destination.run(sql, params=None)` sets up and inspects the test's database on a plain client connection,
+  outside the layer (whose connections take reads only outside a lane transaction since fix round 2).
 - `create_database(name)`, `drop_database(name)` and `leftover_databases(prefix)` create and drop a MotherDuck
   test database through `cdc_v2.testing.md` (package O), the one place that does this. It checks the name, has
   a deadline, and writes a **ledger** entry (an empty file named like the database, under
@@ -456,7 +463,7 @@ alerts.resolve(tx, alerts.dedup_key("table_quarantined", {"table_id": 16385}, ("
 
 | Step | What the layer does | Fault site | Crash point |
 |---|---|---|---|
-| 1 | On a new client connection: connect and set the two session settings; interrupt the server connection it replaces, by id; register in `_cdc.connections` (a transaction of its own: `BEGIN`, the `INSERT`, two `UPDATE`s of the lane's fence row, `COMMIT`; section 2.3) | `md.connect`, `md.execute`, `md.commit`, `md.commit_reply` | |
+| 1 | On a new client connection: connect and set the two session settings; interrupt the server connection it replaces, by id; register in `_cdc.connections` (a transaction of its own: `BEGIN`, the `INSERT`, the `UPDATE` of the lane's fence row, `COMMIT`; section 2.3) | `md.connect`, `md.execute`, `md.commit`, `md.commit_reply` | |
 | 2 | `BEGIN` | `md.execute` | |
 | 3 | The caller's statements | `md.execute` | |
 | 4 | The fence statement; it must change exactly one row. Its deadline is the statement deadline (and never more than what is left of the block) | `md.fence` | `<lane>.fenced` after it |
@@ -468,7 +475,7 @@ alerts.resolve(tx, alerts.dedup_key("table_quarantined", {"table_id": 16385}, ("
   destination refuses rolls back and raises `StatementError` (section 5). Both:
   `test_lane.py::test_an_exception_rolls_back_and_is_passed_on`.
 - What the fault site `md.execute` sees before the caller's statements. On a lane's first connection: the
-  registration's `BEGIN`, `INSERT` and two `UPDATE`s (its `COMMIT` passes `md.commit`), then `BEGIN`. On a connection
+  registration's `BEGIN`, `INSERT` and `UPDATE` (its `COMMIT` passes `md.commit`), then `BEGIN`. On a connection
   that replaces one that was given up, locally the same; on MotherDuck the interrupt of the old id comes first,
   as a statement of its own. On a registered connection: `BEGIN` only. (Locally the interrupt is a call inside
   the process and passes no fault site.)
@@ -568,7 +575,8 @@ client after 0.8 s returned after 4.16 s (`error_mapping.json`, key `raw_texts`,
 | `COMMIT` blocks before it is sent (`md.commit`) | 2.0 s | 4.02 s | `CommitUnknown` | no |
 | the answer of `COMMIT` blocks (`md.commit_reply`) | 2.0 s | 4.00 s | `CommitUnknown` | yes |
 | an `UPDATE` that sleeps 30 s on the server, in a lane transaction | 1.0 s | 1.12 s | `DeadlineExceeded` | no |
-| the same as a read / as a write outside a transaction | 1.0 s | 1.21 s / 1.21 s | `DeadlineExceeded` / `CommitUnknown` | no |
+| the same as a read outside a transaction | 1.0 s | 1.19 to 1.21 s | `DeadlineExceeded` | no |
+| the same as a write outside a transaction | | refused before it is sent since fix round 2 (until then 1.21 to 1.22 s, `CommitUnknown`) | `LaneMisuse` | no |
 
 After the statement that slept on the server was ended, another lane updated the same row 334 ms later: the
 interrupt on the server released the row. After each case the next transaction of the lane ran on a new
@@ -757,8 +765,8 @@ With it, every order ends with exactly one of the two committed, with either tak
 each, locally and on MotherDuck (same file, rows `n_and_epoch_parameter (as built)`). **That was not enough**:
 right after a checkpoint the `epoch` that the fence statement writes is an unchanged value, which is not
 recorded, and a take-over that writes the epoch alone commits next to the old transaction (F0, section 14.4).
-Since the fix round the take-over also writes the counter `n` of every fence row (`n + 1`, then `n - 1`), which
-the fence statement changes; the two meet on `n` in every order. The seeded regression
+Since the fix round the take-over also writes the counter `n` of every fence row (`n + 1`, never put back),
+which the fence statement changes; the two meet on `n` in every order. The seeded regression
 test is `test_lane.py::test_conflicts_are_per_column_which_is_why_the_fence_statement_writes_the_epoch`; it
 also keeps the failing pair as a negative control. The process tests of section 8 run every interleaving that
 the crash points allow against it.
@@ -1298,10 +1306,25 @@ the test that holds it. Tests without a file name are in `tests/destination/test
     starters (section 2.7; item 14).
 45. **Marker `d_full`** for the rest of the full test matrices of this package (section 16; item 7). It is
     registered in `tests/destination/conftest.py`, because this package does not edit `pyproject.toml`.
-46. **The take-over writes the fence rows' counter `n`** (`n + 1`, then `n - 1`), and the registration writes
-    `n` of its lane's fence row the same way (F0, section 14.4). Design 4.5 writes only the epoch; C4's
-    replacement sentence for the fence statement stands, and needs this sentence next to it: "The take-over
-    also writes `n` of every fence row with a changed value and puts it back."
+46. **The take-over raises the fence rows' counter `n`** by one, and the registration raises `n` of its lane's
+    fence row (F0, section 14.4); neither puts it back (fix round 2). Design 4.5 writes only the epoch; the
+    coordinator's replacement sentences for core 4.2, 4.5 and C4 say it.
+47. **Outside a lane transaction only reads run** (fix round 2, N2): `Connection.execute`, `fetchall` and
+    `fetchone` refuse a statement that writes with `LaneMisuse`; the layer's own statements (the creation of
+    the leader tables, the clean-up of `_cdc.connections`, the heartbeat) use an internal path. No caller may
+    `UPDATE` `_cdc.leader`, `_cdc.fence` or `_cdc.heartbeat`, in a lane or outside one.
+48. **`md.schema.heartbeat(conn, epoch, phase, progress_age_us=0)` and `md.schema.release(tx)`** are package L's
+    heartbeat (design 4.3, in autocommit) and release (design 4.6, in a control-lane transaction), statements
+    of the layer since callers may not update the leader tables. Both raise `FenceLost` when the epoch no longer
+    leads. They are in `schema.NAMED_STATEMENTS` (`heartbeat`, `release`).
+49. **`state.transition` refuses `expect` on a column that is not in `values`, and a transition from a state to
+    itself without `values`** (`LaneMisuse`; fix round 2, items 2 and 6). `check_machine` takes `self_values`
+    for a machine with a self-transition.
+50. **The texts of the `md.*` fault sites** are those of the toy system of package F (`tests/fuzz/toy/toy.py`),
+    which declares the same sites; `cdc_v2.faultsites` refuses one site with two texts (found when `origin/main`
+    with package F was merged).
+51. **`cdc_v2.testing.destination.Destination.run(sql, params)`** sets up and inspects a test's database on a
+    plain client connection, outside the layer.
 
 **Added with the merge of the transform (package Y)**
 
@@ -1346,7 +1369,7 @@ says, what was measured, and where the evidence is.
     since the table was written or checkpointed. After a checkpoint the fence statement's write of the unchanged
     epoch is such a write, so a take-over that writes the epoch alone does not conflict with an old run's open
     transaction, and both commit, data included (section 14.4). The take-over must also write the fence rows'
-    counter `n` with a changed value (`n + 1`, then `n - 1`), and every exclusion must rest on a changed value
+    counter `n` with a changed value (`n + 1`, never put back), and every exclusion must rest on a changed value
     (section 6). This changes the take-over text of design 4.5 (package L) and the rule "write the columns your
     condition reads" of finding 1.
 
@@ -1527,7 +1550,7 @@ rounds on `9e389cc` and in 0 of 5 on `7193b39` (same file, key `f0_on_the_old_co
 | 16 (F8) | `RETURNING b AS "Count"` with text was `StatementError` | never read as a count (section 2.2) | `test_a_returning_column_named_count_that_holds_text_is_no_count` |
 
 Changes that the fix round made to tests of the first delivery: the tests that counted the statements of a
-lane's first transaction now count the registration as `BEGIN`, `INSERT`, two `UPDATE`s and `COMMIT`
+lane's first transaction now count the registration as `BEGIN`, `INSERT`, `UPDATE` and `COMMIT`
 (`test_lane.py::test_an_unclassified_error_after_commit_was_sent_is_commit_unknown`, the lost-connection matrix,
 `test_alerts.py::test_emit_now_passes_on_what_it_cannot_decide`,
 `test_review.py::test_registration_writes_the_id_of_the_connection_that_runs_it`, and in
@@ -1562,6 +1585,7 @@ row and the server's listing of the old connection at the crash point, before th
 | diagnostic | `e671405` (as designed) | 235 | 235 | 1 |
 | 2 (stopped when the cause was found) | `e671405` (as designed) | 681 | 341 | 8 (3 `nothing@fenced`, 3 `registered_relation@fenced`, 1 `transition@fenced`, 1 `row@fenced`) |
 | 3 (stopped at round 1001 of 1040 for a pause) | `7193b39` (the fix) | 1001 | 501 | **0** |
+| 4 (fix round 2: the counter only grows) | `50229d7` | RUN4_ROUNDS | RUN4_MAIN | RUN4_BREACHES |
 
 **What it is: both committed.** In the diagnostic breach, at the crash point the committed `n` was the old value
 and the server listed the old connection with its transaction open; the take-over then met **no** conflict (1
@@ -1584,20 +1608,64 @@ take-over of design 4.5 writes `epoch` alone. The fence row normally has updates
 lane transaction writes it), so the hole opens only after MotherDuck checkpoints: about 1 round in 100 in run 2,
 under the load of other tests; run 1 had none in 393.
 
-**The fix.** The take-over also writes the counter `n` of every fence row with a changed value and puts it back in
-the same transaction (`UPDATE _cdc.fence SET epoch = :seen + 1, n = n + 1` and `UPDATE _cdc.fence SET n = n - 1`;
-`cdc_v2.testing.destination.TAKEOVER_FENCE_SQL`, `TAKEOVER_FENCE_RESTORE_SQL`). The fence statement always
+**The rule the design rests on** (the second reviewer's map, `m1b_map.py` under `review_d2/progs/`: 768 cases
+locally, 672 on MotherDuck). Transaction A writes and stays open; then transaction B writes the same column of
+the same row with a changed value. "Recorded" means that B conflicts.
+
+| A's write | The column has had no update since the table was written or checkpointed | The column was updated since (any row, committed or rolled back) |
+|---|---|---|
+| an unchanged value (`= literal`, `c = c`, `c + 0`), also inside a statement of many rows or one that changes other rows | **not recorded: both commit** | recorded |
+| a changed value | recorded | recorded |
+| changed and changed back (`n + 1`, then `n - 1`) | recorded | recorded |
+| unchanged, after a changed write in the same transaction | recorded | recorded |
+| only another column of the row | not recorded (conflicts are per column) | not recorded |
+| `DELETE` plus `INSERT` of the row | never conflicts, in any order | never |
+| any of these when B wrote first (still open, or committed after A's snapshot) | A fails | A fails |
+
+- A `CHECKPOINT` cannot fall between the two writes locally (it is refused while a write transaction or an older
+  snapshot is open). An explicit `CHECKPOINT` on MotherDuck answers OK and resets nothing (the only difference of
+  the two maps). MotherDuck's own background checkpoint came about every 62 s, never while a write transaction
+  or an older snapshot was open, and after one the take-over as designed committed next to an old fence 3 of 3
+  times while the take-over as built excluded it 3 of 3 (`m3_md_bgckpt.py`).
+- **So two statements exclude each other only through a column that both change.** The design never relies on an
+  unchanged write, nor on changed-and-changed-back (it is recorded today, but no documented DuckDB rule keeps it
+  so; fix round 2 removed the one place that used it). DuckDB's concurrency documentation does not describe this
+  behaviour; whether to report it upstream is the owner's decision.
+
+**The fix.** The take-over also raises the counter `n` of every fence row (`UPDATE _cdc.fence SET epoch = :seen + 1,
+n = n + 1`; `cdc_v2.testing.destination.TAKEOVER_FENCE_SQL`). Until fix round 2 it put `n` back with a second
+statement (`n - 1`); that net-zero write is recorded today, but no documented DuckDB rule keeps it so, and a
+future optimisation of the same kind could drop it, so the counter now only grows. The fence statement always
 changes `n`, so the two meet on `n` in every order and after any checkpoint: on MotherDuck on a fresh table 0 of 6
 rounds with both committed, in both orders, and the same for the registration (`unchanged_write.json`); locally after a checkpoint 5 of 5, against 5 of 5 breaches with the code of
-`9e389cc` (`fix_round_old_code.json`). The registration writes `n + 1` and `n - 1` the same way (section 2.3).
-`seq` stays without gaps, because `n` is unchanged by both. Tests: the two "right after a checkpoint" tests of
-`test_fix_round.py`, each with its negative control; the campaign's run 3 above.
+`9e389cc` (`fix_round_old_code.json`). The registration raises `n` the same way (section 2.3). `seq` therefore
+has gaps at take-overs and registrations (section 2.5). Tests: the two "right after a checkpoint" tests of
+`test_fix_round.py`, each with its negative control; the campaign's runs 3 and 4 above.
 
 **What it means for the rest of the design** (finding 24): every exclusion by a write-write conflict must rest on a
 changed value (section 6). Package L's take-over must write `n` as above (design 4.5 does not), its heartbeat and
 release write changed values already. A transition from a state to itself, and an `expect` on a column the
 transition does not change, do not exclude a concurrent writer after a checkpoint (section 2.5). The leadership
 fuzzer should take over at `<lane>.fenced` and right after a `CHECKPOINT`.
+
+### 14.5 Fix round 2
+
+The coordinator's re-check of `161d847` and a second attack by the second reviewer on the fence after the fix
+(1,440 cases of the map above, 620 campaign rounds on MotherDuck and 400 locally: 0 breaches with the fix, the
+control of design 4.5 breached every time). Six items; every one has a test that fails on the code of `161d847`
+(run against that code with the new test support, as in section 14.3).
+
+| Item | What was wrong | What was done | Tests |
+|---|---|---|---|
+| 1 | The take-over and the registration put `n` back (`n - 1`): a net-zero write that no documented rule keeps recorded | the counter only grows; `seq` is strictly increasing per lane with gaps at take-overs and registrations (sections 2.3, 2.5, 14.4) | `test_fix_round.py::test_the_take_over_and_the_registration_never_put_the_counter_back`, `::test_seq_is_strictly_increasing_per_lane_with_gaps_only_at_take_overs_and_registrations` |
+| 2, 6 (N3) | `expect` on a column not in `values` (written `col = col`) and a self-transition without `values` excluded nothing (5 of 5 both committed, across two lanes of one epoch) | refused with `LaneMisuse` (section 2.5); `check_machine` takes `self_values` | `::test_a_condition_on_a_column_the_transition_does_not_change_is_refused` |
+| 3 | `test_md_procs.py` accepted either outcome for a transaction that MotherDuck may end while it is frozen | the time MotherDuck keeps a frozen or killed client's open transaction is recorded and asserted below the take-over's deadline of 45 s (`takeover_open_tx.json`, key `without_interrupt`, `frozen_transaction_kept_s`); the same-epoch case accepts the lost transaction only after a freeze of at least 25 s | `test_md_procs.py::test_takeover_in_the_middle_of_an_open_transaction`, `::test_two_processes_with_the_same_epoch` |
+| 4 (N1) | The local stand-in of the server's interrupt swallowed an interrupted `ROLLBACK` and marked the transaction rolled back; it stayed open and two simultaneous take-overs both failed (9 of 30 local rounds) | one interrupt and its `ROLLBACK` at a time per connection; an interrupted `ROLLBACK` is tried again; the transaction is marked rolled back only after it succeeded | `::test_an_interrupt_that_lands_in_the_local_roll_back_does_not_leave_the_transaction_open`; the reviewer's shape with `-m d_full`: `::test_two_simultaneous_take_overs_while_an_old_run_stands_at_its_fence_have_one_winner` |
+| 5 (N2) | Autocommit writes carried no fence: after a take-over an old run's plain connection inserted data and set its fence row and the leader row back, and all committed | outside a lane only reads run; no caller may `UPDATE` the leader tables; package L's heartbeat and release are statements of the layer (section 2.1, contract notes 47 and 48) | `::test_an_old_runs_plain_connection_cannot_write_after_a_take_over`, `::test_the_heartbeat_and_the_release_are_statements_of_the_layer`, `test_lane.py::test_leader_rows_cannot_be_deleted_or_inserted`, `test_static.py::test_no_text_outside_the_layer_updates_the_leader_or_heartbeat_row` (a guard: no such text existed) |
+
+The second reviewer's liveness note stands: a registration held between its `UPDATE` and its `COMMIT` cannot be
+interrupted (its id is not committed yet); a take-over waits for it, bounded for a frozen client by the time
+MotherDuck keeps its transaction (item 3).
 
 ## 15. What the callers must know
 
@@ -1626,6 +1694,15 @@ For packages A, L, S, V, B and the integrator. Each line is backed by the sectio
   to `apply.max_table_attempts` before the table leaves the stream (design 3). Read `error_class` and
   `statement`; both are safe to log and to put into an alert. The client's text is not available, on purpose
   (section 5; SPEC 8.3).
+- **To exclude another writer, change a column that it also changes.** `state.transition` refuses `expect` on a
+  column that is not in `values` and a transition from a state to itself without `values` (fix round 2, N3);
+  put into `values` a column whose value the transition changes. A write of an unchanged value excludes nothing
+  after a checkpoint (section 14.4).
+- **Write only in a lane transaction.** Outside one, `Connection.execute`, `fetchall` and `fetchone` take reads
+  only; a statement that writes is `LaneMisuse` (fix round 2, N2). Never `UPDATE` `_cdc.leader`, `_cdc.fence`
+  or `_cdc.heartbeat`.
+- `seq` in `_cdc.transitions` is strictly increasing per lane, with gaps at take-overs and registrations; check
+  uniqueness and order, not the absence of gaps.
 - `Conflict` includes DDL on a table that another transaction writes (`Transaction conflict: …`, section 5).
   After it, read the table's schema again before the statements are built again: a column may have been added
   or changed (the spike's question 4).
@@ -1678,12 +1755,15 @@ For packages A, L, S, V, B and the integrator. Each line is backed by the sectio
 
 **Package L (leader, take-over, heartbeat)**
 
-- **The take-over must write the counter `n` of every fence row** with a changed value and put it back in the
-  same transaction: `UPDATE _cdc.fence SET epoch = :seen + 1, n = n + 1` and `UPDATE _cdc.fence SET n = n - 1`
-  (section 14.4; `cdc_v2.testing.destination.TAKEOVER_FENCE_SQL` and `TAKEOVER_FENCE_RESTORE_SQL`). With the
-  text of design 4.5 (`SET epoch = :seen + 1` alone) an old run's transaction commits after the take-over
-  whenever MotherDuck has just checkpointed the fence table. The bootstrap's copy of the statements needs the
-  names `register_fence` and `register_fence_restore` too (`schema.NAMED_STATEMENTS`).
+- **The take-over must raise the counter `n` of every fence row** and never put it back:
+  `UPDATE _cdc.fence SET epoch = :seen + 1, n = n + 1` (section 14.4; `cdc_v2.testing.destination.TAKEOVER_FENCE_SQL`).
+  With the text of design 4.5 (`SET epoch = :seen + 1` alone) an old run's transaction commits after the
+  take-over whenever MotherDuck has just checkpointed the fence table. The bootstrap's copy of the statements
+  needs the names `register_fence`, `heartbeat` and `release` too (`schema.NAMED_STATEMENTS`).
+- **Heartbeat and release are the layer's** (`md.schema.heartbeat`, `md.schema.release`; contract note 48):
+  callers may not update the leader tables (fix round 2, N2). The coordinator's re-check adds that release
+  and take-over must change one common column (a counter `v` in the leader row is L's change of the frozen
+  shape): today the take-over writes `state = 'leading'` over `leading`, an unchanged value.
 - The take-over must try again after a conflict that follows an interrupt: 1 or 2 further attempts were seen
   (section 7).
 - Call `md.interrupt_earlier(conn, new_epoch)` once more **after** the take-over won (finding 2).
@@ -1717,9 +1797,9 @@ For packages A, L, S, V, B and the integrator. Each line is backed by the sectio
 
 ## 16. How to run the suites
 
-**The default run** needs no network: `uv run -q pytest -q`. On 2026-11-10, on commit `7193b39`: 997 passed, 4
-skipped, 431 deselected in 77 s. The tests of this package alone (`uv run -q pytest -q tests/destination`):
-385 passed, 139 deselected in 22 s. Both are in `final_runs.json`.
+**The default run** needs no network: `uv run -q pytest -q`. On 2026-11-11, on commit `50229d7` (fix round 2, with
+`origin/main` merged): 1415 passed, 4 skipped, 742 deselected, 1 xfailed in 106 s. The tests of this package alone
+(`uv run -q pytest -q tests/destination`): DEFAULT_D_COUNT. Both are in `final_runs.json`.
 
 **The rest of the full matrices** (marker `d_full`, fix round item 7): the default run keeps one case per fault
 site of the deadline matrix of `test_lane.py` (the case of `BEGIN` is left out), the door of
@@ -1731,15 +1811,16 @@ MotherDuck run (`-m md`) keeps them. The marker is registered in `tests/destinat
 **The MotherDuck tests** (marker `md`) need the token that `tools/with-env` supplies. They create and drop only
 databases named `cdc_v2_t_d_<random>`. Leave `CDC_V2_MD_PREFIX` unset or set it to `cdc_v2_t_d_`. Every result
 in an evidence file names the command that wrote it and the commit (`commit`, with `+changes` when the files the
-tests use differ from it; fix round, item 5). One recorded run per file, without `-k`, on commit `7193b39`
-(the commit delivered differs from it only in documents, evidence files and one new probe program):
+tests use differ from it; fix round, item 5). One recorded run per file, without `-k` (fix round 2):
 
-| Command | Tests | Recorded run (2026-11-10 UTC) | Earlier runs |
+| Command | Tests | Recorded run (2026-11-11 UTC) | Earlier recorded runs |
 |---|---|---|---|
-| `tools/with-env uv run -q pytest -m md tests/destination/test_md.py` | 31: what MotherDuck answers, deadlines, the registry, the clock, timings | 31 passed in 358 s | 31 passed in 308 s (`88e0cf1`), 327 s (`e671405`) |
-| `tools/with-env uv run -q pytest -m md tests/destination/test_md_again.py` | 88: the T0 tests of lanes, leader tables, migrations, state, alerts, the points from the review of apply and the fix round, with a MotherDuck database | 88 passed in 893 s | 71 passed in 597 s in two `-k` runs (`88e0cf1`); 88 passed in 777 s (`e671405`) |
-| `tools/with-env uv run -q pytest -m md tests/destination/test_md_fix_round.py` | 2: the black-holed path (section 9.4), the take-over at every point (14 rounds) | 2 passed in 113 s | 2 passed in 101 s (`e671405`) |
-| `tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py` | 10: real processes (sections 8 and 9) | 10 passed in 1212 s | 10 passed in 1071 s in six `-k` runs (`88e0cf1`); 8 passed and 2 failed in 1080 s (`e671405`; section 14.3) |
+| `tools/with-env uv run -q pytest -m md tests/destination/test_md.py` | 31: what MotherDuck answers, deadlines, the registry, the clock, timings | MD_RUN_TEST_MD | 31 passed in 358 s (`7193b39`) |
+| `tools/with-env uv run -q pytest -m md tests/destination/test_md_again.py` | 92: the T0 tests of lanes, leader tables, migrations, state, alerts, the points from the review of apply and both fix rounds, with a MotherDuck database | 92 passed in 865 s (`50229d7`) | 88 passed in 893 s (`7193b39`) |
+| `tools/with-env uv run -q pytest -m md tests/destination/test_md_fix_round.py` | 2: the black-holed path (section 9.4), the take-over at every point (14 rounds) | 2 passed in 103 s (`50229d7`) | 2 passed in 113 s (`7193b39`) |
+| `tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py` | 10: real processes (sections 8 and 9) | MD_RUN_PROCS | 10 passed in 1212 s (`7193b39`) |
+
+MD_RUN_NOTE
 
 **The campaign of item 8**: `tools/with-env uv run python tests/destination/fence_campaign.py --rounds 1040 --log
 <file>` (about 3 to 5 s a round; its summary goes to `fence_campaign.json`; SIGTERM stops it and drops its
