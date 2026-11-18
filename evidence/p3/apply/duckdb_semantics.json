@@ -1,9 +1,12 @@
 {
-  "command": "CDC_V2_MD_PREFIX=cdc_v2_t_a_ tools/with-env uv run pytest -m md tests/apply/test_apply_md.py -k semantics",
+  "command": "CDC_V2_MD_PREFIX=cdc_v2_t_a_ tools/with-env uv run pytest -m md tests/apply/test_apply_md.py",
+  "commit": "61528e2",
   "differ": [
-    "DROP SCHEMA CASCADE error"
+    "DROP SCHEMA CASCADE error",
+    "a stored -0 (DOUBLE) against an Arrow-side 0: rows found"
   ],
   "duckdb": "1.5.6",
+  "lane": "package D's md.Lane 'stream' (cdc_v2.testing.destination), one lane transaction per change set or per case's one_tx",
   "local": {
     "DOUBLE CAST('-0' AS DOUBLE) -> 0.0::DOUBLE": {
       "sentinel_then_update_stores_new_value": true,
@@ -22,11 +25,28 @@
       "update_stores_new_value": false,
       "update_through_null_stores_new_value": false
     },
+    "a stored -0 (DOUBLE) against an Arrow-side 0: rows found": {
+      "delete join, plain column, committed row": 1,
+      "delete join, plain column, row written by the same transaction": 1,
+      "delete join, x + 0 on both sides, committed row": 1,
+      "delete join, x + 0 on both sides, row written by the same transaction": 1,
+      "select join, plain column": 1,
+      "select join, x + 0 on both sides": 1,
+      "sql literal: k = 0.0": 1
+    },
     "any_value(double) keeps -0": true,
     "any_value(list) keeps -0": false,
     "arg_max(struct) keeps -0": false,
     "join keeps -0 in a list": true,
     "rename of a rowid column inside a transaction": true,
+    "row ids stay the same within a transaction: a committed row and a row the transaction inserted, across a delete of another row and updates in place of VARCHAR, DOUBLE and the key": {
+      "delete_by_row_id_of_the_inserted_row": 1,
+      "delete_by_row_id_of_the_moved_row": 1,
+      "keys_left": [
+        1
+      ],
+      "same_row_ids": true
+    },
     "rowid deletes exactly 4 of 5 identical rows, 2 of them inserted by the transaction": true,
     "update of INTEGER[] rewrites the row": true,
     "update of MAP(INT, INT) rewrites the row": true,
@@ -52,16 +72,34 @@
       "update_stores_new_value": false,
       "update_through_null_stores_new_value": false
     },
+    "a stored -0 (DOUBLE) against an Arrow-side 0: rows found": {
+      "delete join, plain column, committed row": 1,
+      "delete join, plain column, row written by the same transaction": 1,
+      "delete join, x + 0 on both sides, committed row": 1,
+      "delete join, x + 0 on both sides, row written by the same transaction": 1,
+      "select join, plain column": 0,
+      "select join, x + 0 on both sides": 1,
+      "sql literal: k = 0.0": 1
+    },
     "any_value(double) keeps -0": true,
     "any_value(list) keeps -0": false,
     "arg_max(struct) keeps -0": false,
     "join keeps -0 in a list": true,
     "rename of a rowid column inside a transaction": true,
+    "row ids stay the same within a transaction: a committed row and a row the transaction inserted, across a delete of another row and updates in place of VARCHAR, DOUBLE and the key": {
+      "delete_by_row_id_of_the_inserted_row": 1,
+      "delete_by_row_id_of_the_moved_row": 1,
+      "keys_left": [
+        1
+      ],
+      "same_row_ids": true
+    },
     "rowid deletes exactly 4 of 5 identical rows, 2 of them inserted by the transaction": true,
     "update of INTEGER[] rewrites the row": true,
     "update of MAP(INT, INT) rewrites the row": true,
     "update of STRUCT(a INT) rewrites the row": false,
     "update of UNION(i INT, s VARCHAR) rewrites the row": true,
     "update of VARCHAR rewrites the row": false
-  }
+  },
+  "note": "measured on a plain client connection of each (not through the lane): what apply's statements rely on (docs/design/apply.md 5; docs/spike/md_semantics.md, 'Facts apply relies on')"
 }

@@ -2,13 +2,16 @@
   "all_passed": true,
   "cases": 232,
   "command": "CDC_V2_MD_PREFIX=cdc_v2_t_a_ tools/with-env uv run pytest -m md tests/apply/test_apply_md.py",
-  "note": "every named case of tests/apply/apply_cases.py on MotherDuck, local form and relation form; statements = statements per change set (round trips); this machine to MotherDuck over the internet",
+  "commit": "61528e2",
+  "duckdb": "1.5.6",
+  "lane": "package D's md.Lane 'stream' (cdc_v2.testing.destination), one lane transaction per change set or per case's one_tx",
+  "note": "every named case of tests/apply/apply_cases.py on MotherDuck through D's lane, local form and relation form; statements = apply's statements per change set (round trips; the lane adds its fence statement and COMMIT per block); this machine to MotherDuck over the internet",
   "runs": [
     {
       "case": "insert_update_delete",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.318,
+      "seconds": 1.391,
       "shapes": [
         [
           "K1",
@@ -23,7 +26,7 @@
       "case": "insert_update_delete",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.782,
+      "seconds": 3.399,
       "shapes": [
         [
           "plan",
@@ -71,7 +74,7 @@
       "case": "insert_only_two_statements",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.907,
+      "seconds": 0.855,
       "shapes": [
         [
           "K6"
@@ -85,7 +88,7 @@
       "case": "insert_only_two_statements",
       "form": "relation",
       "mode": "stream",
-      "seconds": 3.739,
+      "seconds": 3.318,
       "shapes": [
         [
           "plan",
@@ -133,20 +136,20 @@
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.982
+      "seconds": 0.962
     },
     {
       "case": "stream_delete_of_a_missing_row_raises",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.455
+      "seconds": 2.148
     },
     {
       "case": "catch_up_delete_of_a_missing_row",
       "form": "local",
       "mode": "catch_up",
-      "seconds": 0.915,
+      "seconds": 0.866,
       "shapes": [
         [
           "K1"
@@ -161,7 +164,7 @@
       "case": "catch_up_delete_of_a_missing_row",
       "form": "relation",
       "mode": "catch_up",
-      "seconds": 4.455,
+      "seconds": 3.944,
       "shapes": [
         [
           "plan",
@@ -218,7 +221,7 @@
       "case": "partial_update_from_destination",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.63,
+      "seconds": 1.468,
       "shapes": [
         [
           "K2",
@@ -235,7 +238,7 @@
       "case": "partial_update_from_destination",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.009,
+      "seconds": 3.493,
       "shapes": [
         [
           "plan",
@@ -285,7 +288,7 @@
       "case": "insert_then_partial_update",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.905,
+      "seconds": 0.876,
       "shapes": [
         [
           "K6"
@@ -299,7 +302,7 @@
       "case": "insert_then_partial_update",
       "form": "relation",
       "mode": "stream",
-      "seconds": 3.831,
+      "seconds": 3.256,
       "shapes": [
         [
           "plan",
@@ -346,7 +349,7 @@
       "case": "consecutive_partial_updates",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.205,
+      "seconds": 1.104,
       "shapes": [
         [
           "K1",
@@ -361,7 +364,7 @@
       "case": "consecutive_partial_updates",
       "form": "relation",
       "mode": "stream",
-      "seconds": 3.868,
+      "seconds": 3.386,
       "shapes": [
         [
           "plan",
@@ -409,7 +412,7 @@
       "case": "key_change_takes_unchanged_from_destination",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.188,
+      "seconds": 1.159,
       "shapes": [
         [
           "K2",
@@ -424,7 +427,7 @@
       "case": "key_change_takes_unchanged_from_destination",
       "form": "relation",
       "mode": "stream",
-      "seconds": 3.922,
+      "seconds": 3.38,
       "shapes": [
         [
           "plan",
@@ -472,7 +475,7 @@
       "case": "chain_a_b_c_one_transaction",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.977,
+      "seconds": 1.947,
       "shapes": [
         [
           "K1",
@@ -490,7 +493,7 @@
       "case": "chain_a_b_c_one_transaction",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.174,
+      "seconds": 3.57,
       "shapes": [
         [
           "plan",
@@ -541,7 +544,7 @@
       "case": "chain_across_two_change_sets",
       "form": "local",
       "mode": "stream",
-      "seconds": 2.752,
+      "seconds": 2.476,
       "shapes": [
         [
           "K2",
@@ -565,7 +568,7 @@
       "case": "chain_across_two_change_sets",
       "form": "relation",
       "mode": "stream",
-      "seconds": 7.518,
+      "seconds": 6.503,
       "shapes": [
         [
           "plan",
@@ -655,7 +658,7 @@
       "case": "chain_across_two_change_sets_one_transaction",
       "form": "local",
       "mode": "stream",
-      "seconds": 2.602,
+      "seconds": 2.332,
       "shapes": [
         [
           "K2",
@@ -679,7 +682,7 @@
       "case": "chain_across_two_change_sets_one_transaction",
       "form": "relation",
       "mode": "stream",
-      "seconds": 7.547,
+      "seconds": 6.276,
       "shapes": [
         [
           "plan",
@@ -769,7 +772,7 @@
       "case": "workload_chain_b_new_then_a_b",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.637,
+      "seconds": 1.457,
       "shapes": [
         [
           "K2",
@@ -786,7 +789,7 @@
       "case": "workload_chain_b_new_then_a_b",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.084,
+      "seconds": 3.579,
       "shapes": [
         [
           "plan",
@@ -836,7 +839,7 @@
       "case": "swap_through_a_third_key",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.929,
+      "seconds": 1.802,
       "shapes": [
         [
           "K1",
@@ -854,7 +857,7 @@
       "case": "swap_through_a_third_key",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.175,
+      "seconds": 3.812,
       "shapes": [
         [
           "plan",
@@ -905,7 +908,7 @@
       "case": "rotation_through_a_free_key",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.916,
+      "seconds": 1.769,
       "shapes": [
         [
           "K1",
@@ -923,7 +926,7 @@
       "case": "rotation_through_a_free_key",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.113,
+      "seconds": 3.566,
       "shapes": [
         [
           "plan",
@@ -974,7 +977,7 @@
       "case": "chain_and_key_reuse_in_one_transaction",
       "form": "local",
       "mode": "stream",
-      "seconds": 2.141,
+      "seconds": 1.889,
       "shapes": [
         [
           "K1",
@@ -993,7 +996,7 @@
       "case": "chain_and_key_reuse_in_one_transaction",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.242,
+      "seconds": 3.646,
       "shapes": [
         [
           "plan",
@@ -1046,118 +1049,118 @@
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.994
+      "seconds": 0.967
     },
     {
       "case": "direct_swap_is_not_a_keyed_history",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.487
+      "seconds": 2.172
     },
     {
       "case": "direct_rotation_is_not_a_keyed_history",
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.985
+      "seconds": 0.981
     },
     {
       "case": "direct_rotation_is_not_a_keyed_history",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.491
+      "seconds": 2.134
     },
     {
       "case": "review_A1_create_at_a_held_key",
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.954
+      "seconds": 0.959
     },
     {
       "case": "review_A1_create_at_a_held_key",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.484
+      "seconds": 2.178
     },
     {
       "case": "review_A4_create_at_a_held_key",
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.958
+      "seconds": 0.959
     },
     {
       "case": "review_A4_create_at_a_held_key",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.575
+      "seconds": 2.115
     },
     {
       "case": "review_SEG_create_at_a_held_key_across_a_cut",
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.198
+      "seconds": 1.277
     },
     {
       "case": "review_SEG_create_at_a_held_key_across_a_cut",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.561
+      "seconds": 2.459
     },
     {
       "case": "delete_twice_is_not_a_history",
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.632
+      "seconds": 0.535
     },
     {
       "case": "delete_twice_is_not_a_history",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.405
+      "seconds": 2.068
     },
     {
       "case": "delete_twice_is_not_a_history_catch_up",
       "error": "invariant",
       "form": "local",
       "mode": "catch_up",
-      "seconds": 0.632
+      "seconds": 0.537
     },
     {
       "case": "delete_twice_is_not_a_history_catch_up",
       "error": "invariant",
       "form": "relation",
       "mode": "catch_up",
-      "seconds": 2.79
+      "seconds": 2.365
     },
     {
       "case": "update_after_delete_is_not_a_history",
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.626
+      "seconds": 0.533
     },
     {
       "case": "update_after_delete_is_not_a_history",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.42
+      "seconds": 2.088
     },
     {
       "case": "key_change_back_to_the_same_key",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.724,
+      "seconds": 2.075,
       "shapes": [
         [
           "K2",
@@ -1174,7 +1177,7 @@
       "case": "key_change_back_to_the_same_key",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.131,
+      "seconds": 3.515,
       "shapes": [
         [
           "plan",
@@ -1224,7 +1227,7 @@
       "case": "key_change_onto_a_deleted_key",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.946,
+      "seconds": 1.719,
       "shapes": [
         [
           "K1",
@@ -1242,7 +1245,7 @@
       "case": "key_change_onto_a_deleted_key",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.217,
+      "seconds": 3.58,
       "shapes": [
         [
           "plan",
@@ -1293,7 +1296,7 @@
       "case": "key_change_onto_a_key_deleted_in_the_previous_set",
       "form": "local",
       "mode": "stream",
-      "seconds": 2.137,
+      "seconds": 1.852,
       "shapes": [
         [
           "K1"
@@ -1314,7 +1317,7 @@
       "case": "key_change_onto_a_key_deleted_in_the_previous_set",
       "form": "relation",
       "mode": "stream",
-      "seconds": 7.448,
+      "seconds": 6.37,
       "shapes": [
         [
           "plan",
@@ -1401,7 +1404,7 @@
       "case": "insert_update_delete_in_one_transaction",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.991,
+      "seconds": 0.925,
       "shapes": [
         [
           "K1"
@@ -1415,7 +1418,7 @@
       "case": "insert_update_delete_in_one_transaction",
       "form": "relation",
       "mode": "stream",
-      "seconds": 3.929,
+      "seconds": 3.32,
       "shapes": [
         [
           "plan",
@@ -1462,7 +1465,7 @@
       "case": "move_then_delete_in_one_transaction",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.014,
+      "seconds": 0.936,
       "shapes": [
         [
           "K1"
@@ -1476,7 +1479,7 @@
       "case": "move_then_delete_in_one_transaction",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.035,
+      "seconds": 3.296,
       "shapes": [
         [
           "plan",
@@ -1524,20 +1527,20 @@
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.999
+      "seconds": 0.973
     },
     {
       "case": "stream_full_update_of_a_missing_row_raises",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.569
+      "seconds": 2.209
     },
     {
       "case": "catch_up_full_update_of_a_missing_row_upserts",
       "form": "local",
       "mode": "catch_up",
-      "seconds": 1.145,
+      "seconds": 1.035,
       "shapes": [
         [
           "K1",
@@ -1553,7 +1556,7 @@
       "case": "catch_up_full_update_of_a_missing_row_upserts",
       "form": "relation",
       "mode": "catch_up",
-      "seconds": 4.794,
+      "seconds": 4.017,
       "shapes": [
         [
           "plan",
@@ -1612,91 +1615,91 @@
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.216
+      "seconds": 1.166
     },
     {
       "case": "stream_partial_update_of_a_missing_row_raises",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.655
+      "seconds": 2.197
     },
     {
       "case": "stream_key_change_of_a_missing_row_raises",
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.235
+      "seconds": 1.151
     },
     {
       "case": "stream_key_change_of_a_missing_row_raises",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.693
+      "seconds": 2.255
     },
     {
       "case": "stream_insert_twice_raises",
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.631
+      "seconds": 0.525
     },
     {
       "case": "stream_insert_twice_raises",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
+      "seconds": 2.149
+    },
+    {
+      "case": "insert_twice_raises_in_catch_up",
+      "error": "invariant",
+      "form": "local",
+      "mode": "catch_up",
+      "seconds": 0.54
+    },
+    {
+      "case": "insert_twice_raises_in_catch_up",
+      "error": "invariant",
+      "form": "relation",
+      "mode": "catch_up",
       "seconds": 2.452
     },
     {
-      "case": "insert_twice_raises_in_catch_up",
-      "error": "invariant",
-      "form": "local",
-      "mode": "catch_up",
-      "seconds": 0.642
-    },
-    {
-      "case": "insert_twice_raises_in_catch_up",
-      "error": "invariant",
-      "form": "relation",
-      "mode": "catch_up",
-      "seconds": 2.929
-    },
-    {
       "case": "stream_insert_at_a_held_key_raises",
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.908
+      "seconds": 0.95
     },
     {
       "case": "stream_insert_at_a_held_key_raises",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.554
+      "seconds": 2.154
     },
     {
       "case": "truncate_record_is_refused",
       "error": "changeset",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.623
+      "seconds": 0.548
     },
     {
       "case": "truncate_record_is_refused",
       "error": "changeset",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.493
+      "seconds": 2.139
     },
     {
       "case": "catch_up_reports_a_key_it_cannot_resolve",
       "form": "local",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 3.588,
+      "seconds": 3.278,
       "shapes": [
         [
           "lookup",
@@ -1718,7 +1721,7 @@
       "form": "relation",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 9.655,
+      "seconds": 8.425,
       "shapes": [
         [
           "plan",
@@ -1781,7 +1784,7 @@
       "form": "local",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 3.234,
+      "seconds": 2.988,
       "shapes": [
         [
           "lookup",
@@ -1802,7 +1805,7 @@
       "form": "relation",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 9.604,
+      "seconds": 8.172,
       "shapes": [
         [
           "plan",
@@ -1864,7 +1867,7 @@
       "form": "local",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 3.204,
+      "seconds": 2.915,
       "shapes": [
         [
           "lookup",
@@ -1885,7 +1888,7 @@
       "form": "relation",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 9.696,
+      "seconds": 8.191,
       "shapes": [
         [
           "plan",
@@ -1947,7 +1950,7 @@
       "form": "local",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 1.319,
+      "seconds": 1.332,
       "shapes": [
         [
           "K1"
@@ -1963,7 +1966,7 @@
       "form": "relation",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 8.995,
+      "seconds": 8.112,
       "shapes": [
         [
           "plan",
@@ -2021,7 +2024,7 @@
       "form": "local",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 3.206,
+      "seconds": 2.964,
       "shapes": [
         [
           "lookup",
@@ -2042,7 +2045,7 @@
       "form": "relation",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 9.588,
+      "seconds": 8.047,
       "shapes": [
         [
           "plan",
@@ -2103,7 +2106,7 @@
       "case": "catch_up_swap_through_a_free_key_after_the_swap",
       "form": "local",
       "mode": "catch_up",
-      "seconds": 3.047,
+      "seconds": 1.002,
       "shapes": [
         [
           "lookup",
@@ -2119,7 +2122,7 @@
       "case": "catch_up_swap_through_a_free_key_after_the_swap",
       "form": "relation",
       "mode": "catch_up",
-      "seconds": 4.809,
+      "seconds": 4.177,
       "shapes": [
         [
           "plan",
@@ -2177,7 +2180,7 @@
       "form": "local",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 3.244,
+      "seconds": 2.991,
       "shapes": [
         [
           "lookup",
@@ -2198,7 +2201,7 @@
       "form": "relation",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 9.764,
+      "seconds": 8.401,
       "shapes": [
         [
           "plan",
@@ -2259,7 +2262,7 @@
       "case": "negative_zero_and_interval_form_complete_image",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.242,
+      "seconds": 1.197,
       "shapes": [
         [
           "K1",
@@ -2274,7 +2277,7 @@
       "case": "negative_zero_and_interval_form_complete_image",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.175,
+      "seconds": 3.79,
       "shapes": [
         [
           "plan",
@@ -2322,7 +2325,7 @@
       "case": "negative_zero_and_interval_form_partial_image",
       "form": "local",
       "mode": "stream",
-      "seconds": 2.542,
+      "seconds": 2.331,
       "shapes": [
         [
           "K2",
@@ -2343,7 +2346,7 @@
       "case": "negative_zero_and_interval_form_partial_image",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.673,
+      "seconds": 4.203,
       "shapes": [
         [
           "plan",
@@ -2397,7 +2400,7 @@
       "case": "zero_to_negative_zero_partial_image",
       "form": "local",
       "mode": "stream",
-      "seconds": 2.554,
+      "seconds": 2.363,
       "shapes": [
         [
           "K2",
@@ -2418,7 +2421,7 @@
       "case": "zero_to_negative_zero_partial_image",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.662,
+      "seconds": 4.13,
       "shapes": [
         [
           "plan",
@@ -2472,7 +2475,7 @@
       "case": "null_then_zero_over_a_negative_zero_slot",
       "form": "local",
       "mode": "stream",
-      "seconds": 4.425,
+      "seconds": 4.13,
       "shapes": [
         [
           "K2",
@@ -2504,7 +2507,7 @@
       "case": "null_then_zero_over_a_negative_zero_slot",
       "form": "relation",
       "mode": "stream",
-      "seconds": 8.706,
+      "seconds": 7.692,
       "shapes": [
         [
           "plan",
@@ -2603,7 +2606,7 @@
       "form": "local",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 4.587,
+      "seconds": 4.194,
       "shapes": [
         [
           "lookup",
@@ -2627,7 +2630,7 @@
       "form": "relation",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 10.489,
+      "seconds": 9.091,
       "shapes": [
         [
           "plan",
@@ -2691,7 +2694,7 @@
       "case": "double_key_negative_zero_to_zero_with_unchanged",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.273,
+      "seconds": 1.15,
       "shapes": [
         [
           "C0",
@@ -2707,7 +2710,7 @@
       "case": "double_key_negative_zero_to_zero_with_unchanged",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.413,
+      "seconds": 3.845,
       "shapes": [
         [
           "plan",
@@ -2758,7 +2761,7 @@
       "case": "double_key_negative_zero_to_zero_complete",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.313,
+      "seconds": 1.157,
       "shapes": [
         [
           "K1",
@@ -2773,7 +2776,7 @@
       "case": "double_key_negative_zero_to_zero_complete",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.18,
+      "seconds": 3.67,
       "shapes": [
         [
           "plan",
@@ -2821,7 +2824,7 @@
       "case": "interval_key_change_of_form_with_unchanged",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.231,
+      "seconds": 1.14,
       "shapes": [
         [
           "C0",
@@ -2837,7 +2840,7 @@
       "case": "interval_key_change_of_form_with_unchanged",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.547,
+      "seconds": 3.856,
       "shapes": [
         [
           "plan",
@@ -2888,7 +2891,7 @@
       "case": "interval_key_delete_removes_only_its_form",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.012,
+      "seconds": 0.968,
       "shapes": [
         [
           "K1"
@@ -2902,7 +2905,7 @@
       "case": "interval_key_delete_removes_only_its_form",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.108,
+      "seconds": 3.564,
       "shapes": [
         [
           "plan",
@@ -2949,7 +2952,7 @@
       "case": "composite_key_with_a_double_part_changing_form",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.244,
+      "seconds": 1.185,
       "shapes": [
         [
           "C0",
@@ -2965,7 +2968,7 @@
       "case": "composite_key_with_a_double_part_changing_form",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.467,
+      "seconds": 3.947,
       "shapes": [
         [
           "plan",
@@ -3016,7 +3019,7 @@
       "case": "composite_key_changed_form_then_updated",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.837,
+      "seconds": 1.8,
       "shapes": [
         [
           "C0",
@@ -3037,7 +3040,7 @@
       "case": "composite_key_changed_form_then_updated",
       "form": "relation",
       "mode": "stream",
-      "seconds": 8.181,
+      "seconds": 7.006,
       "shapes": [
         [
           "plan",
@@ -3126,7 +3129,7 @@
       "case": "date_key_beyond_the_timestamp_range",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.519,
+      "seconds": 1.418,
       "shapes": [
         [
           "K1",
@@ -3142,7 +3145,7 @@
       "case": "date_key_beyond_the_timestamp_range",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.249,
+      "seconds": 3.594,
       "shapes": [
         [
           "plan",
@@ -3192,20 +3195,20 @@
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.635
+      "seconds": 0.535
     },
     {
       "case": "review_B_two_forms_of_one_key_held_at_once",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.585
+      "seconds": 2.158
     },
     {
       "case": "double_keys_negative_zero_and_zero_are_two_keys",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.218,
+      "seconds": 1.133,
       "shapes": [
         [
           "K1",
@@ -3220,7 +3223,7 @@
       "case": "double_keys_negative_zero_and_zero_are_two_keys",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.223,
+      "seconds": 3.573,
       "shapes": [
         [
           "plan",
@@ -3268,7 +3271,7 @@
       "case": "key_type_int",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.51,
+      "seconds": 1.427,
       "shapes": [
         [
           "K1",
@@ -3284,7 +3287,7 @@
       "case": "key_type_int",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.884,
+      "seconds": 3.696,
       "shapes": [
         [
           "plan",
@@ -3333,7 +3336,7 @@
       "case": "key_type_bigint",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.506,
+      "seconds": 1.447,
       "shapes": [
         [
           "K1",
@@ -3349,7 +3352,7 @@
       "case": "key_type_bigint",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.265,
+      "seconds": 3.731,
       "shapes": [
         [
           "plan",
@@ -3398,7 +3401,7 @@
       "case": "key_type_decimal",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.493,
+      "seconds": 1.439,
       "shapes": [
         [
           "K1",
@@ -3414,7 +3417,7 @@
       "case": "key_type_decimal",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.268,
+      "seconds": 3.744,
       "shapes": [
         [
           "plan",
@@ -3461,1010 +3464,1010 @@
     },
     {
       "case": "key_type_double",
-      "form": "local",
-      "mode": "stream",
-      "seconds": 1.501,
-      "shapes": [
-        [
-          "K1",
-          "K3",
-          "K6"
-        ]
-      ],
-      "statements": [
-        3
-      ]
-    },
-    {
-      "case": "key_type_double",
-      "form": "relation",
-      "mode": "stream",
-      "seconds": 4.307,
-      "shapes": [
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "K1",
-          "K3",
-          "K6",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ]
-      ],
-      "statements": [
-        36
-      ]
-    },
-    {
-      "case": "key_type_varchar",
-      "form": "local",
-      "mode": "stream",
-      "seconds": 1.537,
-      "shapes": [
-        [
-          "K1",
-          "K3",
-          "K6"
-        ]
-      ],
-      "statements": [
-        3
-      ]
-    },
-    {
-      "case": "key_type_varchar",
-      "form": "relation",
-      "mode": "stream",
-      "seconds": 4.289,
-      "shapes": [
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "K1",
-          "K3",
-          "K6",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ]
-      ],
-      "statements": [
-        36
-      ]
-    },
-    {
-      "case": "key_type_blob",
-      "form": "local",
-      "mode": "stream",
-      "seconds": 1.502,
-      "shapes": [
-        [
-          "K1",
-          "K3",
-          "K6"
-        ]
-      ],
-      "statements": [
-        3
-      ]
-    },
-    {
-      "case": "key_type_blob",
-      "form": "relation",
-      "mode": "stream",
-      "seconds": 4.314,
-      "shapes": [
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "K1",
-          "K3",
-          "K6",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ]
-      ],
-      "statements": [
-        36
-      ]
-    },
-    {
-      "case": "key_type_uuid",
-      "form": "local",
-      "mode": "stream",
-      "seconds": 1.512,
-      "shapes": [
-        [
-          "K1",
-          "K3",
-          "K6"
-        ]
-      ],
-      "statements": [
-        3
-      ]
-    },
-    {
-      "case": "key_type_uuid",
-      "form": "relation",
-      "mode": "stream",
-      "seconds": 4.348,
-      "shapes": [
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "K1",
-          "K3",
-          "K6",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ]
-      ],
-      "statements": [
-        36
-      ]
-    },
-    {
-      "case": "key_type_date",
-      "form": "local",
-      "mode": "stream",
-      "seconds": 1.505,
-      "shapes": [
-        [
-          "K1",
-          "K3",
-          "K6"
-        ]
-      ],
-      "statements": [
-        3
-      ]
-    },
-    {
-      "case": "key_type_date",
-      "form": "relation",
-      "mode": "stream",
-      "seconds": 4.305,
-      "shapes": [
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "K1",
-          "K3",
-          "K6",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ]
-      ],
-      "statements": [
-        36
-      ]
-    },
-    {
-      "case": "key_type_ts",
-      "form": "local",
-      "mode": "stream",
-      "seconds": 1.499,
-      "shapes": [
-        [
-          "K1",
-          "K3",
-          "K6"
-        ]
-      ],
-      "statements": [
-        3
-      ]
-    },
-    {
-      "case": "key_type_ts",
-      "form": "relation",
-      "mode": "stream",
-      "seconds": 4.484,
-      "shapes": [
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "K1",
-          "K3",
-          "K6",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ]
-      ],
-      "statements": [
-        36
-      ]
-    },
-    {
-      "case": "key_type_timetz",
-      "form": "local",
-      "mode": "stream",
-      "seconds": 1.673,
-      "shapes": [
-        [
-          "K1",
-          "K3",
-          "K6"
-        ]
-      ],
-      "statements": [
-        3
-      ]
-    },
-    {
-      "case": "key_type_timetz",
-      "form": "relation",
-      "mode": "stream",
-      "seconds": 5.011,
-      "shapes": [
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "K1",
-          "K3",
-          "K6",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ]
-      ],
-      "statements": [
-        36
-      ]
-    },
-    {
-      "case": "key_type_interval",
-      "form": "local",
-      "mode": "stream",
-      "seconds": 1.693,
-      "shapes": [
-        [
-          "K1",
-          "K3",
-          "K6"
-        ]
-      ],
-      "statements": [
-        3
-      ]
-    },
-    {
-      "case": "key_type_interval",
-      "form": "relation",
-      "mode": "stream",
-      "seconds": 5.021,
-      "shapes": [
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "K1",
-          "K3",
-          "K6",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ]
-      ],
-      "statements": [
-        36
-      ]
-    },
-    {
-      "case": "composite_key_move_onto_deleted",
-      "form": "local",
-      "mode": "stream",
-      "seconds": 1.442,
-      "shapes": [
-        [
-          "K1",
-          "K3"
-        ]
-      ],
-      "statements": [
-        2
-      ]
-    },
-    {
-      "case": "composite_key_move_onto_deleted",
-      "form": "relation",
-      "mode": "stream",
-      "seconds": 4.969,
-      "shapes": [
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "K1",
-          "K3",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ]
-      ],
-      "statements": [
-        35
-      ]
-    },
-    {
-      "case": "infinite_date_keys_in_one_transaction",
-      "form": "local",
-      "mode": "stream",
-      "seconds": 1.458,
-      "shapes": [
-        [
-          "K6"
-        ],
-        [
-          "K1",
-          "K3"
-        ]
-      ],
-      "statements": [
-        1,
-        2
-      ]
-    },
-    {
-      "case": "infinite_date_keys_in_one_transaction",
-      "form": "relation",
-      "mode": "stream",
-      "seconds": 8.813,
-      "shapes": [
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "K6",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ],
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "K1",
-          "K3",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ]
-      ],
-      "statements": [
-        34,
-        35
-      ]
-    },
-    {
-      "case": "infinite_timestamp_keys_in_one_transaction",
-      "form": "local",
-      "mode": "stream",
-      "seconds": 1.463,
-      "shapes": [
-        [
-          "K6"
-        ],
-        [
-          "K1",
-          "K3"
-        ]
-      ],
-      "statements": [
-        1,
-        2
-      ]
-    },
-    {
-      "case": "infinite_timestamp_keys_in_one_transaction",
-      "form": "relation",
-      "mode": "stream",
-      "seconds": 8.828,
-      "shapes": [
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "K6",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ],
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "K1",
-          "K3",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ]
-      ],
-      "statements": [
-        34,
-        35
-      ]
-    },
-    {
-      "case": "infinite_timestamptz_keys_in_one_transaction",
-      "form": "local",
-      "mode": "stream",
-      "seconds": 1.435,
-      "shapes": [
-        [
-          "K6"
-        ],
-        [
-          "K1",
-          "K3"
-        ]
-      ],
-      "statements": [
-        1,
-        2
-      ]
-    },
-    {
-      "case": "infinite_timestamptz_keys_in_one_transaction",
-      "form": "relation",
-      "mode": "stream",
-      "seconds": 8.779,
-      "shapes": [
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "K6",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ],
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "K1",
-          "K3",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ]
-      ],
-      "statements": [
-        34,
-        35
-      ]
-    },
-    {
-      "case": "uuid_keys_in_one_transaction",
-      "form": "local",
-      "mode": "stream",
-      "seconds": 1.509,
-      "shapes": [
-        [
-          "K6"
-        ],
-        [
-          "K1",
-          "K3"
-        ]
-      ],
-      "statements": [
-        1,
-        2
-      ]
-    },
-    {
-      "case": "uuid_keys_in_one_transaction",
-      "form": "relation",
-      "mode": "stream",
-      "seconds": 8.882,
-      "shapes": [
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "K6",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ],
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "K1",
-          "K3",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ]
-      ],
-      "statements": [
-        34,
-        35
-      ]
-    },
-    {
-      "case": "json_keys_in_one_transaction",
       "form": "local",
       "mode": "stream",
       "seconds": 1.462,
       "shapes": [
         [
+          "K1",
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "key_type_double",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.772,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        36
+      ]
+    },
+    {
+      "case": "key_type_varchar",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.473,
+      "shapes": [
+        [
+          "K1",
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "key_type_varchar",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.785,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        36
+      ]
+    },
+    {
+      "case": "key_type_blob",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 2.132,
+      "shapes": [
+        [
+          "K1",
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "key_type_blob",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.696,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        36
+      ]
+    },
+    {
+      "case": "key_type_uuid",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.409,
+      "shapes": [
+        [
+          "K1",
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "key_type_uuid",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.864,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        36
+      ]
+    },
+    {
+      "case": "key_type_date",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.426,
+      "shapes": [
+        [
+          "K1",
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "key_type_date",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.715,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        36
+      ]
+    },
+    {
+      "case": "key_type_ts",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.42,
+      "shapes": [
+        [
+          "K1",
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "key_type_ts",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.823,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        36
+      ]
+    },
+    {
+      "case": "key_type_timetz",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.45,
+      "shapes": [
+        [
+          "K1",
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "key_type_timetz",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.68,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        36
+      ]
+    },
+    {
+      "case": "key_type_interval",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.406,
+      "shapes": [
+        [
+          "K1",
+          "K3",
+          "K6"
+        ]
+      ],
+      "statements": [
+        3
+      ]
+    },
+    {
+      "case": "key_type_interval",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.755,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        36
+      ]
+    },
+    {
+      "case": "composite_key_move_onto_deleted",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.26,
+      "shapes": [
+        [
+          "K1",
+          "K3"
+        ]
+      ],
+      "statements": [
+        2
+      ]
+    },
+    {
+      "case": "composite_key_move_onto_deleted",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 3.714,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        35
+      ]
+    },
+    {
+      "case": "infinite_date_keys_in_one_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.302,
+      "shapes": [
+        [
+          "K6"
+        ],
+        [
+          "K1",
+          "K3"
+        ]
+      ],
+      "statements": [
+        1,
+        2
+      ]
+    },
+    {
+      "case": "infinite_date_keys_in_one_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 6.23,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        34,
+        35
+      ]
+    },
+    {
+      "case": "infinite_timestamp_keys_in_one_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.233,
+      "shapes": [
+        [
+          "K6"
+        ],
+        [
+          "K1",
+          "K3"
+        ]
+      ],
+      "statements": [
+        1,
+        2
+      ]
+    },
+    {
+      "case": "infinite_timestamp_keys_in_one_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 6.25,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        34,
+        35
+      ]
+    },
+    {
+      "case": "infinite_timestamptz_keys_in_one_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.218,
+      "shapes": [
+        [
+          "K6"
+        ],
+        [
+          "K1",
+          "K3"
+        ]
+      ],
+      "statements": [
+        1,
+        2
+      ]
+    },
+    {
+      "case": "infinite_timestamptz_keys_in_one_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 6.101,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        34,
+        35
+      ]
+    },
+    {
+      "case": "uuid_keys_in_one_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.205,
+      "shapes": [
+        [
+          "K6"
+        ],
+        [
+          "K1",
+          "K3"
+        ]
+      ],
+      "statements": [
+        1,
+        2
+      ]
+    },
+    {
+      "case": "uuid_keys_in_one_transaction",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 6.204,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K6",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ],
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "K1",
+          "K3",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        34,
+        35
+      ]
+    },
+    {
+      "case": "json_keys_in_one_transaction",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 1.209,
+      "shapes": [
+        [
           "K6"
         ],
         [
@@ -4481,7 +4484,7 @@
       "case": "json_keys_in_one_transaction",
       "form": "relation",
       "mode": "stream",
-      "seconds": 8.969,
+      "seconds": 6.19,
       "shapes": [
         [
           "plan",
@@ -4566,7 +4569,7 @@
       "case": "keyless_json_uuid_in_one_transaction",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.092,
+      "seconds": 0.927,
       "shapes": [
         [
           "L2"
@@ -4584,7 +4587,7 @@
       "case": "keyless_json_uuid_in_one_transaction",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.306,
+      "seconds": 3.143,
       "shapes": [
         [
           "plan",
@@ -4628,7 +4631,7 @@
       "case": "timetz_key_lookup_keeps_the_offset",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.112,
+      "seconds": 0.949,
       "shapes": [
         [
           "K1"
@@ -4642,7 +4645,7 @@
       "case": "timetz_key_lookup_keeps_the_offset",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.012,
+      "seconds": 3.489,
       "shapes": [
         [
           "plan",
@@ -4689,7 +4692,7 @@
       "case": "timetz_key_unresolved_comes_back_with_its_offset",
       "form": "local",
       "mode": "catch_up",
-      "seconds": 1.107,
+      "seconds": 0.964,
       "shapes": [
         [
           "lookup",
@@ -4705,7 +4708,7 @@
       "case": "timetz_key_unresolved_comes_back_with_its_offset",
       "form": "relation",
       "mode": "catch_up",
-      "seconds": 5.856,
+      "seconds": 4.135,
       "shapes": [
         [
           "plan",
@@ -4762,7 +4765,7 @@
       "case": "awkward_names",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.364,
+      "seconds": 1.149,
       "shapes": [
         [
           "K3",
@@ -4777,7 +4780,7 @@
       "case": "awkward_names",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.21,
+      "seconds": 3.647,
       "shapes": [
         [
           "plan",
@@ -4825,7 +4828,7 @@
       "case": "keyless_delete_one_of_three",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.136,
+      "seconds": 0.909,
       "shapes": [
         [
           "L1"
@@ -4839,7 +4842,7 @@
       "case": "keyless_delete_one_of_three",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.797,
+      "seconds": 2.123,
       "shapes": [
         [
           "plan",
@@ -4866,7 +4869,7 @@
       "case": "keyless_update_one_of_three",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.362,
+      "seconds": 1.079,
       "shapes": [
         [
           "L1",
@@ -4881,7 +4884,7 @@
       "case": "keyless_update_one_of_three",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.887,
+      "seconds": 2.135,
       "shapes": [
         [
           "plan",
@@ -4910,34 +4913,34 @@
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.115
+      "seconds": 0.946
     },
     {
       "case": "keyless_delete_more_than_present_raises",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.037
+      "seconds": 1.502
     },
     {
       "case": "keyless_delete_missing_row_raises_in_catch_up_too",
       "error": "invariant",
       "form": "local",
       "mode": "catch_up",
-      "seconds": 1.113
+      "seconds": 0.957
     },
     {
       "case": "keyless_delete_missing_row_raises_in_catch_up_too",
       "error": "invariant",
       "form": "relation",
       "mode": "catch_up",
-      "seconds": 2.075
+      "seconds": 1.522
     },
     {
       "case": "keyless_negative_zero_image_never_deletes_zero",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.181,
+      "seconds": 0.903,
       "shapes": [
         [
           "L1"
@@ -4951,7 +4954,7 @@
       "case": "keyless_negative_zero_image_never_deletes_zero",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.819,
+      "seconds": 2.093,
       "shapes": [
         [
           "plan",
@@ -4976,218 +4979,218 @@
     },
     {
       "case": "keyless_negative_zero_to_zero_does_not_net_to_nothing",
-      "form": "local",
-      "mode": "stream",
-      "seconds": 1.332,
-      "shapes": [
-        [
-          "L1",
-          "L2"
-        ]
-      ],
-      "statements": [
-        2
-      ]
-    },
-    {
-      "case": "keyless_negative_zero_to_zero_does_not_net_to_nothing",
-      "form": "relation",
-      "mode": "stream",
-      "seconds": 2.894,
-      "shapes": [
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "L1",
-          "L2",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ]
-      ],
-      "statements": [
-        15
-      ]
-    },
-    {
-      "case": "keyless_interval_forms_are_different_rows",
-      "form": "local",
-      "mode": "stream",
-      "seconds": 1.155,
-      "shapes": [
-        [
-          "L1"
-        ]
-      ],
-      "statements": [
-        1
-      ]
-    },
-    {
-      "case": "keyless_interval_forms_are_different_rows",
-      "form": "relation",
-      "mode": "stream",
-      "seconds": 2.832,
-      "shapes": [
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "L1",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ]
-      ],
-      "statements": [
-        14
-      ]
-    },
-    {
-      "case": "keyless_nan_equals_nan",
-      "form": "local",
-      "mode": "stream",
-      "seconds": 1.146,
-      "shapes": [
-        [
-          "L1"
-        ]
-      ],
-      "statements": [
-        1
-      ]
-    },
-    {
-      "case": "keyless_nan_equals_nan",
-      "form": "relation",
-      "mode": "stream",
-      "seconds": 2.804,
-      "shapes": [
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "L1",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ]
-      ],
-      "statements": [
-        14
-      ]
-    },
-    {
-      "case": "keyless_null_equals_null",
-      "form": "local",
-      "mode": "stream",
-      "seconds": 1.134,
-      "shapes": [
-        [
-          "L1"
-        ]
-      ],
-      "statements": [
-        1
-      ]
-    },
-    {
-      "case": "keyless_null_equals_null",
-      "form": "relation",
-      "mode": "stream",
-      "seconds": 2.78,
-      "shapes": [
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "L1",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ]
-      ],
-      "statements": [
-        14
-      ]
-    },
-    {
-      "case": "keyless_union_members_differ",
-      "form": "local",
-      "mode": "stream",
-      "seconds": 1.138,
-      "shapes": [
-        [
-          "L1"
-        ]
-      ],
-      "statements": [
-        1
-      ]
-    },
-    {
-      "case": "keyless_union_members_differ",
-      "form": "relation",
-      "mode": "stream",
-      "seconds": 2.862,
-      "shapes": [
-        [
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "plan",
-          "L1",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup",
-          "cleanup"
-        ]
-      ],
-      "statements": [
-        14
-      ]
-    },
-    {
-      "case": "keyless_list_elements_compare_exactly",
       "form": "local",
       "mode": "stream",
       "seconds": 1.085,
       "shapes": [
         [
+          "L1",
+          "L2"
+        ]
+      ],
+      "statements": [
+        2
+      ]
+    },
+    {
+      "case": "keyless_negative_zero_to_zero_does_not_net_to_nothing",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.154,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L1",
+          "L2",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        15
+      ]
+    },
+    {
+      "case": "keyless_interval_forms_are_different_rows",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.915,
+      "shapes": [
+        [
+          "L1"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "keyless_interval_forms_are_different_rows",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.112,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L1",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        14
+      ]
+    },
+    {
+      "case": "keyless_nan_equals_nan",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.932,
+      "shapes": [
+        [
+          "L1"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "keyless_nan_equals_nan",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.075,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L1",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        14
+      ]
+    },
+    {
+      "case": "keyless_null_equals_null",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.926,
+      "shapes": [
+        [
+          "L1"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "keyless_null_equals_null",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.071,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L1",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        14
+      ]
+    },
+    {
+      "case": "keyless_union_members_differ",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.901,
+      "shapes": [
+        [
+          "L1"
+        ]
+      ],
+      "statements": [
+        1
+      ]
+    },
+    {
+      "case": "keyless_union_members_differ",
+      "form": "relation",
+      "mode": "stream",
+      "seconds": 2.05,
+      "shapes": [
+        [
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "plan",
+          "L1",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup",
+          "cleanup"
+        ]
+      ],
+      "statements": [
+        14
+      ]
+    },
+    {
+      "case": "keyless_list_elements_compare_exactly",
+      "form": "local",
+      "mode": "stream",
+      "seconds": 0.908,
+      "shapes": [
+        [
           "L1"
         ]
       ],
@@ -5199,7 +5202,7 @@
       "case": "keyless_list_elements_compare_exactly",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.835,
+      "seconds": 2.076,
       "shapes": [
         [
           "plan",
@@ -5226,7 +5229,7 @@
       "case": "keyless_insert_then_delete_in_the_same_set",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.394,
+      "seconds": 1.084,
       "shapes": [
         [
           "L1",
@@ -5241,7 +5244,7 @@
       "case": "keyless_insert_then_delete_in_the_same_set",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.895,
+      "seconds": 2.12,
       "shapes": [
         [
           "plan",
@@ -5269,7 +5272,7 @@
       "case": "keyless_rows_inserted_by_the_same_transaction",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.672,
+      "seconds": 1.31,
       "shapes": [
         [
           "L2"
@@ -5288,7 +5291,7 @@
       "case": "keyless_rows_inserted_by_the_same_transaction",
       "form": "relation",
       "mode": "stream",
-      "seconds": 4.886,
+      "seconds": 3.46,
       "shapes": [
         [
           "plan",
@@ -5333,7 +5336,7 @@
       "case": "keyless_unchanged_value_comes_from_the_old_image",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.365,
+      "seconds": 1.102,
       "shapes": [
         [
           "L1",
@@ -5348,7 +5351,7 @@
       "case": "keyless_unchanged_value_comes_from_the_old_image",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.905,
+      "seconds": 2.124,
       "shapes": [
         [
           "plan",
@@ -5376,7 +5379,7 @@
       "case": "keyless_date_beyond_the_timestamp_range",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.082,
+      "seconds": 0.894,
       "shapes": [
         [
           "L1"
@@ -5390,7 +5393,7 @@
       "case": "keyless_date_beyond_the_timestamp_range",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.775,
+      "seconds": 2.126,
       "shapes": [
         [
           "plan",
@@ -5417,7 +5420,7 @@
       "case": "keyless_with_a_column_named_rowid",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.326,
+      "seconds": 1.102,
       "shapes": [
         [
           "R1",
@@ -5433,7 +5436,7 @@
       "case": "keyless_with_a_column_named_rowid",
       "form": "relation",
       "mode": "stream",
-      "seconds": 2.975,
+      "seconds": 2.224,
       "shapes": [
         [
           "plan",
@@ -5462,7 +5465,7 @@
       "case": "round2_X1_form_change_then_move_onto_its_old_form",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.654,
+      "seconds": 1.373,
       "shapes": [
         [
           "C0",
@@ -5479,7 +5482,7 @@
       "case": "round2_X1_form_change_then_move_onto_its_old_form",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.646,
+      "seconds": 3.912,
       "shapes": [
         [
           "plan",
@@ -5531,7 +5534,7 @@
       "case": "round2_X1_two_change_sets_one_transaction",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.77,
+      "seconds": 1.44,
       "shapes": [
         [
           "C0",
@@ -5551,7 +5554,7 @@
       "case": "round2_X1_two_change_sets_one_transaction",
       "form": "relation",
       "mode": "stream",
-      "seconds": 9.918,
+      "seconds": 6.769,
       "shapes": [
         [
           "plan",
@@ -5639,7 +5642,7 @@
       "case": "round2_form_change_second_onto_a_moved_root",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.717,
+      "seconds": 1.426,
       "shapes": [
         [
           "C0",
@@ -5656,7 +5659,7 @@
       "case": "round2_form_change_second_onto_a_moved_root",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.737,
+      "seconds": 4.041,
       "shapes": [
         [
           "plan",
@@ -5708,7 +5711,7 @@
       "case": "round2_two_form_changes_in_a_chain",
       "form": "local",
       "mode": "stream",
-      "seconds": 2.054,
+      "seconds": 1.116,
       "shapes": [
         [
           "C0",
@@ -5724,7 +5727,7 @@
       "case": "round2_two_form_changes_in_a_chain",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.602,
+      "seconds": 3.935,
       "shapes": [
         [
           "plan",
@@ -5775,7 +5778,7 @@
       "case": "round2_three_keys_in_a_ring_with_a_form_change",
       "form": "local",
       "mode": "stream",
-      "seconds": 2.008,
+      "seconds": 1.648,
       "shapes": [
         [
           "K1",
@@ -5793,7 +5796,7 @@
       "case": "round2_three_keys_in_a_ring_with_a_form_change",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.814,
+      "seconds": 4.012,
       "shapes": [
         [
           "plan",
@@ -5846,7 +5849,7 @@
       "case": "round3_copy_root_inserted_earlier_in_the_transaction",
       "form": "local",
       "mode": "stream",
-      "seconds": 2.287,
+      "seconds": 1.828,
       "shapes": [
         [
           "K6"
@@ -5868,7 +5871,7 @@
       "case": "round3_copy_root_inserted_earlier_in_the_transaction",
       "form": "relation",
       "mode": "stream",
-      "seconds": 10.122,
+      "seconds": 6.835,
       "shapes": [
         [
           "plan",
@@ -5958,7 +5961,7 @@
       "case": "round2_X1_interval_key_part",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.699,
+      "seconds": 1.394,
       "shapes": [
         [
           "C0",
@@ -5975,7 +5978,7 @@
       "case": "round2_X1_interval_key_part",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.781,
+      "seconds": 3.978,
       "shapes": [
         [
           "plan",
@@ -6028,76 +6031,76 @@
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.111
+      "seconds": 0.996
     },
     {
       "case": "round2_4b_moves_of_a_doubled_and_a_missing_key_raise",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 3.192
+      "seconds": 2.382
     },
     {
       "case": "round2_4b_deletes_of_a_doubled_and_a_missing_key_raise",
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.142
+      "seconds": 1.009
     },
     {
       "case": "round2_4b_deletes_of_a_doubled_and_a_missing_key_raise",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 3.247
+      "seconds": 2.364
     },
     {
       "case": "round2_4b_updates_of_a_doubled_and_a_missing_key_raise",
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.118
+      "seconds": 1.0
     },
     {
       "case": "round2_4b_updates_of_a_doubled_and_a_missing_key_raise",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 3.183
+      "seconds": 2.378
     },
     {
       "case": "round2_copy_of_a_doubled_root_raises",
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.875
+      "seconds": 0.832
     },
     {
       "case": "round2_copy_of_a_doubled_root_raises",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 3.334
+      "seconds": 2.536
     },
     {
       "case": "round2_insert_at_a_held_key_raises",
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.024
+      "seconds": 0.947
     },
     {
       "case": "round2_insert_at_a_held_key_raises",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 3.158
+      "seconds": 2.34
     },
     {
       "case": "round2_insert_at_a_held_key_unchecked_with_the_switch_off",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.078,
+      "seconds": 0.918,
       "shapes": [
         [
           "K6"
@@ -6111,7 +6114,7 @@
       "case": "round2_insert_at_a_held_key_unchecked_with_the_switch_off",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.268,
+      "seconds": 3.729,
       "shapes": [
         [
           "plan",
@@ -6159,20 +6162,20 @@
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.133
+      "seconds": 1.029
     },
     {
       "case": "round2_move_onto_a_held_free_key_raises",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 3.253
+      "seconds": 2.393
     },
     {
       "case": "round2_move_onto_a_held_free_key_unchecked_with_the_switch_off",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.097,
+      "seconds": 0.992,
       "shapes": [
         [
           "K3"
@@ -6186,7 +6189,7 @@
       "case": "round2_move_onto_a_held_free_key_unchecked_with_the_switch_off",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.238,
+      "seconds": 3.781,
       "shapes": [
         [
           "plan",
@@ -6234,20 +6237,20 @@
       "error": "invariant",
       "form": "local",
       "mode": "stream",
-      "seconds": 1.303
+      "seconds": 1.322
     },
     {
       "case": "round2_copy_onto_a_held_free_key_raises",
       "error": "invariant",
       "form": "relation",
       "mode": "stream",
-      "seconds": 3.515
+      "seconds": 2.66
     },
     {
       "case": "round2_insert_only_is_one_statement",
       "form": "local",
       "mode": "stream",
-      "seconds": 0.991,
+      "seconds": 0.908,
       "shapes": [
         [
           "K6"
@@ -6261,7 +6264,7 @@
       "case": "round2_insert_only_is_one_statement",
       "form": "relation",
       "mode": "stream",
-      "seconds": 5.231,
+      "seconds": 3.748,
       "shapes": [
         [
           "plan",
@@ -6309,7 +6312,7 @@
       "form": "local",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 1.745,
+      "seconds": 1.501,
       "shapes": [
         [
           "lookup",
@@ -6326,7 +6329,7 @@
       "form": "relation",
       "idempotent": true,
       "mode": "catch_up",
-      "seconds": 11.888,
+      "seconds": 8.433,
       "shapes": [
         [
           "plan",
@@ -6383,7 +6386,7 @@
       "case": "round2_catch_up_self_key_change_loaded_after_the_pair_resolves",
       "form": "local",
       "mode": "catch_up",
-      "seconds": 1.111,
+      "seconds": 1.022,
       "shapes": [
         [
           "lookup",
@@ -6399,7 +6402,7 @@
       "case": "round2_catch_up_self_key_change_loaded_after_the_pair_resolves",
       "form": "relation",
       "mode": "catch_up",
-      "seconds": 6.533,
+      "seconds": 4.448,
       "shapes": [
         [
           "plan",
@@ -6456,7 +6459,7 @@
       "case": "round2_catch_up_back_through_another_key_resolves",
       "form": "local",
       "mode": "catch_up",
-      "seconds": 1.433,
+      "seconds": 1.229,
       "shapes": [
         [
           "lookup",
@@ -6473,7 +6476,7 @@
       "case": "round2_catch_up_back_through_another_key_resolves",
       "form": "relation",
       "mode": "catch_up",
-      "seconds": 6.395,
+      "seconds": 4.582,
       "shapes": [
         [
           "plan",
@@ -6531,7 +6534,7 @@
       "case": "round2_catch_up_full_update_between_self_key_changes",
       "form": "local",
       "mode": "catch_up",
-      "seconds": 1.403,
+      "seconds": 1.11,
       "shapes": [
         [
           "K1",
@@ -6547,7 +6550,7 @@
       "case": "round2_catch_up_full_update_between_self_key_changes",
       "form": "relation",
       "mode": "catch_up",
-      "seconds": 6.516,
+      "seconds": 4.533,
       "shapes": [
         [
           "plan",
@@ -6605,7 +6608,7 @@
       "case": "round2_catch_up_two_self_key_changes_stay_unresolved",
       "form": "local",
       "mode": "catch_up",
-      "seconds": 1.141,
+      "seconds": 0.981,
       "shapes": [
         [
           "lookup",
@@ -6621,7 +6624,7 @@
       "case": "round2_catch_up_two_self_key_changes_stay_unresolved",
       "form": "relation",
       "mode": "catch_up",
-      "seconds": 6.314,
+      "seconds": 4.495,
       "shapes": [
         [
           "plan",

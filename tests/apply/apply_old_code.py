@@ -39,7 +39,8 @@ def run(tree: Path, full: bool) -> dict:
     env.pop("CDC_V2_APPLY_FULL", None)
     if full:
         env["CDC_V2_APPLY_FULL"] = "1"
-    out = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests/apply"], cwd=str(tree),
+    # one -q only (pyproject's addopts has the other): with two, pytest prints no summary line
+    out = subprocess.run([sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "tests/apply"], cwd=str(tree),
                          env=env, capture_output=True, text=True, timeout=1800).stdout
     counts = {k: int(n) for n, k in SUMMARY.findall(out.strip().splitlines()[-1] if out.strip() else "")}
     failed = sorted(line.split(" ", 1)[1].split(" - ")[0] for line in out.splitlines() if line.startswith("FAILED "))

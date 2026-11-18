@@ -22,7 +22,7 @@ reduce_duplicates(tx, target, change_set)        # catch-up, design 7.3 step 1
 ```
 
 `tx` is a lane transaction of package D (C4: `md.Transaction`). Apply calls `tx.execute`, `tx.fetch_arrow` and
-`tx.register` only, and never begins, commits, rolls back or fences. Every test runs on D's real lane, on a local
+`tx.register` only, and never begins, commits, rolls back or fences. Every test that applies runs on D's real lane, on a local
 DuckDB in memory or on MotherDuck (`tests/apply/apply_lane.py`); the stand-in of the first rounds is deleted.
 Section 10 says what apply keeps to on that lane.
 
@@ -458,7 +458,10 @@ unless another file is named).
    DOUBLE and INTERVAL through an expression (`types.source_wrap`). The probe of `test_apply_md.py`
    (`duckdb_semantics.json`, key "a stored -0 (DOUBLE) against an Arrow-side 0") measures the join both ways,
    for a committed row and for a row the same transaction wrote, locally and on MotherDuck
-   (`docs/spike/md_semantics.md`, "Facts apply relies on"). (A first fix cast DATE to
+   (`docs/spike/md_semantics.md`, "Facts apply relies on"). In the run of this round (commit `61528e2`) MotherDuck
+   missed the row with the plain column in a SELECT join in autocommit (0 rows) and found it in the DELETE joins
+   inside a transaction; with `x + 0` on both sides it found the row in every shape; local DuckDB found it in
+   every shape. (A first fix cast DATE to
    TIMESTAMP; the review found that this overflows for dates past 294247 AD, which Postgres and DuckDB allow, and
    puts the value into the error text: named cases `*date*beyond_the_timestamp_range`.) The cost: DuckDB cannot
    prune the destination scan by the join's key range for DATE, TIMESTAMP, FLOAT, DOUBLE and INTERVAL keys; every
@@ -539,7 +542,7 @@ how many examples it took (`campaign_local.json`, `negative_controls_examples_to
 ## 10. On package D's lane
 
 Package D is merged; apply runs on its lane (`md.Transaction`, contract C4 as built: `docs/design/destination.md`
-sections 2.2, 13 to 15). Every test of this package does too (`tests/apply/apply_lane.py`): the default run on a
+sections 2.2, 13 to 15). So does every test of this package that applies (`tests/apply/apply_lane.py`): the default run on a
 local DuckDB in memory, `test_apply_md.py` on MotherDuck. The stand-in of the first rounds is deleted: no test
 needs a fault that D's lane cannot give (`test_apply_lane.py` injects D's own errors at every call through a thin
 wrapper over the real lane).

@@ -1,5 +1,7 @@
 {
-  "command": "CDC_V2_MD_PREFIX=cdc_v2_t_a_ CDC_V2_APPLY_MD_EXAMPLES=25 tools/with-env uv run pytest -m md tests/apply/test_apply_md.py -k property",
+  "command": "CDC_V2_MD_PREFIX=cdc_v2_t_a_ tools/with-env uv run pytest -m md tests/apply/test_apply_md.py",
+  "commit": "61528e2",
+  "duckdb": "1.5.6",
   "entries": [
     {
       "form": "local",
@@ -416,5 +418,7 @@
     }
   ],
   "examples": 25,
-  "failures": 0
+  "examples_setting": "CDC_V2_APPLY_MD_EXAMPLES=25",
+  "failures": 0,
+  "lane": "package D's md.Lane 'stream' (cdc_v2.testing.destination), one lane transaction per change set or per case's one_tx"
 }

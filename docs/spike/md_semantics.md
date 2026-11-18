@@ -340,6 +340,35 @@ batches (SPEC 5.4). **Design:** the backfill's destination side is far above 100
 chunks as Parquet files and `COPY` them (lowest CPU and memory), at most 2 loaders per Flight; the source read is the
 part to measure next (stage 2).
 
+## Facts apply relies on (package A, measured after D's merge, 2026-11-18)
+
+Two behaviours that the statements of package A depend on, measured by the probes of
+`tests/apply/test_apply_md.py::test_duckdb_semantics_local_and_motherduck` on a plain client connection, locally
+(DuckDB 1.5.6) and on MotherDuck, at commit `61528e2` (`evidence/p3/apply/duckdb_semantics.json`; the command is in
+the file). The design is `docs/design/apply.md` sections 3.4, 5.5 and 11.
+
+1. **A row id is stable within a transaction** (both). Inside one transaction: the row ids of two committed rows
+   and of a row the transaction inserted were read; then a third row was deleted, one committed row's VARCHAR and
+   DOUBLE columns and then its key were updated in place, and the inserted row was updated; the row ids read again
+   were the same for all three, and a `DELETE ... WHERE rowid = <id read first>` removed exactly that row (1 row
+   for the inserted row, 1 for the row whose key moved). An update that sets a LIST, ARRAY, MAP or UNION column is the
+   exception: it rewrites the row and its row id changes (the same file, "update of ... rewrites the row"). Apply
+   reads the row ids of the rows it copies (statement C0) and finds them again after its deletes and in-place
+   updates (K7, K8); it never sets such a column before them. The named case
+   `round3_copy_root_inserted_earlier_in_the_transaction` exercises this through apply on MotherDuck
+   (`evidence/p3/apply/md_cases.json`). No DuckDB or MotherDuck document promises it; it is measured, not
+   specified.
+2. **A stored `-0` and an Arrow-side `0` do not always join on MotherDuck.** A table holds `-0.0` (DOUBLE); the
+   client registers Arrow data holding `0.0`. With `t.k = r.k` on the plain column, MotherDuck found the row in
+   the DELETE joins inside a transaction (committed row, and row written by the same transaction: 1 each) but
+   **not** in a SELECT join in autocommit (0 rows), although `k = 0.0` with a SQL literal finds it (1). Local
+   DuckDB found it in every shape. Package A's earlier round saw a DELETE of this shape find no row on MotherDuck
+   (`docs/design/apply.md` 5.5). With both sides written as an expression, `(t.k + 0) = (r.k + 0)`, every shape
+   found the row, locally and on MotherDuck. So the plain-column result depends on how the statement is executed,
+   and apply does not rely on it: where apply compares by the source's equality (`repair_keys`), FLOAT, DOUBLE and
+   INTERVAL go through `types.source_wrap` (`x + 0`, `x + INTERVAL '0 microseconds'`); everywhere else apply joins
+   on exact forms (`types.exact`: the bits of a DOUBLE), where `-0` and `0` are different keys by design.
+
 ## Unfinished or limited
 
 - The SIGKILL "during COMMIT" trials could not separate "COMMIT not yet received by the server" from "received":

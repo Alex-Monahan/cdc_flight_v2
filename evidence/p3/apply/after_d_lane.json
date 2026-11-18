@@ -1,0 +1,80 @@
+{
+  "command": "uv run python tests/apply/apply_old_code.py --old origin/main",
+  "commit": "61528e2+changes",
+  "old_code": "d8a52ea (origin/main, src/cdc_v2/apply only)",
+  "results": {
+    "old_code": {
+      "default": {
+        "counts": {
+          "deselected": 264,
+          "failed": 9,
+          "passed": 267,
+          "xfailed": 1
+        },
+        "failed": [
+          "tests/apply/test_apply_cases.py::test_case[keyless_delete_missing_row_raises_in_catch_up_too-relation]",
+          "tests/apply/test_apply_cases.py::test_case[keyless_delete_more_than_present_raises-relation]",
+          "tests/apply/test_apply_cases.py::test_case[keyless_json_uuid_in_one_transaction-relation]",
+          "tests/apply/test_apply_lane.py::test_a_missing_count_is_never_read_as_zero",
+          "tests/apply/test_apply_lane.py::test_counting_hands_back_no_result_but_a_count",
+          "tests/apply/test_apply_lane.py::test_counts_are_read_from_insert_update_and_delete_only",
+          "tests/apply/test_apply_lane.py::test_d_errors_pass_through_unchanged_from_every_call[keyless_with_a_column_named_rowid-relation]",
+          "tests/apply/test_apply_lane.py::test_keyless_relation_form_counts_through_the_lossless_export",
+          "tests/apply/test_apply_property.py::test_keyless_stream_equals_source"
+        ]
+      },
+      "full": {
+        "counts": {
+          "deselected": 264,
+          "failed": 23,
+          "passed": 356,
+          "xfailed": 1
+        },
+        "failed": [
+          "tests/apply/test_apply_cases.py::test_case[keyless_date_beyond_the_timestamp_range-relation]",
+          "tests/apply/test_apply_cases.py::test_case[keyless_delete_missing_row_raises_in_catch_up_too-relation]",
+          "tests/apply/test_apply_cases.py::test_case[keyless_delete_more_than_present_raises-relation]",
+          "tests/apply/test_apply_cases.py::test_case[keyless_delete_one_of_three-relation]",
+          "tests/apply/test_apply_cases.py::test_case[keyless_insert_then_delete_in_the_same_set-relation]",
+          "tests/apply/test_apply_cases.py::test_case[keyless_interval_forms_are_different_rows-relation]",
+          "tests/apply/test_apply_cases.py::test_case[keyless_json_uuid_in_one_transaction-relation]",
+          "tests/apply/test_apply_cases.py::test_case[keyless_list_elements_compare_exactly-relation]",
+          "tests/apply/test_apply_cases.py::test_case[keyless_nan_equals_nan-relation]",
+          "tests/apply/test_apply_cases.py::test_case[keyless_negative_zero_image_never_deletes_zero-relation]",
+          "tests/apply/test_apply_cases.py::test_case[keyless_negative_zero_to_zero_does_not_net_to_nothing-relation]",
+          "tests/apply/test_apply_cases.py::test_case[keyless_null_equals_null-relation]",
+          "tests/apply/test_apply_cases.py::test_case[keyless_rows_inserted_by_the_same_transaction-relation]",
+          "tests/apply/test_apply_cases.py::test_case[keyless_unchanged_value_comes_from_the_old_image-relation]",
+          "tests/apply/test_apply_cases.py::test_case[keyless_union_members_differ-relation]",
+          "tests/apply/test_apply_cases.py::test_case[keyless_update_one_of_three-relation]",
+          "tests/apply/test_apply_cases.py::test_case[keyless_with_a_column_named_rowid-relation]",
+          "tests/apply/test_apply_lane.py::test_a_missing_count_is_never_read_as_zero",
+          "tests/apply/test_apply_lane.py::test_counting_hands_back_no_result_but_a_count",
+          "tests/apply/test_apply_lane.py::test_counts_are_read_from_insert_update_and_delete_only",
+          "tests/apply/test_apply_lane.py::test_d_errors_pass_through_unchanged_from_every_call[keyless_with_a_column_named_rowid-relation]",
+          "tests/apply/test_apply_lane.py::test_keyless_relation_form_counts_through_the_lossless_export",
+          "tests/apply/test_apply_property.py::test_keyless_stream_equals_source"
+        ]
+      }
+    },
+    "this_code": {
+      "default": {
+        "counts": {
+          "deselected": 264,
+          "passed": 276,
+          "xfailed": 1
+        },
+        "failed": []
+      },
+      "full": {
+        "counts": {
+          "deselected": 264,
+          "passed": 379,
+          "xfailed": 1
+        },
+        "failed": []
+      }
+    }
+  },
+  "what": "the apply tests on package D's lane over local DuckDB, default run and full matrix (CDC_V2_APPLY_FULL=1), with this commit's apply code and with the old apply code; in the old copy the conftest's check of counted statements is left out (the old code has no _Counting.count)"
+}
