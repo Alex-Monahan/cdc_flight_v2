@@ -83,6 +83,22 @@ A promotion of the decoding replica switches the stream to the primary rule of t
 tracker again). You do nothing for open cuts: `valid_on` at the swap rejects them. A restarted standby is unsettled
 until it replays its next commit; that is not a slot finding. (Contract C9, `docs/design/cut.md` 13.4.)
 
+## From the destination (D, merged)
+
+Package D is merged; `docs/design/destination.md` section 15 "Every caller" holds for you.
+
+- A slot finding changes a state, or the applied position, with a condition on the value it read, inside the
+  stream-lane transaction of `stream.reposition`. A late commit of an earlier copy must never move the position
+  back. A `reposition` to the same position relies on nothing.
+- `expect` only on columns in `values` (`state.transition` refuses anything else with `LaneMisuse`); a
+  transition from a state to itself only with `values`. A condition excludes a concurrent writer only through a
+  column that both change.
+- Write only inside lane transactions; autocommit takes reads only. The slot and stream machine is created on
+  the stream lane (`Machine(creators=("stream",))`), where the attach step and `reposition` run.
+- Declare a crash point after slot creation (`slot.created`, section 4), by the rule of C1.
+- After `Conflict` (a take-over, a registration on the stream lane) run the enactment again with a pause; an
+  interrupted transaction frees its rows after about 1 s, an abandoned one after about 29 s.
+
 ## Resources
 
 - Postgres: `tools/localpg --home ~/.cache/cdc_flight_v2/pg-v --port-base 55680`, and a second pair

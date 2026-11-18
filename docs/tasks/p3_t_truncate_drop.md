@@ -73,6 +73,23 @@ if the `GapMark` that package S hands you at `group_end` admits it (a DDL can be
 An observation made on a node other than the stream's is used only if `valid_on` holds. (Contract C9,
 `docs/design/cut.md` 13.4.)
 
+## From the destination (D, merged)
+
+Package D is merged; `docs/design/destination.md` section 15 "Every caller" holds for you.
+
+- A table confirmed `same` writes nothing. Every change of a table's state is a transition between two different
+  states: a condition excludes a concurrent writer only through a column that both change, and `state.transition`
+  refuses a transition from a state to itself without `values`, and `expect` on a column not in `values`
+  (`LaneMisuse`).
+- Findings are created in S's group, inside `tables.on_group`, on the stream lane: declare the finding machine
+  with `Machine(creators=("stream",))`.
+- Write only inside lane transactions; autocommit takes reads only.
+- `state.audit`: order the rows of `_cdc.transitions` of a lane by `seq`, never by `changed_at`. `seq` is strictly
+  increasing per lane, with gaps at take-overs and registrations: check uniqueness and order, never the absence
+  of gaps.
+- `docs/state_machines.md` is generated: `uv run python -m cdc_v2.state > docs/state_machines.md`; a test
+  compares the two.
+
 ## What may be missing when you start
 
 Packages S and B are merged, and with them X, E, D, A, P, Y, O and H. Packages V, L and F may or may not be.

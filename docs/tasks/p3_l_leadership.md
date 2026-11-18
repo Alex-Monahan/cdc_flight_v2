@@ -24,6 +24,48 @@ write anything: its contract notes say what D found on MotherDuck.
 - `docs/testing/harness.md`: crash points, fault sites, process control (`procs`, `Fleet`), the crash runner.
 - Design open points 16 and 17.
 
+## From the destination (D, merged)
+
+Package D is merged. `docs/design/destination.md` section 15 "Package L" is written for you; its contract notes
+(section 13) and core design 4 as now written hold where this task says less.
+
+- **Statements.** Copy the take-over and the registration statements as core 4.5 and C4 now give them: the
+  take-over changes the fence rows' `n` (`n = n + 1`) and never puts it back; the registration raises its
+  lane's `n` the same way. The bootstrap's copy holds the take-over, the registration (`register_connection`,
+  `register_fence`), `heartbeat` and `release` of `cdc_v2.md.schema.NAMED_STATEMENTS`; a T0 test compares the
+  bootstrap's copy with the package's (`schema.compare_statements`). The take-over is not in
+  `NAMED_STATEMENTS`: it is yours; `cdc_v2.testing.destination` holds D's copy for tests.
+- **Heartbeat and release are the layer's.** No caller may `UPDATE` `_cdc.leader`, `_cdc.fence` or
+  `_cdc.heartbeat`. Use `md.schema.heartbeat(conn, epoch, phase, progress_age_us)` (autocommit) and
+  `md.schema.release(tx)` (in a `control`-lane transaction); both raise `FenceLost` when the epoch no longer
+  leads. Change their text in `cdc_v2.md.schema` if the meaning needs it (phases, progress age).
+- **Every exclusion rests on a column that both sides change** (core 4.2). The heartbeat changes `beat_at`, which
+  the take-over also changes. The release meets the take-over through the `control` fence row's `n`, which the
+  control lane's fence statement and the take-over both change, so the leader row needs no counter of its own.
+  Two take-overs meet on the leader row's `epoch`. Test the heartbeat, the release and the take-over against the
+  take-over in every order, as `tests/destination/probes/probe_fence_columns.py` does for the fence row.
+- **The leader machine's rows.** `md.schema.release` writes no row to `_cdc.transitions`, and `state.transition`
+  cannot move the leader row (callers may not update it). Append the leader machine's row, with its cause, in the
+  release's transaction, and the same for the take-over.
+- **After winning**, call `md.interrupt_earlier(conn, new_epoch)` once more (destination finding 2).
+- **Losers exit.** The take-over decides once from which epoch it takes over. A run that finds another run's id
+  at a higher epoch reads the record again and exits ("another run leads"; `AnotherRunLeads` in D's stand-in).
+- **Commit outcome unknown.** The take-over writes its own `run_id` and decides by it in a new read; otherwise it
+  can take a rival's take-over for its own and two runs lead. The wait of more than 2 s is no bound; the
+  condition `WHERE epoch = :seen` of the next attempt is what decides.
+- **Retry budget.** An interrupted transaction frees its rows after about 1 s; an abandoned one after about 29 s.
+  Retry `Conflict` with a pause for at least 5 s; a take-over needed 1 or 2 further attempts.
+- **`main.py` is a plain client.** There, too: read the clock only inside a statement on a MotherDuck table (a
+  bare `SELECT` gives the client's clock); `COMMIT` after a failed statement answers OK and commits nothing, so
+  stop at the first failed statement and never take that OK for a won take-over.
+- **The heartbeat connection** registers with `registry.register(conn, "control", epoch, retry_conflict=True)`
+  before its first write and after every change of `conn.generation`. Such a registration makes an open
+  `control`-lane transaction that has not reached its fence fail with `Conflict`; run it again.
+- **The supervisor** (C11) reads `md.waiting_calls()` and ends the process past a bound of yours; say how it
+  fits the 120 s of SPEC 4.5.
+- **A check of your own for the bootstrap.** D's static tests read `src/cdc_v2` only; write one that
+  `flights/cdc_v2/main.py` holds the take-over and nothing else that commits.
+
 ## Resources
 
 MotherDuck through `tools/with-env` only; databases `cdc_v2_t_l_*` only. No Postgres, no JVM. No Flight is
@@ -54,7 +96,8 @@ beyond the `duckdb` client. In order:
      carries what it needs of it) and try again, until it wins, or a healthy heartbeat appears, or
      `leader.takeover_timeout` (default 45 s) has passed; then exit non-zero.
    - A take-over whose commit outcome is unknown is never repeated blindly: read the record again after more
-     than 2 s and decide by `run_id`.
+     than 2 s and decide by `run_id` (the wait is no bound; see "From the destination").
+   - After winning: `md.interrupt_earlier` once more, with the new epoch (the bootstrap carries what it needs).
    - After winning: cancel the stored previous run through the platform if it is still running — that run
      number only, never "all other runs" (finding 8 of the run spike).
    - The alert `takeover` (previous run, age of its heartbeat, reason), unless the previous leader had released.
@@ -84,7 +127,8 @@ exception); a T0 test compares it with the declaration in the package.
 
 ### 2. In the pipeline: `src/cdc_v2/leader/`
 
-- **Heartbeat** (design 4.3): a dedicated connection and thread; the statement with `WHERE epoch = :my_epoch`;
+- **Heartbeat** (design 4.3): a dedicated connection and thread, registered under `control`;
+  `md.schema.heartbeat`, which carries `WHERE epoch = :my_epoch`;
   its only input is `supervisor.progress() -> (ok, phase, progress_at)` (C11; package S delivers the supervisor,
   you build against the interface with a stand-in of your own). No progress ⇒ no heartbeat. Zero rows changed ⇒
   another run leads: stop every lane and exit non-zero. After each successful heartbeat a tick to the bootstrap.
@@ -94,11 +138,14 @@ exception); a T0 test compares it with the declaration in the package.
   the process, non-zero, without writing anything more.
 - **Planned hand-over** (design 4.6): at `run.max_runtime` ask the stream to finish the group in flight (an
   interface S will implement: `finish_current_group(deadline)`; an oversized transaction that is still arriving
-  is abandoned, not waited for), then set `state = 'released'` in a fenced `control`-lane transaction through
-  `state.transition`, close, exit 0, timed to end about 5 s before a minute boundary of MotherDuck's clock.
+  is abandoned, not waited for), then set `state = 'released'` in a fenced `control`-lane transaction with
+  `md.schema.release(tx)` and the leader machine's row in `_cdc.transitions`, close, exit 0, timed to end about
+  5 s before a minute boundary of MotherDuck's clock.
   A release whose commit outcome is unknown: say what the next run sees in both cases and that both are safe.
 - **Leader machine**: declared with `state.declare` (two states), added to `docs/state_machines.md` through the
-  declaration; the enumeration helper of D runs over it (SPEC 1.9).
+  declaration; the enumeration helper of D runs over it (SPEC 1.9). Its row is moved by the take-over and
+  `md.schema.release`, not by `state.transition`; you append its rows to `_cdc.transitions`. D's helper moves a
+  row with `state.transition`, which the layer refuses on `_cdc.leader`: say how you enumerate the machine.
 - **Clean-up of `_cdc.connections`** for epochs before the previous one (D provides the statement; you call it
   at the right time and say when).
 - **`leader_record` view**, so that SPEC 4.2 and 6.1 can name one record.

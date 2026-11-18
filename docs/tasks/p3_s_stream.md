@@ -185,6 +185,40 @@ heartbeat write is also what settles a restarted standby (a standby that has jus
 it replays the next one; the takers refuse a cut until then). If the decoding replica is promoted, the stream
 switches to the primary rule and the tracker starts again with `unknown_below`.
 
+## From the destination (D, merged)
+
+Package D is merged. `docs/design/destination.md` section 15 "Every caller" is written for you; read it whole.
+Contract notes 1 to 51 (section 13) say how each open point of C4 and C5 was built.
+
+- **The batch move** is `state.transition(…, values={applied_lsn: new}, expect={applied_lsn: prev}, detail=…)`,
+  with `new > prev`, in the group's own transaction: one `UPDATE` of the position and one `INSERT` of the row of
+  `_cdc.transitions`, which carries the facts of section 10 in `detail` and the lane's `seq`. No step relies on an
+  unchanged write: a condition excludes a concurrent writer only through a column that both change, `expect` is
+  allowed only on columns in `values` (`LaneMisuse` otherwise), and a self-transition only with `values`.
+- **Write only inside lane transactions**; autocommit takes reads only.
+- **`md.StatementError`** (`where`, `error_class`, `statement`; never a value) is a failure of the table: count it
+  towards `apply.max_table_attempts`; never put it into the transport retry loop with `Conflict` and
+  `ConnectionLost`.
+- **`md.LaneMisuse`** is a programming error: never catch it with `DestinationError`; the pipeline exits with a
+  failure status (C12).
+- **Retry budget after a take-over.** An interrupted transaction frees its rows after about 1 s, an abandoned one
+  after about 29 s. Size `apply.max_group_attempts` and its pauses for that. A registration on the stream lane
+  (a replaced connection) makes an open transaction that has not reached its fence fail with `Conflict`; it is
+  run again like any other.
+- **After `CommitUnknown`** the wait is no bound; the conditional move of `applied_lsn` decides.
+- **Crash points**: declare one after each staging chunk's commit, as section 5 says; the lane's own points are
+  D's.
+- **Alerts**: `alerts.emit(tx, kind, severity, fields, key)`; a kind is a lower-case identifier, the severity is
+  `info`, `warning` or `critical`, and `fields` holds identifiers, positions, counts and durations only.
+- **Machines of the stream** (the table machine, the batch machine, the slot and stream machine) are created on
+  the stream lane: `Machine(creators=("stream",))`. V's attach step and `stream.reposition` run there too.
+- **A swap and the other writers of its table** (C10, the second reviewer's E1): a DDL that drops a table does not
+  conflict with a committed write of another lane to it. Agree with B which rule holds: the swap and every lane
+  that writes the table change one column of the table's state row, or writes to a table in swap go only
+  through the swap's lane.
+- **Settings of private DuckDBs**: on your own connections use `SET SESSION`; a plain `SET` reaches the other
+  connections of the process to that database.
+
 ## What may be missing when you start
 
 Packages E, D, A, P, Y, K and X are merged. Others are not. Build to their contracts and join when they arrive
@@ -294,7 +328,8 @@ every package (C0) and nothing else reads the file.
 
 The eight steps exactly as the design numbers them, in one function per group that can run again from the start
 (the run-again rule of C4): it reads `applied_lsn` inside the transaction, checks that it is the position the
-group was built on, applies, moves the position with `execute_one … WHERE applied_lsn = :prev`, and leaves the
+group was built on, applies, moves the position with `state.transition(…, values={applied_lsn: new},
+expect={applied_lsn: prev}, detail=…)` (one row, else `Conflict`; see "From the destination"), and leaves the
 block (fence, `COMMIT`: package D).
 
 - Crash points, declared by you: `stream.staged`, `stream.begun`, `stream.applied`,
@@ -418,8 +453,9 @@ Package F points its fuzzers at your pipeline after you are merged. It must be a
 - **Never two writers.** The row that the batch machine appends to `_cdc.transitions` for every committed group
   carries the facts: epoch, run id, previous and new applied position, first and last commit position of the
   group's source transactions and their count, and a sequence that gives the order of commit. It is part of the
-  group's own transaction: no extra statement and no extra round trip per group (SPEC 6.1). If package D's
-  `state.transition` has no place for such facts, say so at once; do not build a second log.
+  group's own transaction: no extra statement and no extra round trip per group (SPEC 6.1). As built (D), the
+  facts go into `detail` of `state.transition`, and the row's `seq` (the lane's fence counter after the commit:
+  strictly increasing per lane, with gaps) is the order of commit. Do not build a second log.
 - The applied position only through `stream.applied_position` (C8).
 - **The spill area can be made tiny by a setting** (the transform connection's and apply's planning database's
   `max_temp_directory_size`), and "spill area full" is an alert through `alerts.emit`: the alert row is the fuzzer's

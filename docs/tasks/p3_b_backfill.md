@@ -96,6 +96,30 @@ for you:
   is safe); after a crash resume from the stored round. A repair replaces the key's row (delete, then insert, in
   the repair's transaction). The start-state checks of apply are sums; your final comparison stays the proof.
 
+## From the destination (D, merged)
+
+Package D is merged; `docs/design/destination.md` section 15 "Every caller" holds for you.
+
+- A round that applies rows raises `caught_up_lsn` in the same transaction, strictly: the move must change the
+  column, because a condition excludes a concurrent writer only through a column that both change.
+- Chunk rows are created together with a transition of the backfill row (`planned → reading`), in one
+  transaction. Declare who creates the rows of each machine (`Machine(creators=…)`: lane names, or
+  `state.FRESH_IDS`).
+- `expect` only on columns in `values` (`state.transition` refuses anything else with `LaneMisuse`); a
+  transition from a state to itself only with `values`. Write only inside lane transactions; autocommit takes
+  reads only.
+- **The swap and the other writers of its table** (C10, the second reviewer's E1). A DDL that drops a table does
+  not conflict with a committed `INSERT` of another lane into it; both commit, and the inserted rows are lost with
+  the dropped table. Make the swap and every lane that writes that table conflict (the swap changes a column of
+  the table's state row that every writer of the table also changes), or route the writes to a table in swap
+  only through the swap's lane. Agree the rule with S and test it with a concurrent writer on another lane.
+- Crash points after a chunk's load, after a pending log append and after the swap, by the rule of C1.
+- **Retry budget.** After `Conflict` (a take-over, a registration on the lane, a DDL) run the transaction again
+  with a pause and a limit: an interrupted transaction frees its rows after about 1 s, an abandoned one after
+  about 29 s. After a `Conflict` caused by a DDL read the table's schema again before the statements are built.
+- `md.StatementError` is a failure of the table (counted towards `backfill.max_table_attempts`), never a
+  transport error.
+
 ## What may be missing when you start
 
 Packages X, E, D, A, P, Y, S and O are merged. Package V (slot continuity) may or may not be: its finding reaches

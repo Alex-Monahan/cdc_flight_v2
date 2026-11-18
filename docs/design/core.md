@@ -125,27 +125,36 @@ rows 38 s). The view `_cdc.leader_record` joins them into the record that SPEC 4
 
 | Table | Rows | Written by | Content |
 |---|---|---|---|
-| `_cdc.leader` | 1 | take-over and release only | `epoch`, `flight_id`, `run_number`, `run_id`, `state` (`leading`, `released`), `taken_at` |
-| `_cdc.fence` | 1 per lane | every data transaction of that lane | `lane`, `epoch`, `n` |
-| `_cdc.heartbeat` | 1 | heartbeat connection | `epoch`, `beat_at`, `progress_at`, `phase` |
+| `_cdc.leader` | 1 | take-over and release (`md.schema.release`) only | `epoch`, `flight_id`, `run_number`, `run_id`, `state` (`leading`, `released`), `taken_at` |
+| `_cdc.fence` | 1 per lane | every data transaction of that lane, the registration of its connections, the take-over | `lane`, `epoch`, `n` |
+| `_cdc.heartbeat` | 1 | heartbeat connection (`md.schema.heartbeat`), the take-over | `epoch`, `beat_at`, `progress_at`, `phase` |
 
 All three are created once, with all their rows, and rows are only ever updated, never deleted and inserted again
 (a delete next to an update is not detected as a conflict; a row inserted later would miss a concurrent
 take-over). They are created by the bootstrap, in a way that leaves exactly one row set when several first runs
 start at once (table and rows in one statement, or a key; proven on MotherDuck with simultaneous starters). Their
 shape is frozen: the bootstrap cannot import the package before the clone, so it carries a copy of the statements
-that `cdc_v2.md.schema` holds, and a T0 test compares the two.
+that `cdc_v2.md.schema` holds, and a T0 test compares the two. As built (D): no caller may `UPDATE` these three
+tables, in a lane or outside one. The heartbeat and the release are statements of the layer
+(`md.schema.heartbeat`, `md.schema.release`); the take-over is the bootstrap's.
 
 `_cdc.connections` lists the server connection ids of every run: `epoch`, `lane`, connection id, time. A
-connection adds its row before its first transaction, in one statement that inserts only if `_cdc.leader` still
-holds the connection's epoch (so the epoch is checked there too, without holding a row). A take-over interrupts
-the connections of earlier epochs from this list; the leader removes rows of epochs before the previous one.
+connection adds its row before its first transaction. As built (D), a registration is its own transaction:
+`UPDATE _cdc.fence SET n = n + 1 WHERE lane = :l AND epoch = :e` (one row, else `FenceLost`), the `INSERT`, then
+`COMMIT` (`md.registry.register`). A take-over changes `n` too, so the two cannot both commit. The heartbeat
+connection is no lane; it registers under `control` and retries `Conflict`. A take-over interrupts the
+connections of earlier epochs from this list; the leader removes rows of epochs before the previous one.
 
 ### 4.1 Time
 
 Every timestamp that is compared with another run's timestamp is MotherDuck's clock:
 `uuid_extract_timestamp(uuidv7())` evaluated in the statement that writes or reads it. `now()` through the DuckDB
 client is the container's clock and is never used for the leader protocol.
+
+As built (D): MotherDuck evaluates the expression only in a statement that reads or writes a MotherDuck table. A
+bare `SELECT` of it is answered by the client, with the client's clock (`docs/design/destination.md` section 10).
+Read the clock with `tx.clock_us()` or `conn.clock_us()`, or write `md.clock_sql` inside a statement on a
+MotherDuck table. This holds for `main.py` too.
 
 ### 4.2 Fence
 
@@ -154,12 +163,17 @@ fence row is ever added later). A lane is one connection that commits data or st
 every `COMMIT` in a lane is
 
 ```sql
-UPDATE _cdc.fence SET n = n + 1 WHERE lane = :lane AND epoch = :my_epoch;
+UPDATE _cdc.fence SET n = n + 1, epoch = :my_epoch WHERE lane = :lane AND epoch = :my_epoch;
 ```
 
-and the transaction commits only if exactly one row changed. A take-over updates every fence row, so a transaction
-of the old leader either committed before the take-over or fails (zero rows changed, or a write conflict on the
-row). One row per lane lets a backfill chunk commit while a large stream commit is in flight.
+and it must change exactly one row, else the transaction does not commit (`md.FENCE_SQL`). DuckDB and MotherDuck
+record an UPDATE only where the value changes: a write of an equal value into a column with no update since its
+last checkpoint is not recorded and conflicts with nothing (`docs/design/destination.md` finding 24). Two
+statements therefore conflict only through a column that both change. The `epoch = :my_epoch` in `SET` is such an
+equal write and excludes nothing; the fence rests on `n`, which the fence statement, the registration and the
+take-over all change, and none puts it back. A take-over updates every fence row, so a transaction of the old leader
+either committed before the take-over or fails (zero rows changed, or a write conflict on `n`). One row per lane
+lets a backfill chunk commit while a large stream commit is in flight.
 
 ### 4.3 Heartbeat
 
@@ -168,6 +182,9 @@ A dedicated connection runs every 10 s:
 ```sql
 UPDATE _cdc.heartbeat SET beat_at = <md clock>, progress_at = :p, phase = :phase WHERE epoch = :my_epoch;
 ```
+
+As built (D), this is `md.schema.heartbeat(conn, epoch, phase, progress_age_us)`, in autocommit; zero rows changed
+is `FenceLost`. It changes `beat_at`, which the take-over also changes, so the two conflict.
 
 - The supervisor sends the heartbeat only while it sees progress (SPEC 4.2, 4.5): the stream component has reported
   within its deadline, and no component is past its restart limit. A commit in flight counts as progress until its
@@ -196,26 +213,43 @@ MotherDuck's Postgres endpoint at half the run time; it is kept as an optimisati
 
 ### 4.5 Take-over
 
+The take-over, in one transaction (as built (D); `cdc_v2.testing.destination` holds a copy for tests):
+
 ```sql
 BEGIN;
 UPDATE _cdc.leader    SET epoch = epoch + 1, flight_id = :f, run_number = :r, run_id = :id,
-                          state = 'leading', taken_at = <md clock>, connection_ids = :mine
+                          state = 'leading', taken_at = <md clock>
                       WHERE epoch = :seen_epoch;              -- must change exactly 1 row
-UPDATE _cdc.fence     SET epoch = :seen_epoch + 1;            -- every lane
+UPDATE _cdc.fence     SET epoch = :seen_epoch + 1, n = n + 1; -- every lane; n is not put back
 UPDATE _cdc.heartbeat SET epoch = :seen_epoch + 1, beat_at = <md clock>, phase = 'starting';
 COMMIT;
 ```
 
+- Each exclusion rests on a column that both sides change (4.2): two take-overs meet on the leader row's
+  `epoch`; a take-over and an old run's lane transaction, or a registration, meet on the fence row's `n`; a
+  take-over and a heartbeat meet on `beat_at`. The release runs in a fenced `control`-lane transaction, so it
+  meets the take-over on the `control` fence row's `n`. The leader row has no `connection_ids`: the ids are in
+  `_cdc.connections`.
 - Exactly one of several simultaneous starters commits; the others see zero rows changed or a write conflict,
-  re-read the record and exit by rule 2 of 4.4.
+  re-read the record and exit by rule 2 of 4.4. A run that finds another run's id at a higher epoch than the
+  one it started from exits ("another run leads"; `AnotherRunLeads` in the stand-in for tests).
 - If the statement conflicts with an open transaction of the previous leader (a hung commit holds a fence row), the
   newcomer calls `md_interrupt_server_connection` for the connection ids of earlier epochs in `_cdc.connections`
   and retries, until it wins, a healthy heartbeat appears, or `leader.takeover_timeout` (default 45 s) has passed;
   then it exits non-zero and the next minute's run tries again. It only ever interrupts ids read from that table.
   A lane that replaces its connection interrupts the old server connection first, so that no transaction of its
   own is left holding a fence row.
-- A take-over whose commit outcome is unknown is not repeated blindly: the newcomer reads the record again after
-  more than 2 s (a commit can land that late) and decides by `run_id` whether it leads.
+- An interrupted transaction frees its rows after about 1 s, not at once; an abandoned one that nobody interrupts
+  holds them for about 29 s. So `Conflict` is retried with a pause for at least 5 s; a take-over needed 1 or 2
+  further attempts (`docs/design/destination.md` sections 7 and 8.3).
+- After winning, the new leader calls `md.interrupt_earlier(conn, seen_epoch + 1)` once more: a take-over that
+  met no conflict has interrupted nothing, and an old run that holds only data rows would block the new run's
+  lanes for about 29 s (destination finding 2).
+- A take-over whose commit outcome is unknown is not repeated blindly: the newcomer reads the record again in a
+  new transaction and decides by `run_id` whether it leads; it never takes a rival's take-over for its own. The
+  wait of more than 2 s before that read is no bound (a `COMMIT` held by the network landed after 4 s;
+  destination finding 4). What decides is the conditional write: a further attempt changes the leader row only
+  `WHERE epoch = :seen_epoch`, so a late first commit makes it fail, and the next read finds its own `run_id`.
 - After winning: cancel the stored `run_number` through the MotherDuck API if `MD_GET_FLIGHT_RUN` shows it running
   (never "all other runs"); continue with start-up. The replication session that holds the slot is terminated
   later, by the pipeline's attach step (section 8), because the bootstrap has no Postgres client before the
@@ -229,7 +263,9 @@ COMMIT;
 ### 4.6 Planned hand-over
 
 At `run.max_runtime` (default 7 h 30 min) the leader finishes the group in flight, commits, sets
-`state = 'released'` in a fenced transaction, closes the slot connection and exits 0, timed to finish about 5 s
+`state = 'released'` in a fenced transaction (as built (D): `md.schema.release(tx)` in a `control`-lane
+transaction; with the leader machine's row in `_cdc.transitions`, which package L adds), closes the slot
+connection and exits 0, timed to finish about 5 s
 before a minute boundary. A transaction larger than a group that is still arriving is not waited for: it is
 abandoned, and the slot sends it again to the next run. The next scheduled run takes over by 4.5 without interrupting or cancelling anything.
 `max_runtime_sec` of the Flight is set above `run.max_runtime` as a coarse backstop only.
@@ -710,6 +746,15 @@ from, to, cause)` is the only function that writes a state. It runs inside the c
 stored state is not `from` or the pair is not in the table, and appends a row to `_cdc.transitions`. States live in
 `_cdc` tables and change in the same transaction as the data they govern.
 
+As built (D): `state.transition(tx, machine, key, from_state, to_state, cause, *, detail=None, values=None,
+expect=None)` and `state.create(tx, machine, key, state, cause, values=None, detail=None)` take an `md.Transaction`
+only. `expect` is allowed only on columns in `values`, and a transition from a state to itself only with `values`
+(else `LaneMisuse`): a condition excludes a concurrent writer only through a column that both change (4.2). Every
+row of `_cdc.transitions` carries lane, epoch, `seq` and `detail`; `seq` is the lane's fence counter `n` after the
+commit, strictly increasing per lane, with gaps at take-overs and registrations. The leader row is the exception:
+callers may not update it, so the take-over (bootstrap) and `md.schema.release` write it, and package L appends
+the leader machine's row to `_cdc.transitions` in the same transaction.
+
 | Machine | Key | States |
 |---|---|---|
 | leader | the one leader row | `released` → `leading`; `leading` → `leading` (take-over, epoch + 1); `leading` → `released`. Why a run ended (superseded, failed, released) is the cause in `_cdc.transitions`. Written by the bootstrap with its own copy of the machine (section 4) |
@@ -764,3 +809,4 @@ src/cdc_v2/oracle/          source/destination comparison used by every test tie
 | 17 | SPEC 4.2 "a newcomer exits within 10 s": measured from the first line of `main.py`; the platform's own start time varies (p95 7 s, max 21 s in the spike) and is outside our control | reported to the owner |
 | 18 | A table without a key on a standby whose server has the exported-snapshot defect (7.1, 7.4) | Decided by the coordinator, reported to the owner: a quiet exported snapshot within a bounded, declared wait (default 60 s); if none comes, one reader with its own snapshot; on a server with the fix a plain exported snapshot (cut.md 7.1) |
 | 19 | Two Postgres defects found in P3: exported snapshots on a standby (fixed upstream, not released), a standby that hides a commit after a restart (cut.md 8, not reported) | Owner decides whether to report the second upstream; re-check the first when 16.16, 17.12, 18.7 appear |
+| 20 | DuckDB 1.5.6 and MotherDuck do not record an UPDATE that writes an equal value, so such a write neither stores distinguishable equal values (`-0`/`0`, `1 mon`/`30 days`, package A) nor takes part in write-write conflict detection (package D, 4.2). This is not in DuckDB's concurrency documentation, so it looks like a defect to report upstream | the owner decides |

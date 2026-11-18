@@ -67,7 +67,9 @@ inside the process before a value is buffered on disk or sent anywhere); the lon
   uses MotherDuck's clock (design 4.1). No code compares a local wall clock with a stored time.
 - Every blocking call takes a deadline (SPEC 4.5): a `cdc_v2.deadline.Deadline` (monotonic; `Deadline.after`,
   `remaining`, `check`, `within`, `sleep`). A package offers no call that can wait for ever. A deadline that passes
-  raises `cdc_v2.deadline.DeadlineExceeded`, the one class for this in every package.
+  raises `cdc_v2.deadline.DeadlineExceeded`, the one class for this in every package. The client's `interrupt()`
+  does not end a statement that runs on MotherDuck: a MotherDuck statement's deadline is enforced by a server
+  interrupt sent from a second connection, as package D does (`docs/design/destination.md` section 4, finding 10).
 - Evidence files are written through `cdc_v2.testing.harness_evidence.write_evidence` only (it scrubs paths and
   the user name, then refuses what is left).
 - Logs go through `logging` with structured fields; no value of a source row is ever logged (SPEC 8.3).
@@ -93,7 +95,9 @@ Delivered; the contract is `docs/testing/harness.md`.
   is the only way to produce "commit in flight when the process died".
 - A point that is declared and never reached by the crash runner is a failure of the suite, not a pass.
 - `cdc_v2.faultsites`: `declare_site(name, description)`, `fault_site(name)` immediately before a call to an
-  outside service that the TCP proxy cannot reach (MotherDuck). Package D owns the `md.*` sites.
+  outside service that the TCP proxy cannot reach (MotherDuck). Package D owns the `md.*` sites: as built (D)
+  `md.connect`, `md.execute`, `md.fence`, `md.commit` and `md.commit_reply` (after the destination executed
+  `COMMIT`, before the caller sees the answer).
 - Process control, the crash runner, the TCP fault proxy and the byte-stream relay are in `cdc_v2.testing`; a
   package's crash and fault tests use them and do not build their own.
 
@@ -377,6 +381,12 @@ with lane.transaction(deadline) as tx:
 md.clock_sql                                   # the expression for MotherDuck's clock (4.1)
 ```
 
+As built (D): `docs/design/destination.md` is the contract where it is more precise than this section. Its
+contract notes (section 13, notes 1 to 51) say how each open point of C4 and C5 was read, and its section 15 says
+what every caller must know. In short: `md.configure(settings)` once per process or `md.connect(role, settings)`;
+a deadline is a `Deadline`, never a number; `tx.execute_one`, `tx.fetchone`, `tx.fetchall`, `tx.fetch_arrow`,
+`tx.register`, `tx.clock_us`.
+
 Errors (all in `cdc_v2.md.errors`, all subclasses of `DestinationError` except the deadline):
 
 | Error | Meaning | What the caller may do |
@@ -386,9 +396,12 @@ Errors (all in `cdc_v2.md.errors`, all subclasses of `DestinationError` except t
 | `Conflict` | the transaction lost a write-write conflict and was rolled back; nothing was applied | run it again from the start |
 | `ConnectionLost` | the connection was lost before `COMMIT` was sent; nothing was applied | run it again from the start; the lane has replaced the connection |
 | `cdc_v2.deadline.DeadlineExceeded` | a statement before `COMMIT` was interrupted; rolled back; the connection is closed and replaced | as the caller's own deadline rule says |
+| `md.StatementError(where, error_class, statement)` | the destination refused a statement (a conversion or constraint error, a missing name, text that does not parse); rolled back | count it as a failure of the table (C10); never put it into the transport retry loop with `Conflict` and `ConnectionLost` |
 
-Any other error of the destination (a statement that is wrong, a value that does not fit) is passed on unchanged
-after the roll-back; it is not a transport error and is never retried blindly.
+Any other error of the destination (a statement that is wrong, a value that does not fit) is, as built (D),
+`md.StatementError`. Its message keeps the error class and the kind of the statement, never a value; the client's
+text is not passed on (SPEC 8.3). `md.LaneMisuse` is not a `DestinationError`: it marks a programming error (a
+nested block, a second thread, a statement the layer refuses) and is never caught with the errors above (C12).
 
 **Run-again rule.** A sent `COMMIT` can become durable up to about 2 s after its client is gone, and a dead
 client's open transaction can hold its rows for about 30 s (`docs/spike/md_semantics.md`). So every transaction
@@ -398,20 +411,39 @@ condition on the value it read (the applied position, the chunk's state, the mac
 exactly one row changed. Then a late first copy and the second copy can never both commit. The lane offers
 `tx.execute_one(sql, params)` for such a statement: it raises `Conflict` when the statement changed no row.
 
+As built (D), three more rules belong to the run-again rule:
+
+- A condition excludes a concurrent writer only through a column that both change. `expect`, a self-transition
+  or `SET c = c` excludes nothing: DuckDB and MotherDuck do not record a write of an equal value into a column
+  with no update since its last checkpoint (`docs/design/destination.md` finding 24).
+- The wait after `CommitUnknown` is no bound: a `COMMIT` held by the network landed 4 s later. Only a
+  conditional write decides (destination finding 4).
+- `COMMIT` after a failed statement answers OK and commits nothing (destination finding 11). Only the lane
+  commits; code outside the layer never takes such an OK for a commit.
+
 Crash points of a lane, declared by package D for each lane name: `<lane>.fenced` (fence statement executed),
 `<lane>.commit_sent` (immediately before `COMMIT`; run with `kill_later`), `<lane>.committed` (`COMMIT` returned).
-Fault sites: `md.connect`, `md.execute`, `md.fence`, `md.commit`.
+Fault sites: `md.connect`, `md.execute`, `md.fence`, `md.commit`, `md.commit_reply`. `md.waiting_calls()` counts the
+calls of given-up connections that still wait; past `Settings.max_waiting_calls` a call fails at once with
+`ConnectionLost`.
 
 Every call has a deadline; none can wait for ever (SPEC 4.5). No other module issues `BEGIN`, `COMMIT` or the fence
-statement.
+statement. Only `cdc_v2.md` opens a connection to the destination; a DuckDB database that a module needs to
+compute with is opened as `duckdb.connect(":memory:", …)`, with that literal, and no SQL text outside the layer
+attaches a database or names `md:` (static tests; destination contract note 37). Writes run only inside a lane
+transaction: outside one, `Connection.execute`, `fetchall` and `fetchone` take reads only. No caller may `UPDATE`
+`_cdc.leader`, `_cdc.fence` or `_cdc.heartbeat`; the heartbeat and the release are statements of the layer
+(`md.schema.heartbeat`, `md.schema.release`).
 
 Lanes and their fence rows are a fixed set, created with the leader tables at initialisation (`stream`, `control`,
 `backfill.0` … `backfill.15`); no fence row is ever added later, because a row added during a take-over would
 keep the old epoch.
 
 Connections. Every connection of a lane appends (epoch, lane, server connection id) to `_cdc.connections` before
-its first transaction, in one autocommit statement that inserts only if `_cdc.leader` still holds that epoch (no
-row inserted ⇒ `FenceLost`). A take-over interrupts every listed connection of earlier epochs and gives up after
+its first transaction. A registration is its own transaction: `UPDATE _cdc.fence SET n = n + 1 WHERE lane = :l AND
+epoch = :e` (one row, else `FenceLost`), the `INSERT`, then `COMMIT` (`md.registry.register`). The heartbeat
+connection registers under `control` and retries `Conflict`. A registration on a lane makes an open transaction of
+that lane that has not yet reached its fence fail with `Conflict`; the caller runs it again as usual. A take-over interrupts every listed connection of earlier epochs and gives up after
 its deadline (design 4.5). A lane that replaces a connection first interrupts the old server connection by id,
 so that an abandoned transaction cannot keep holding a fence row.
 
@@ -425,21 +457,38 @@ package, run only by a leader after its take-over, in fenced `control`-lane tran
 
 `_cdc` schema: created and migrated by `cdc_v2.md.schema` only; every package adds its tables there.
 
+`seq` in `_cdc.transitions` is the lane's `n` after the commit: strictly increasing per lane, with gaps at
+take-overs and registrations. Check uniqueness and order, never the absence of gaps.
+
 From apply: `tx.fetch_arrow(sql, params)` returns a complete Arrow table; `tx.register(name, table)` takes lower-case
 names, registering again replaces, and names are released when the transaction ends. Apply relies on `rowid` staying
 the same within one transaction. Every private DuckDB of the pipeline (the transform connection, apply's planning
 database, `reduce_duplicates`) spills only into the run's one spill area, its cursors use `SET SESSION`, and the sum
 of their limits is the area's limit.
 
-Alerts: `alerts.emit(tx, kind, severity, fields)` records an alert in `_cdc.alerts` inside the caller's transaction
+Alerts: `alerts.emit(tx, kind, severity, fields=None, key=())` (as built (D); also `alerts.resolve`, `alerts.emit_now`;
+destination contract note 25) records an alert in `_cdc.alerts` inside the caller's transaction
 (delivery to Slack is built in the operations wave and reads that table). Packages raise alerts only this way.
 
 ### C5 Transition function (package D)
 
 ```python
-state.transition(tx, machine, key, from_state, to_state, cause)   # inside the caller's transaction
+state.transition(tx, machine, key, from_state, to_state, cause, *, detail=None, values=None, expect=None)
+state.create(tx, machine, key, state, cause, values=None, detail=None)
 state.read(conn_or_tx, machine, key) -> state
 ```
+
+As built (D):
+
+- `Machine(creators=…)` names who creates the keys of a machine: lane names, or `state.FRESH_IDS` for fresh
+  random ids; `create` on any other lane is `LaneMisuse`. A child row is created together with a transition of
+  its parent row.
+- `transition` takes `values` (the row's other columns, in the same `UPDATE`), `expect` (the values the
+  transaction read; a changed value is `Conflict`, the run-again rule) and `detail` (identifiers, positions,
+  counts, durations). `expect` only on columns in `values`; a self-transition only with `values` (else
+  `LaneMisuse`): a condition excludes a concurrent writer only through a column that both change (C4).
+- `state` and `alerts` accept only an `md.Transaction` for a write; `state.read` takes a connection too.
+- Every row of `_cdc.transitions` carries lane, epoch, `seq` and `detail` (`seq` as C4 says).
 
 Each machine is declared once as a state set and a transition table, by the package that owns it, with
 `state.declare(machine)`; the function refuses a pair that is not in the table, refuses when the stored state is
@@ -449,7 +498,9 @@ transitions are accepted (SPEC 1.9); every owning package calls it for its machi
 
 One exception to "no other code": the leader machine is written by `main.py`, which cannot import the package
 before the clone. It carries its own copy of that machine (states `leading`, `released`; why a run ended is the
-cause of the transition), and a T0 test compares the copy with the declaration.
+cause of the transition), and a T0 test compares the copy with the declaration. As built (D), no caller may
+update the leader row, so `state.transition` cannot move it: the take-over (bootstrap) and `md.schema.release`
+write it, and package L appends the leader machine's row to `_cdc.transitions` in the same transaction.
 
 ### C6 Platform (package L)
 
@@ -590,7 +641,9 @@ cut (`cut.sealed`). A cut from a one-attempt function (`take_standby_cut_own`, `
   point) and enacts a backfill of every CDC table, in one stream-lane transaction (design section 8). The
   function that does it belongs to S, because S owns `_cdc.stream_state`:
   `stream.reposition(tx, position, tables, cause)` — the position set (in any direction), a backfill request
-  enacted for each table with `P0` = that position (after a gap), the alert, all in `tx`. V calls it for a
+  enacted for each table with `P0` = that position (after a gap), the alert, all in `tx`. It writes the
+  position with a condition on the value it read in `tx`, so that a late commit of an earlier copy never moves
+  it back; a `reposition` to the same position relies on nothing. V calls it for a
   finding; S calls it for a message that fails again and again at one position (SPEC 4.3, last line); P4 calls it
   for the lag rule of SPEC 3.6. Every `stream.reposition` is followed by a new engine: an engine keeps the highest
   `DURABLE` of its life, so one that outlived a move backwards would still confirm the old, higher position.
@@ -635,7 +688,17 @@ cut (`cut.sealed`). A cut from a one-attempt function (`take_standby_cut_own`, `
   of restarts), the engine started again without it in its include list, and a backfill after a gap once
   `replica_identity_problem` is `None` again.
 - S runs a group again after `Conflict`, a bounded number of times, building its statements again when the
-  conflict came from a DDL (a swap changes the catalog).
+  conflict came from a DDL (a swap changes the catalog). The bound leaves room for a take-over: an interrupted
+  transaction frees its rows after about 1 s, an abandoned one after about 29 s (design 4.5).
+- **A swap and the other writers of its table** (as built (D), the second reviewer's E1). A DDL that drops a table
+  does not conflict with a committed write of another lane to that table: the swap and an `INSERT` of another
+  lane, committed first, both commit, and the inserted rows are lost with the dropped table. So the swap and
+  every lane that writes that table must conflict: the swap transaction changes a column of the table's state
+  row that every writer of the table also changes. Or the writes to a table in swap go only through the swap's
+  lane. B and S choose one and test it.
+- S, B, T and V write only inside lane transactions (autocommit takes reads only), put `expect` only on columns
+  in `values`, and move a state or a position only with a condition on the value they read, through a column
+  that the write changes (C4, C5).
 - `ApplySpillFull` is not a failure of a table: it never counts towards `apply.max_table_attempts` (task S).
 - A table that fails to apply `apply.max_table_attempts` times (default 3) leaves the stream: state `quarantined`,
   routing `skip`, alert, in a stream-lane transaction; the group is then applied without it (design section 3).
@@ -647,6 +710,10 @@ cut (`cut.sealed`). A cut from a one-attempt function (`take_standby_cut_own`, `
   deadline, and not after it. Slot creation, the attach step after a take-over, a commit in flight and the wait
   for a replica to reach `P0` are declared this way.
 - Until package S delivers the supervisor, package L builds against this interface with a stand-in of its own.
+- As built (D): calls on a black-holed path return within their bounds, but the calls a connection gave up keep
+  waiting until the path heals. The supervisor reads `md.waiting_calls()` and ends the process past a bound
+  (package L sets it). A lane block's default deadline (`Settings.transaction_deadline_s`, 300 s) is longer than
+  the 120 s of SPEC 4.5: a block that may last longer than that is a declared wait, or has a shorter deadline.
 
 ### C12 Pipeline process (packages S, L)
 
@@ -659,6 +726,8 @@ cut (`cut.sealed`). A cut from a one-attempt function (`take_standby_cut_own`, `
 - Exit status of the pipeline, passed on by the bootstrap: `0` only after a committed release (planned
   hand-over); `10` when the run was superseded (`FenceLost`, or a heartbeat that changed no row); any other
   value is a failure.
+- `md.LaneMisuse` is a programming error: it is never caught with `DestinationError`, nothing is retried, and the
+  pipeline exits with a failure status (neither `0` nor `10`).
 - Inside the pipeline, `cdc_v2.leader` (L) owns the heartbeat thread, the tick, the one reaction to `FenceLost`
   and the hand-over clock; `cdc_v2.supervisor` (S) owns progress and the restart of components; the stream
   component (S) offers `finish_current_group(deadline)` for the hand-over. `cdc_v2.pipeline` (S) is the process
@@ -829,6 +898,17 @@ accepted, a swap before `R1` is passed, catch-up before all snapshots are passed
 several snapshots, an unsettled standby); a double apply after `CommitUnknown`; a table with a deferrable key applied
 on the keyed path (rule K), also through an engine started with an empty list of tables without a key; a slot that is
 ahead or recreated and ignored (V); a `FATAL` repeated at one position (SPEC 4.3).
+
+**From the merge of D, for round 2 of F.** The leadership fuzzer and the crash suite take over at `<lane>.fenced`
+and at `<lane>.commit_sent` right after a `CHECKPOINT`, in every seed: that is where a take-over that writes the
+epoch alone let an old run commit (`docs/design/destination.md` section 14.4). After every round: the fence rows'
+epoch equals the leader's epoch, and the old lane's next transaction gets `FenceLost`. The planted defect is that
+take-over, which writes the fence rows' epoch without `n` (`take_over(…, as_designed=True)` in
+`cdc_v2.testing.destination`); it must be caught. "Never two writers" checks `seq` for uniqueness and order per
+lane, never for the absence of gaps (gaps come at take-overs and registrations). The black-hole fuzzer measures
+the calls still waiting (`md.waiting_calls()`). The destination faults include `md.commit_reply`. The workload
+seeds transport phrases (`Conflict`, connection errors) into values: a refused statement stays
+`md.StatementError` and is never taken for a transport error (the head rule, destination section 5).
 
 **The ledger of SPEC section 4 (rules of the orchestrator, 2026-11-10).** No run against the toy replicator
 counts toward a bar. The counters of a fuzzer restart from zero after any change to correctness code, and a
