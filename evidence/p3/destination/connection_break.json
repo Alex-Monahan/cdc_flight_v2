@@ -1,0 +1,273 @@
+{
+  "command": "see results.<key>.command (each result names the run that wrote it)",
+  "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
+  "results": {
+    "fault_sites_in_a_child": {
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py",
+      "commit": "0fff918",
+      "date_utc": "2026-11-18 14:32",
+      "sites": {
+        "md.commit": {
+          "check": {
+            "doubles": 0,
+            "n": 12,
+            "pos": 12,
+            "rows": 12,
+            "source": 12
+          },
+          "error_the_sut_got": [
+            "CommitUnknown"
+          ],
+          "events": [
+            "intend:9-12",
+            "error:CommitUnknown",
+            "intend:9-12",
+            "done:9-12"
+          ],
+          "seconds_until_caught_up": 4.05,
+          "transaction_at_the_fault_committed": false
+        },
+        "md.commit_reply": {
+          "check": {
+            "doubles": 0,
+            "n": 15,
+            "pos": 15,
+            "rows": 15,
+            "source": 15
+          },
+          "error_the_sut_got": [
+            "CommitUnknown"
+          ],
+          "events": [
+            "intend:12-15",
+            "error:CommitUnknown",
+            "intend:15-15",
+            "done:15-15"
+          ],
+          "seconds_until_caught_up": 0.54,
+          "transaction_at_the_fault_committed": true
+        },
+        "md.execute": {
+          "check": {
+            "doubles": 0,
+            "n": 6,
+            "pos": 6,
+            "rows": 6,
+            "source": 6
+          },
+          "error_the_sut_got": [
+            "ConnectionLost"
+          ],
+          "events": [
+            "error:ConnectionLost",
+            "intend:3-6",
+            "done:3-6"
+          ],
+          "seconds_until_caught_up": 1.27,
+          "transaction_at_the_fault_committed": false
+        },
+        "md.fence": {
+          "check": {
+            "doubles": 0,
+            "n": 9,
+            "pos": 9,
+            "rows": 9,
+            "source": 9
+          },
+          "error_the_sut_got": [
+            "ConnectionLost"
+          ],
+          "events": [
+            "intend:6-9",
+            "error:ConnectionLost",
+            "intend:6-9",
+            "done:6-9"
+          ],
+          "seconds_until_caught_up": 1.46,
+          "transaction_at_the_fault_committed": false
+        }
+      }
+    },
+    "real_break": {
+      "cases": {
+        "blackhole_statement": {
+          "check": {
+            "doubles": 0,
+            "n": 12,
+            "pos": 12,
+            "rows": 12,
+            "source": 12
+          },
+          "child_frozen_at": "sut.begun",
+          "errors_the_sut_got": [
+            "DeadlineExceeded"
+          ],
+          "events": [
+            "error:DeadlineExceeded",
+            "intend:9-12",
+            "done:9-12",
+            "exit:0"
+          ],
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "signal_name": null
+          },
+          "ms_of_first_error_after_process_start": 7919,
+          "proxy_connections_accepted": 2,
+          "proxy_connections_reset": 0,
+          "recovered_by_itself": true,
+          "rows_of_the_child": 6,
+          "seconds_from_lifting_to_exit": 4.9,
+          "transaction_at_the_break_committed": false,
+          "what": "nothing passes in either direction from the next statement on; the proxy passes again 8 s later (what it held is then delivered)"
+        },
+        "commit_answer_lost": {
+          "check": {
+            "doubles": 0,
+            "n": 18,
+            "pos": 18,
+            "rows": 18,
+            "source": 18
+          },
+          "child_frozen_at": "stream.commit_sent",
+          "errors_the_sut_got": [
+            "CommitUnknown"
+          ],
+          "events": [
+            "error:CommitUnknown",
+            "intend:18-18",
+            "done:18-18",
+            "exit:0"
+          ],
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "signal_name": null
+          },
+          "ms_of_first_error_after_process_start": 11812,
+          "proxy_connections_accepted": 4,
+          "proxy_connections_reset": 2,
+          "recovered_by_itself": true,
+          "rows_of_the_child": 6,
+          "seconds_from_lifting_to_exit": 6.8,
+          "transaction_at_the_break_committed": true,
+          "what": "the COMMIT reaches MotherDuck, nothing comes back; after the child's error the connections are reset and the proxy passes again"
+        },
+        "commit_delivered_late": {
+          "check": {
+            "doubles": 0,
+            "n": 24,
+            "pos": 24,
+            "rows": 24,
+            "source": 24
+          },
+          "child_frozen_at": "stream.commit_sent",
+          "errors_the_sut_got": [
+            "CommitUnknown"
+          ],
+          "events": [
+            "error:CommitUnknown",
+            "intend:24-24",
+            "done:24-24",
+            "exit:0"
+          ],
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "signal_name": null
+          },
+          "ms_of_first_error_after_process_start": 11814,
+          "proxy_connections_accepted": 2,
+          "proxy_connections_reset": 0,
+          "recovered_by_itself": true,
+          "rows_of_the_child": 6,
+          "seconds_from_lifting_to_exit": 4.8,
+          "transaction_at_the_break_committed": true,
+          "what": "the COMMIT is held by the proxy; 4 s after the child's error the proxy passes again and delivers what it held: the late COMMIT and the statements of the child's next attempt"
+        },
+        "commit_never_arrives": {
+          "check": {
+            "doubles": 0,
+            "n": 30,
+            "pos": 30,
+            "rows": 30,
+            "source": 30
+          },
+          "child_frozen_at": "stream.commit_sent",
+          "errors_the_sut_got": [
+            "CommitUnknown"
+          ],
+          "events": [
+            "error:CommitUnknown",
+            "intend:27-30",
+            "done:27-30",
+            "exit:0"
+          ],
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "signal_name": null
+          },
+          "ms_of_first_error_after_process_start": 11805,
+          "proxy_connections_accepted": 4,
+          "proxy_connections_reset": 2,
+          "recovered_by_itself": true,
+          "rows_of_the_child": 6,
+          "seconds_from_lifting_to_exit": 6.9,
+          "transaction_at_the_break_committed": false,
+          "what": "the COMMIT is held by the proxy; after the child's error the connections are reset, so the COMMIT is never delivered"
+        },
+        "reset": {
+          "check": {
+            "doubles": 0,
+            "n": 6,
+            "pos": 6,
+            "rows": 6,
+            "source": 6
+          },
+          "child_frozen_at": "sut.written",
+          "errors_the_sut_got": [],
+          "events": [
+            "intend:3-6",
+            "done:3-6",
+            "exit:0"
+          ],
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "signal_name": null
+          },
+          "proxy_connections_accepted": 3,
+          "proxy_connections_reset": 2,
+          "recovered_by_itself": true,
+          "rows_of_the_child": 6,
+          "seconds_from_lifting_to_exit": 4.5,
+          "transaction_at_the_break_committed": "committed normally, no error",
+          "what": "every TCP connection of the child is reset (RST) while its transaction is open; then the proxy passes again and the child goes on"
+        }
+      },
+      "child_options": {
+        "exit_idle": 4.0,
+        "grace": 1,
+        "stmt_deadline": 4,
+        "tx_deadline": 8
+      },
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py",
+      "commit": "0fff918",
+      "date_utc": "2026-11-18 14:34",
+      "proxy": {
+        "accepted": 15,
+        "closed_by_fault": 0,
+        "reset_by_fault": 6
+      },
+      "relay_tunnels": 13
+    }
+  },
+  "versions": {
+    "duckdb_client": "1.5.6",
+    "platform": "Darwin arm64",
+    "python": "3.13.1"
+  },
+  "what": "a lost connection in a SUT process. fault_sites_in_a_child: a fault site raises a connection error once. real_break: the client library of the child reaches MotherDuck through a local proxy chain (environment https_proxy and grpc_proxy of the child point to the harness NetProxy, which forwards to a small CONNECT relay in the test process); the test resets or black-holes the proxy"
+}

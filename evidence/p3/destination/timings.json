@@ -1,0 +1,73 @@
+{
+  "command": "see results.<key>.command (each result names the run that wrote it)",
+  "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
+  "results": {
+    "connect": {
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md.py",
+      "commit": "1599194",
+      "date_utc": "2026-11-18 13:43",
+      "seconds": [
+        0.066,
+        0.068,
+        0.078,
+        0.07,
+        0.066
+      ],
+      "what": "md.connect() five times in one process, one after the other, to a database that this process already has open (the fixture connected once before); each call includes SET TimeZone, reading the connection id and one statement on the server"
+    },
+    "lane_transaction": {
+      "begin": {
+        "max_ms": 0.8,
+        "median_ms": 0.5,
+        "min_ms": 0.1,
+        "n": 25,
+        "p90_ms": 0.7
+      },
+      "clock_reading": {
+        "max_ms": 107.5,
+        "median_ms": 67.2,
+        "min_ms": 63.9,
+        "n": 25,
+        "p90_ms": 69.3
+      },
+      "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md.py",
+      "commit": "1599194",
+      "commit_after_fence": {
+        "max_ms": 80.1,
+        "median_ms": 68.2,
+        "min_ms": 64.8,
+        "n": 25,
+        "p90_ms": 72.9
+      },
+      "date_utc": "2026-11-18 13:43",
+      "empty_lane_transaction": {
+        "max_ms": 140.4,
+        "median_ms": 134.4,
+        "min_ms": 127.9,
+        "n": 25,
+        "p90_ms": 138.3
+      },
+      "fence_statement": {
+        "max_ms": 73.6,
+        "median_ms": 66.6,
+        "min_ms": 62.2,
+        "n": 25,
+        "p90_ms": 70.3
+      },
+      "lane_transaction_with_one_update": {
+        "max_ms": 229.4,
+        "median_ms": 202.1,
+        "min_ms": 191.3,
+        "n": 25,
+        "p90_ms": 209.6
+      },
+      "what": "one process, one connection, 25 repetitions each; an empty lane transaction is BEGIN, the fence statement and COMMIT; the parts were measured on a plain client connection with the same texts"
+    }
+  },
+  "versions": {
+    "duckdb_client": "1.5.6",
+    "platform": "Darwin arm64",
+    "python": "3.13.1"
+  },
+  "what": "Timings of the destination layer against MotherDuck"
+}

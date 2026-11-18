@@ -1,0 +1,127 @@
+{
+  "d_full": {
+    "command": "uv run pytest -p no:cacheprovider -m d_full tests/destination",
+    "commit": "7193b39",
+    "passed": 8,
+    "seconds": 2.9
+  },
+  "date_utc": "2026-11-10",
+  "default_run": {
+    "command": "uv run pytest -p no:cacheprovider",
+    "commit": "7193b39",
+    "deselected": 431,
+    "failed": 0,
+    "passed": 997,
+    "seconds": 76.68,
+    "skipped": 4,
+    "subtests_passed": 24
+  },
+  "delivered_commit_differs_from_the_run_commit_in": "documents, evidence files and tests/destination/probes/probe_unchanged_write.py (a probe the tests do not import)",
+  "earlier_md_runs": {
+    "commit": "88e0cf1",
+    "test_md.py": "31 passed in 308 s",
+    "test_md_again.py": "71 passed in 597 s, two -k runs",
+    "test_md_procs.py": "10 passed in 1071 s, six -k runs"
+  },
+  "fix_round_2": {
+    "campaign_run_4": "513 rounds on 50229d7, 257 of them the reviewer's case, 0 breaches (fence_campaign.json)",
+    "default_run": {
+      "command": "uv run pytest -p no:cacheprovider",
+      "commit": "1599194",
+      "deselected": 742,
+      "failed": 0,
+      "passed": 1415,
+      "seconds": 110.5,
+      "skipped": 4,
+      "subtests_passed": 24,
+      "xfailed": 1
+    },
+    "frozen_transaction_kept_s": "28.7 to 29.0 s, bound 45 s (takeover_open_tx.json)",
+    "md_runs": {
+      "test_md.py": "31 passed in 297 s (1599194)",
+      "test_md_again.py": "92 passed in 724 s (1599194)",
+      "test_md_fix_round.py": "2 passed in 95 s (1599194)",
+      "test_md_procs.py": "10 passed in 1047 s (0fff918); on 1599194: 1 failed, the same-epoch case at sut.moved, whose assertion 0fff918 restates for the monotone counter"
+    },
+    "md_runs_before": {
+      "50229d7": "test_md.py 7 failed (counter values of a counter that was put back), test_md_again.py 92 passed, test_md_fix_round.py 2 passed, test_md_procs.py stopped after 5 passed for a pause"
+    },
+    "tests_of_the_package": {
+      "command": "uv run pytest -p no:cacheprovider tests/destination",
+      "commit": "1599194",
+      "deselected": 144,
+      "passed": 391,
+      "seconds": 21.7
+    }
+  },
+  "machine_note": "10 cores, 16 GB, shared with other workers of the same build; the MotherDuck account was shared with them; the fence campaign ran at the same time as the MotherDuck test files",
+  "md_runs": {
+    "command": "tools/with-env uv run -q pytest -m md tests/destination/<file>",
+    "commit": "7193b39",
+    "files": {
+      "test_md.py": {
+        "ended_utc": "19:55:14",
+        "exit": "rc=0",
+        "result": "31 passed in 358.23s (0:05:58)"
+      },
+      "test_md_again.py": {
+        "ended_utc": "20:10:07",
+        "exit": "rc=0",
+        "result": "88 passed in 892.55s (0:14:52)"
+      },
+      "test_md_fix_round.py": {
+        "ended_utc": "20:12:01",
+        "exit": "rc=0",
+        "result": "2 passed in 113.28s (0:01:53)"
+      },
+      "test_md_procs.py": {
+        "ended_utc": "20:32:13",
+        "exit": "rc=0",
+        "result": "10 passed in 1211.59s (0:20:11)"
+      }
+    }
+  },
+  "md_runs_before_the_fix_of_F0": {
+    "commit": "e671405",
+    "failed": [
+      "test_md_procs.py::test_two_processes_with_the_same_epoch (sut.moved: the frozen transaction was ended by MotherDuck, the second process applied its events; exactly-once held)",
+      "test_md_procs.py::test_a_real_connection_break_in_a_child (commit_never_arrives: the held COMMIT landed after the reset)"
+    ],
+    "files": {
+      "test_md.py": {
+        "ended_utc": "19:06:22",
+        "exit": "rc=0",
+        "result": "31 passed in 327.00s (0:05:26)"
+      },
+      "test_md_again.py": {
+        "ended_utc": "19:19:19",
+        "exit": "rc=0",
+        "result": "88 passed in 776.61s (0:12:56)"
+      },
+      "test_md_fix_round.py": {
+        "ended_utc": "19:21:00",
+        "exit": "rc=0",
+        "result": "2 passed in 100.55s (0:01:40)"
+      },
+      "test_md_procs.py": {
+        "ended_utc": "19:39:01",
+        "exit": "rc=1",
+        "result": "2 failed, 8 passed in 1080.37s (0:18:00)"
+      }
+    },
+    "what_was_done": "both assertions accept the outcome the layer does not decide (docs/design/destination.md 8.2, 9.2); the runs were made again on 7193b39 after the fix of F0"
+  },
+  "tests_of_the_package_in_the_default_run": {
+    "command": "uv run pytest -p no:cacheprovider tests/destination",
+    "commit": "7193b39",
+    "deselected": 139,
+    "passed": 385,
+    "seconds": 21.9
+  },
+  "versions": {
+    "duckdb_client": "1.5.6",
+    "platform": "Darwin arm64",
+    "python": "3.13.1"
+  },
+  "what": "the last runs of package D in the fix round: the default run, the d_full matrices, and one recorded run of each MotherDuck test file without -k (fix round, item 5)"
+}

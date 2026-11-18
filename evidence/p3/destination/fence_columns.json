@@ -1,0 +1,607 @@
+{
+  "command": "tools/with-env uv run python tests/destination/probes/probe_fence_columns.py",
+  "date_utc": "2026-11-10 07:18",
+  "fence_statements": {
+    "n_and_epoch_parameter (as built)": "UPDATE _cdc.fence SET n = n + 1, epoch = $epoch WHERE lane = $lane AND epoch = $epoch",
+    "n_and_epoch_same_column": "UPDATE _cdc.fence SET n = n + 1, epoch = epoch WHERE lane = $lane AND epoch = $epoch",
+    "n_only (design 4.2)": "UPDATE _cdc.fence SET n = n + 1 WHERE lane = $lane AND epoch = $epoch"
+  },
+  "local_duckdb": [
+    {
+      "fence_statement": "n_only (design 4.2)",
+      "old_commits": 5,
+      "order": "stale",
+      "rounds": 5,
+      "take_over_statement": "epoch_only (design 4.5)",
+      "take_overs_committed": 5,
+      "violations": 5,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "take-over COMMIT: committed",
+          "old fence statement: 1 row",
+          "old COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_only (design 4.2)",
+      "old_commits": 5,
+      "order": "fenced",
+      "rounds": 5,
+      "take_over_statement": "epoch_only (design 4.5)",
+      "take_overs_committed": 5,
+      "violations": 5,
+      "what_happened": [
+        [
+          "old fence statement: 1 row",
+          "take-over statement: ok",
+          "take-over COMMIT: committed",
+          "old COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_only (design 4.2)",
+      "old_commits": 5,
+      "order": "overlap",
+      "rounds": 5,
+      "take_over_statement": "epoch_only (design 4.5)",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "old fence statement: 1 row",
+          "old COMMIT: committed",
+          "take-over COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_only (design 4.2)",
+      "old_commits": 0,
+      "order": "stale",
+      "rounds": 5,
+      "take_over_statement": "epoch_and_n",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "take-over COMMIT: committed",
+          "old fence statement: TransactionException: TransactionContext Error: Conflict on update!"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_only (design 4.2)",
+      "old_commits": 5,
+      "order": "fenced",
+      "rounds": 5,
+      "take_over_statement": "epoch_and_n",
+      "take_overs_committed": 0,
+      "violations": 0,
+      "what_happened": [
+        [
+          "old fence statement: 1 row",
+          "take-over statement: TransactionException: TransactionContext Error: Conflict on update!",
+          "old COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_only (design 4.2)",
+      "old_commits": 0,
+      "order": "overlap",
+      "rounds": 5,
+      "take_over_statement": "epoch_and_n",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "old fence statement: TransactionException: TransactionContext Error: Conflict on update!",
+          "take-over COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_same_column",
+      "old_commits": 0,
+      "order": "stale",
+      "rounds": 5,
+      "take_over_statement": "epoch_only (design 4.5)",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "take-over COMMIT: committed",
+          "old fence statement: TransactionException: TransactionContext Error: Conflict on update!"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_same_column",
+      "old_commits": 5,
+      "order": "fenced",
+      "rounds": 5,
+      "take_over_statement": "epoch_only (design 4.5)",
+      "take_overs_committed": 0,
+      "violations": 0,
+      "what_happened": [
+        [
+          "old fence statement: 1 row",
+          "take-over statement: TransactionException: TransactionContext Error: Conflict on update!",
+          "old COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_same_column",
+      "old_commits": 0,
+      "order": "overlap",
+      "rounds": 5,
+      "take_over_statement": "epoch_only (design 4.5)",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "old fence statement: TransactionException: TransactionContext Error: Conflict on update!",
+          "take-over COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_same_column",
+      "old_commits": 0,
+      "order": "stale",
+      "rounds": 5,
+      "take_over_statement": "epoch_and_n",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "take-over COMMIT: committed",
+          "old fence statement: TransactionException: TransactionContext Error: Conflict on update!"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_same_column",
+      "old_commits": 5,
+      "order": "fenced",
+      "rounds": 5,
+      "take_over_statement": "epoch_and_n",
+      "take_overs_committed": 0,
+      "violations": 0,
+      "what_happened": [
+        [
+          "old fence statement: 1 row",
+          "take-over statement: TransactionException: TransactionContext Error: Conflict on update!",
+          "old COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_same_column",
+      "old_commits": 0,
+      "order": "overlap",
+      "rounds": 5,
+      "take_over_statement": "epoch_and_n",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "old fence statement: TransactionException: TransactionContext Error: Conflict on update!",
+          "take-over COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_parameter (as built)",
+      "old_commits": 0,
+      "order": "stale",
+      "rounds": 5,
+      "take_over_statement": "epoch_only (design 4.5)",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "take-over COMMIT: committed",
+          "old fence statement: TransactionException: TransactionContext Error: Conflict on update!"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_parameter (as built)",
+      "old_commits": 5,
+      "order": "fenced",
+      "rounds": 5,
+      "take_over_statement": "epoch_only (design 4.5)",
+      "take_overs_committed": 0,
+      "violations": 0,
+      "what_happened": [
+        [
+          "old fence statement: 1 row",
+          "take-over statement: TransactionException: TransactionContext Error: Conflict on update!",
+          "old COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_parameter (as built)",
+      "old_commits": 0,
+      "order": "overlap",
+      "rounds": 5,
+      "take_over_statement": "epoch_only (design 4.5)",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "old fence statement: TransactionException: TransactionContext Error: Conflict on update!",
+          "take-over COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_parameter (as built)",
+      "old_commits": 0,
+      "order": "stale",
+      "rounds": 5,
+      "take_over_statement": "epoch_and_n",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "take-over COMMIT: committed",
+          "old fence statement: TransactionException: TransactionContext Error: Conflict on update!"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_parameter (as built)",
+      "old_commits": 5,
+      "order": "fenced",
+      "rounds": 5,
+      "take_over_statement": "epoch_and_n",
+      "take_overs_committed": 0,
+      "violations": 0,
+      "what_happened": [
+        [
+          "old fence statement: 1 row",
+          "take-over statement: TransactionException: TransactionContext Error: Conflict on update!",
+          "old COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_parameter (as built)",
+      "old_commits": 0,
+      "order": "overlap",
+      "rounds": 5,
+      "take_over_statement": "epoch_and_n",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "old fence statement: TransactionException: TransactionContext Error: Conflict on update!",
+          "take-over COMMIT: committed"
+        ]
+      ]
+    }
+  ],
+  "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build; times are indications only",
+  "motherduck": [
+    {
+      "fence_statement": "n_only (design 4.2)",
+      "old_commits": 5,
+      "order": "stale",
+      "rounds": 5,
+      "take_over_statement": "epoch_only (design 4.5)",
+      "take_overs_committed": 5,
+      "violations": 5,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "take-over COMMIT: committed",
+          "old fence statement: 1 row",
+          "old COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_only (design 4.2)",
+      "old_commits": 5,
+      "order": "fenced",
+      "rounds": 5,
+      "take_over_statement": "epoch_only (design 4.5)",
+      "take_overs_committed": 5,
+      "violations": 5,
+      "what_happened": [
+        [
+          "old fence statement: 1 row",
+          "take-over statement: ok",
+          "take-over COMMIT: committed",
+          "old COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_only (design 4.2)",
+      "old_commits": 5,
+      "order": "overlap",
+      "rounds": 5,
+      "take_over_statement": "epoch_only (design 4.5)",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "old fence statement: 1 row",
+          "old COMMIT: committed",
+          "take-over COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_only (design 4.2)",
+      "old_commits": 0,
+      "order": "stale",
+      "rounds": 5,
+      "take_over_statement": "epoch_and_n",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "take-over COMMIT: committed",
+          "old fence statement: TransactionException: TransactionContext Error: Conflict on update!"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_only (design 4.2)",
+      "old_commits": 5,
+      "order": "fenced",
+      "rounds": 5,
+      "take_over_statement": "epoch_and_n",
+      "take_overs_committed": 0,
+      "violations": 0,
+      "what_happened": [
+        [
+          "old fence statement: 1 row",
+          "take-over statement: TransactionException: TransactionContext Error: Conflict on update!",
+          "old COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_only (design 4.2)",
+      "old_commits": 0,
+      "order": "overlap",
+      "rounds": 5,
+      "take_over_statement": "epoch_and_n",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "old fence statement: TransactionException: TransactionContext Error: Conflict on update!",
+          "take-over COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_same_column",
+      "old_commits": 0,
+      "order": "stale",
+      "rounds": 5,
+      "take_over_statement": "epoch_only (design 4.5)",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "take-over COMMIT: committed",
+          "old fence statement: TransactionException: TransactionContext Error: Conflict on update!"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_same_column",
+      "old_commits": 5,
+      "order": "fenced",
+      "rounds": 5,
+      "take_over_statement": "epoch_only (design 4.5)",
+      "take_overs_committed": 0,
+      "violations": 0,
+      "what_happened": [
+        [
+          "old fence statement: 1 row",
+          "take-over statement: TransactionException: TransactionContext Error: Conflict on update!",
+          "old COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_same_column",
+      "old_commits": 0,
+      "order": "overlap",
+      "rounds": 5,
+      "take_over_statement": "epoch_only (design 4.5)",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "old fence statement: TransactionException: TransactionContext Error: Conflict on update!",
+          "take-over COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_same_column",
+      "old_commits": 0,
+      "order": "stale",
+      "rounds": 5,
+      "take_over_statement": "epoch_and_n",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "take-over COMMIT: committed",
+          "old fence statement: TransactionException: TransactionContext Error: Conflict on update!"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_same_column",
+      "old_commits": 5,
+      "order": "fenced",
+      "rounds": 5,
+      "take_over_statement": "epoch_and_n",
+      "take_overs_committed": 0,
+      "violations": 0,
+      "what_happened": [
+        [
+          "old fence statement: 1 row",
+          "take-over statement: TransactionException: TransactionContext Error: Conflict on update!",
+          "old COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_same_column",
+      "old_commits": 0,
+      "order": "overlap",
+      "rounds": 5,
+      "take_over_statement": "epoch_and_n",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "old fence statement: TransactionException: TransactionContext Error: Conflict on update!",
+          "take-over COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_parameter (as built)",
+      "old_commits": 0,
+      "order": "stale",
+      "rounds": 5,
+      "take_over_statement": "epoch_only (design 4.5)",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "take-over COMMIT: committed",
+          "old fence statement: TransactionException: TransactionContext Error: Conflict on update!"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_parameter (as built)",
+      "old_commits": 5,
+      "order": "fenced",
+      "rounds": 5,
+      "take_over_statement": "epoch_only (design 4.5)",
+      "take_overs_committed": 0,
+      "violations": 0,
+      "what_happened": [
+        [
+          "old fence statement: 1 row",
+          "take-over statement: TransactionException: TransactionContext Error: Conflict on update!",
+          "old COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_parameter (as built)",
+      "old_commits": 0,
+      "order": "overlap",
+      "rounds": 5,
+      "take_over_statement": "epoch_only (design 4.5)",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "old fence statement: TransactionException: TransactionContext Error: Conflict on update!",
+          "take-over COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_parameter (as built)",
+      "old_commits": 0,
+      "order": "stale",
+      "rounds": 5,
+      "take_over_statement": "epoch_and_n",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "take-over COMMIT: committed",
+          "old fence statement: TransactionException: TransactionContext Error: Conflict on update!"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_parameter (as built)",
+      "old_commits": 5,
+      "order": "fenced",
+      "rounds": 5,
+      "take_over_statement": "epoch_and_n",
+      "take_overs_committed": 0,
+      "violations": 0,
+      "what_happened": [
+        [
+          "old fence statement: 1 row",
+          "take-over statement: TransactionException: TransactionContext Error: Conflict on update!",
+          "old COMMIT: committed"
+        ]
+      ]
+    },
+    {
+      "fence_statement": "n_and_epoch_parameter (as built)",
+      "old_commits": 0,
+      "order": "overlap",
+      "rounds": 5,
+      "take_over_statement": "epoch_and_n",
+      "take_overs_committed": 5,
+      "violations": 0,
+      "what_happened": [
+        [
+          "take-over statement: ok",
+          "old fence statement: TransactionException: TransactionContext Error: Conflict on update!",
+          "take-over COMMIT: committed"
+        ]
+      ]
+    }
+  ],
+  "take_over_statements": {
+    "epoch_and_n": "UPDATE _cdc.fence SET epoch = ? + 1, n = n",
+    "epoch_only (design 4.5)": "UPDATE _cdc.fence SET epoch = ? + 1"
+  },
+  "versions": {
+    "duckdb_client": "1.5.6",
+    "platform": "Darwin arm64",
+    "python": "3.13.1"
+  },
+  "violation_means": "the take-over committed, and the old transaction committed after it",
+  "what": "Fence statement against a take-over that commits while the old transaction is open: which column pairs stop the old transaction"
+}

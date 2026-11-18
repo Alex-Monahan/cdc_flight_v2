@@ -1,0 +1,936 @@
+"""Connections to the destination: one worker thread per connection, a deadline on every call.
+
+Why a worker thread. The client library offers no time limit for a statement, and on MotherDuck its local
+``interrupt()`` does not end a statement that is in flight on the server (measured: the statement returns at its
+natural end; `evidence/p3/destination/error_mapping.json`). So the caller never runs a statement itself: it hands it
+to the connection's worker thread and waits for the answer until the deadline. When the deadline passes
+
+1. a **watchdog thread** interrupts the statement: the client's ``interrupt()`` and, on MotherDuck, the server-side
+   ``md_interrupt_server_connection(<own id>)`` through a second connection (this one ends a statement in flight
+   within a fraction of a second and rolls the open transaction back);
+2. the caller waits for the answer during a short **grace period**;
+3. answer or not, the connection is **retired**: it is never used again, a reaper thread interrupts its server
+   connection once more, closes it in the background (so that no caller ever waits for a ``close()``) and
+   ends the worker thread. The `Connection` object takes a new client connection at its next call and first
+   interrupts the old server connection by id, so that no abandoned transaction keeps holding a row.
+
+So one statement never blocks its caller longer than its deadline plus the grace period, whatever it does. What
+a lane transaction adds for the clean-up after a failure (roll-back, removing views) is bounded in
+`cdc_v2.md.lane`.
+
+What a retired connection can leave behind. The client's ``interrupt()`` does not end a call that waits for
+the server (same evidence file), so the worker thread, the reaper thread and the client connection of a retired
+connection stay until the statement in flight returns; on a network that answers nothing, until the network
+answers again (`evidence/p3/destination/blackhole.json`). So the number of them is bounded: a `Connection`
+keeps at most ``Settings.max_waiting_calls`` calls that it gave up and that have not returned; the call that
+would need one more fails at once with `ConnectionLost` and starts nothing. They are daemon threads;
+`background_threads()` counts every worker thread of a retired connection and every helper thread,
+`open_connections()` every client connection of the layer (also the short-lived ones that interrupt), and
+`waiting_calls()` the calls that were given up and still wait, so that a supervisor can end the process past a
+bound.
+
+A destination that is a local DuckDB database (tier T0) runs the same code. The server's interrupt function does
+not exist there; `interrupt_server_connection` then acts on the connections of this process: it interrupts the
+statement in flight, rolls the open transaction back and makes the next statement fail with the text MotherDuck
+uses, which is what the server does (same evidence file).
+"""
+from __future__ import annotations
+
+import functools
+import logging
+import queue
+import re
+import threading
+import time
+import uuid
+
+import duckdb
+
+from cdc_v2.deadline import Deadline, DeadlineExceeded
+from cdc_v2.faultsites import declare_site, fault_site
+
+from . import errors
+from .errors import CommitUnknown, Conflict, ConnectionLost, LaneMisuse, StatementError
+from .settings import Settings
+
+log = logging.getLogger("cdc_v2.md")
+
+# The texts are those of the toy system of package F (`tests/fuzz/toy/toy.py`), which declares the same sites: a
+# site declared twice must have one text (`cdc_v2.faultsites`). `md.execute` covers BEGIN, the caller's statements
+# and ROLLBACK; `md.commit` lies immediately before COMMIT is sent.
+SITE_CONNECT = declare_site("md.connect", "open a destination connection")
+SITE_EXECUTE = declare_site("md.execute", "one destination statement")
+SITE_FENCE = declare_site("md.fence", "the fence statement of a data transaction")
+SITE_COMMIT = declare_site("md.commit", "COMMIT of a destination transaction")
+SITE_COMMIT_REPLY = declare_site("md.commit_reply", "the answer to COMMIT, after the destination executed it")
+
+#: The expression for MotherDuck's clock (design 4.1). It is the server's clock only inside a statement that runs on
+#: the server: every statement that writes a MotherDuck table, and every read FROM a MotherDuck table. A SELECT
+#: without a table is evaluated by the client (evidence/p3/destination/clock.json), so never read the clock that way;
+#: use `Connection.clock_us` or `CLOCK_US_SQL`.
+clock_sql = "uuid_extract_timestamp(uuidv7())"
+#: Reads MotherDuck's clock as microseconds since 1970 (an integer: the client cannot fetch TIMESTAMPTZ without the
+#: `pytz` module, which is not a dependency). `_cdc.leader` always has exactly one row.
+CLOCK_US_SQL = "SELECT epoch_us(uuid_extract_timestamp(uuidv7())) FROM _cdc.leader"
+
+INTERRUPT_SQL = "SELECT md_interrupt_server_connection(?::UUID)"
+#: The kinds of statement whose changed rows `execute` returns (contract C4). The names are those of
+#: `duckdb.StatementType`; TRUNCATE is a DELETE there. A statement with a RETURNING clause is not counted
+#: (`counts_rows`).
+COUNTED = frozenset(("INSERT", "UPDATE", "DELETE"))
+_WORD = re.compile(rb"[A-Za-z0-9_]")
+#: The kind of a statement that the client's parser refused.
+UNPARSED = "UNPARSED"
+INTERRUPTED_TEXT = "Connection Error: interrupted by user"      # MotherDuck's text after a server-side interrupt
+_ROLE = re.compile(r"^[a-z][a-z0-9_.-]{0,40}$")
+_NO_TX = re.compile(r"no transaction is active", re.IGNORECASE)
+# Statements that would remove or re-create a row of the leader tables, or change their shape (design 4.1: the
+# rows are only ever updated; "a delete next to an update is not detected as a conflict").
+_LEADER_ROWS = re.compile(
+    r"""\b(?:insert\s+(?:or\s+\w+\s+)?into|delete\s+from|truncate(?:\s+table)?|merge\s+into|"""
+    r"""drop\s+table(?:\s+if\s+exists)?|alter\s+table(?:\s+if\s+exists)?|"""
+    r"""create\s+or\s+replace\s+(?:temp(?:orary)?\s+)?table)\s+"""
+    r"""(?:"?\w+"?\s*\.\s*)?"?_cdc"?\s*\.\s*"?(?:leader|fence|heartbeat)"?(?![\w"])""", re.IGNORECASE)
+_DROP_CDC = re.compile(r"""\bdrop\s+schema\s+(?:if\s+exists\s+)?(?:"?\w+"?\s*\.\s*)?"?_cdc"?(?![\w"])""",
+                       re.IGNORECASE)
+# A caller's UPDATE of the leader tables (fix round 2, N2): only the layer's own statements write them (the fence
+# statement, the registration, `schema.heartbeat`, `schema.release`) and the bootstrap's take-over.
+_LEADER_UPDATE = re.compile(
+    r"""\bupdate\s+(?:"?\w+"?\s*\.\s*)?"?_cdc"?\s*\.\s*"?(?:leader|fence|heartbeat)"?(?![\w"])""", re.IGNORECASE)
+
+_default_settings = None
+_registry_lock = threading.Lock()
+_open_sessions = set()                 # sessions whose client connection is open (leak checks)
+_live_sessions = set()                 # sessions whose worker thread has not ended
+_local_sessions = {}                   # server id -> session, local destinations only
+_background = set()                    # watchdog, reaper and close threads that have not ended
+_side = {"open": 0, "calls": 0}        # short-lived connections that interrupt, and their calls in flight
+
+
+def configure(settings):
+    """Set the settings that `connect` uses when it is given none. Returns the settings."""
+    global _default_settings
+    if settings is not None and not isinstance(settings, Settings):
+        raise TypeError("configure() takes a cdc_v2.md.Settings")
+    _default_settings = settings
+    return settings
+
+
+def default_settings():
+    if _default_settings is None:
+        raise LaneMisuse("no destination settings: pass settings to md.connect() or call md.configure() first")
+    return _default_settings
+
+
+def as_deadline(deadline, default_s):
+    """A `Deadline` from the caller's argument; None means the default of the settings, never 'no deadline'."""
+    if deadline is None:
+        return Deadline.after(default_s)
+    if not isinstance(deadline, Deadline):
+        raise TypeError("a deadline is a cdc_v2.deadline.Deadline, got %s" % type(deadline).__name__)
+    return deadline
+
+
+@functools.lru_cache(maxsize=1024)
+def _parse(sql):
+    """``(kind, reads, error_class)`` of one statement of a caller. ``kind`` is the name the client's parser
+    gives the statement (`duckdb.StatementType`), ``reads`` says that it only reads (SELECT, EXPLAIN). Text
+    that the parser refuses gives ``(UNPARSED, False, <class of the parser's error>)``: the parser's text
+    repeats the line of SQL, with its literals, so it is not kept."""
+    try:
+        stmts = duckdb.extract_statements(sql)
+    except Exception as e:                           # noqa: BLE001 - ParserException, in practice
+        return UNPARSED, False, type(e).__name__
+    if len(stmts) != 1:
+        raise LaneMisuse("exactly one statement per call, got %d" % len(stmts))
+    kind = stmts[0].type
+    if kind == duckdb.StatementType.TRANSACTION:
+        raise LaneMisuse("BEGIN, COMMIT and ROLLBACK are issued by the lane only")
+    if _LEADER_ROWS.search(sql) or _DROP_CDC.search(sql):
+        raise LaneMisuse("the rows of _cdc.leader, _cdc.fence and _cdc.heartbeat are only ever updated, and the "
+                         "tables keep their shape (design 4.1)")
+    if _LEADER_UPDATE.search(sql):
+        raise LaneMisuse("only the destination layer's own statements update _cdc.leader, _cdc.fence and "
+                         "_cdc.heartbeat (md.schema.heartbeat, md.schema.release)")
+    return kind.name, kind in (duckdb.StatementType.SELECT, duckdb.StatementType.EXPLAIN), None
+
+
+def check_sql(sql, where="destination"):
+    """Check one statement of a caller. Returns True when it only reads (SELECT, EXPLAIN).
+
+    A caller passes exactly one statement, and never a transaction statement: BEGIN, COMMIT and ROLLBACK belong to
+    the lane (contract C4). A statement that deletes, inserts or re-creates rows of the three leader tables is
+    refused as well; this makes the delete-and-insert mistake hard, it is not a security boundary. Text that
+    the client cannot parse is a `StatementError` of the kind ``UNPARSED``; ``where`` names the place."""
+    if not isinstance(sql, str):
+        raise LaneMisuse("a statement is SQL text")
+    kind, reads, error_class = _parse(sql)
+    if error_class is not None:
+        raise StatementError(where, error_class, kind)
+    return reads
+
+
+def statement_kind(sql):
+    """The kind of a statement: ``INSERT``, ``UPDATE``, ``DELETE``, ``SELECT``, ``CREATE``, ``DROP``, ``ALTER``,
+    ``MERGE_INTO``, ... (the names of `duckdb.StatementType`), or ``UNPARSED``. Found by the client's parser on
+    this side; nothing is sent."""
+    try:
+        return _parse(sql)[0]
+    except (LaneMisuse, TypeError):
+        return UNPARSED
+
+
+@functools.lru_cache(maxsize=1024)
+def returns_rows(sql):
+    """True when the statement has a RETURNING clause: its result is the rows it returns, not a count.
+
+    The client tells the two apart nowhere (same result type, same description when a returned column is named
+    ``Count``), so the clause is looked for in the tokens of the client's tokenizer, on this side. RETURNING is
+    a reserved word: it is a keyword token as the clause, and not inside a text, a quoted name or a comment.
+    Two other places give a keyword token too: a column label after AS (``SELECT 1 AS returning``) and a
+    parameter named ``$returning``. They count as a RETURNING clause; the mistake is on the safe side (no count
+    where one was possible, never a wrong number). Text that cannot be tokenized counts as returning rows."""
+    try:
+        raw = sql.encode("utf-8")                    # the tokenizer's positions are byte offsets
+        tokens = duckdb.tokenize(sql)
+    except Exception:                                # noqa: BLE001 - not text, or text the tokenizer refuses
+        return True
+    for pos, kind in tokens:
+        if (kind == duckdb.token_type.keyword and raw[pos:pos + 9].lower() == b"returning"
+                and not _WORD.match(raw[pos + 9:pos + 10])):
+            return True
+    return False
+
+
+def counts_rows(sql):
+    """True when `execute` returns the number of rows the statement changed: an INSERT, UPDATE or DELETE
+    without a RETURNING clause (contract C4)."""
+    return statement_kind(sql) in COUNTED and not returns_rows(sql)
+
+
+def count_fetch(sql):
+    """What to read after a statement whose changed rows a caller may want: ``"count"`` for an INSERT, UPDATE
+    or DELETE without RETURNING, else nothing. A statement with RETURNING is never read as a count: the client
+    describes ``... RETURNING b AS "Count"`` like one, and its value can be text (finding 19; fix round, F8)."""
+    return "count" if counts_rows(sql) else None
+
+
+def _read(cur, fetch):
+    if fetch == "count":
+        d = cur.description
+        if d is not None and len(d) == 1 and d[0][0] == "Count":
+            row = cur.fetchone()
+            return int(row[0]) if row is not None and row[0] is not None else None
+        return None
+    if fetch == "all":
+        return cur.fetchall()
+    if fetch == "one":
+        return cur.fetchone()
+    if fetch == "arrow":
+        return cur.to_arrow_table()
+    return None
+
+
+class _Job:
+    __slots__ = ("fn", "done", "result", "error")
+
+    def __init__(self, fn):
+        self.fn = fn
+        self.done = threading.Event()
+        self.result = None
+        self.error = None
+
+
+class Outcome:
+    """What became of one call: ``sent`` (False: the deadline had passed before it started), ``late`` (the deadline
+    passed while it ran; the connection is retired), ``returned`` (an answer exists), ``result`` / ``error``."""
+    __slots__ = ("sent", "late", "returned", "result", "error")
+
+    def __init__(self, sent, late, returned, result=None, error=None):
+        self.sent, self.late, self.returned, self.result, self.error = sent, late, returned, result, error
+
+    @property
+    def ok(self):
+        return self.sent and self.returned and self.error is None
+
+
+def _spawn(name, target, *args):
+    """Start a background thread of this package (watchdog, reaper, close). It is counted until it ends."""
+    def run():
+        try:
+            target(*args)
+        except Exception as e:                       # noqa: BLE001 - a background helper never raises
+            log.warning("md background step failed", extra={"cdc": {"thread": name, "error": errors.label(e)}})
+        finally:
+            with _registry_lock:
+                _background.discard(t)
+
+    t = threading.Thread(target=run, name=name, daemon=True)
+    with _registry_lock:
+        _background.add(t)
+    try:
+        t.start()
+    except BaseException:                            # the process cannot start another thread
+        with _registry_lock:
+            _background.discard(t)
+        raise
+    return t
+
+
+def _spawn_or_log(name, target, *args):
+    """`_spawn` for a step its caller must not fail on: a thread that cannot be started is logged, and the step
+    is missing then (a statement is not interrupted, a retired connection is not closed). The connection is
+    given up all the same and is never used again."""
+    try:
+        return _spawn(name, target, *args)
+    except Exception as e:                           # noqa: BLE001 - RuntimeError: can't start new thread
+        log.warning("md background thread not started", extra={"cdc": {"thread": name,
+                                                                       "error": type(e).__name__}})
+        return None
+
+
+class Session:
+    """One client connection and the thread that runs its statements. Internal; callers use `Connection`."""
+
+    def __init__(self, settings, role):
+        self.settings = settings
+        self.role = role
+        self.raw = None
+        self.server_id = None
+        self.state = "new"                 # new -> open -> retired -> closed
+        self.in_tx = False                 # a transaction is open, as far as this side knows
+        self.kill_text = None              # local stand-in for a server interrupt: the next statement raises this
+        self.lock = threading.Lock()       # held while a statement runs on the client connection
+        self._current = None               # the job handed to the worker last
+        self._side_busy = False            # an interrupt through a side connection is in flight for it
+        self._local_interrupts = threading.Lock()   # local stand-in: one interrupt and its ROLLBACK at a time
+        self._q = queue.SimpleQueue()
+        self._thread = threading.Thread(target=self._loop, name="cdc_v2-md-%s" % role, daemon=True)
+        with _registry_lock:
+            _live_sessions.add(self)
+        try:
+            self._thread.start()
+        except BaseException:
+            with _registry_lock:
+                _live_sessions.discard(self)
+            raise
+
+    # ------------------------------------------------------------------ the worker thread
+    def _loop(self):
+        try:
+            while True:
+                job = self._q.get()
+                if job is None:
+                    return
+                try:
+                    job.result = job.fn()
+                except BaseException as e:           # noqa: BLE001 - handed to the caller's thread
+                    job.error = e
+                finally:
+                    job.done.set()
+        finally:
+            with _registry_lock:
+                _live_sessions.discard(self)
+
+    def waiting(self):
+        """True while a call of this connection, or an interrupt of it, has not returned (after the connection
+        was given up: a call that waits for an answer the network does not bring)."""
+        job = self._current
+        return (job is not None and not job.done.is_set() and self._thread.is_alive()) or self._side_busy
+
+    def submit(self, fn):
+        """Hand ``fn`` to the worker thread. Returns the job, or None when the connection is not usable."""
+        if self.state not in ("open", "new"):
+            return None
+        job = _Job(fn)
+        self._current = job
+        self._q.put(job)
+        return job
+
+    def wait(self, job, deadline, interrupt=True):
+        """Wait for a job until ``deadline``; past it interrupt, wait the grace period, retire the connection.
+
+        A wait that an exception in the waiting thread breaks off (``KeyboardInterrupt``, ...) retires the
+        connection too before the exception is passed on: what the statement did is not known then."""
+        if job is None:
+            return Outcome(True, False, True, error=duckdb.ConnectionException("Connection Error: connection closed"))
+        try:
+            if job.done.wait(max(0.0, deadline.remaining())):
+                return Outcome(True, False, True, job.result, job.error)
+            if interrupt:
+                _spawn_or_log("cdc_v2-md-watchdog", self._interrupt_from_watchdog)
+            returned = job.done.wait(self.settings.grace_s)
+        except BaseException:
+            self.retire()
+            raise
+        self.retire()
+        return Outcome(True, True, returned, job.result, job.error)
+
+    def call(self, fn, deadline, interrupt=True):
+        """Run ``fn()`` on the worker thread and wait for it until ``deadline`` (plus grace after the interrupt).
+        A call whose deadline has already passed is not started."""
+        if deadline.expired:
+            return Outcome(False, False, False)
+        return self.wait(self.submit(fn), deadline, interrupt)
+
+    # ------------------------------------------------------------------ statements (run on the worker thread)
+    def _open(self):
+        fault_site(SITE_CONNECT)
+        s = self.settings
+        raw = duckdb.connect(s.target, config={"custom_user_agent": s.marker})
+        with self.lock:
+            if self.state != "new":                  # abandoned while connecting: leave nothing open
+                raw.close()
+                raise duckdb.ConnectionException("Connection Error: connection closed")
+            self.raw = raw                           # from here on the reaper closes it
+            with _registry_lock:
+                _open_sessions.add(self)                 # counted from the moment it exists
+            # Both settings are set for this connection only (SESSION). A plain SET of the second one changes
+            # it for every connection this process has to the database, and any of them could change it back.
+            raw.execute("SET SESSION TimeZone = 'UTC'")
+            # Arrow data keeps UUID, JSON and the offset of TIMETZ (without it they arrive as text, and TIMETZ
+            # as a time without offset), in both directions: `fetch_arrow` and registered data
+            raw.execute("SET SESSION arrow_lossless_conversion = true")
+            if s.is_motherduck:
+                sid = str(raw.execute("SELECT md_current_client_connection_id()").fetchone()[0])
+                # connect() does no network round trip when this process already has the database open, so one
+                # statement goes to the server here: a server that cannot be reached is found now, inside the
+                # deadline of the connect, and not by the first statement of the caller. (The answer is not used:
+                # the server lists a connection only while it has a statement in flight or a transaction open.)
+                raw.execute("SELECT count(*) FROM md_active_server_connections() WHERE client_connection_id = ?::UUID",
+                            [sid]).fetchall()
+            else:
+                sid = str(uuid.uuid4())
+            self.server_id = sid
+        with _registry_lock:
+            if self.state != "new":                  # abandoned meanwhile; the reaper closes the connection
+                raise duckdb.ConnectionException("Connection Error: connection closed")
+            self.state = "open"
+            if not s.is_motherduck:
+                _local_sessions[sid] = self
+        return sid
+
+    def statement(self, site, sql, params, fetch, tx=None):
+        """The function a job runs for one statement: fault site, then the statement, then its result.
+        ``tx`` is True for BEGIN and False for ROLLBACK: what the statement does to the open transaction."""
+        def run():
+            fault_site(site)
+            with self.lock:
+                self._usable_locked()
+                cur = self.raw.execute(sql, params) if params else self.raw.execute(sql)
+                if tx is not None:
+                    self.in_tx = tx
+                return _read(cur, fetch)
+        return run
+
+    def commit(self):
+        """The function a job runs for COMMIT. A fault at the first site stands for a COMMIT that never arrived,
+        a fault at the second one for a COMMIT that was executed and whose answer was lost."""
+        def run():
+            fault_site(SITE_COMMIT)
+            with self.lock:
+                self._usable_locked()
+                self.raw.execute("COMMIT")
+                self.in_tx = False
+            fault_site(SITE_COMMIT_REPLY)
+        return run
+
+    def _usable_locked(self):
+        if self.state != "open":
+            raise duckdb.ConnectionException("Connection Error: connection closed")
+        if self.kill_text is not None:
+            text, self.kill_text = self.kill_text, None
+            raise duckdb.ConnectionException(text)
+
+    def view(self, name, data):
+        def run():
+            with self.lock:
+                if self.state != "open":
+                    raise duckdb.ConnectionException("Connection Error: connection closed")
+                if data is None:
+                    self.raw.unregister(name)
+                else:
+                    self.raw.register(name, data)
+        return run
+
+    # ------------------------------------------------------------------ interrupt, retire, close
+    def _interrupt_from_watchdog(self):
+        raw = self.raw
+        if raw is not None:
+            try:
+                raw.interrupt()
+            except Exception:                        # noqa: BLE001
+                pass
+        self._interrupt_side()
+
+    def _interrupt_side(self):
+        """MotherDuck: the server's interrupt for this connection's id, through a side connection. At most one
+        is in flight per connection: on a network that answers nothing it waits as long as the statement does."""
+        if not (self.settings.is_motherduck and self.server_id is not None):
+            return None
+        with _registry_lock:
+            if self._side_busy:
+                return None
+            self._side_busy = True
+        try:
+            return _interrupt_through_side_connection(self.settings, self.server_id)
+        finally:
+            with _registry_lock:
+                self._side_busy = False
+
+    def local_interrupt(self, deadline=None):
+        """Local stand-in for the server's interrupt: end the statement in flight, roll the open transaction back,
+        make the next statement fail the way MotherDuck's does. True when the connection is known and not closed.
+
+        Like the server's interrupt it also reaches a connection that its owner has given up and that is not
+        closed yet (a retired connection whose statement has not returned)."""
+        raw = self.raw
+        if self.state not in ("open", "retired") or raw is None:
+            return False
+        wait_s = self.settings.interrupt_deadline_s
+        if deadline is not None:
+            wait_s = min(wait_s, max(0.0, deadline.remaining()))
+        end = Deadline.after(wait_s)
+        # One interrupt and its ROLLBACK at a time (fix round 2, N1): a second caller's interrupt that landed in the
+        # first caller's ROLLBACK made it fail; the error was swallowed and the transaction stayed open, marked as
+        # rolled back, so every later interrupt skipped it.
+        if not self._local_interrupts.acquire(timeout=wait_s):
+            return True                              # another interrupt of this connection is at work
+        try:
+            try:
+                raw.interrupt()
+            except Exception:                        # noqa: BLE001
+                return False
+            if not self.lock.acquire(timeout=end.remaining()):
+                return True                          # still inside a statement: the interrupt is on its way
+            try:
+                if self.raw is not None and self.in_tx:
+                    if not self._rollback_locked(end):
+                        return True                  # not rolled back: in_tx stays, the next interrupt tries again
+                    self.in_tx = False
+                    self.kill_text = INTERRUPTED_TEXT
+            finally:
+                self.lock.release()
+        finally:
+            self._local_interrupts.release()
+        return True
+
+    def _rollback_locked(self, end):
+        """ROLLBACK for the local stand-in, with ``self.lock`` held. An interrupt from elsewhere (the watchdog, the
+        reaper) can land in it; it is tried again until ``end``. True when no transaction is open afterwards."""
+        while True:
+            try:
+                self.raw.execute("ROLLBACK")
+                return True
+            except duckdb.Error as e:
+                if _NO_TX.search(str(e)):
+                    return True
+                if end.expired:
+                    return False
+            time.sleep(0.005)
+
+    def abort(self):
+        """From any thread: fail the call in flight at once and retire the connection."""
+        job = self._current
+        if job is not None and not job.done.is_set():
+            if job.error is None:
+                job.error = duckdb.ConnectionException("Connection Error: connection closed (aborted)")
+            job.done.set()
+        self.retire()
+
+    def retire(self):
+        """Never use this connection again; close it in the background. Safe to call twice."""
+        with _registry_lock:
+            if self.state in ("retired", "closed"):
+                return
+            self.state = "retired"
+        _spawn_or_log("cdc_v2-md-reaper", self._reap)
+
+    def _reap(self):
+        raw, s = self.raw, self.settings
+        if raw is not None:
+            try:
+                raw.interrupt()
+            except Exception:                        # noqa: BLE001
+                pass
+        if s.is_motherduck:
+            try:
+                self._interrupt_side()
+            except Exception:                        # noqa: BLE001
+                pass
+        else:
+            self.local_interrupt()                   # as the server does: the open transaction is rolled back now
+        self._close_raw()
+
+    def _close_raw(self):
+        self._q.put(None)
+        self._thread.join()                          # ends when the statement in flight has returned
+        with self.lock:
+            raw, self.raw = self.raw, None
+        if raw is not None:
+            try:
+                raw.close()
+            except Exception:                        # noqa: BLE001
+                pass
+        with _registry_lock:
+            self.state = "closed"
+            _open_sessions.discard(self)
+            if self.server_id is not None:
+                _local_sessions.pop(self.server_id, None)
+
+    def close(self, deadline):
+        """Orderly close of a connection that is not inside a statement. Past the deadline it is retired."""
+        with _registry_lock:
+            if self.state in ("retired", "closed"):
+                return
+            self.state = "retired"
+        t = _spawn_or_log("cdc_v2-md-close", self._close_raw)
+        if t is not None:
+            t.join(max(0.0, deadline.remaining()))
+
+
+def _interrupt_through_side_connection(settings, server_id):
+    """Call the server's interrupt function for one id through a short-lived connection of its own. Returns the
+    function's answer. Used by the watchdog and the reaper, which cannot use the connection they interrupt. The
+    connection and the call are counted (`open_connections`, `waiting_calls`) until they end."""
+    with _registry_lock:
+        _side["calls"] += 1
+    try:
+        side = duckdb.connect(settings.target, config={"custom_user_agent": settings.marker})
+        with _registry_lock:
+            _side["open"] += 1
+        try:
+            row = side.execute(INTERRUPT_SQL, [server_id]).fetchone()
+            return bool(row[0]) if row is not None else False
+        finally:
+            try:
+                side.close()
+            finally:
+                with _registry_lock:
+                    _side["open"] -= 1
+    finally:
+        with _registry_lock:
+            _side["calls"] -= 1
+
+
+def _interrupt_local(server_id, deadline=None):
+    with _registry_lock:
+        sess = _local_sessions.get(str(server_id))
+    return sess.local_interrupt(deadline) if sess is not None else False
+
+
+def _open_session(settings, role, deadline, given_up=None):
+    """A new session with its client connection open, or the error of the connect. A session that is given up is
+    appended to ``given_up`` (the `Connection` counts the calls it gave up that still wait)."""
+    sess = Session(settings, role)
+    try:
+        out = sess.call(sess._open, deadline, interrupt=False)
+    except BaseException:
+        sess.retire()
+        if given_up is not None:
+            given_up.append(sess)
+        raise
+    if out.ok and not out.late:                      # a connect that answered late is retired already
+        return sess
+    if given_up is not None:
+        given_up.append(sess)
+    if not out.late:
+        sess.retire()
+    if not out.sent or out.late:
+        raise DeadlineExceeded("connecting to the destination (%s)" % role)
+    if isinstance(out.error, DeadlineExceeded):
+        raise out.error
+    # the client's text for a failed connect holds a local path; only the replaced text travels on. It holds no
+    # value of a row (nothing was sent), so the whole first line is kept: it says why (not authenticated, ...)
+    raise ConnectionLost("cannot connect to the destination (%s): %s" % (role, errors.safe_text(out.error))) from None
+
+
+def connect(role, settings=None, deadline=None):
+    """A connection to the destination (contract C4): session time zone UTC, the pipeline's marker as
+    ``custom_user_agent``, the server-side connection id read and kept (``conn.server_id``).
+
+    ``role`` names what the connection is for (``stream``, ``heartbeat``, ...); it appears in thread names and logs.
+    Raises `ConnectionLost` when the destination cannot be reached, `DeadlineExceeded` when it does not answer
+    within the deadline (default: the attempts of the settings, each with ``connect_deadline_s``)."""
+    if not isinstance(role, str) or not _ROLE.match(role):
+        raise ValueError("a connection role is a short lower-case name, got %r" % (role,))
+    settings = default_settings() if settings is None else settings
+    if not isinstance(settings, Settings):
+        raise TypeError("settings must be a cdc_v2.md.Settings")
+    conn = Connection(role, settings)
+    conn.ensure(as_deadline(deadline, settings.connect_attempts * (settings.connect_deadline_s
+                                                                   + settings.connect_retry_pause_s)))
+    return conn
+
+
+class Connection:
+    """A destination connection with a deadline on every call.
+
+    The object outlives its client connection: when a call retires the client connection (deadline, lost
+    connection), the next call opens a new one and first interrupts the old server connection by id.
+    ``server_id`` therefore changes over time; `generation` counts the client connections so far.
+
+    Outside a lane transaction every statement is its own transaction (autocommit). The errors:
+    `Conflict` (nothing applied), `ConnectionLost` / `DeadlineExceeded` for a statement that only reads,
+    `CommitUnknown` for a statement that writes and whose outcome is not known (lost connection or deadline),
+    `StatementError` for a statement that the destination refused (nothing applied).
+    """
+
+    def __init__(self, role, settings):
+        self.role = role
+        self.settings = settings
+        self.generation = 0
+        self._session = None
+        self._stale_ids = []               # server ids of retired connections, not yet interrupted from a new one
+        self._given_up = []                # sessions it retired; kept while a call of theirs still waits
+        self._lane = None                  # the lane that owns this connection, if any
+        self._in_block = False             # a lane transaction is open on it
+        self._closed = False
+
+    def __repr__(self):
+        return "<md.Connection %s %s gen=%d>" % (self.role, "open" if self.usable else "not connected",
+                                                 self.generation)
+
+    # ------------------------------------------------------------------ state
+    @property
+    def is_motherduck(self):
+        return self.settings.is_motherduck
+
+    @property
+    def usable(self):
+        return self._session is not None and self._session.state == "open"
+
+    @property
+    def server_id(self):
+        """The server-side id of the current client connection (text), or None while there is none."""
+        return self._session.server_id if self.usable else None
+
+    def _drop_session(self, only=None):
+        """Retire the current client connection; its server id is interrupted before the next one is used."""
+        if only is not None and self._session is not only:
+            only.retire()
+            self._keep_given_up(only)
+            return
+        sess, self._session = self._session, None
+        if sess is not None:
+            if sess.server_id is not None and sess.server_id not in self._stale_ids:
+                self._stale_ids.append(sess.server_id)
+            sess.retire()
+            self._keep_given_up(sess)
+
+    def _keep_given_up(self, sess):
+        if sess not in self._given_up:
+            self._given_up.append(sess)
+
+    def waiting_calls(self):
+        """How many calls that this connection gave up (deadline, lost connection) have not returned yet."""
+        self._given_up = [s for s in self._given_up if s.waiting()]
+        return len(self._given_up)
+
+    def ensure(self, deadline):
+        """Make sure a client connection is open: connect if needed (with the attempts of the settings), then
+        interrupt the server connections this object retired earlier. Returns the session."""
+        if self._closed:
+            raise LaneMisuse("this connection was closed")
+        if self._session is not None and self._session.state != "open":
+            self._drop_session()
+        if self._session is None:
+            s = self.settings
+            waiting = self.waiting_calls()
+            if waiting >= s.max_waiting_calls:
+                # each such call holds a thread and a client connection until the network answers; one more
+                # would add more of both. Nothing is started; the caller tries again later (fix round, F7)
+                raise ConnectionLost("connection %s: %d calls that were given up still wait for the destination "
+                                     "(at most %d); no new connection until one returns"
+                                     % (self.role, waiting, s.max_waiting_calls))
+            attempt = 0
+            while True:
+                attempt += 1
+                try:
+                    self._session = _open_session(s, self.role, deadline.within(s.connect_deadline_s),
+                                                  self._given_up)
+                    break
+                except ConnectionLost:
+                    if attempt >= s.connect_attempts or deadline.remaining() <= s.connect_retry_pause_s:
+                        raise
+                    deadline.sleep(s.connect_retry_pause_s, "connecting to the destination (%s)" % self.role)
+            self.generation += 1
+        while self._stale_ids:
+            # on the connection made sure of above, not through `_interrupt`: that one asks `ensure` for a connection
+            refused = None
+            try:
+                self._interrupt_on(self._session, self._stale_ids[0],
+                                   deadline.within(self.settings.interrupt_deadline_s))
+            except StatementError as e:
+                refused = e
+            except (errors.DestinationError, DeadlineExceeded):
+                raise                                # the connection or the deadline: the id is tried again
+            except Exception as e:                   # noqa: BLE001
+                refused = errors.refused(e, "connection %s" % self.role, "INTERRUPT")
+            self._stale_ids.pop(0)
+            if refused is not None:                  # the destination refused this id: this call fails, and
+                raise refused                        # the id does not stand in the way of every later call
+        return self._session
+
+    # ------------------------------------------------------------------ calls
+    def _run(self, site, sql, params, fetch, deadline, writes):
+        """One autocommit statement with the error rules of the class docstring."""
+        return self._run_on(self.ensure(deadline), site, sql, params, fetch, deadline, writes)
+
+    def _run_on(self, sess, site, sql, params, fetch, deadline, writes):
+        """`_run` on a session that is already made sure of."""
+        try:
+            out = sess.call(sess.statement(site, sql, params, fetch), deadline)
+        except BaseException:
+            self._drop_session(sess)                 # the wait was broken off: what the statement did is not known
+            raise
+        if out.ok and not out.late:
+            return out.result
+        if not out.sent:
+            raise DeadlineExceeded("destination statement not started before its deadline (%s)" % self.role)
+        if out.late:
+            self._drop_session(sess)
+            if writes:
+                if out.ok:
+                    return out.result                # it did complete; only the connection is replaced
+                raise CommitUnknown("deadline passed during a writing statement outside a transaction (%s)"
+                                    % self.role)
+            raise DeadlineExceeded("destination statement (%s)" % self.role)
+        err = out.error
+        kind = errors.kind_of(err)
+        if kind == "transport":
+            self._drop_session(sess)
+            text = errors.label(err)                 # nothing of the client's text but a phrase from the list;
+            if writes:                               # the client's error is not attached
+                raise CommitUnknown("connection lost during a writing statement outside a transaction (%s): %s"
+                                    % (self.role, text)) from None
+            raise ConnectionLost("connection lost (%s): %s" % (self.role, text)) from None
+        if kind == "conflict":
+            raise Conflict("write-write conflict in a statement outside a transaction (%s)" % self.role) from None
+        # refused as a whole, nothing applied. The client's text can name a value: it does not travel on
+        raise errors.refused(err, "connection %s" % self.role, statement_kind(sql)) from None
+
+    def _autocommit(self, sql, params, fetch, deadline, site=SITE_EXECUTE):
+        if self._in_block:
+            raise LaneMisuse("this connection is inside a lane transaction; use the transaction object")
+        reads = check_sql(sql, "connection %s" % self.role)
+        if not reads:
+            # a write outside a lane transaction carries no fence: after a take-over an old run's write would
+            # commit (fix round 2, N2). Writes go through a lane; the layer's own statements use `_layer_execute`
+            raise LaneMisuse("connection %s: a statement that writes runs in a lane transaction (contract C4); "
+                             "outside one only reads are allowed" % self.role)
+        return self._run(site, sql, params, fetch, as_deadline(deadline, self.settings.statement_deadline_s),
+                         writes=False)
+
+    def _layer_execute(self, sql, params=None, deadline=None):
+        """One of the layer's own named statements in autocommit (the leader tables' creation, the clean-up of
+        `_cdc.connections`, the heartbeat). Returns the changed rows of an INSERT, UPDATE or DELETE, else None."""
+        if self._in_block:
+            raise LaneMisuse("this connection is inside a lane transaction; use the transaction object")
+        # the kind straight from the parser: `statement_kind` refuses the layer's own statements on leader tables
+        counted = duckdb.extract_statements(sql)[0].type.name in COUNTED and not returns_rows(sql)
+        n = self._run(SITE_EXECUTE, sql, params, "count" if counted else None,
+                      as_deadline(deadline, self.settings.statement_deadline_s), writes=True)
+        return n if counted else None
+
+    def execute(self, sql, params=None, deadline=None):
+        """Run one statement that only reads, in autocommit; it returns None. A statement that writes raises
+        `LaneMisuse`: writes run in a lane transaction, behind the fence (fix round 2, N2)."""
+        n = self._autocommit(sql, params, count_fetch(sql), deadline)
+        return n if counts_rows(sql) else None
+
+    def fetchall(self, sql, params=None, deadline=None):
+        return self._autocommit(sql, params, "all", deadline)
+
+    def fetchone(self, sql, params=None, deadline=None):
+        return self._autocommit(sql, params, "one", deadline)
+
+    def clock_us(self, deadline=None):
+        """MotherDuck's clock, microseconds since 1970 (design 4.1). Needs the leader tables."""
+        return int(self.fetchone(CLOCK_US_SQL, None, deadline)[0])
+
+    def _interrupt_on(self, sess, server_id, deadline):
+        """Interrupt one server connection by id, with a statement on the session ``sess`` (MotherDuck)."""
+        if not self.is_motherduck:
+            return _interrupt_local(server_id, deadline)
+        row = self._run_on(sess, SITE_EXECUTE, INTERRUPT_SQL, [str(server_id)], "one", deadline, writes=False)
+        return bool(row[0]) if row is not None else False
+
+    def _interrupt(self, server_id, deadline):
+        if not self.is_motherduck:
+            return _interrupt_local(server_id, deadline)
+        return self._interrupt_on(self.ensure(deadline), server_id, deadline)
+
+    def interrupt_server_connection(self, server_id, deadline=None):
+        """Interrupt another connection of this pipeline by its server-side id: a statement in flight ends, an open
+        transaction is rolled back. Returns False when there was nothing to end: the connection is idle outside a
+        transaction, is closed, or the server does not know the id."""
+        if self._in_block:
+            raise LaneMisuse("this connection is inside a lane transaction")
+        if self.usable and str(server_id) == self.server_id:
+            raise LaneMisuse("a connection does not interrupt itself")
+        return self._interrupt(server_id, as_deadline(deadline, self.settings.interrupt_deadline_s))
+
+    def abort(self):
+        """From any thread (a supervisor that restarts a component): end the call in flight at once, interrupt the
+        server connection and close this connection for good. The thread that uses the connection gets
+        `ConnectionLost` from its statement (`CommitUnknown` when it was inside COMMIT) and `LaneMisuse` from
+        every later call."""
+        self._closed = True
+        sess = self._session
+        if sess is not None:
+            sess.abort()
+
+    def close(self, deadline=None):
+        """Close the connection. An open transaction is rolled back by the close."""
+        self._closed = True
+        sess, self._session = self._session, None
+        self._stale_ids = []
+        if sess is not None:
+            sess.close(as_deadline(deadline, self.settings.rollback_deadline_s))
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
+
+# ---------------------------------------------------------------------- leak checks for tests and shutdown
+def open_connections():
+    """How many client connections of this package are open in this process: those of the connections in use,
+    those of retired connections that are not closed yet (also one whose connect never finished), and the
+    short-lived ones that interrupt a connection."""
+    with _registry_lock:
+        return len(_open_sessions) + _side["open"]
+
+
+def background_threads():
+    """Threads of this package that a caller does not wait for and that have not ended: watchdog, reaper and
+    close threads, and the worker thread of every retired connection."""
+    with _registry_lock:
+        helpers = [t for t in _background if t.is_alive()]
+        workers = [s._thread for s in _live_sessions if s.state in ("retired", "closed") and s._thread.is_alive()]
+    return helpers + workers
+
+
+def waiting_calls():
+    """How many calls of this process were given up (deadline, lost connection) and have not returned: a
+    statement or a connect of a retired connection, and an interrupt through a side connection. A supervisor
+    that sees this above its bound ends the process (contract C11); each such call holds a thread and a client
+    connection, and on a network that answers nothing it waits until the network answers again."""
+    with _registry_lock:
+        stuck = sum(1 for s in _live_sessions if s.state in ("retired", "closed") and s._current is not None
+                    and not s._current.done.is_set())
+        return stuck + _side["calls"]
+
+
+def wait_idle(deadline):
+    """Wait until every background thread of this package has ended. True when none is left."""
+    while True:
+        alive = background_threads()
+        if not alive:
+            return True
+        if deadline.expired:
+            return False
+        alive[0].join(min(0.2, deadline.remaining()))
