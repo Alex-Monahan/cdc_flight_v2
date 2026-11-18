@@ -114,8 +114,8 @@
         }
       },
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py",
-      "commit": "1599194",
-      "date_utc": "2026-11-18 14:11",
+      "commit": "0fff918",
+      "date_utc": "2026-11-18 14:30",
       "delays_ms": [
         0,
         10,

@@ -69,8 +69,8 @@
         }
       },
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py",
-      "commit": "1599194",
-      "date_utc": "2026-11-18 14:13",
+      "commit": "0fff918",
+      "date_utc": "2026-11-18 14:32",
       "kill_later_ms": 60,
       "second_copy_follows_the_rule": false
     },
@@ -132,8 +132,8 @@
         }
       },
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py",
-      "commit": "1599194",
-      "date_utc": "2026-11-18 14:12",
+      "commit": "0fff918",
+      "date_utc": "2026-11-18 14:31",
       "kill_later_ms": 60,
       "second_copy_follows_the_rule": true
     }

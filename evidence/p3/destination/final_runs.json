@@ -23,6 +23,37 @@
     "test_md_again.py": "71 passed in 597 s, two -k runs",
     "test_md_procs.py": "10 passed in 1071 s, six -k runs"
   },
+  "fix_round_2": {
+    "campaign_run_4": "513 rounds on 50229d7, 257 of them the reviewer's case, 0 breaches (fence_campaign.json)",
+    "default_run": {
+      "command": "uv run pytest -p no:cacheprovider",
+      "commit": "1599194",
+      "deselected": 742,
+      "failed": 0,
+      "passed": 1415,
+      "seconds": 110.5,
+      "skipped": 4,
+      "subtests_passed": 24,
+      "xfailed": 1
+    },
+    "frozen_transaction_kept_s": "28.7 to 29.0 s, bound 45 s (takeover_open_tx.json)",
+    "md_runs": {
+      "test_md.py": "31 passed in 297 s (1599194)",
+      "test_md_again.py": "92 passed in 724 s (1599194)",
+      "test_md_fix_round.py": "2 passed in 95 s (1599194)",
+      "test_md_procs.py": "10 passed in 1047 s (0fff918); on 1599194: 1 failed, the same-epoch case at sut.moved, whose assertion 0fff918 restates for the monotone counter"
+    },
+    "md_runs_before": {
+      "50229d7": "test_md.py 7 failed (counter values of a counter that was put back), test_md_again.py 92 passed, test_md_fix_round.py 2 passed, test_md_procs.py stopped after 5 passed for a pause"
+    },
+    "tests_of_the_package": {
+      "command": "uv run pytest -p no:cacheprovider tests/destination",
+      "commit": "1599194",
+      "deselected": 144,
+      "passed": 391,
+      "seconds": 21.7
+    }
+  },
   "machine_note": "10 cores, 16 GB, shared with other workers of the same build; the MotherDuck account was shared with them; the fence campaign ran at the same time as the MotherDuck test files",
   "md_runs": {
     "command": "tools/with-env uv run -q pytest -m md tests/destination/<file>",

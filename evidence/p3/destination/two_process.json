@@ -24,7 +24,7 @@
           "newcomer": {
             "errors_before_its_first_commit": {},
             "exit_code": 0,
-            "ms_first_commit_after_process_start": 4185,
+            "ms_first_commit_after_process_start": 4241,
             "rows": 6,
             "takeover": {
               "attempts": 3,
@@ -36,8 +36,8 @@
               },
               "interrupted": 2,
               "listed": 4,
-              "ms_after_process_start": 3308,
-              "seconds": 1.73,
+              "ms_after_process_start": 3331,
+              "seconds": 1.748,
               "unknown": 0
             }
           },
@@ -49,9 +49,9 @@
             ],
             "exit_code": 3,
             "rows": 3,
-            "seconds_to_exit": 3.07
+            "seconds_to_exit": 3.05
           },
-          "old_run_frozen_for_s": 8.0
+          "old_run_frozen_for_s": 8.1
         },
         "stream.committed": {
           "check": {
@@ -73,7 +73,7 @@
           "newcomer": {
             "errors_before_its_first_commit": {},
             "exit_code": 0,
-            "ms_first_commit_after_process_start": 2884,
+            "ms_first_commit_after_process_start": 2809,
             "rows": 3,
             "takeover": {
               "attempts": 1,
@@ -85,8 +85,8 @@
               },
               "interrupted": 0,
               "listed": 0,
-              "ms_after_process_start": 1963,
-              "seconds": 0.357,
+              "ms_after_process_start": 1924,
+              "seconds": 0.342,
               "unknown": 0
             }
           },
@@ -101,7 +101,7 @@
             "rows": 6,
             "seconds_to_exit": 0.49
           },
-          "old_run_frozen_for_s": 6.4
+          "old_run_frozen_for_s": 6.3
         },
         "stream.fenced": {
           "check": {
@@ -123,20 +123,20 @@
           "newcomer": {
             "errors_before_its_first_commit": {},
             "exit_code": 0,
-            "ms_first_commit_after_process_start": 4120,
+            "ms_first_commit_after_process_start": 3558,
             "rows": 6,
             "takeover": {
-              "attempts": 3,
-              "conflicts": 2,
+              "attempts": 2,
+              "conflicts": 1,
               "epoch": 9,
               "interrupt_earlier_after_the_takeover": {
                 "interrupted": 0,
                 "listed": 2
               },
-              "interrupted": 2,
-              "listed": 4,
-              "ms_after_process_start": 3260,
-              "seconds": 1.724,
+              "interrupted": 1,
+              "listed": 2,
+              "ms_after_process_start": 2610,
+              "seconds": 1.048,
               "unknown": 0
             }
           },
@@ -148,9 +148,9 @@
             ],
             "exit_code": 3,
             "rows": 3,
-            "seconds_to_exit": 3.07
+            "seconds_to_exit": 3.09
           },
-          "old_run_frozen_for_s": 7.9
+          "old_run_frozen_for_s": 7.4
         },
         "sut.begun": {
           "check": {
@@ -172,7 +172,7 @@
           "newcomer": {
             "errors_before_its_first_commit": {},
             "exit_code": 0,
-            "ms_first_commit_after_process_start": 2864,
+            "ms_first_commit_after_process_start": 3256,
             "rows": 4,
             "takeover": {
               "attempts": 1,
@@ -184,8 +184,8 @@
               },
               "interrupted": 0,
               "listed": 0,
-              "ms_after_process_start": 1944,
-              "seconds": 0.36,
+              "ms_after_process_start": 2364,
+              "seconds": 0.336,
               "unknown": 0
             }
           },
@@ -197,9 +197,9 @@
             ],
             "exit_code": 3,
             "rows": 3,
-            "seconds_to_exit": 0.67
+            "seconds_to_exit": 0.79
           },
-          "old_run_frozen_for_s": 6.7
+          "old_run_frozen_for_s": 7.1
         },
         "sut.moved": {
           "check": {
@@ -221,7 +221,7 @@
           "newcomer": {
             "errors_before_its_first_commit": {},
             "exit_code": 0,
-            "ms_first_commit_after_process_start": 2757,
+            "ms_first_commit_after_process_start": 2763,
             "rows": 6,
             "takeover": {
               "attempts": 1,
@@ -233,8 +233,8 @@
               },
               "interrupted": 0,
               "listed": 0,
-              "ms_after_process_start": 1856,
-              "seconds": 0.338,
+              "ms_after_process_start": 1898,
+              "seconds": 0.345,
               "unknown": 0
             }
           },
@@ -247,7 +247,7 @@
             ],
             "exit_code": 3,
             "rows": 3,
-            "seconds_to_exit": 0.72
+            "seconds_to_exit": 0.78
           },
           "old_run_frozen_for_s": 6.6
         },
@@ -271,7 +271,7 @@
           "newcomer": {
             "errors_before_its_first_commit": {},
             "exit_code": 0,
-            "ms_first_commit_after_process_start": 2781,
+            "ms_first_commit_after_process_start": 2871,
             "rows": 6,
             "takeover": {
               "attempts": 1,
@@ -283,8 +283,8 @@
               },
               "interrupted": 0,
               "listed": 0,
-              "ms_after_process_start": 1894,
-              "seconds": 0.33,
+              "ms_after_process_start": 1950,
+              "seconds": 0.35,
               "unknown": 0
             }
           },
@@ -296,14 +296,14 @@
             ],
             "exit_code": 3,
             "rows": 3,
-            "seconds_to_exit": 0.71
+            "seconds_to_exit": 0.65
           },
-          "old_run_frozen_for_s": 6.6
+          "old_run_frozen_for_s": 6.7
         }
       },
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py",
-      "commit": "1599194",
-      "date_utc": "2026-11-18 14:03",
+      "commit": "0fff918",
+      "date_utc": "2026-11-18 14:21",
       "exit_code_3_means": "FenceLost",
       "points": [
         "sut.begun",
@@ -342,8 +342,8 @@
         }
       },
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py",
-      "commit": "7193b39",
-      "date_utc": "2026-11-10 20:15",
+      "commit": "0fff918",
+      "date_utc": "2026-11-18 14:23",
       "epoch": 1,
       "first_frozen_at_a_point_of_its_second_transaction": {
         "stream.commit_sent": {
@@ -365,6 +365,7 @@
             "done:78-78",
             "exit:0"
           ],
+          "first_frozen_for_s": 3.3,
           "first_holds_the_position_row": true,
           "rows": {
             "first": 6,
@@ -392,6 +393,7 @@
             "done:87-87",
             "exit:0"
           ],
+          "first_frozen_for_s": 5.5,
           "first_holds_the_position_row": false,
           "rows": {
             "first": 6,
@@ -408,21 +410,21 @@
             "source": 69
           },
           "errors_of_the_second": {
-            "Conflict": 4
+            "Conflict": 5
           },
           "first_after_it_went_on": [
             "done:63-66",
             "intend:66-69",
             "error:Conflict",
-            "error:Conflict",
-            "intend:69-69",
-            "done:69-69",
+            "intend:66-69",
+            "done:66-69",
             "exit:0"
           ],
+          "first_frozen_for_s": 3.1,
           "first_holds_the_position_row": true,
           "rows": {
-            "first": 6,
-            "second": 3
+            "first": 9,
+            "second": 0
           },
           "second_while_the_first_is_frozen": {
             "data_transactions": 0,
@@ -446,6 +448,7 @@
             "done:42-42",
             "exit:0"
           ],
+          "first_frozen_for_s": 5.9,
           "first_holds_the_position_row": false,
           "rows": {
             "first": 3,
@@ -462,19 +465,21 @@
             "source": 60
           },
           "errors_of_the_second": {
-            "Conflict": 4
+            "Conflict": 3
           },
           "first_after_it_went_on": [
             "intend:54-57",
             "error:Conflict",
-            "intend:57-60",
-            "done:57-60",
+            "error:Conflict",
+            "intend:60-60",
+            "done:60-60",
             "exit:0"
           ],
+          "first_frozen_for_s": 3.7,
           "first_holds_the_position_row": true,
           "rows": {
-            "first": 6,
-            "second": 3
+            "first": 3,
+            "second": 6
           },
           "second_while_the_first_is_frozen": {
             "data_transactions": 0,
@@ -498,6 +503,7 @@
             "done:51-51",
             "exit:0"
           ],
+          "first_frozen_for_s": 5.9,
           "first_holds_the_position_row": false,
           "rows": {
             "first": 3,

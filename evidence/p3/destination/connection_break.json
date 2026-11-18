@@ -4,8 +4,8 @@
   "results": {
     "fault_sites_in_a_child": {
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py",
-      "commit": "1599194",
-      "date_utc": "2026-11-18 14:13",
+      "commit": "0fff918",
+      "date_utc": "2026-11-18 14:32",
       "sites": {
         "md.commit": {
           "check": {
@@ -24,7 +24,7 @@
             "intend:9-12",
             "done:9-12"
           ],
-          "seconds_until_caught_up": 4.08,
+          "seconds_until_caught_up": 4.05,
           "transaction_at_the_fault_committed": false
         },
         "md.commit_reply": {
@@ -44,7 +44,7 @@
             "intend:15-15",
             "done:15-15"
           ],
-          "seconds_until_caught_up": 0.61,
+          "seconds_until_caught_up": 0.54,
           "transaction_at_the_fault_committed": true
         },
         "md.execute": {
@@ -63,7 +63,7 @@
             "intend:3-6",
             "done:3-6"
           ],
-          "seconds_until_caught_up": 1.25,
+          "seconds_until_caught_up": 1.27,
           "transaction_at_the_fault_committed": false
         },
         "md.fence": {
@@ -83,7 +83,7 @@
             "intend:6-9",
             "done:6-9"
           ],
-          "seconds_until_caught_up": 1.45,
+          "seconds_until_caught_up": 1.46,
           "transaction_at_the_fault_committed": false
         }
       }
@@ -113,7 +113,7 @@
             "signal": null,
             "signal_name": null
           },
-          "ms_of_first_error_after_process_start": 7881,
+          "ms_of_first_error_after_process_start": 7919,
           "proxy_connections_accepted": 2,
           "proxy_connections_reset": 0,
           "recovered_by_itself": true,
@@ -145,7 +145,7 @@
             "signal": null,
             "signal_name": null
           },
-          "ms_of_first_error_after_process_start": 11803,
+          "ms_of_first_error_after_process_start": 11812,
           "proxy_connections_accepted": 4,
           "proxy_connections_reset": 2,
           "recovered_by_itself": true,
@@ -177,7 +177,7 @@
             "signal": null,
             "signal_name": null
           },
-          "ms_of_first_error_after_process_start": 11803,
+          "ms_of_first_error_after_process_start": 11814,
           "proxy_connections_accepted": 2,
           "proxy_connections_reset": 0,
           "recovered_by_itself": true,
@@ -200,8 +200,8 @@
           ],
           "events": [
             "error:CommitUnknown",
-            "intend:30-30",
-            "done:30-30",
+            "intend:27-30",
+            "done:27-30",
             "exit:0"
           ],
           "exit": {
@@ -209,13 +209,13 @@
             "signal": null,
             "signal_name": null
           },
-          "ms_of_first_error_after_process_start": 11912,
+          "ms_of_first_error_after_process_start": 11805,
           "proxy_connections_accepted": 4,
           "proxy_connections_reset": 2,
           "recovered_by_itself": true,
           "rows_of_the_child": 6,
-          "seconds_from_lifting_to_exit": 6.7,
-          "transaction_at_the_break_committed": true,
+          "seconds_from_lifting_to_exit": 6.9,
+          "transaction_at_the_break_committed": false,
           "what": "the COMMIT is held by the proxy; after the child's error the connections are reset, so the COMMIT is never delivered"
         },
         "reset": {
@@ -254,8 +254,8 @@
         "tx_deadline": 8
       },
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py",
-      "commit": "1599194",
-      "date_utc": "2026-11-18 14:15",
+      "commit": "0fff918",
+      "date_utc": "2026-11-18 14:34",
       "proxy": {
         "accepted": 15,
         "closed_by_fault": 0,

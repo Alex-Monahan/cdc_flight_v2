@@ -889,8 +889,11 @@ both, and the run-again rule holds as well. `test_two_processes_with_the_same_ep
 - The first frozen at `sut.begun` or `sut.written` of its second transaction: the second applied everything.
   The first got `Conflict` when it went on.
 - The first frozen at `sut.moved`, `stream.fenced` or `stream.commit_sent` (it holds the position row): the
-  second got 3 or 4 `Conflict`s and committed nothing while the first was frozen. The first committed when it
-  went on, in the runs on `88e0cf1` and `7193b39`. In the run on `e671405`, under the load of two campaigns at
+  second got 3 or 4 `Conflict`s and committed nothing while the first was frozen. At `stream.fenced` and
+  `stream.commit_sent` the first committed when it went on. At `sut.moved` it did so in the runs on `88e0cf1`
+  and `7193b39`; since fix round 2 it gets `Conflict` there and the second applies the events: the first has not
+  run its fence statement yet, and the second process's registration raises the lane's counter and commits
+  meanwhile (the counter only grows), so the first one's fence statement conflicts (the run on `1599194`). In the run on `e671405`, under the load of two campaigns at
   once, the second process applied the events at `sut.moved` and the first got an error when it went on:
   MotherDuck had ended its frozen transaction (the lease of section 8.3); exactly-once held. The test accepts
   both. Without a take-over nobody interrupts the first.
@@ -1659,7 +1662,7 @@ control of design 4.5 breached every time). Six items; every one has a test that
 |---|---|---|---|
 | 1 | The take-over and the registration put `n` back (`n - 1`): a net-zero write that no documented rule keeps recorded | the counter only grows; `seq` is strictly increasing per lane with gaps at take-overs and registrations (sections 2.3, 2.5, 14.4) | `test_fix_round.py::test_the_take_over_and_the_registration_never_put_the_counter_back`, `::test_seq_is_strictly_increasing_per_lane_with_gaps_only_at_take_overs_and_registrations` |
 | 2, 6 (N3) | `expect` on a column not in `values` (written `col = col`) and a self-transition without `values` excluded nothing (5 of 5 both committed, across two lanes of one epoch) | refused with `LaneMisuse` (section 2.5); `check_machine` takes `self_values` | `::test_a_condition_on_a_column_the_transition_does_not_change_is_refused` |
-| 3 | `test_md_procs.py` accepted either outcome for a transaction that MotherDuck may end while it is frozen | the time MotherDuck keeps a frozen or killed client's open transaction is recorded and asserted below the take-over's deadline of 45 s (`takeover_open_tx.json`, key `without_interrupt`, `frozen_transaction_kept_s`); the same-epoch case accepts the lost transaction only after a freeze of at least 25 s | `test_md_procs.py::test_takeover_in_the_middle_of_an_open_transaction`, `::test_two_processes_with_the_same_epoch` |
+| 3 | `test_md_procs.py` accepted either outcome for a transaction that MotherDuck may end while it is frozen | the time MotherDuck keeps a frozen or killed client's open transaction is recorded and asserted below the take-over's deadline of 45 s (`takeover_open_tx.json`, key `without_interrupt`, `frozen_transaction_kept_s`: 28.7 to 29.0 s on `0fff918`); the same-epoch case accepts the lost transaction only after a freeze of at least 25 s | `test_md_procs.py::test_takeover_in_the_middle_of_an_open_transaction`, `::test_two_processes_with_the_same_epoch` |
 | 4 (N1) | The local stand-in of the server's interrupt swallowed an interrupted `ROLLBACK` and marked the transaction rolled back; it stayed open and two simultaneous take-overs both failed (9 of 30 local rounds) | one interrupt and its `ROLLBACK` at a time per connection; an interrupted `ROLLBACK` is tried again; the transaction is marked rolled back only after it succeeded | `::test_an_interrupt_that_lands_in_the_local_roll_back_does_not_leave_the_transaction_open`; the reviewer's shape with `-m d_full`: `::test_two_simultaneous_take_overs_while_an_old_run_stands_at_its_fence_have_one_winner` |
 | 5 (N2) | Autocommit writes carried no fence: after a take-over an old run's plain connection inserted data and set its fence row and the leader row back, and all committed | outside a lane only reads run; no caller may `UPDATE` the leader tables; package L's heartbeat and release are statements of the layer (section 2.1, contract notes 47 and 48) | `::test_an_old_runs_plain_connection_cannot_write_after_a_take_over`, `::test_the_heartbeat_and_the_release_are_statements_of_the_layer`, `test_lane.py::test_leader_rows_cannot_be_deleted_or_inserted`, `test_static.py::test_no_text_outside_the_layer_updates_the_leader_or_heartbeat_row` (a guard: no such text existed) |
 
@@ -1815,12 +1818,13 @@ tests use differ from it; fix round, item 5). One recorded run per file, without
 
 | Command | Tests | Recorded run (2026-11-11 UTC) | Earlier recorded runs |
 |---|---|---|---|
-| `tools/with-env uv run -q pytest -m md tests/destination/test_md.py` | 31: what MotherDuck answers, deadlines, the registry, the clock, timings | MD_RUN_TEST_MD | 31 passed in 358 s (`7193b39`) |
-| `tools/with-env uv run -q pytest -m md tests/destination/test_md_again.py` | 92: the T0 tests of lanes, leader tables, migrations, state, alerts, the points from the review of apply and both fix rounds, with a MotherDuck database | 92 passed in 865 s (`50229d7`) | 88 passed in 893 s (`7193b39`) |
-| `tools/with-env uv run -q pytest -m md tests/destination/test_md_fix_round.py` | 2: the black-holed path (section 9.4), the take-over at every point (14 rounds) | 2 passed in 103 s (`50229d7`) | 2 passed in 113 s (`7193b39`) |
-| `tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py` | 10: real processes (sections 8 and 9) | MD_RUN_PROCS | 10 passed in 1212 s (`7193b39`) |
+| `tools/with-env uv run -q pytest -m md tests/destination/test_md.py` | 31: what MotherDuck answers, deadlines, the registry, the clock, timings | 31 passed in 297 s (`1599194`) | 31 passed in 358 s (`7193b39`); 7 failed on `50229d7` (counter values written for a counter that was put back; fixed) |
+| `tools/with-env uv run -q pytest -m md tests/destination/test_md_again.py` | 92: the T0 tests of lanes, leader tables, migrations, state, alerts, the points from the review of apply and both fix rounds, with a MotherDuck database | 92 passed in 724 s (`1599194`) | 88 passed in 893 s (`7193b39`); 92 passed in 865 s (`50229d7`) |
+| `tools/with-env uv run -q pytest -m md tests/destination/test_md_fix_round.py` | 2: the black-holed path (section 9.4), the take-over at every point (14 rounds) | 2 passed in 95 s (`1599194`) | 2 passed in 113 s (`7193b39`); 2 passed in 103 s (`50229d7`) |
+| `tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py` | 10: real processes (sections 8 and 9) | 10 passed in 1047 s (`0fff918`) | 10 passed in 1212 s (`7193b39`); on `1599194` 1 failed (the same-epoch case at `sut.moved`, section 8.2; the assertion now states what the monotone counter makes of it) |
 
-MD_RUN_NOTE
+The first three files ran on `1599194`, `test_md_procs.py` on `0fff918`, which differs from it only in that
+file's assertion of section 8.2. The commit delivered differs from `0fff918` only in documents and evidence.
 
 **The campaign of item 8**: `tools/with-env uv run python tests/destination/fence_campaign.py --rounds 1040 --log
 <file>` (about 3 to 5 s a round; its summary goes to `fence_campaign.json`; SIGTERM stops it and drops its
