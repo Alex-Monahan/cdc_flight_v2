@@ -412,12 +412,16 @@ SELECT row_number() OVER () AS gid, * FROM (
 
 
 def keyless_stats_sql(rel: Callable[[str], str]) -> str:
+    """One row of counts. Every column is a BIGINT: `sum` of a BIGINT is a HUGEINT, which the lane's Arrow export
+    (`arrow_lossless_conversion`, C4) hands out as an opaque 16-byte value, not as a number (RemoteBackend reads
+    this row through `tx.fetch_arrow`)."""
     return ("SELECT (SELECT count(*) FROM {r}) AS n_records, (SELECT count(*) FROM {r} WHERE op = 'c') AS n_c, "
             "(SELECT count(*) FROM {r} WHERE op = 'u') AS n_u, (SELECT count(*) FROM {r} WHERE op = 'd') AS n_d, "
             "(SELECT count(*) FROM {r} WHERE op NOT IN ('c', 'u', 'd') OR op IS NULL) AS n_badop, "
             "(SELECT count(*) FROM (SELECT tord, seq FROM {r0} GROUP BY ALL HAVING count(*) > 1)) AS n_dupseq, "
             "(SELECT count(*) FROM {r0} WHERE tord IS NULL OR seq IS NULL) AS n_nullorder, "
-            "(SELECT count(*) FROM {neg}) AS n_neg_groups, (SELECT coalesce(sum(n), 0) FROM {neg}) AS n_neg_rows, "
+            "(SELECT count(*) FROM {neg}) AS n_neg_groups, "
+            "(SELECT CAST(coalesce(sum(n), 0) AS BIGINT) FROM {neg}) AS n_neg_rows, "
             "(SELECT count(*) FROM {delta} WHERE n > 0) AS n_pos_groups, "
-            "(SELECT coalesce(sum(n), 0) FROM {delta} WHERE n > 0) AS n_pos_rows"
+            "(SELECT CAST(coalesce(sum(n), 0) AS BIGINT) FROM {delta} WHERE n > 0) AS n_pos_rows"
             ).format(r0=rel("r0"), r=rel("r0"), neg=rel("neg"), delta=rel("delta"))

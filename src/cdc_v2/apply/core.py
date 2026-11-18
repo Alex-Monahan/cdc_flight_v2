@@ -69,7 +69,14 @@ class ApplyCounts:
 
 
 class _Counting:
-    """Counts what is sent through the lane transaction and names each statement's shape."""
+    """Everything apply sends to the lane transaction goes through here: it counts the statements and names each
+    one's shape. It passes no deadline (the lane's own deadlines hold, C4) and catches nothing: every error of the
+    lane (`md.DestinationError`, `DeadlineExceeded`, `md.LaneMisuse`) reaches apply's caller as the lane raised it.
+
+    Only `count` hands back what the lane answers, and apply calls it only for an INSERT, UPDATE or DELETE without
+    RETURNING (K1, K3, K6, K7, K8, L1, L2, RK1, RK2, the reduction and truncate): the statements for which C4
+    promises a count. `execute` returns nothing, so nothing in apply can read the `None` that the lane answers for
+    CREATE TABLE ... AS, other DDL or a statement with RETURNING (docs/design/apply.md 10)."""
 
     def __init__(self, tx, counts: ApplyCounts):
         self._tx, self._counts = tx, counts
@@ -79,16 +86,26 @@ class _Counting:
         self._counts.statements += 1
         self._counts.shapes.append(self.shape)
 
-    def execute(self, sql, params=None):
+    def execute(self, sql, params=None) -> None:
         self._note()
-        return self._tx.execute(sql, params)
+        self._tx.execute(sql, params)
+
+    def count(self, sql, params=None) -> int:
+        """Rows that an INSERT, UPDATE or DELETE (without RETURNING) changed. A transaction that reports no count
+        for such a statement is not a lane transaction of C4: never read as 0."""
+        self._note()
+        n = self._tx.execute(sql, params)
+        if n is None:
+            raise RuntimeError("apply: the transaction reported no row count for statement %s (contract C4: an "
+                               "INSERT, UPDATE or DELETE reports the rows it changed)" % self.shape)
+        return n
 
     def fetch_arrow(self, sql, params=None):
         self._note()
         return self._tx.fetch_arrow(sql, params)
 
     def register(self, name, data):
-        return self._tx.register(name, data)
+        self._tx.register(name, data)
 
 
 def _require_spill_dir(settings: ApplySettings) -> None:
@@ -232,7 +249,7 @@ def _keyed_statements(ctx, backend, target, meta, ucols, mode, stats, counts, se
     if n_del:
         ctx.shape = "K1"
         for rel in backend.statement_relations("del", chunked=True):
-            got = ctx.execute(sh.k1_delete(rel)) or 0
+            got = ctx.count(sh.k1_delete(rel))
             counts.deleted += got
             want = backend.current_sum("p")
             want = int(stats["n_del_held"]) if want is None else want
@@ -254,17 +271,17 @@ def _keyed_statements(ctx, backend, target, meta, ucols, mode, stats, counts, se
             ctx.shape = "K2"
             ctx.execute(sh.k2_sentinel_mover(upd_rel))
         ctx.shape = "K3"
-        moved = ctx.execute(sh.k3_move(upd_rel))
+        moved = ctx.count(sh.k3_move(upd_rel))
         if moved != n_upd:
             raise ApplyInvariantError("%s: %d of %d rows to update found in the destination%s"
-                                      % (target, moved or 0, n_upd, " (each alone at its key, and its new key free)"
+                                      % (target, moved, n_upd, " (each alone at its key, and its new key free)"
                                          if sh.per_key else ""))
         counts.updated += moved
     if n_copy:
         ctx.shape = "K7"
-        copied = ctx.execute(sh.k7_copy(copy_rel))
+        copied = ctx.count(sh.k7_copy(copy_rel))
         ctx.shape = "K8"
-        removed = ctx.execute(sh.k8_delete_copied(copy_rel))
+        removed = ctx.count(sh.k8_delete_copied(copy_rel))
         if copied != n_copy or removed != n_copy:
             raise ApplyInvariantError("%s: %d rows to copy, %s copied, %s removed" % (target, n_copy, copied, removed))
         counts.inserted += copied
@@ -282,7 +299,7 @@ def _keyed_statements(ctx, backend, target, meta, ucols, mode, stats, counts, se
         ctx.shape = "K6"
         got = 0
         for rel in backend.statement_relations("ins", chunked=True):
-            got += ctx.execute(sh.k6_insert(rel)) or 0
+            got += ctx.count(sh.k6_insert(rel))
         if sh.new_keys and got != n_ins:
             raise ApplyInvariantError("%s: %d of %d rows to insert have a free key" % (target, got, n_ins))
         counts.inserted += got
@@ -313,22 +330,23 @@ def _keyless_statements(ctx, backend, target, meta, ucols, stats, counts):
         ctx.shape = "L1"
         got = 0
         for rel in backend.statement_relations("neg", chunked=True):
-            got += ctx.execute(sh.l1_delete(rel)) or 0
+            got += ctx.count(sh.l1_delete(rel))
         if got != need:
             raise ApplyInvariantError("%s: %d rows to delete, %d found" % (target, need, got))
         counts.deleted += got
     if stats["n_pos_rows"]:
         ctx.shape = "L2"
         for rel in backend.statement_relations("plus", chunked=True):
-            counts.inserted += ctx.execute(sh.l2_insert(rel)) or 0
+            counts.inserted += ctx.count(sh.l2_insert(rel))
 
 
 class _rowid_free:
     """DuckDB's row id is hidden by a column named `rowid` (any case). The keyless delete and reduce_duplicates
     need the row id, so such a column is renamed for the duration of the statements, inside the caller's
-    transaction, and renamed back; the statements use the temporary name (docs/design/apply.md 4.3)."""
+    transaction, and renamed back; the statements use the temporary name (docs/design/apply.md 4.3). `tx` is a
+    `_Counting`."""
 
-    def __init__(self, tx, target: Target, meta: TableMeta):
+    def __init__(self, tx: _Counting, target: Target, meta: TableMeta):
         self.tx, self.target, self.meta = tx, target, meta
         self.col = next((c for c in meta.columns if c.name.casefold() == "rowid"), None)
 
@@ -339,8 +357,7 @@ class _rowid_free:
         from .meta import Column
         from .types import quote_ident
         self.tmp = "rowid_cdc_v2_%s" % secrets.token_hex(6)
-        if hasattr(self.tx, "shape"):
-            self.tx.shape = "R1"
+        self.tx.shape = "R1"
         self.tx.execute("ALTER TABLE %s RENAME COLUMN %s TO %s" % (self.target.sql(), self.col.qname,
                                                                     quote_ident(self.tmp)))
         cols = [Column(c.position, self.tmp, c.type, c.key, c.unchanged_possible) if c is self.col else c
@@ -351,8 +368,7 @@ class _rowid_free:
         if self.col is None or et is not None:
             return False                           # after an error the caller rolls back, which undoes the rename
         from .types import quote_ident
-        if hasattr(self.tx, "shape"):
-            self.tx.shape = "R2"
+        self.tx.shape = "R2"
         self.tx.execute("ALTER TABLE %s RENAME COLUMN %s TO %s" % (self.target.sql(), quote_ident(self.tmp),
                                                                     self.col.qname))
         return False
@@ -392,12 +408,12 @@ def repair_keys(tx, target: Target, meta: TableMeta, rows: Union[pa.Table, str],
     cond = " AND ".join("%s = %s" % (source_wrap("t.%s" % c.qname, c.dtype), source_wrap("r.%s" % c.qname, c.dtype))
                         for c in kcols)
     ctx.shape = "RK1"
-    counts.deleted = ctx.execute("DELETE FROM %s AS t USING %s AS r WHERE %s" % (target.sql(), krel, cond),
-                                 list(p_all) or None) or 0
+    counts.deleted = ctx.count("DELETE FROM %s AS t USING %s AS r WHERE %s" % (target.sql(), krel, cond),
+                               list(p_all) or None)
     ctx.shape = "RK2"
     names = ", ".join(c.qname for c in cols)
-    counts.inserted = ctx.execute("INSERT INTO %s (%s) SELECT %s FROM %s AS s" % (
-        target.sql(), names, ", ".join("s.%s" % c.qname for c in cols), src), list(p_rows) or None) or 0
+    counts.inserted = ctx.count("INSERT INTO %s (%s) SELECT %s FROM %s AS s" % (
+        target.sql(), names, ", ".join("s.%s" % c.qname for c in cols), src), list(p_rows) or None)
     return counts
 
 
@@ -405,7 +421,9 @@ def truncate(tx, target: Target) -> int:
     """Empty the table inside the transaction (a TRUNCATE of the source at this place of the stream)."""
     if not isinstance(target, Target):
         raise TypeError("target is a Target")
-    return tx.execute("DELETE FROM %s" % target.sql()) or 0
+    ctx = _Counting(tx, ApplyCounts())
+    ctx.shape = "T"
+    return ctx.count("DELETE FROM %s" % target.sql())
 
 
 def reduce_duplicates(tx, target: Target, change_set: Union[LocalChangeSet, RelationChangeSet],
@@ -416,6 +434,7 @@ def reduce_duplicates(tx, target: Target, change_set: Union[LocalChangeSet, Rela
     if not meta.has_key:
         raise ValueError("reduce_duplicates is for tables with a key")
     settings = settings or ApplySettings()
+    ctx = _Counting(tx, ApplyCounts())
     keys = meta.key_columns
     from .types import exact
     xs = ", ".join("%s AS x%d" % (exact(c.a, c.dtype), c.position) for c in keys)
@@ -441,11 +460,17 @@ def reduce_duplicates(tx, target: Target, change_set: Union[LocalChangeSet, Rela
         L.close()
         if data.num_rows == 0:
             return 0
-        tx.register("cdc_v2_apply_keys", data)
-        with _rowid_free(tx, target, meta) as smeta:
-            return tx.execute(Shapes(smeta, target, []).reduce_duplicates("cdc_v2_apply_keys")) or 0
+        from .backend import VIEW_PREFIX
+        name = VIEW_PREFIX + "keys"
+        ctx.register(name, data)
+        with _rowid_free(ctx, target, meta) as smeta:
+            ctx.shape = "RD"
+            removed = ctx.count(Shapes(smeta, target, []).reduce_duplicates(name))
+        return removed
     rel = ("(SELECT DISTINCT * FROM (SELECT %s FROM (%s) AS s UNION ALL SELECT %s FROM (%s) AS s WHERE %s))"
            % (xs, change_set.sql, ks, change_set.sql, nn))
     params = list(change_set.params) * 2 or None
-    with _rowid_free(tx, target, meta) as smeta:
-        return tx.execute(Shapes(smeta, target, []).reduce_duplicates(rel), params) or 0
+    with _rowid_free(ctx, target, meta) as smeta:
+        ctx.shape = "RD"
+        removed = ctx.count(Shapes(smeta, target, []).reduce_duplicates(rel), params)
+    return removed
