@@ -481,7 +481,9 @@ unless another file is named).
 `evidence/p3/apply/perf_md.json`: this laptop to MotherDuck over the internet, lineitem width, short runs. The
 spike's numbers come from an F16 Flight (`docs/spike/md_semantics.md` Q3: 0.066 s for 1-100 rows, 212K rows/s at
 100K, 342-355K rows/s at 1M) and are bound by round trips (8 ms on a Flight, about 80 ms here) and upload. See
-the report for the comparison.
+the report for the comparison. `perf_md.json` was measured before D's merge, through the stand-in, which sent
+`COMMIT` alone; D's lane sends its fence statement before `COMMIT`, one more round trip per block
+(`docs/design/destination.md` sections 3 and 11). It was not measured again in this round.
 
 ## 8. How to run
 
@@ -529,9 +531,10 @@ What apply keeps to, and what holds it:
    `FenceLost`), `DeadlineExceeded` and `md.LaneMisuse` reach apply's caller as the lane raised them: the same
    object, from any call apply makes, and the lane's roll-back leaves the table as it was
    (`test_d_errors_pass_through_unchanged_from_every_call`: every call of five named cases, both forms, one of
-   D's six statement errors at each). Apply's only `except` is for the planning database's own out-of-memory
-   error (`ApplySpillFull`); its clean-up touches no lane call after an error (`_rowid_free` does not rename back
-   after an error: the roll-back undoes the rename).
+   D's six statement errors at each). No handler in apply catches an error of the lane: its handlers catch the
+   planning database's own out-of-memory error (`LocalSpill`, which only the private planning cursor raises; it
+   becomes `ApplySpillFull`) and errors of closing that private database. Its clean-up makes no lane call after an error (`_rowid_free` does not rename back after an error: the
+   roll-back undoes the rename).
 2. **A statement that the destination refuses** (a value that does not fit a column, a constraint, a name that
    does not exist) **reaches the caller as D's `md.StatementError`**, with `error_class` (the class of the client's
    error) and `statement` (the kind of statement, from the client's parser), and never a value: the lane keeps
