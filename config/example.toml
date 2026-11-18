@@ -1,0 +1,141 @@
+# Example configuration of one deployment (task S section 1). Every key is set here, to its default; a test loads
+# this file (tests/stream/test_config.py). docs/configuration.md lists every key with its unit and what it serves.
+#
+# Durations: a number and a unit (ms, s, m, h), parts may follow each other ("7h30m"). Sizes: an integer and a unit
+# (B, KiB, MiB, GiB). No secret is in this file: a password is named by the environment variable that holds it, and
+# so may the host, port, database and user of a node (values that must not be committed, SPEC R23).
+
+[destination]
+database = "cdc_v2_example"
+marker = "cdc_v2"
+connect_deadline = "30s"
+connect_attempts = 3
+connect_retry_pause = "500ms"
+statement_deadline = "60s"
+transaction_deadline = "300s"
+rollback_deadline = "5s"
+grace = "2s"
+interrupt_deadline = "5s"
+max_waiting_calls = 2
+
+[source]
+publication = "cdc_v2_pub"
+slot = "cdc_v2_slot"
+heartbeat_schema = "cdc_v2"
+heartbeat_table = "heartbeat"
+
+[source.nodes.primary]
+host_env = "PG_HOST"
+port_env = "PG_PORT"
+dbname_env = "PG_DATABASE"
+user_env = "PG_USER"
+password_env = "PG_PASSWORD"
+tls = "verify-full"
+sslrootcert = "system"
+application_name = "cdc_v2"
+connect_timeout = "10s"
+statement_timeout = "30s"
+lock_timeout = "5s"
+idle_in_transaction_session_timeout = "60s"
+keepalives_idle = 30
+keepalives_interval = 10
+keepalives_count = 6
+tcp_user_timeout = "120s"
+cancel_grace = "2s"
+
+[source.nodes.replica]
+host_env = "PG_REPLICA_HOST"
+port_env = "PG_REPLICA_PORT"
+dbname_env = "PG_DATABASE"
+user_env = "PG_USER"
+password_env = "PG_PASSWORD"
+tls = "verify-full"
+sslrootcert = "system"
+application_name = "cdc_v2"
+connect_timeout = "10s"
+statement_timeout = "30s"
+lock_timeout = "5s"
+idle_in_transaction_session_timeout = "60s"
+keepalives_idle = 30
+keepalives_interval = 10
+keepalives_count = 6
+tcp_user_timeout = "120s"
+cancel_grace = "2s"
+
+[engine]
+heap = "512MiB"
+gc = "parallel"
+active_processors = 2
+max_batch_size = 8192
+max_queue_size = 32768
+max_queue_bytes = "256MiB"
+poll_interval = "50ms"
+record_processing_threads = 1
+heartbeat_interval = "5s"
+status_update_interval = "10s"
+message_prefixes = ["cdc_v2_.*"]
+frame_max_rows = 65536
+frame_target_bytes = "8MiB"
+frame_max_bytes = "1040MiB"
+max_value_bytes = "256MiB"
+ack_max_pending = 4096
+stop_timeout = "15s"
+stat_interval = "10s"
+
+[transform]
+threads = 1
+memory_limit = "512MiB"
+max_cached_queries = 256
+
+[apply]
+statement_rows = 1000000
+local_threads = 2
+local_memory_limit = "1GiB"
+check_new_keys = true
+max_group_delay = "1s"
+max_group_bytes = "128MiB"
+max_group_attempts = 12
+retry_pause = "500ms"
+retry_pause_max = "5s"
+max_table_attempts = 3
+commit_timeout_base = "60s"
+commit_timeout_per_million_rows = "60s"
+stage_chunk_bytes = "64MiB"
+
+[stream]
+node = "replica"
+frame_silence = "30s"
+marker_timeout = "60s"
+heartbeat_interval = "10s"
+idle_position_interval = "10s"
+max_attempts_at_position = 3
+max_key_restarts = 2
+attach_timeout = "90s"
+unreachable_wait = "30m"
+unreachable_pause = "1s"
+engine_stop = "20s"
+request_poll = "5s"
+alert_flush = "5s"
+source_statement = "30s"
+
+[supervisor]
+restart_after = "120s"
+max_restarts = 5
+restart_window = "10m"
+join_timeout = "30s"
+check_interval = "1s"
+max_waiting_calls = 8
+
+[run]
+max_runtime = "7h30m"
+work_dir = ""
+spill_limit = "8GiB"
+jvm_cache_dir = ""
+stop_timeout = "30s"
+
+[leader]
+heartbeat_interval = "10s"
+stale_age = "30s"
+hard_exit_age = "60s"
+takeover_timeout = "45s"
+startup_timeout = "180s"
