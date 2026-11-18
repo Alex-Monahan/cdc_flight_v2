@@ -239,7 +239,9 @@ repair read through it.
   `ApplySettingsError`) and `local_max_temp_directory_size` (4 GB); all are set before that database's first
   statement. A plan that exceeds both limits raises `ApplySpillFull` (no value in the message; the database is
   closed, so its spill files go, and the next call starts afresh); the stream can then stage the change set and
-  use the relation form. `check_new_keys` (2.5).
+  use the relation form, in a new transaction: `ApplySpillFull` can come after statements of the change set were
+  sent (the outputs are assembled per statement, 3.1), so the transaction that saw it must not commit (section 10,
+  "Every error of apply ends the transaction"). `check_new_keys` (2.5).
 * The relation form creates its working tables in a schema `<scratch_prefix>_<random>` inside the caller's
   transaction and drops every table and the schema before returning (one `DROP TABLE` per table, section 5).
 * `TableMeta` refuses two names that differ only by case. Any other string is a destination name, including
@@ -247,34 +249,51 @@ repair read through it.
 
 ### 2.8 Hazard: a TOASTed key column sent as "unchanged"
 
-**What.** An `UPDATE` that does not change a key column can arrive with no value for that key column. Then apply
-cannot find the row, and it refuses the change set.
+**What.** An `UPDATE` that does not change a key column could arrive with no value for that key column (Debezium's
+unavailable-value placeholder in a key column). Apply could then not find the row.
 
-**Mechanism.** Postgres moves a value out of the row (TOAST, "external") when the row is larger than about 2 KB
-after compression. A key value can be external in the table even though the index holds it inline (a B-tree entry
-may be up to about 2.7 KB). pgoutput then sends the column as `u` ("unchanged toasted datum") in the new image of
-an `UPDATE` that did not change it (H-003, `docs/wal_hazards.md`). Under the default replica identity the old key
-is sent only when the key changed, so the record has no key value at all. Debezium replaces the `u` with its
-unavailable-value placeholder (default `__debezium_unavailable_value`); our engine turns the placeholder into
-`u<i>` = true and `a<i>` = NULL (`docs/design/engine.md` section 3, "Unchanged (H-003)"). With
-`REPLICA IDENTITY FULL` the old image is complete and Debezium fills the unchanged value from it (H-003), so the
-key is present.
+**Mechanism** (read in the public source, not measured by this package, which runs no Postgres). Postgres moves a
+value out of the row (TOAST, "external") when the row is larger than about 2 KB after compression, also a key
+value that the index holds inline (a B-tree entry may be up to about 2.7 KB).
 
-**What apply does.** A key value is never taken from "unchanged": `u<i>` on a key column is ignored (2.7), and a
-record whose key value is NULL (or whose old key `k<i>` is partly NULL) raises `ApplyInvariantError` from the
-plan, before any statement that changes the destination table, in both modes and both forms. The message gives
-the table and the number of such records, never a value. The caller rolls back. In the stream this is a failure
-of the table: after `apply.max_table_attempts` the table leaves the stream (state `quarantined`, alert; core
-design 3, plan C10), and the quarantine of SPEC 4.0 takes it from there. Apply never guesses the key, and never
-matches a row by its other columns.
+* pgoutput writes `u` ("unchanged toasted datum") for every column of the new image that holds an external value
+  on disk, key columns included (`logicalrep_write_tuple`, `src/backend/replication/logical/proto.c` of Postgres
+  18: `VARATT_IS_EXTERNAL_ONDISK` gives `LOGICALREP_COLUMN_UNCHANGED`; H-003 in `docs/wal_hazards.md`).
+* But `heap_update` logs the old replica-identity key, with its external values inlined, not only when the key
+  changed but also **when a key column is stored externally** (`id_has_external`, passed as `key_required` to
+  `ExtractReplicaIdentity`; `src/backend/access/heap/heapam.c` of `REL_16_STABLE` and `REL_18_STABLE`). So
+  pgoutput sends the old key tuple with the real key value.
+* Stock Debezium 3.7.1 reads that old tuple as the update's old columns, caches its values, and fills an unchanged
+  column of the new image from the cache (`PostgresChangeRecordEmitter.columnValues`, `cachedOldToastedValues`;
+  `PgOutputMessageDecoder` reads the old tuple; `RelationalChangeRecordEmitter.emitUpdateRecord` reads the old
+  columns first). The record therefore carries the key, and old and new key are equal: a plain update.
 
-**Prevention** (not apply's; owner's question in `STATUS.md`, with F-7): a table whose key column can be TOASTed
-(a long `text`, `varchar` or `bytea` key) is replicated only with `REPLICA IDENTITY FULL`; until the owner rules,
-such a table without `FULL` is refused (STATUS, "From the apply package"). With `FULL` the record carries the key.
+So on Postgres 16 and 18 with stock Debezium 3.7.1 the key should never arrive as "unchanged". It can only where
+the old key tuple is missing: a server whose `heap_update` lacks that logging (an older minor release; which
+releases carry it was not checked here), or a Debezium that stops filling from the old tuple. With
+`REPLICA IDENTITY FULL` the old tuple is the complete flattened row, and the same fill applies (H-003). An earlier
+version of this note said that under the default identity the old key is sent only when the key changed; the
+source above says otherwise (found by this round's reviewer).
 
-**Test.** `test_apply_lane.py::test_a_key_sent_as_unchanged_is_refused` (a single key and a composite key with one
-part sent as unchanged, `u<i>` set or absent, both forms: `ApplyInvariantError`, nothing written, no value in the
-message).
+**What apply does if it happens anyway.** A key value is never taken from "unchanged": `u<i>` on a key column is
+ignored (2.7), and a record whose key value is NULL (or whose old key `k<i>` is partly NULL) raises
+`ApplyInvariantError` from the plan, before any statement that changes the destination table, in both modes and
+both forms. The message gives the table and the number of such records, never a value. The caller rolls back. In
+the stream this is a failure of the table: after `apply.max_table_attempts` the table leaves the stream (state
+`quarantined`, alert; core design 3, plan C10), and the quarantine of SPEC 4.0 takes it from there. Apply never
+guesses the key, and never matches a row by its other columns.
+
+**Prevention.** The old-key logging of `heap_update` plus Debezium's fill. Open, for the owner's question in
+`STATUS.md` ("From the apply package", (1): refuse a table whose key can be TOASTed unless it has
+`REPLICA IDENTITY FULL`): the source says that `FULL` is not needed for the key on Postgres 16 and 18. This should
+be measured on T1 before the question is ruled (a text key of about 2.5 KB of incompressible text under the
+default identity, an `UPDATE` of another column, the engine's record and apply's result; with a server version
+check in the preflight if an older release must be served). That test belongs to the engine or the stream
+package, which run Postgres.
+
+**Test** (apply's part). `test_apply_lane.py::test_a_key_sent_as_unchanged_is_refused`: a single key and a
+composite key with one part sent as unchanged, `u<i>` set or absent, both forms, both modes:
+`ApplyInvariantError`, nothing written, no value in the message.
 
 ## 3. Statements for a table with a key
 
@@ -529,12 +548,17 @@ What apply keeps to, and what holds it:
 
 1. **Apply catches nothing of D's.** `md.DestinationError` (`StatementError`, `ConnectionLost`, `Conflict`,
    `FenceLost`), `DeadlineExceeded` and `md.LaneMisuse` reach apply's caller as the lane raised them: the same
-   object, from any call apply makes, and the lane's roll-back leaves the table as it was
-   (`test_d_errors_pass_through_unchanged_from_every_call`: every call of five named cases, both forms, one of
-   D's six statement errors at each). No handler in apply catches an error of the lane: its handlers catch the
-   planning database's own out-of-memory error (`LocalSpill`, which only the private planning cursor raises; it
-   becomes `ApplySpillFull`) and errors of closing that private database. Its clean-up makes no lane call after an error (`_rowid_free` does not rename back after an error: the
-   roll-back undoes the rename).
+   object, out of `apply_group` itself (not only out of the block, which raises a failed transaction's error
+   again by itself), from any call apply makes, and the lane's roll-back leaves the table as it was
+   (`test_d_errors_pass_through_unchanged_from_every_call`: five named cases, one of D's six statement errors at
+   each call; every call in the local form; in the relation form, about 45 calls a case, a sample of about ten in
+   the default run and every call with `CDC_V2_APPLY_FULL=1`). The reviewer of this round showed that a first
+   version of the test could not tell an error passed on from one swallowed (it checked only the block's error):
+   a planted `except` that returned empty counts passed it; it fails the test as it is now. No handler in apply
+   catches an error of the lane: its handlers catch the planning database's own out-of-memory error (`LocalSpill`,
+   which only the private planning cursor raises; it becomes `ApplySpillFull`) and errors of closing that private
+   database. Its clean-up makes no lane call after an error (`_rowid_free` does not rename back after an error:
+   the roll-back undoes the rename).
 2. **A statement that the destination refuses** (a value that does not fit a column, a constraint, a name that
    does not exist) **reaches the caller as D's `md.StatementError`**, with `error_class` (the class of the client's
    error) and `statement` (the kind of statement, from the client's parser), and never a value: the lane keeps
@@ -560,8 +584,8 @@ What apply keeps to, and what holds it:
    and on MotherDuck).
 5. **Deadlines.** Apply passes no deadline of its own (None: the lane's statement and block deadlines hold); a
    caller that wants one gives the block its `Deadline`. Checked at every call of every named case; a block
-   deadline that passes while apply plans is the lane's `DeadlineExceeded`
-   (`test_a_deadline_of_the_block_passes_through`).
+   deadline that passes while apply plans is the lane's `DeadlineExceeded`, out of `apply_group` at its first
+   lane call, not at the block's fence statement (`test_a_deadline_of_the_block_passes_through`).
 6. **What the stand-in hid**, and what changed for it:
    * the lossless Arrow export (5.8): the keyless plan's two sums are cast to BIGINT. On the code before this
      round, with the real lane: 17 keyless named cases in the relation form, the keyless property and the new
@@ -573,10 +597,20 @@ What apply keeps to, and what holds it:
    * one thread only: apply starts no thread and uses the transaction from the caller's thread; a call from
      another thread is the lane's `LaneMisuse` (`test_a_call_from_another_thread_is_the_lane_s_lane_misuse`).
      The planning database is per thread (3.1).
-7. **The planning database** is shared by the calls of a thread; its cursors set `TimeZone` and
-   `arrow_lossless_conversion` with `SET SESSION`, never a plain `SET`, which reaches every connection of that
-   database (D's finding 21; `test_planning_settings_stay_with_the_cursor`). Already so on main before this
-   round; the test now also checks that another cursor keeps the database's own time zone.
+7. **The planning database** is shared by the calls of a thread; its cursors set their options with
+   `SET SESSION`, never a plain `SET`, which reaches every connection of that database (D's finding 21):
+   `apply_group`'s cursor sets `TimeZone` and `arrow_lossless_conversion`, `reduce_duplicates`' cursor
+   `arrow_lossless_conversion` (its keys do not depend on the time zone), and the private connection of
+   `RemoteBackend.fetch_arrow` the same. Already so on main before this round. Test:
+   `test_planning_settings_stay_with_the_cursor`, which now also gives the database another time zone first and
+   checks that a call of apply leaves it.
+8. **Every error of apply ends the transaction** (a rule for the caller). `ApplyInvariantError`,
+   `ChangeSetError`, `ApplySpillFull` and the missing-count `RuntimeError` are apply's own; apply raises them
+   without failing the lane transaction (C4: apply never rolls back), and some come after statements of the
+   change set were sent (K1 before K3, a slice assembled after K1 to K8). The caller leaves the block with the
+   error, and the lane rolls back; a caller that caught one inside the block and went on would commit a partial
+   change set (and a `rowid` column left renamed, 4.3). The stream applies a group again without a failed
+   table in a new transaction (plan C10).
 
 What a block costs on the lane: D's fence statement and `COMMIT` (and, on a lane's first block, its
 registration) come on top of apply's statements; `ApplyCounts.statements` counts apply's only.

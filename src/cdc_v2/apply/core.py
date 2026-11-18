@@ -29,9 +29,10 @@ class ApplyInvariantError(Exception):
 
 
 class ApplySpillFull(Exception):
-    """The private DuckDB that plans a local change set ran out of memory and of spill space (SPEC 5.4). Nothing
-    was sent to the destination for this change set by the plan; the caller can stage the change set in MotherDuck
-    and apply it in the relation form instead. The message carries no value."""
+    """The private DuckDB that plans a local change set ran out of memory and of spill space (SPEC 5.4). It can
+    come after some statements of the change set were sent (the outputs are assembled per statement), so the
+    caller rolls the transaction back, then can stage the change set in MotherDuck and apply it in the relation
+    form in a new transaction. The message carries no value."""
 
 
 class ApplySettingsError(ValueError):

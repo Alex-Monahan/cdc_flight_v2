@@ -90,23 +90,32 @@ INJECT_CASES = ["round2_X1_form_change_then_move_onto_its_old_form", "catch_up_r
 _BY_NAME = {c.name: c for c in all_cases()}
 
 
-def _run(db, case, form, table, wrap=lambda tx: tx):
+def _run(db, case, form, table, wrap=lambda tx: tx, out=None):
+    """Apply the case's change sets, one lane block each. With `out` (a list), an exception that `apply_group`
+    itself raises is recorded there and passed on: so a test can tell an error that apply passed on from one that
+    only the block raised again (D's block raises a failed transaction's error by itself when it ends)."""
     target = Target(SCHEMA, table)
     create_table(db, SCHEMA, table, case.meta, case.start)
     css = [change_set(db, case.meta, recs, form, i) for i, recs in enumerate(case.sets)]
     settings = test_settings(**(case.settings or {}))
     for cs in css:
         with db.transaction() as tx:
-            apply_group(wrap(tx), target, cs, mode=case.mode, settings=settings)
+            try:
+                apply_group(wrap(tx), target, cs, mode=case.mode, settings=settings)
+            except BaseException as e:
+                if out is not None:
+                    out.append(e)
+                raise
     return target
 
 
 @pytest.mark.parametrize("form", ["local", "relation"])
 @pytest.mark.parametrize("name", INJECT_CASES)
 def test_d_errors_pass_through_unchanged_from_every_call(db, name, form):
-    """Item 1: the error that the lane raises at any call of apply is the error apply's caller gets, the same
-    object, and the lane's roll-back leaves the table as it was. (On the code before this round too: apply caught
-    nothing then either; this confirms it on the real lane.)"""
+    """Item 1: the error that the lane raises at any call of apply is the error that `apply_group` raises, the
+    same object, and the lane's roll-back leaves the table as it was. (On the code before this round too: apply
+    caught nothing then either; this confirms it on the real lane.) Every call in the local form; in the relation
+    form (about 45 calls) a sample, every call with CDC_V2_APPLY_FULL=1."""
     case = _BY_NAME[name]
     calls = [0]
     _run(db, case, form, "t_count", lambda tx: _Inject(tx, 0, None, calls))
@@ -116,9 +125,11 @@ def test_d_errors_pass_through_unchanged_from_every_call(db, name, form):
     for at in sites:
         err = ERRORS[at % len(ERRORS)]()
         table = "t_%d" % at
-        n = [0]
+        n, raised = [0], []
         with pytest.raises(type(err)) as got:
-            _run(db, case, form, table, lambda tx: _Inject(tx, at, err, n))
+            _run(db, case, form, table, lambda tx: _Inject(tx, at, err, n), out=raised)
+        assert n[0] == at, (at, n[0])                         # the injection fired, and apply made no call after it
+        assert raised and raised[0] is err, (at, raised)      # out of apply_group itself, not only out of the block
         assert got.value is err, (at, got.value)
         if case.sets and len(case.sets) == 1:
             assert dest_canon(db, Target(SCHEMA, table), case.meta) == literal_rows_canon(
@@ -164,14 +175,17 @@ def test_a_refused_value_is_d_s_statement_error_without_the_value(db, form):
 
 
 def test_a_deadline_of_the_block_passes_through(db):
-    """The block's deadline passes while apply plans: the lane's `DeadlineExceeded` reaches the caller."""
+    """The block's deadline passes while apply plans: the lane's `DeadlineExceeded` comes out of `apply_group`
+    itself, at apply's first call on the lane (not at the block's fence statement), and the block ends with it."""
     case = _BY_NAME["insert_update_delete"]
     create_table(db, SCHEMA, "t", case.meta, case.start)
     cs = change_set(db, case.meta, case.sets[0], "local")
-    with pytest.raises(DeadlineExceeded):
+    with pytest.raises(DeadlineExceeded) as outer:
         with db.transaction(Deadline.after(0.2)) as tx:
             time.sleep(0.3)
-            apply_group(tx, Target(SCHEMA, "t"), cs, settings=test_settings())
+            with pytest.raises(DeadlineExceeded) as inner:
+                apply_group(tx, Target(SCHEMA, "t"), cs, settings=test_settings())
+    assert outer.value is inner.value and "fence" not in str(inner.value), str(inner.value)
     assert dest_canon(db, Target(SCHEMA, "t"), case.meta) == literal_rows_canon(list(case.meta.columns), case.start)
 
 

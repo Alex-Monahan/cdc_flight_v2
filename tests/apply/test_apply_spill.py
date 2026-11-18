@@ -103,14 +103,20 @@ def test_planning_settings_stay_with_the_cursor():
     database, and a cursor of another call keeps the database's own values."""
     from cdc_v2.apply.backend import _planning_db
     small = ApplySettings(local_temp_directory=spill_dir())
-    with _dest() as db:
-        with db.transaction() as tx:
-            apply_group(tx, Target("s", "t"), LocalChangeSet(_rows(3), None, META), settings=small)
     db_, _ = _planning_db(small.local_threads, small.local_memory_limit, small.local_temp_directory,
                           small.local_max_temp_directory_size)
-    other = db_.cursor()
-    assert other.execute("SELECT current_setting('arrow_lossless_conversion')").fetchone()[0] is False
-    fresh = duckdb.connect()
-    assert other.execute("SELECT current_setting('TimeZone')").fetchone() == \
-        fresh.execute("SELECT current_setting('TimeZone')").fetchone()
-    fresh.close()
+    # the database's own time zone is not UTC, so that a global setting by apply would show (also on a machine
+    # whose zone is UTC)
+    before = db_.cursor().execute("SELECT current_setting('TimeZone')").fetchone()[0]
+    db_.cursor().execute("SET GLOBAL TimeZone = 'America/Denver'")
+    try:
+        with _dest() as db:
+            with db.transaction() as tx:
+                apply_group(tx, Target("s", "t"), LocalChangeSet(_rows(3), None, META), settings=small)
+            with db.transaction() as tx:
+                reduce_duplicates(tx, Target("s", "t"), LocalChangeSet(_rows(3), None, META), settings=small)
+        other = db_.cursor()
+        assert other.execute("SELECT current_setting('arrow_lossless_conversion')").fetchone()[0] is False
+        assert other.execute("SELECT current_setting('TimeZone')").fetchone()[0] == "America/Denver"
+    finally:
+        db_.cursor().execute("SET GLOBAL TimeZone = '%s'" % before)
