@@ -1585,7 +1585,7 @@ row and the server's listing of the old connection at the crash point, before th
 | diagnostic | `e671405` (as designed) | 235 | 235 | 1 |
 | 2 (stopped when the cause was found) | `e671405` (as designed) | 681 | 341 | 8 (3 `nothing@fenced`, 3 `registered_relation@fenced`, 1 `transition@fenced`, 1 `row@fenced`) |
 | 3 (stopped at round 1001 of 1040 for a pause) | `7193b39` (the fix) | 1001 | 501 | **0** |
-| 4 (fix round 2: the counter only grows) | `50229d7` | RUN4_ROUNDS | RUN4_MAIN | RUN4_BREACHES |
+| 4 (fix round 2: the counter only grows; stopped at round 513 of 1000 for a pause) | `50229d7` | 513 | 257 | **0** |
 
 **What it is: both committed.** In the diagnostic breach, at the crash point the committed `n` was the old value
 and the server listed the old connection with its transaction open; the take-over then met **no** conflict (1
@@ -1797,9 +1797,9 @@ For packages A, L, S, V, B and the integrator. Each line is backed by the sectio
 
 ## 16. How to run the suites
 
-**The default run** needs no network: `uv run -q pytest -q`. On 2026-11-11, on commit `50229d7` (fix round 2, with
-`origin/main` merged): 1415 passed, 4 skipped, 742 deselected, 1 xfailed in 106 s. The tests of this package alone
-(`uv run -q pytest -q tests/destination`): DEFAULT_D_COUNT. Both are in `final_runs.json`.
+**The default run** needs no network: `uv run -q pytest -q`. On 2026-11-18, on commit `1599194` (fix round 2, with
+`origin/main` merged): 1415 passed, 4 skipped, 742 deselected, 1 xfailed in 111 s. The tests of this package alone
+(`uv run -q pytest -q tests/destination`): 391 passed, 144 deselected in 22 s. Both are in `final_runs.json`.
 
 **The rest of the full matrices** (marker `d_full`, fix round item 7): the default run keeps one case per fault
 site of the deadline matrix of `test_lane.py` (the case of `BEGIN` is left out), the door of

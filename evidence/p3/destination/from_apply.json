@@ -4,8 +4,8 @@
   "results": {
     "arrow_types": {
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_again.py",
-      "commit": "7193b39",
-      "date_utc": "2026-11-10 20:00",
+      "commit": "1599194",
+      "date_utc": "2026-11-18 13:52",
       "registered_as": [
         "UUID",
         "JSON",
@@ -30,17 +30,17 @@
     },
     "drop_schema_cascade": {
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_again.py",
-      "commit": "7193b39",
+      "commit": "1599194",
       "committed_value": 0,
-      "date_utc": "2026-11-10 20:00",
+      "date_utc": "2026-11-18 13:52",
       "error": "CommitUnknown",
       "message": "the outcome of COMMIT is unknown (TransactionException)",
       "schemas_left": 0
     },
     "merge_and_truncate": {
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_again.py",
-      "commit": "7193b39",
-      "date_utc": "2026-11-10 20:01",
+      "commit": "1599194",
+      "date_utc": "2026-11-18 13:53",
       "merge_returns": null,
       "rows_after_merge": [
         [
@@ -98,15 +98,15 @@
         ]
       ],
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_again.py",
-      "commit": "7193b39",
-      "date_utc": "2026-11-10 20:00",
+      "commit": "1599194",
+      "date_utc": "2026-11-18 13:52",
       "what": "kind of statement, class of the client's error, its text names the value"
     },
     "settings_scope": {
       "arrow_type_of_uuid": "extension<arrow.uuid>",
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_again.py",
-      "commit": "7193b39",
-      "date_utc": "2026-11-10 20:01",
+      "commit": "1599194",
+      "date_utc": "2026-11-18 13:53",
       "lane_after_a_global_change": [
         "UTC",
         true

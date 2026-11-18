@@ -11,8 +11,8 @@
         "statement": 2.5
       },
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_fix_round.py",
-      "commit": "7193b39",
-      "date_utc": "2026-11-10 20:10",
+      "commit": "1599194",
+      "date_utc": "2026-11-18 14:00",
       "freed_after_heal_s": 1.0,
       "phases": [
         {
@@ -23,8 +23,8 @@
           "md_open_connections": 1,
           "md_waiting_calls": 0,
           "phase": "warm",
-          "seconds": 0.567,
-          "t_test": 1.93,
+          "seconds": 0.419,
+          "t_test": 1.6,
           "threads": 2
         },
         {
@@ -35,8 +35,8 @@
           "md_waiting_calls": 2,
           "message": "lane stream: a statement",
           "phase": "statement",
-          "seconds": 2.515,
-          "t_test": 4.44,
+          "seconds": 2.52,
+          "t_test": 4.12,
           "threads": 4
         },
         {
@@ -47,8 +47,8 @@
           "md_open_connections": 1,
           "md_waiting_calls": 0,
           "phase": "statement.recover",
-          "seconds": 0.763,
-          "t_test": 5.21,
+          "seconds": 0.562,
+          "t_test": 4.68,
           "threads": 2
         },
         {
@@ -59,8 +59,8 @@
           "md_waiting_calls": 2,
           "message": "lane stream: the fence statement",
           "phase": "fence",
-          "seconds": 2.598,
-          "t_test": 7.81,
+          "seconds": 2.584,
+          "t_test": 7.27,
           "threads": 4
         },
         {
@@ -71,8 +71,8 @@
           "md_open_connections": 1,
           "md_waiting_calls": 0,
           "phase": "fence.recover",
-          "seconds": 0.832,
-          "t_test": 8.64,
+          "seconds": 0.605,
+          "t_test": 7.88,
           "threads": 2
         },
         {
@@ -83,8 +83,8 @@
           "md_waiting_calls": 2,
           "message": "lane stream: the outcome of COMMIT is unknown (no answer within the deadline and the grace period)",
           "phase": "commit",
-          "seconds": 4.514,
-          "t_test": 13.16,
+          "seconds": 4.521,
+          "t_test": 12.4,
           "threads": 4
         },
         {
@@ -95,8 +95,8 @@
           "md_open_connections": 1,
           "md_waiting_calls": 0,
           "phase": "commit.recover",
-          "seconds": 0.84,
-          "t_test": 14.0,
+          "seconds": 0.567,
+          "t_test": 12.97,
           "threads": 2
         },
         {
@@ -107,8 +107,8 @@
           "md_waiting_calls": 1,
           "message": "connecting to the destination (extra)",
           "phase": "connect",
-          "seconds": 3.513,
-          "t_test": 17.52,
+          "seconds": 3.519,
+          "t_test": 16.49,
           "threads": 4
         },
         {
@@ -119,8 +119,8 @@
           "md_open_connections": 1,
           "md_waiting_calls": 0,
           "phase": "connect.recover",
-          "seconds": 0.249,
-          "t_test": 17.77,
+          "seconds": 0.213,
+          "t_test": 16.7,
           "threads": 2
         },
         {
@@ -131,8 +131,8 @@
           "md_waiting_calls": 2,
           "message": "lane backfill.0: registration: INSERT",
           "phase": "register",
-          "seconds": 2.519,
-          "t_test": 20.37,
+          "seconds": 2.521,
+          "t_test": 19.3,
           "threads": 5
         },
         {
@@ -143,8 +143,8 @@
           "md_open_connections": 1,
           "md_waiting_calls": 0,
           "phase": "register.recover",
-          "seconds": 0.243,
-          "t_test": 20.62,
+          "seconds": 0.215,
+          "t_test": 19.52,
           "threads": 2
         },
         {
@@ -156,8 +156,8 @@
           "md_waiting_calls": 2,
           "message": "lane stream: a statement",
           "phase": "repeat",
-          "seconds": 2.518,
-          "t_test": 23.14,
+          "seconds": 2.526,
+          "t_test": 22.04,
           "threads": 4
         },
         {
@@ -169,8 +169,8 @@
           "md_waiting_calls": 3,
           "message": "connecting to the destination (stream)",
           "phase": "repeat",
-          "seconds": 3.519,
-          "t_test": 26.66,
+          "seconds": 3.512,
+          "t_test": 25.56,
           "threads": 6
         },
         {
@@ -183,7 +183,7 @@
           "message": "connection stream: 2 calls that were given up still wait for the destination (at most 2); no new connection until one returns",
           "phase": "repeat",
           "seconds": 0.0,
-          "t_test": 26.66,
+          "t_test": 25.56,
           "threads": 6
         },
         {
@@ -196,7 +196,7 @@
           "message": "connection stream: 2 calls that were given up still wait for the destination (at most 2); no new connection until one returns",
           "phase": "repeat",
           "seconds": 0.0,
-          "t_test": 26.66,
+          "t_test": 25.56,
           "threads": 6
         },
         {
@@ -209,7 +209,7 @@
           "message": "connection stream: 2 calls that were given up still wait for the destination (at most 2); no new connection until one returns",
           "phase": "repeat",
           "seconds": 0.0,
-          "t_test": 26.66,
+          "t_test": 25.56,
           "threads": 6
         },
         {
@@ -222,7 +222,7 @@
           "message": "connection stream: 2 calls that were given up still wait for the destination (at most 2); no new connection until one returns",
           "phase": "repeat",
           "seconds": 0.0,
-          "t_test": 26.66,
+          "t_test": 25.56,
           "threads": 6
         },
         {
@@ -235,7 +235,7 @@
           "message": "connection stream: 2 calls that were given up still wait for the destination (at most 2); no new connection until one returns",
           "phase": "repeat",
           "seconds": 0.0,
-          "t_test": 26.66,
+          "t_test": 25.56,
           "threads": 6
         },
         {
@@ -248,7 +248,7 @@
           "message": "connection stream: 2 calls that were given up still wait for the destination (at most 2); no new connection until one returns",
           "phase": "repeat",
           "seconds": 0.0,
-          "t_test": 26.66,
+          "t_test": 25.56,
           "threads": 6
         },
         {
@@ -261,7 +261,7 @@
           "message": "connection stream: 2 calls that were given up still wait for the destination (at most 2); no new connection until one returns",
           "phase": "repeat",
           "seconds": 0.0,
-          "t_test": 26.66,
+          "t_test": 25.56,
           "threads": 6
         },
         {
@@ -274,7 +274,7 @@
           "message": "connection stream: 2 calls that were given up still wait for the destination (at most 2); no new connection until one returns",
           "phase": "repeat",
           "seconds": 0.0,
-          "t_test": 26.66,
+          "t_test": 25.56,
           "threads": 6
         },
         {
@@ -287,7 +287,7 @@
           "message": "connection stream: 2 calls that were given up still wait for the destination (at most 2); no new connection until one returns",
           "phase": "repeat",
           "seconds": 0.0,
-          "t_test": 26.66,
+          "t_test": 25.56,
           "threads": 6
         },
         {
@@ -300,7 +300,7 @@
           "message": "connection stream: 2 calls that were given up still wait for the destination (at most 2); no new connection until one returns",
           "phase": "repeat",
           "seconds": 0.0,
-          "t_test": 26.66,
+          "t_test": 25.56,
           "threads": 6
         },
         {
@@ -310,7 +310,7 @@
           "md_waiting_calls": 3,
           "phase": "monitor_still_blackholed",
           "t": 0.0,
-          "t_test": 26.66,
+          "t_test": 25.56,
           "threads": 6
         },
         {
@@ -320,7 +320,7 @@
           "md_waiting_calls": 3,
           "phase": "monitor_still_blackholed",
           "t": 5.0,
-          "t_test": 31.67,
+          "t_test": 30.57,
           "threads": 6
         },
         {
@@ -331,12 +331,12 @@
           "md_waiting_calls": 3,
           "phase": "monitor_still_blackholed",
           "t": 10.0,
-          "t_test": 36.68,
+          "t_test": 35.58,
           "threads": 6
         },
         {
           "event": "healed",
-          "t_test": 36.68
+          "t_test": 35.58
         },
         {
           "ev": "monitor",
@@ -345,7 +345,7 @@
           "md_waiting_calls": 3,
           "phase": "monitor_after_heal",
           "t": 0.0,
-          "t_test": 36.68,
+          "t_test": 35.58,
           "threads": 6
         },
         {
@@ -355,7 +355,7 @@
           "md_waiting_calls": 0,
           "phase": "monitor_after_heal",
           "t": 1.0,
-          "t_test": 37.68,
+          "t_test": 36.59,
           "threads": 1
         },
         {
@@ -366,7 +366,7 @@
           "md_waiting_calls": 0,
           "phase": "monitor_after_heal",
           "t": 1.0,
-          "t_test": 37.68,
+          "t_test": 36.59,
           "threads": 1
         },
         {
@@ -377,8 +377,8 @@
           "md_open_connections": 1,
           "md_waiting_calls": 0,
           "phase": "final",
-          "seconds": 0.778,
-          "t_test": 38.46,
+          "seconds": 0.541,
+          "t_test": 37.13,
           "threads": 2
         },
         {
@@ -388,7 +388,7 @@
           "md_open_connections": 0,
           "md_waiting_calls": 0,
           "phase": "quit",
-          "t_test": 38.47,
+          "t_test": 37.13,
           "threads": 1
         }
       ],
@@ -426,8 +426,8 @@
     },
     "takeover_at_every_point": {
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_fix_round.py",
-      "commit": "7193b39",
-      "date_utc": "2026-11-10 20:12",
+      "commit": "1599194",
+      "date_utc": "2026-11-18 14:01",
       "records": [
         {
           "after": {
@@ -436,12 +436,12 @@
             ],
             "fence_stream": {
               "epoch": 3,
-              "n": 2
+              "n": 7
             },
             "heartbeat_epoch": 3,
             "leader": {
               "epoch": 3,
-              "run_id": "new-9dd6fe2694d1",
+              "run_id": "new-ca19a2e695a9",
               "state": "leading"
             }
           },
@@ -451,12 +451,12 @@
             ],
             "fence_stream": {
               "epoch": 2,
-              "n": 2
+              "n": 6
             },
             "heartbeat_epoch": 2,
             "leader": {
               "epoch": 2,
-              "run_id": "old-9dd6fe2694d1",
+              "run_id": "old-ca19a2e695a9",
               "state": "leading"
             }
           },
@@ -472,7 +472,7 @@
             "interrupted": 0,
             "last_error": null,
             "listed": 0,
-            "seconds": 0.513,
+            "seconds": 0.34,
             "unknown": 0
           },
           "verdict": "pass"
@@ -484,12 +484,12 @@
             ],
             "fence_stream": {
               "epoch": 5,
-              "n": 3
+              "n": 11
             },
             "heartbeat_epoch": 5,
             "leader": {
               "epoch": 5,
-              "run_id": "new-b97d55d79161",
+              "run_id": "new-227310135c37",
               "state": "leading"
             }
           },
@@ -499,12 +499,12 @@
             ],
             "fence_stream": {
               "epoch": 4,
-              "n": 3
+              "n": 10
             },
             "heartbeat_epoch": 4,
             "leader": {
               "epoch": 4,
-              "run_id": "old-b97d55d79161",
+              "run_id": "old-227310135c37",
               "state": "leading"
             }
           },
@@ -520,7 +520,7 @@
             "interrupted": 0,
             "last_error": null,
             "listed": 0,
-            "seconds": 0.523,
+            "seconds": 0.357,
             "unknown": 0
           },
           "verdict": "pass"
@@ -532,12 +532,12 @@
             ],
             "fence_stream": {
               "epoch": 7,
-              "n": 4
+              "n": 15
             },
             "heartbeat_epoch": 7,
             "leader": {
               "epoch": 7,
-              "run_id": "new-cd27254260ce",
+              "run_id": "new-3635e27d757c",
               "state": "leading"
             }
           },
@@ -547,12 +547,12 @@
             ],
             "fence_stream": {
               "epoch": 6,
-              "n": 4
+              "n": 14
             },
             "heartbeat_epoch": 6,
             "leader": {
               "epoch": 6,
-              "run_id": "old-cd27254260ce",
+              "run_id": "old-3635e27d757c",
               "state": "leading"
             }
           },
@@ -563,12 +563,12 @@
           "point": "fenced",
           "shape": "nothing",
           "takeover": {
-            "attempts": 3,
-            "conflicts": 2,
-            "interrupted": 2,
+            "attempts": 2,
+            "conflicts": 1,
+            "interrupted": 1,
             "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
-            "listed": 4,
-            "seconds": 2.168,
+            "listed": 2,
+            "seconds": 1.063,
             "unknown": 0
           },
           "verdict": "pass"
@@ -580,12 +580,12 @@
             ],
             "fence_stream": {
               "epoch": 9,
-              "n": 5
+              "n": 19
             },
             "heartbeat_epoch": 9,
             "leader": {
               "epoch": 9,
-              "run_id": "new-d78b7ac28887",
+              "run_id": "new-53540b088324",
               "state": "leading"
             }
           },
@@ -595,12 +595,12 @@
             ],
             "fence_stream": {
               "epoch": 8,
-              "n": 5
+              "n": 18
             },
             "heartbeat_epoch": 8,
             "leader": {
               "epoch": 8,
-              "run_id": "old-d78b7ac28887",
+              "run_id": "old-53540b088324",
               "state": "leading"
             }
           },
@@ -616,7 +616,7 @@
             "interrupted": 1,
             "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
             "listed": 2,
-            "seconds": 1.275,
+            "seconds": 1.062,
             "unknown": 0
           },
           "verdict": "pass"
@@ -628,12 +628,12 @@
             ],
             "fence_stream": {
               "epoch": 11,
-              "n": 6
+              "n": 23
             },
             "heartbeat_epoch": 11,
             "leader": {
               "epoch": 11,
-              "run_id": "new-fdf8ffac4e4f",
+              "run_id": "new-377a11f4eb0d",
               "state": "leading"
             }
           },
@@ -643,12 +643,12 @@
             ],
             "fence_stream": {
               "epoch": 10,
-              "n": 6
+              "n": 22
             },
             "heartbeat_epoch": 10,
             "leader": {
               "epoch": 10,
-              "run_id": "old-fdf8ffac4e4f",
+              "run_id": "old-377a11f4eb0d",
               "state": "leading"
             }
           },
@@ -659,12 +659,12 @@
           "point": "commit_sent",
           "shape": "nothing",
           "takeover": {
-            "attempts": 3,
-            "conflicts": 2,
+            "attempts": 2,
+            "conflicts": 1,
             "interrupted": 1,
             "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
-            "listed": 4,
-            "seconds": 2.063,
+            "listed": 2,
+            "seconds": 1.039,
             "unknown": 0
           },
           "verdict": "pass"
@@ -676,12 +676,12 @@
             ],
             "fence_stream": {
               "epoch": 13,
-              "n": 7
+              "n": 27
             },
             "heartbeat_epoch": 13,
             "leader": {
               "epoch": 13,
-              "run_id": "new-6433d7186b58",
+              "run_id": "new-c638ed188913",
               "state": "leading"
             }
           },
@@ -691,12 +691,12 @@
             ],
             "fence_stream": {
               "epoch": 12,
-              "n": 7
+              "n": 26
             },
             "heartbeat_epoch": 12,
             "leader": {
               "epoch": 12,
-              "run_id": "old-6433d7186b58",
+              "run_id": "old-c638ed188913",
               "state": "leading"
             }
           },
@@ -707,12 +707,12 @@
           "point": "commit_sent",
           "shape": "nothing",
           "takeover": {
-            "attempts": 3,
-            "conflicts": 2,
-            "interrupted": 2,
+            "attempts": 2,
+            "conflicts": 1,
+            "interrupted": 1,
             "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
-            "listed": 4,
-            "seconds": 2.051,
+            "listed": 2,
+            "seconds": 1.044,
             "unknown": 0
           },
           "verdict": "pass"
@@ -724,12 +724,12 @@
             ],
             "fence_stream": {
               "epoch": 15,
-              "n": 9
+              "n": 32
             },
             "heartbeat_epoch": 15,
             "leader": {
               "epoch": 15,
-              "run_id": "new-02ec3149f910",
+              "run_id": "new-9631ce9ce336",
               "state": "leading"
             }
           },
@@ -739,12 +739,12 @@
             ],
             "fence_stream": {
               "epoch": 14,
-              "n": 8
+              "n": 30
             },
             "heartbeat_epoch": 14,
             "leader": {
               "epoch": 14,
-              "run_id": "old-02ec3149f910",
+              "run_id": "old-9631ce9ce336",
               "state": "leading"
             }
           },
@@ -760,7 +760,7 @@
             "interrupted": 0,
             "last_error": null,
             "listed": 0,
-            "seconds": 0.502,
+            "seconds": 0.338,
             "unknown": 0
           },
           "verdict": "pass"
@@ -772,12 +772,12 @@
             ],
             "fence_stream": {
               "epoch": 17,
-              "n": 11
+              "n": 37
             },
             "heartbeat_epoch": 17,
             "leader": {
               "epoch": 17,
-              "run_id": "new-b0dd2e166b2d",
+              "run_id": "new-4b9b53c95cc6",
               "state": "leading"
             }
           },
@@ -787,12 +787,12 @@
             ],
             "fence_stream": {
               "epoch": 16,
-              "n": 10
+              "n": 35
             },
             "heartbeat_epoch": 16,
             "leader": {
               "epoch": 16,
-              "run_id": "old-b0dd2e166b2d",
+              "run_id": "old-4b9b53c95cc6",
               "state": "leading"
             }
           },
@@ -808,7 +808,7 @@
             "interrupted": 0,
             "last_error": null,
             "listed": 0,
-            "seconds": 0.47,
+            "seconds": 0.337,
             "unknown": 0
           },
           "verdict": "pass"
@@ -820,12 +820,12 @@
             ],
             "fence_stream": {
               "epoch": 19,
-              "n": 12
+              "n": 41
             },
             "heartbeat_epoch": 19,
             "leader": {
               "epoch": 19,
-              "run_id": "new-bb0c11032203",
+              "run_id": "new-599c56b04dcd",
               "state": "leading"
             }
           },
@@ -835,12 +835,12 @@
             ],
             "fence_stream": {
               "epoch": 18,
-              "n": 12
+              "n": 40
             },
             "heartbeat_epoch": 18,
             "leader": {
               "epoch": 18,
-              "run_id": "old-bb0c11032203",
+              "run_id": "old-599c56b04dcd",
               "state": "leading"
             }
           },
@@ -851,12 +851,12 @@
           "point": "fenced",
           "shape": "row",
           "takeover": {
-            "attempts": 3,
-            "conflicts": 2,
+            "attempts": 2,
+            "conflicts": 1,
             "interrupted": 1,
             "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
-            "listed": 4,
-            "seconds": 2.116,
+            "listed": 2,
+            "seconds": 1.054,
             "unknown": 0
           },
           "verdict": "pass"
@@ -868,12 +868,12 @@
             ],
             "fence_stream": {
               "epoch": 21,
-              "n": 13
+              "n": 45
             },
             "heartbeat_epoch": 21,
             "leader": {
               "epoch": 21,
-              "run_id": "new-5d05d9b8787a",
+              "run_id": "new-a809011a4ab3",
               "state": "leading"
             }
           },
@@ -883,12 +883,12 @@
             ],
             "fence_stream": {
               "epoch": 20,
-              "n": 13
+              "n": 44
             },
             "heartbeat_epoch": 20,
             "leader": {
               "epoch": 20,
-              "run_id": "old-5d05d9b8787a",
+              "run_id": "old-a809011a4ab3",
               "state": "leading"
             }
           },
@@ -904,7 +904,7 @@
             "interrupted": 1,
             "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
             "listed": 4,
-            "seconds": 2.067,
+            "seconds": 1.712,
             "unknown": 0
           },
           "verdict": "pass"
@@ -916,12 +916,12 @@
             ],
             "fence_stream": {
               "epoch": 23,
-              "n": 14
+              "n": 49
             },
             "heartbeat_epoch": 23,
             "leader": {
               "epoch": 23,
-              "run_id": "new-d0a767a6f7f6",
+              "run_id": "new-ab1d482fb0cd",
               "state": "leading"
             }
           },
@@ -931,12 +931,12 @@
             ],
             "fence_stream": {
               "epoch": 22,
-              "n": 14
+              "n": 48
             },
             "heartbeat_epoch": 22,
             "leader": {
               "epoch": 22,
-              "run_id": "old-d0a767a6f7f6",
+              "run_id": "old-ab1d482fb0cd",
               "state": "leading"
             }
           },
@@ -952,7 +952,7 @@
             "interrupted": 2,
             "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
             "listed": 4,
-            "seconds": 2.059,
+            "seconds": 1.806,
             "unknown": 0
           },
           "verdict": "pass"
@@ -964,12 +964,12 @@
             ],
             "fence_stream": {
               "epoch": 25,
-              "n": 15
+              "n": 53
             },
             "heartbeat_epoch": 25,
             "leader": {
               "epoch": 25,
-              "run_id": "new-c393292e6a94",
+              "run_id": "new-704f6e666864",
               "state": "leading"
             }
           },
@@ -979,12 +979,12 @@
             ],
             "fence_stream": {
               "epoch": 24,
-              "n": 15
+              "n": 52
             },
             "heartbeat_epoch": 24,
             "leader": {
               "epoch": 24,
-              "run_id": "old-c393292e6a94",
+              "run_id": "old-704f6e666864",
               "state": "leading"
             }
           },
@@ -995,12 +995,12 @@
           "point": "fenced",
           "shape": "other_schema_rows",
           "takeover": {
-            "attempts": 3,
-            "conflicts": 2,
-            "interrupted": 2,
+            "attempts": 2,
+            "conflicts": 1,
+            "interrupted": 1,
             "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
-            "listed": 4,
-            "seconds": 2.066,
+            "listed": 2,
+            "seconds": 1.049,
             "unknown": 0
           },
           "verdict": "pass"
@@ -1012,12 +1012,12 @@
             ],
             "fence_stream": {
               "epoch": 27,
-              "n": 16
+              "n": 57
             },
             "heartbeat_epoch": 27,
             "leader": {
               "epoch": 27,
-              "run_id": "new-cfb352760986",
+              "run_id": "new-4271662a524f",
               "state": "leading"
             }
           },
@@ -1027,12 +1027,12 @@
             ],
             "fence_stream": {
               "epoch": 26,
-              "n": 16
+              "n": 56
             },
             "heartbeat_epoch": 26,
             "leader": {
               "epoch": 26,
-              "run_id": "old-cfb352760986",
+              "run_id": "old-4271662a524f",
               "state": "leading"
             }
           },
@@ -1043,12 +1043,12 @@
           "point": "fenced",
           "shape": "returning",
           "takeover": {
-            "attempts": 2,
-            "conflicts": 1,
-            "interrupted": 1,
+            "attempts": 3,
+            "conflicts": 2,
+            "interrupted": 2,
             "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
-            "listed": 2,
-            "seconds": 1.281,
+            "listed": 4,
+            "seconds": 1.731,
             "unknown": 0
           },
           "verdict": "pass"
@@ -1060,12 +1060,12 @@
             ],
             "fence_stream": {
               "epoch": 29,
-              "n": 17
+              "n": 61
             },
             "heartbeat_epoch": 29,
             "leader": {
               "epoch": 29,
-              "run_id": "new-6fb06b232fe2",
+              "run_id": "new-44e0fa9cba09",
               "state": "leading"
             }
           },
@@ -1075,12 +1075,12 @@
             ],
             "fence_stream": {
               "epoch": 28,
-              "n": 17
+              "n": 60
             },
             "heartbeat_epoch": 28,
             "leader": {
               "epoch": 28,
-              "run_id": "old-6fb06b232fe2",
+              "run_id": "old-44e0fa9cba09",
               "state": "leading"
             }
           },
@@ -1093,10 +1093,10 @@
           "takeover": {
             "attempts": 3,
             "conflicts": 2,
-            "interrupted": 2,
+            "interrupted": 1,
             "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
             "listed": 4,
-            "seconds": 2.059,
+            "seconds": 1.783,
             "unknown": 0
           },
           "verdict": "pass"

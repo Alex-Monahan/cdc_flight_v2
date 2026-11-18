@@ -4,8 +4,8 @@
   "results": {
     "fault_sites_in_a_child": {
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py",
-      "commit": "7193b39",
-      "date_utc": "2026-11-10 20:26",
+      "commit": "1599194",
+      "date_utc": "2026-11-18 14:13",
       "sites": {
         "md.commit": {
           "check": {
@@ -24,7 +24,7 @@
             "intend:9-12",
             "done:9-12"
           ],
-          "seconds_until_caught_up": 4.4,
+          "seconds_until_caught_up": 4.08,
           "transaction_at_the_fault_committed": false
         },
         "md.commit_reply": {
@@ -44,7 +44,7 @@
             "intend:15-15",
             "done:15-15"
           ],
-          "seconds_until_caught_up": 0.76,
+          "seconds_until_caught_up": 0.61,
           "transaction_at_the_fault_committed": true
         },
         "md.execute": {
@@ -63,7 +63,7 @@
             "intend:3-6",
             "done:3-6"
           ],
-          "seconds_until_caught_up": 1.37,
+          "seconds_until_caught_up": 1.25,
           "transaction_at_the_fault_committed": false
         },
         "md.fence": {
@@ -83,7 +83,7 @@
             "intend:6-9",
             "done:6-9"
           ],
-          "seconds_until_caught_up": 1.68,
+          "seconds_until_caught_up": 1.45,
           "transaction_at_the_fault_committed": false
         }
       }
@@ -113,12 +113,12 @@
             "signal": null,
             "signal_name": null
           },
-          "ms_of_first_error_after_process_start": 8778,
+          "ms_of_first_error_after_process_start": 7881,
           "proxy_connections_accepted": 2,
           "proxy_connections_reset": 0,
           "recovered_by_itself": true,
           "rows_of_the_child": 6,
-          "seconds_from_lifting_to_exit": 5.2,
+          "seconds_from_lifting_to_exit": 4.9,
           "transaction_at_the_break_committed": false,
           "what": "nothing passes in either direction from the next statement on; the proxy passes again 8 s later (what it held is then delivered)"
         },
@@ -145,12 +145,12 @@
             "signal": null,
             "signal_name": null
           },
-          "ms_of_first_error_after_process_start": 12567,
+          "ms_of_first_error_after_process_start": 11803,
           "proxy_connections_accepted": 4,
           "proxy_connections_reset": 2,
           "recovered_by_itself": true,
           "rows_of_the_child": 6,
-          "seconds_from_lifting_to_exit": 7.0,
+          "seconds_from_lifting_to_exit": 6.8,
           "transaction_at_the_break_committed": true,
           "what": "the COMMIT reaches MotherDuck, nothing comes back; after the child's error the connections are reset and the proxy passes again"
         },
@@ -177,12 +177,12 @@
             "signal": null,
             "signal_name": null
           },
-          "ms_of_first_error_after_process_start": 12490,
+          "ms_of_first_error_after_process_start": 11803,
           "proxy_connections_accepted": 2,
           "proxy_connections_reset": 0,
           "recovered_by_itself": true,
           "rows_of_the_child": 6,
-          "seconds_from_lifting_to_exit": 5.0,
+          "seconds_from_lifting_to_exit": 4.8,
           "transaction_at_the_break_committed": true,
           "what": "the COMMIT is held by the proxy; 4 s after the child's error the proxy passes again and delivers what it held: the late COMMIT and the statements of the child's next attempt"
         },
@@ -209,12 +209,12 @@
             "signal": null,
             "signal_name": null
           },
-          "ms_of_first_error_after_process_start": 12546,
+          "ms_of_first_error_after_process_start": 11912,
           "proxy_connections_accepted": 4,
           "proxy_connections_reset": 2,
           "recovered_by_itself": true,
           "rows_of_the_child": 6,
-          "seconds_from_lifting_to_exit": 7.0,
+          "seconds_from_lifting_to_exit": 6.7,
           "transaction_at_the_break_committed": true,
           "what": "the COMMIT is held by the proxy; after the child's error the connections are reset, so the COMMIT is never delivered"
         },
@@ -242,7 +242,7 @@
           "proxy_connections_reset": 2,
           "recovered_by_itself": true,
           "rows_of_the_child": 6,
-          "seconds_from_lifting_to_exit": 4.6,
+          "seconds_from_lifting_to_exit": 4.5,
           "transaction_at_the_break_committed": "committed normally, no error",
           "what": "every TCP connection of the child is reset (RST) while its transaction is open; then the proxy passes again and the child goes on"
         }
@@ -254,8 +254,8 @@
         "tx_deadline": 8
       },
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py",
-      "commit": "7193b39",
-      "date_utc": "2026-11-10 20:27",
+      "commit": "1599194",
+      "date_utc": "2026-11-18 14:15",
       "proxy": {
         "accepted": 15,
         "closed_by_fault": 0,

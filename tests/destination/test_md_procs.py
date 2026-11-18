@@ -353,11 +353,17 @@ def test_two_processes_with_the_same_epoch(scene, evidence):
             assert kinds1 and rows[t1] == 3 and rows[t2] == 6, (point, kinds1, rows)
         if point == "stream.committed":
             assert not kinds1 and rows[t1] == 6 and rows[t2] == 3, (point, kinds1, rows)
-        if holds:
-            # the frozen transaction commits after it went on, unless MotherDuck ended it while it was frozen: then
-            # it got an error and the second process applied its events. That is allowed only when the freeze
-            # lasted as long as MotherDuck keeps a frozen transaction (about 29 s, test_takeover_in_the_middle_..);
-            # the run of 2026-11-10 19:21 UTC saw it at sut.moved. Exactly-once held in both (checked above)
+        if point == "sut.moved":
+            # the first holds the position row but has not run its fence statement. The second process registers
+            # its connection meanwhile, which raises the lane's fence counter and commits (the counter only grows,
+            # fix round 2), so the first one's fence statement then conflicts: it gets Conflict and the second
+            # applies its events. Exactly-once held (checked above)
+            assert "Conflict" in kinds1 and rows[t1] == 3 and rows[t2] == 6, (point, kinds1, rows)
+        elif holds:
+            # the first has run its fence statement, so the second one's registration conflicts with it, and the
+            # frozen transaction commits after it went on; unless MotherDuck ended it while it was frozen, which is
+            # allowed only when the freeze lasted as long as MotherDuck keeps a frozen transaction (about 29 s,
+            # test_takeover_in_the_middle_of_an_open_transaction)
             assert rows.get(t1, 0) >= 6 or (kinds1 and rows.get(t2, 0) >= 6 and frozen_s >= 25.0), (
                 point, kinds1, rows, frozen_s)
         by_point[point] = {

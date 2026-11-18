@@ -3,6 +3,7 @@
   "machine_note": "10 cores, 16 GB, shared with up to three other workers of the same build (their tests, Postgres clusters and JVMs may have been running); times are indications only",
   "results": {
     "with_interrupt": {
+      "bound_s": null,
       "cases": {
         "fence_row.frozen": {
           "check_after_the_newcomer": {
@@ -15,23 +16,23 @@
           "newcomer": {
             "errors_before_its_first_commit": {},
             "exit_code": 0,
-            "ms_first_commit_after_process_start": 6543,
-            "ms_from_takeover_to_first_commit": 1684,
+            "ms_first_commit_after_process_start": 3565,
+            "ms_from_takeover_to_first_commit": 923,
             "no_takeover": null,
             "rows": 4,
-            "seconds_from_start_to_exit": 10.2,
+            "seconds_from_start_to_exit": 7.2,
             "takeover": {
-              "attempts": 3,
-              "conflicts": 2,
+              "attempts": 2,
+              "conflicts": 1,
               "epoch": 9,
               "interrupt_earlier_after_the_takeover": {
                 "interrupted": 0,
                 "listed": 2
               },
               "interrupted": 1,
-              "listed": 4,
-              "ms_after_process_start": 4859,
-              "seconds": 2.713,
+              "listed": 2,
+              "ms_after_process_start": 2642,
+              "seconds": 1.043,
               "unknown": 0
             },
             "took_over": true
@@ -63,11 +64,11 @@
           "newcomer": {
             "errors_before_its_first_commit": {},
             "exit_code": 0,
-            "ms_first_commit_after_process_start": 4500,
-            "ms_from_takeover_to_first_commit": 1213,
+            "ms_first_commit_after_process_start": 3533,
+            "ms_from_takeover_to_first_commit": 924,
             "no_takeover": null,
             "rows": 4,
-            "seconds_from_start_to_exit": 8.2,
+            "seconds_from_start_to_exit": 7.1,
             "takeover": {
               "attempts": 2,
               "conflicts": 1,
@@ -78,8 +79,8 @@
               },
               "interrupted": 1,
               "listed": 2,
-              "ms_after_process_start": 3287,
-              "seconds": 1.385,
+              "ms_after_process_start": 2609,
+              "seconds": 1.058,
               "unknown": 0
             },
             "took_over": true
@@ -103,11 +104,11 @@
           "newcomer": {
             "errors_before_its_first_commit": {},
             "exit_code": 0,
-            "ms_first_commit_after_process_start": 7024,
-            "ms_from_takeover_to_first_commit": 1591,
+            "ms_first_commit_after_process_start": 4213,
+            "ms_from_takeover_to_first_commit": 902,
             "no_takeover": null,
             "rows": 4,
-            "seconds_from_start_to_exit": 10.8,
+            "seconds_from_start_to_exit": 7.8,
             "takeover": {
               "attempts": 3,
               "conflicts": 2,
@@ -118,8 +119,8 @@
               },
               "interrupted": 1,
               "listed": 4,
-              "ms_after_process_start": 5433,
-              "seconds": 2.726,
+              "ms_after_process_start": 3311,
+              "seconds": 1.773,
               "unknown": 0
             },
             "took_over": true
@@ -151,11 +152,11 @@
           "newcomer": {
             "errors_before_its_first_commit": {},
             "exit_code": 0,
-            "ms_first_commit_after_process_start": 3856,
-            "ms_from_takeover_to_first_commit": 1324,
+            "ms_first_commit_after_process_start": 2838,
+            "ms_from_takeover_to_first_commit": 927,
             "no_takeover": null,
             "rows": 3,
-            "seconds_from_start_to_exit": 7.1,
+            "seconds_from_start_to_exit": 6.1,
             "takeover": {
               "attempts": 1,
               "conflicts": 0,
@@ -166,8 +167,8 @@
               },
               "interrupted": 0,
               "listed": 0,
-              "ms_after_process_start": 2532,
-              "seconds": 0.579,
+              "ms_after_process_start": 1911,
+              "seconds": 0.332,
               "unknown": 0
             },
             "took_over": true
@@ -200,11 +201,11 @@
           "newcomer": {
             "errors_before_its_first_commit": {},
             "exit_code": 0,
-            "ms_first_commit_after_process_start": 3586,
-            "ms_from_takeover_to_first_commit": 1220,
+            "ms_first_commit_after_process_start": 2892,
+            "ms_from_takeover_to_first_commit": 1000,
             "no_takeover": null,
             "rows": 4,
-            "seconds_from_start_to_exit": 7.2,
+            "seconds_from_start_to_exit": 6.5,
             "takeover": {
               "attempts": 1,
               "conflicts": 0,
@@ -215,8 +216,8 @@
               },
               "interrupted": 0,
               "listed": 0,
-              "ms_after_process_start": 2366,
-              "seconds": 0.491,
+              "ms_after_process_start": 1892,
+              "seconds": 0.348,
               "unknown": 0
             },
             "took_over": true
@@ -238,13 +239,15 @@
             "source": 11
           },
           "newcomer": {
-            "errors_before_its_first_commit": {},
+            "errors_before_its_first_commit": {
+              "Conflict": 1
+            },
             "exit_code": 0,
-            "ms_first_commit_after_process_start": 3994,
-            "ms_from_takeover_to_first_commit": 1384,
+            "ms_first_commit_after_process_start": 3308,
+            "ms_from_takeover_to_first_commit": 1433,
             "no_takeover": null,
             "rows": 4,
-            "seconds_from_start_to_exit": 7.7,
+            "seconds_from_start_to_exit": 7.0,
             "takeover": {
               "attempts": 1,
               "conflicts": 0,
@@ -255,8 +258,8 @@
               },
               "interrupted": 0,
               "listed": 0,
-              "ms_after_process_start": 2610,
-              "seconds": 0.66,
+              "ms_after_process_start": 1875,
+              "seconds": 0.33,
               "unknown": 0
             },
             "took_over": true
@@ -280,18 +283,20 @@
         }
       },
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py",
-      "commit": "7193b39",
-      "date_utc": "2026-11-10 20:17",
+      "commit": "1599194",
+      "date_utc": "2026-11-18 14:05",
       "exit_codes": {
         "0": "ended idle",
         "3": "FenceLost",
         "4": "no take-over within the time"
       },
+      "frozen_transaction_kept_s": null,
       "newcomer_interrupts_the_connections_of_earlier_epochs": true,
       "newcomer_tries_to_take_over_for_s": 100.0,
       "slow_old_run_keeps_its_transaction_open_for_s": 15.0
     },
     "without_interrupt": {
+      "bound_s": 45.0,
       "cases": {
         "fence_row.frozen": {
           "check_after_the_newcomer": {
@@ -304,19 +309,19 @@
           "newcomer": {
             "errors_before_its_first_commit": {},
             "exit_code": 0,
-            "ms_first_commit_after_process_start": 31904,
-            "ms_from_takeover_to_first_commit": 1110,
+            "ms_first_commit_after_process_start": 31237,
+            "ms_from_takeover_to_first_commit": 842,
             "no_takeover": null,
             "rows": 4,
-            "seconds_from_start_to_exit": 35.5,
+            "seconds_from_start_to_exit": 34.9,
             "takeover": {
-              "attempts": 41,
-              "conflicts": 40,
+              "attempts": 46,
+              "conflicts": 45,
               "epoch": 9,
               "interrupted": 0,
               "listed": 0,
-              "ms_after_process_start": 30794,
-              "seconds": 28.932,
+              "ms_after_process_start": 30395,
+              "seconds": 28.842,
               "unknown": 0
             },
             "took_over": true
@@ -349,19 +354,19 @@
           "newcomer": {
             "errors_before_its_first_commit": {},
             "exit_code": 0,
-            "ms_first_commit_after_process_start": 31665,
-            "ms_from_takeover_to_first_commit": 1112,
+            "ms_first_commit_after_process_start": 31856,
+            "ms_from_takeover_to_first_commit": 851,
             "no_takeover": null,
             "rows": 4,
-            "seconds_from_start_to_exit": 35.3,
+            "seconds_from_start_to_exit": 35.4,
             "takeover": {
-              "attempts": 40,
-              "conflicts": 39,
+              "attempts": 47,
+              "conflicts": 46,
               "epoch": 11,
               "interrupted": 0,
               "listed": 0,
-              "ms_after_process_start": 30553,
-              "seconds": 28.668,
+              "ms_after_process_start": 31005,
+              "seconds": 29.462,
               "unknown": 0
             },
             "took_over": true
@@ -385,19 +390,19 @@
           "newcomer": {
             "errors_before_its_first_commit": {},
             "exit_code": 0,
-            "ms_first_commit_after_process_start": null,
-            "ms_from_takeover_to_first_commit": null,
+            "ms_first_commit_after_process_start": 15919,
+            "ms_from_takeover_to_first_commit": 833,
             "no_takeover": null,
-            "rows": 0,
-            "seconds_from_start_to_exit": 20.3,
+            "rows": 1,
+            "seconds_from_start_to_exit": 19.2,
             "takeover": {
-              "attempts": 19,
-              "conflicts": 18,
+              "attempts": 22,
+              "conflicts": 21,
               "epoch": 13,
               "interrupted": 0,
               "listed": 0,
-              "ms_after_process_start": 15970,
-              "seconds": 14.156,
+              "ms_after_process_start": 15086,
+              "seconds": 13.548,
               "unknown": 0
             },
             "took_over": true
@@ -406,8 +411,6 @@
             "events_after_the_newcomer_started": [
               "done:19-22",
               "intend:22-23",
-              "done:22-23",
-              "intend:23-24",
               "fence_lost",
               "exit:3"
             ],
@@ -418,7 +421,7 @@
             },
             "fate": "slow",
             "held": "fence_row",
-            "rows_committed": 4
+            "rows_committed": 3
           }
         },
         "position_row.frozen": {
@@ -431,22 +434,22 @@
           },
           "newcomer": {
             "errors_before_its_first_commit": {
-              "Conflict": 47
+              "Conflict": 53
             },
             "exit_code": 0,
-            "ms_first_commit_after_process_start": 30868,
-            "ms_from_takeover_to_first_commit": 28585,
+            "ms_first_commit_after_process_start": 30549,
+            "ms_from_takeover_to_first_commit": 28603,
             "no_takeover": null,
             "rows": 3,
-            "seconds_from_start_to_exit": 34.0,
+            "seconds_from_start_to_exit": 33.8,
             "takeover": {
               "attempts": 1,
               "conflicts": 0,
               "epoch": 3,
               "interrupted": 0,
               "listed": 0,
-              "ms_after_process_start": 2283,
-              "seconds": 0.465,
+              "ms_after_process_start": 1946,
+              "seconds": 0.352,
               "unknown": 0
             },
             "took_over": true
@@ -479,22 +482,22 @@
           },
           "newcomer": {
             "errors_before_its_first_commit": {
-              "Conflict": 45
+              "Conflict": 57
             },
             "exit_code": 0,
-            "ms_first_commit_after_process_start": 30561,
-            "ms_from_takeover_to_first_commit": 28003,
+            "ms_first_commit_after_process_start": 30796,
+            "ms_from_takeover_to_first_commit": 28914,
             "no_takeover": null,
             "rows": 4,
-            "seconds_from_start_to_exit": 34.7,
+            "seconds_from_start_to_exit": 34.4,
             "takeover": {
               "attempts": 1,
               "conflicts": 0,
               "epoch": 5,
               "interrupted": 0,
               "listed": 0,
-              "ms_after_process_start": 2558,
-              "seconds": 0.494,
+              "ms_after_process_start": 1882,
+              "seconds": 0.34,
               "unknown": 0
             },
             "took_over": true
@@ -517,22 +520,22 @@
           },
           "newcomer": {
             "errors_before_its_first_commit": {
-              "Conflict": 20
+              "Conflict": 24
             },
             "exit_code": 0,
-            "ms_first_commit_after_process_start": 14927,
-            "ms_from_takeover_to_first_commit": 12463,
+            "ms_first_commit_after_process_start": 14937,
+            "ms_from_takeover_to_first_commit": 13046,
             "no_takeover": null,
             "rows": 4,
-            "seconds_from_start_to_exit": 18.5,
+            "seconds_from_start_to_exit": 18.6,
             "takeover": {
               "attempts": 1,
               "conflicts": 0,
               "epoch": 7,
               "interrupted": 0,
               "listed": 0,
-              "ms_after_process_start": 2464,
-              "seconds": 0.519,
+              "ms_after_process_start": 1891,
+              "seconds": 0.343,
               "unknown": 0
             },
             "took_over": true
@@ -555,12 +558,18 @@
         }
       },
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md_procs.py",
-      "commit": "7193b39",
-      "date_utc": "2026-11-10 20:20",
+      "commit": "1599194",
+      "date_utc": "2026-11-18 14:09",
       "exit_codes": {
         "0": "ended idle",
         "3": "FenceLost",
         "4": "no take-over within the time"
+      },
+      "frozen_transaction_kept_s": {
+        "fence_row.frozen": 28.842,
+        "fence_row.killed": 29.462,
+        "position_row.frozen": 28.6,
+        "position_row.killed": 28.91
       },
       "newcomer_interrupts_the_connections_of_earlier_epochs": false,
       "newcomer_tries_to_take_over_for_s": 100.0,

@@ -599,7 +599,8 @@
         "verdict": "round_error"
       }
     ],
-    "run_3": []
+    "run_3": [],
+    "run_4": []
   },
   "machine_note": "a laptop over the public internet; the MotherDuck account was shared with other workers and with the MotherDuck test files of this package that ran at the same time",
   "runs": {
@@ -801,6 +802,60 @@
       },
       "verdicts": {
         "pass": 1001
+      }
+    },
+    "run_4": {
+      "by_case": {
+        "ddl_only@fenced": {
+          "pass": 23
+        },
+        "nothing@commit_sent": {
+          "pass": 24
+        },
+        "nothing@committed": {
+          "pass": 24
+        },
+        "nothing@fenced": {
+          "pass": 257
+        },
+        "nothing@in_block": {
+          "pass": 24
+        },
+        "other_schema_rows@fenced": {
+          "pass": 23
+        },
+        "registered_relation@fenced": {
+          "pass": 23
+        },
+        "returning@fenced": {
+          "pass": 23
+        },
+        "row@commit_sent": {
+          "pass": 23
+        },
+        "row@fenced": {
+          "pass": 23
+        },
+        "transition@fenced": {
+          "pass": 23
+        },
+        "transition@in_block": {
+          "pass": 23
+        }
+      },
+      "commit": "50229d7",
+      "note": "fix round 2: the take-over and the registration raise n and never put it back; stopped by SIGTERM at round 513 of 1000 for the owner's third pause (its handler dropped the database)",
+      "nothing_at_fenced": 257,
+      "rounds": 513,
+      "takeover_conflicts_by_verdict": {
+        "pass": {
+          "0": 71,
+          "1": 201,
+          "2": 241
+        }
+      },
+      "verdicts": {
+        "pass": 513
       }
     }
   },

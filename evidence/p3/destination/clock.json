@@ -4,24 +4,24 @@
   "results": {
     "where_evaluated": {
       "bare_select": {
-        "max_ms": 2.8,
-        "median_ms": 0.8,
-        "min_ms": 0.3,
+        "max_ms": 7.3,
+        "median_ms": 2.1,
+        "min_ms": 0.6,
         "n": 30,
-        "p90_ms": 0.9
+        "p90_ms": 3.1
       },
       "bare_select_value_inside_the_clients_own_send_receive_window": "30 of 30",
       "clock_sql": "uuid_extract_timestamp(uuidv7())",
       "clock_us_sql": {
-        "max_ms": 84.6,
-        "median_ms": 77.5,
-        "min_ms": 74.3,
+        "max_ms": 75.1,
+        "median_ms": 64.8,
+        "min_ms": 61.4,
         "n": 30,
-        "p90_ms": 83.1
+        "p90_ms": 69.3
       },
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md.py",
-      "commit": "7193b39",
-      "date_utc": "2026-11-10 19:49",
+      "commit": "1599194",
+      "date_utc": "2026-11-18 13:43",
       "plans": {
         "bare select": {
           "operators": [

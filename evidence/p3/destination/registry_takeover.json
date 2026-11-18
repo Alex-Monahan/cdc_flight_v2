@@ -4,8 +4,8 @@
   "results": {
     "old_run_stands_before_commit": {
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md.py",
-      "commit": "7193b39",
-      "date_utc": "2026-11-10 19:54",
+      "commit": "1599194",
+      "date_utc": "2026-11-18 13:47",
       "old_run_gets": "CommitUnknown",
       "old_transaction_committed": false,
       "take_over_with_the_interrupt": {
@@ -15,25 +15,25 @@
         "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
         "listed": 2,
         "result": "won",
-        "seconds": 1.345,
+        "seconds": 1.022,
         "unknown": 0
       },
       "take_over_without_the_interrupt": {
-        "attempts": 8,
-        "conflicts": 8,
+        "attempts": 9,
+        "conflicts": 9,
         "interrupted": 0,
         "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
         "listed": 0,
         "result": "TakeoverFailed after 5 s",
-        "seconds": 5.524,
+        "seconds": 5.431,
         "unknown": 0
       },
       "what": "the old run's stream-lane transaction has run its fence statement and stands before COMMIT"
     },
     "open_transaction_holds_a_leader_row": {
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md.py",
-      "commit": "7193b39",
-      "date_utc": "2026-11-10 19:53",
+      "commit": "1599194",
+      "date_utc": "2026-11-18 13:46",
       "old_run_at_its_next_statement": "ConnectionLost",
       "old_run_at_its_next_transaction": "FenceLost",
       "take_over_with_the_interrupt": {
@@ -43,33 +43,33 @@
         "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
         "listed": 2,
         "result": "won",
-        "seconds": 1.471,
+        "seconds": 1.022,
         "unknown": 0
       },
       "take_over_without_the_interrupt": {
-        "attempts": 8,
-        "conflicts": 8,
+        "attempts": 11,
+        "conflicts": 11,
         "interrupted": 0,
         "last_error": "TransactionException: TransactionContext Error: Conflict on update!",
         "listed": 0,
         "result": "TakeoverFailed after 6 s",
-        "seconds": 6.685,
+        "seconds": 6.397,
         "unknown": 0
       },
       "what": "the old run's control-lane transaction has updated the heartbeat row and stays open"
     },
     "open_transaction_holds_only_data_rows": {
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md.py",
-      "commit": "7193b39",
-      "date_utc": "2026-11-10 19:53",
+      "commit": "1599194",
+      "date_utc": "2026-11-18 13:46",
       "interrupt_earlier": {
         "interrupted": 1,
         "listed": 2
       },
       "new_run_after_the_interrupt": {
-        "conflicts": 1,
+        "conflicts": 2,
         "pause_between_tries_s": 0.1,
-        "row_free_after_s": 0.65
+        "row_free_after_s": 0.84
       },
       "new_run_updating_the_same_row": "Conflict until md.interrupt_earlier(conn, new_epoch) ran",
       "old_run_at_its_next_statement": "ConnectionLost",
@@ -80,25 +80,25 @@
         "last_error": null,
         "listed": 0,
         "result": "won without a conflict",
-        "seconds": 0.567,
+        "seconds": 0.339,
         "unknown": 0
       },
       "what": "the old run's stream-lane transaction has updated a data row and stays open"
     },
     "replaced_connection_interrupted_by_id": {
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md.py",
-      "commit": "7193b39",
-      "date_utc": "2026-11-10 19:53",
-      "interrupt_statement_ms": 86.6,
-      "next_transaction_with_connect_interrupt_and_registration_ms": 776.5,
+      "commit": "1599194",
+      "date_utc": "2026-11-18 13:46",
+      "interrupt_statement_ms": 61.9,
+      "next_transaction_with_connect_interrupt_and_registration_ms": 546.7,
       "old_connection_still_held_a_transaction": false,
       "what": "a lane transaction loses its connection before COMMIT (fault site md.fence); the next transaction of the lane connects again, interrupts the old server connection by id and updates the same row"
     },
     "what_the_server_answers": {
-      "begin_alone_took_ms": 0.9,
+      "begin_alone_took_ms": 0.7,
       "command": "tools/with-env uv run -q pytest -m md tests/destination/test_md.py",
-      "commit": "7193b39",
-      "date_utc": "2026-11-10 19:55",
+      "commit": "1599194",
+      "date_utc": "2026-11-18 13:47",
       "reading": "BEGIN is not sent to the server. The server lists a connection only while it has a statement in flight or a transaction with at least one statement, and an interrupt answers true in exactly those states. So the count `interrupted` of md.interrupt_earlier is the number of connections that held something, not the number of connections that are still alive, and a registered id of an idle connection cannot be told from one that is gone",
       "states": {
         "a statement that interrupts its own connection": {
@@ -136,7 +136,7 @@
         "statement in flight": {
           "interrupt_answers": true,
           "listed": 1,
-          "statement_ended_after_s": 0.36,
+          "statement_ended_after_s": 0.3,
           "user_agent_carries_the_marker": true
         },
         "the client's next statement": {
@@ -146,10 +146,10 @@
         "the same transaction after the interrupt, before the client sent anything": {
           "a_second_interrupt_answered_true": 5,
           "next_transaction_on_the_same_row_began_after_s": [
-            0.08,
-            0.08,
-            0.08,
-            0.08
+            0.06,
+            0.07,
+            0.07,
+            0.06
           ],
           "rounds": 5,
           "still_listed_1s_later": 0,
