@@ -13,7 +13,7 @@ connection registry and the migrations. `docs/design/destination.md` describes i
 No other module issues BEGIN, COMMIT, ROLLBACK or the fence statement.
 """
 from . import errors, registry, schema
-from .connection import (CLOCK_US_SQL, Connection, background_threads, clock_sql, configure, connect,
+from .connection import (CLOCK_US_SQL, Connection, abort_all, background_threads, clock_sql, configure, connect,
                          default_settings, open_connections, statement_kind, wait_idle, waiting_calls)
 from .errors import (CommitUnknown, Conflict, ConnectionLost, DeadlineExceeded, DestinationError, FenceLost,
                      LaneMisuse, StatementError)
@@ -29,5 +29,5 @@ __all__ = [
     "DeadlineExceeded", "LaneMisuse",
     "SchemaError", "Step", "register_migrations", "migrate", "ensure_leader_tables", "interrupt_earlier",
     "errors", "registry", "schema", "open_connections", "background_threads", "wait_idle", "statement_kind",
-    "waiting_calls",
+    "waiting_calls", "abort_all",
 ]

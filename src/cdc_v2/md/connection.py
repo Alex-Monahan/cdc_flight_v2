@@ -925,6 +925,22 @@ def waiting_calls():
         return stuck + _side["calls"]
 
 
+def abort_all():
+    """From any thread: abort every client connection of this process (`Session.abort`): the call in flight ends
+    at once, the connection is retired, and its reaper interrupts the server connection, which rolls an open
+    transaction back on the server. Returns how many were aborted.
+
+    For the one reaction to `FenceLost` (package L, `cdc_v2.leader.stop`): the process ends right after, and an
+    open transaction that it left on MotherDuck would otherwise hold its rows for about 29 s against the new
+    leader's lanes (`docs/design/destination.md` section 8.3). A `Connection` whose session was aborted takes a
+    new client connection at its next call; a run that no longer leads gets `FenceLost` at its registration."""
+    with _registry_lock:
+        sessions = [s for s in _open_sessions if s.state == "open"]
+    for sess in sessions:
+        sess.abort()
+    return len(sessions)
+
+
 def wait_idle(deadline):
     """Wait until every background thread of this package has ended. True when none is left."""
     while True:

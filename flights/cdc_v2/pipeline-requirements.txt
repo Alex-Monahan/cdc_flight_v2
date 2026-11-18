@@ -1,0 +1,5 @@
+# The pipeline's Python dependencies beyond the guard's duckdb, at the versions of uv.lock. The Flight installs
+# only flights/cdc_v2/requirements.txt (duckdb) for each of its 1,440 short runs a day; the bootstrap installs these
+# after it has taken over (CDC_V2_PIP_REQUIREMENTS=flights/cdc_v2/pipeline-requirements.txt).
+pyarrow==26.0.1
+psycopg[binary]==3.3.8

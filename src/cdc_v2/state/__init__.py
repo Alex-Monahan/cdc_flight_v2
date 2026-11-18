@@ -403,6 +403,22 @@ def transition(tx, machine, key, from_state, to_state, cause, *, detail=None, va
                              % (m.name, n, m.table)))
 
 
+def record(tx, machine, key, from_state, to_state, cause, *, detail=None):
+    """Append the row of `_cdc.transitions` for a transition that a statement of the destination layer made
+    itself, inside ``tx``. This is contract C5's one exception, the leader machine: callers may not update the
+    leader row, so `md.schema.release` (and the bootstrap's take-over) change it, and package L records the
+    transition here in the same transaction. The pair must be declared (`IllegalTransition` otherwise, before the
+    database is touched); ``tx`` must be an `md.Transaction`. The row is the one `transition` writes."""
+    m = _resolve(machine)
+    key = _key(m, key)
+    cause = _cause(cause)
+    if not m.allows(from_state, to_state):
+        raise IllegalTransition(m.name, key, from_state, to_state, declared=False)
+    detail = _detail(detail)
+    _transaction(tx, "record")
+    _record(tx, m, key, from_state, to_state, cause, detail)
+
+
 def create(tx, machine, key, state, cause, values=None, detail=None):
     """Add the row of a new key in ``state``. Fails with `IllegalTransition` when the key has a row already
     (``stored`` says in which state) or when ``state`` is not one a new row may have. ``values`` gives the other
@@ -522,6 +538,6 @@ def render_document(which=None):
     return DOC_HEADER + "\n## The machines\n" + "".join("\n" + render_machine(m) for m in ms)
 
 
-__all__ = ["Machine", "declare", "machines", "get", "transition", "create", "read", "IllegalTransition",
+__all__ = ["Machine", "declare", "machines", "get", "transition", "create", "read", "record", "IllegalTransition",
            "StateError", "NOW", "FRESH_IDS", "check_fields", "FieldError", "MAX_FIELDS", "MAX_STRING",
            "render_machine", "render_document", "load_all"]
