@@ -7,7 +7,7 @@ Last updated: 2026-11-10, by the orchestrator. Resume from `SPEC.md`, `PLAN.md` 
 - **Stage 1 (local). P1 Environment: gate passed on 2026-11-09** (one item cannot be shown from this session, see the
   table). **P2 Platform spike: gate passed on 2026-11-10** — every spike is done and merged, the report
   (`docs/spike_report.md`) is complete and was sent to the owner; nothing found contradicts SPEC, so the build
-  continues without waiting. **Paused for the usage limit at 2026-11-18 07:57 (the 5-hour window at 40 %); resumes after 11:30 the same day.** **P3 Core: in progress** (table below): the fault harness, the oracle, the source
+  continues without waiting. **P3 Core: in progress** (table below): the fault harness, the oracle, the source
   package, the engine, the transform and the apply package are merged; the question the second review raised — which
   tables have a key — is measured and decided (rule K, below) and has a small package of its own, which is merged; the
   cut is merged; the destination basics finished their fix round: the unexplained fence result was a real breach (a
@@ -54,8 +54,8 @@ green on T1 (local primary and standby, real MotherDuck, local JVM).
 | O | Oracle, T1 harness, evidence writer, workload generator and observer | Opus | **merged** (fix round included) |
 | X | The cut: where a snapshot lies in the stream | Opus (was Fable) | **merged** (`1cd62c9`; three reviews, three fix rounds; with it the oracle's reader on a standby was repaired) |
 | E | Engine: the JVM program around stock Debezium, frames, the Python side | Opus | **merged** (two reviews, two fix rounds) |
-| D | Destination basics: lanes, fence, deadlines, errors, `_cdc` schema, transition function, alert records | Opus (was Fable) | **fix round delivered** (`161d847`, 16 items). The unexplained fence result was **a real breach**, now fixed: DuckDB 1.5.6 and MotherDuck do not record a write of an unchanged value into a column right after a checkpoint, so a take-over that wrote only the epoch did not conflict with an old run's fence statement and both committed (8 in 681 rounds). The take-over and the registration now also write the fence counter: 0 breaches in 1,001 rounds. The coordinator's re-check: **merge after three fixes** (the counter must stay raised, not be put back; a transition with `expect` on a column it does not change must be refused; one test must bound how long MotherDuck keeps a frozen transaction); the second attack on the fence (1,440 cases mapping which writes DuckDB and MotherDuck record, 1,020 rounds): 0 breaches with the fix, **merge after named fixes** (an autocommit write of an old run is not fenced; a local stand-in can lose a rollback); **last fixes running** |
-| A | Apply: the statements over a change set, keyed and keyless | Opus | **merged** (`a6728f9`; two reviews, three fix rounds; with `apply.repair_keys` for the backfill) |
+| D | Destination basics: lanes, fence, deadlines, errors, `_cdc` schema, transition function, alert records | Opus (was Fable) | **merged** (`a50b27a`; two reviews, two fix rounds; the fence's real breach fixed with a counter that only rises; 513 attack rounds, 0 breaches) |
+| A | Apply: the statements over a change set, keyed and keyless | Opus | **merged** (`a6728f9`; two reviews, three fix rounds; with `apply.repair_keys` for the backfill); a short round to run on D's real lane is **running** |
 | P | Source: connections, catalog and its observation, publication, slot, slot facts, timeline, heartbeat | Opus | **merged** (with the repair of `tools/localpg` for Postgres 16; one fix after the review) |
 | L | Leadership: guard, take-over, heartbeat, hand-over, bootstrap, platform interface | Opus (was Fable) | task written; after D |
 | Y | Transform: source types to destination types | Opus | **merged** (`362d00b`; one review, one fix round, one last check) |

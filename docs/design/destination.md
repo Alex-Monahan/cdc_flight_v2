@@ -1764,9 +1764,10 @@ For packages A, L, S, V, B and the integrator. Each line is backed by the sectio
   take-over whenever MotherDuck has just checkpointed the fence table. The bootstrap's copy of the statements
   needs the names `register_fence`, `heartbeat` and `release` too (`schema.NAMED_STATEMENTS`).
 - **Heartbeat and release are the layer's** (`md.schema.heartbeat`, `md.schema.release`; contract note 48):
-  callers may not update the leader tables (fix round 2, N2). The coordinator's re-check adds that release
-  and take-over must change one common column (a counter `v` in the leader row is L's change of the frozen
-  shape): today the take-over writes `state = 'leading'` over `leading`, an unchanged value.
+  callers may not update the leader tables (fix round 2, N2). Release runs inside a fenced control-lane
+  transaction, so it meets a take-over through the control fence row's `n`, which both change; no counter in
+  the leader row is needed (coordinator, last check). Release does not yet append the leader machine's
+  `_cdc.transitions` row that design section 9 and C5 require; L adds it.
 - The take-over must try again after a conflict that follows an interrupt: 1 or 2 further attempts were seen
   (section 7).
 - Call `md.interrupt_earlier(conn, new_epoch)` once more **after** the take-over won (finding 2).
