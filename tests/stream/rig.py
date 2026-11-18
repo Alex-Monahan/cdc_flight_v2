@@ -30,7 +30,8 @@ FAST_GROUP = dict(max_group_delay_s=0.05, max_group_attempts=6, retry_pause_s=0.
 
 
 class Rig:
-    def __init__(self, dest, tmp_path, catalog=None, tables=(K, N), stream=None, group=None, slot=None):
+    def __init__(self, dest, tmp_path, catalog=None, tables=(K, N), stream=None, group=None, slot=None,
+                 first_start=True):
         self.dest = dest
         self.tmp = tmp_path
         self.epoch = dest.lead()
@@ -46,7 +47,8 @@ class Rig:
         self.board = BeatBoard()
         self.outbox = AlertOutbox()
         self.engine_kw = {}
-        self._first_start(tables)
+        if first_start:
+            self._first_start(tables)
 
     def lane(self, name="stream"):
         return self.dest.lane(name, self.epoch)

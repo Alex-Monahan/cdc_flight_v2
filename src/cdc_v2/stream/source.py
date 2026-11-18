@@ -14,15 +14,10 @@ from typing import Optional
 
 from cdc_v2 import lsn as lsnmod
 from cdc_v2 import pg
-from cdc_v2.crashpoints import crash_point, declare
 from cdc_v2.deadline import Deadline
 from cdc_v2.pg import errors as pg_errors
 
 log = logging.getLogger("cdc_v2.stream")
-
-CP_SLOT_ADVANCED = declare("stream.slot_advanced", "SPEC 4.3 last line: our slot was moved past the failing place; "
-                           "the reposition is not committed yet (reached only on that path)")
-
 
 class PgSource:
     def __init__(self, settings: pg.SourceSettings, node: str = "replica", *, primary: str = "primary"):
@@ -114,9 +109,7 @@ class PgSource:
                       what="slot advance")
             f = pg.slot.facts(c, self.slot, deadline=deadline)
             return f.confirmed_flush_lsn
-        pos = self._call(run, deadline)
-        crash_point(CP_SLOT_ADVANCED)
-        return pos
+        return self._call(run, deadline)
 
 
 class PgBeat:
@@ -152,4 +145,4 @@ def format_position(p) -> str:
     return lsnmod.format(p) if isinstance(p, int) else str(p)
 
 
-__all__ = ["PgSource", "PgBeat", "CP_SLOT_ADVANCED"]
+__all__ = ["PgSource", "PgBeat"]

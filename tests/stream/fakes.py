@@ -207,9 +207,10 @@ class ScriptedEngine:
 
     pid_counter = itertools.count(5000)
 
-    def __init__(self, slot: ScriptedSlot, start, *, heartbeat_every=0, schema_versions=None, catalog=None,
-                 keyless=True, include=None):
+    def __init__(self, slot: ScriptedSlot, start, *, heartbeat_every=0.5, schema_versions=None, catalog=None,
+                 keyless=True, include=None, rows_per_frame=64):
         self.slot = slot
+        self.rows_per_frame = rows_per_frame
         self.start = start
         self.engine_id = start.engine_id
         self.hello = None
@@ -224,6 +225,7 @@ class ScriptedEngine:
         self.heartbeat_every = heartbeat_every
         self.delivered_ends = []
         self._built_until = None
+        self._last_frame = 0.0
         slot.lives += 1
         slot.active = (self.pid, self.pid * 10)
         self._q.append(F.Hello(1, "scripted", "cdc_v2_slot", start.start_position, self.pid, self.engine_id,
@@ -242,7 +244,7 @@ class ScriptedEngine:
             if t.commit_lsn <= self._pos:
                 continue
             self._pos = t.commit_lsn
-            if t.fatal is not None:
+            if t.fatal is not None and (t.fatal.get("culprit") is None or self._included(t.fatal["culprit"])):
                 self._q.append(("fatal", t.fatal))
                 return
             self._emit(t)
@@ -252,6 +254,14 @@ class ScriptedEngine:
         self._seq += 1
         return s
 
+    def _included(self, key) -> bool:
+        inc = getattr(self.start, "table_include", None)
+        if not inc:
+            return True
+        import re
+        pats = [p.replace("\\,", ",") for p in re.split(r"(?<!\\),", inc)]
+        return any(re.fullmatch(p, "%s.%s" % key) for p in pats)
+
     def _emit(self, t: STxn):
         q = self._q
         q.append(F.Begin(self._next_seq(), "%d:0" % t.xid, t.commit_ms, {"txId": t.xid, "lsn": t.commit_lsn - 0x80},
@@ -259,15 +269,19 @@ class ScriptedEngine:
         counts = collections.Counter()
         events = 0
         for part in t.parts:
+            if part[0] in ("rows", "truncate") and not self._included(part[1]):
+                continue                                      # Debezium: outside table.include.list, not counted
             if part[0] == "rows":
                 key, recs = part[1], part[2]
                 st = self.catalog[key]
                 if key not in self._versions:
                     self._versions[key] = 1
                     q.append(schema_frame(st, 1))
-                seq0 = self._seq
-                self._seq += len(recs)
-                q.append(F.Rows(key[0], key[1], self._versions[key], rows_batch(st, recs, seq0)))
+                for j in range(0, len(recs), self.rows_per_frame):       # at most one Debezium batch per frame
+                    part_recs = recs[j:j + self.rows_per_frame]
+                    seq0 = self._seq
+                    self._seq += len(part_recs)
+                    q.append(F.Rows(key[0], key[1], self._versions[key], rows_batch(st, part_recs, seq0)))
                 counts["%s.%s" % key] += len(recs)
                 events += len(recs)
             elif part[0] == "truncate":
@@ -296,16 +310,20 @@ class ScriptedEngine:
         if not self._q:
             self._fill()
         if not self._q:
-            left = deadline.remaining()
-            if self.heartbeat_every:
-                pass
             import time
+            left = deadline.remaining()
             time.sleep(min(left, 0.01))
             if not self._q:
                 self._fill()
             if not self._q:
+                now = time.monotonic()
+                if self.heartbeat_every is not None and now - self._last_frame >= self.heartbeat_every:
+                    self._last_frame = now               # Debezium's heartbeat record: the engine is alive
+                    return F.Heartbeat(self._next_seq(), {"lsn": self._pos or 0})
                 raise DeadlineExceeded("no frame")
         f = self._q.popleft()
+        import time
+        self._last_frame = time.monotonic()
         if isinstance(f, tuple) and f[0] == "fatal":
             self.dead = True
             info = f[1]

@@ -52,6 +52,8 @@ log = logging.getLogger("cdc_v2.stream")
 CP_ATTACHED = declare("stream.attached", "the attach decision is committed (slot and stream: verified); DURABLE of "
                       "the applied position follows")
 SITE_SPILL = declare_site("stream.spill_full", "the stream's spill area has no space left (transform or apply plan)")
+CP_SLOT_ADVANCED = declare("stream.slot_advanced", "SPEC 4.3 last line: our slot was moved past the failing place; "
+                           "the reposition is not committed yet (reached only on that path)")
 
 
 class RestartEngine(Exception):
@@ -362,6 +364,7 @@ class _Life:
         asm = Assembler(self.applied, clock)
         self.asm = asm
         group: Optional[Group] = None
+        self.group = None
         last_frame = last_tick = last_commit = clock()
         armed = False
         eligible = 0.0
@@ -381,6 +384,9 @@ class _Life:
             except DeadlineExceeded:
                 frame = None
             except Exception as e:                                       # noqa: BLE001
+                # the complete transactions before the failure are applied first, so that the attempts of SPEC 4.3
+                # are counted at the place that fails and nothing healthy before it is skipped
+                self._commit_before_failure(group)
                 self._engine_failure(e)
             self.handle.progress("streaming")
             now = clock()
@@ -395,6 +401,7 @@ class _Life:
                                      key=("slot",))
                     raise RestartEngine("frame_silence")
             else:
+                self.group = group
                 ended = self._dispatch(frame)
                 if isinstance(frame, F.Begin) and not armed:
                     armed = True
@@ -439,7 +446,16 @@ class _Life:
         try:
             return self.asm.feed(frame)
         except ProtocolError as e:
+            self._commit_before_failure(self.group)
             self._content_failure("protocol_error", str(e))
+
+    def _commit_before_failure(self, group: Optional[Group]):
+        """Before a failure of the engine or of the protocol ends the life: commit the group of complete
+        transactions that arrived before it (they are whole and checked; the failing transaction is not among
+        them)."""
+        if group is not None and not group.empty and group.large is None:
+            self._commit(group)
+            self.group = None
 
     def _take(self, ended: EndedTxn, group: Optional[Group]) -> Optional[Group]:
         """A transaction ended: discard it, close a staged one, or add it to the group."""
@@ -694,6 +710,7 @@ class _Life:
             self.engine.kill()
             self.engine = None
         new = self._retrying("source_slot", lambda d: self.ctx.source.advance_slot(d))
+        crash_point(CP_SLOT_ADVANCED)
         tables = [k for k, r in self.routes.items() if r.routing != "skip"]
         self._retrying("destination", lambda d: self._tx(
             lambda tx: st.reposition(tx, new, tables, "spec_4_3_last_line: %s" % kind, slot=self.s.slot,
