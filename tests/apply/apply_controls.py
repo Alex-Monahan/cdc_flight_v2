@@ -13,7 +13,6 @@ import contextlib
 
 import apply_harness
 from apply_sim import change_set_table
-from apply_standin import StandInTx
 from cdc_v2.apply import ApplyCounts
 from cdc_v2.oracle.canonical import quote_ident
 
@@ -25,7 +24,7 @@ def last_record_decides(conn, target, meta, sets, mode="stream", form="local", o
     cols = list(meta.columns)
     for recs in sets:
         rows = change_set_table(meta, recs)
-        with StandInTx(conn) as tx:
+        with conn.transaction() as tx:
             tx.register("ctl_rows", rows)
             kcond = " AND ".join("t.%s IS NOT DISTINCT FROM r.%s" % (c.qname, c.a) for c in keys)
             tx.execute("DELETE FROM %s AS t USING (SELECT DISTINCT %s FROM ctl_rows UNION SELECT DISTINCT %s FROM "
@@ -60,7 +59,7 @@ def everything_unresolved(conn, target, meta, sets, mode="catch_up", form="local
     for recs, counts in zip(sets, out):
         rows = change_set_table(meta, recs)
         keys = meta.key_columns
-        con = apply_harness.local_conn()
+        con = apply_harness.scratch()
         con.register("r", rows)
         counts.unresolved = con.execute("SELECT DISTINCT %s FROM r" % ", ".join(c.a for c in keys)).to_arrow_table()
         conn.register("ctl_unres", counts.unresolved)

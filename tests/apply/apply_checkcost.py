@@ -32,27 +32,21 @@ def main():
     sys.path.insert(0, str(HERE))
     sys.path.insert(0, args.src)
     import duckdb
-    from apply_harness import spill_dir
-    from apply_standin import StandInTx
+    from apply_harness import local_db, md_db, spill_dir
     from cdc_v2.apply import ApplySettings, Column, LocalChangeSet, TableMeta, Target, apply_group
 
     out = {"rows": args.rows, "batch": args.batch, "reps": args.reps, "target": args.target, "label": args.label,
            "runs": []}
-    dest = None
-    if args.target == "md":
-        from cdc_v2.testing.md import TestDestination
-        dest = TestDestination()
+    big = dict(statement_deadline_s=600.0, transaction_deadline_s=1800.0)
+    # package D's lane on one destination for the run: a MotherDuck database of its own, or local DuckDB in memory
+    dest = md_db("cdc_v2_t_a_", **big) if args.target == "md" else local_db(**big)
     try:
         cases = [("insert", "increasing", "BIGINT"), ("insert", "random_uuid", "UUID"), ("update", "increasing", "BIGINT")]
         for n, (what, kind, typ) in enumerate(cases):
             gen = "CAST(i AS BIGINT)" if typ == "BIGINT" else "uuid()"
             meta = TableMeta((Column(0, "id", typ, key=True), Column(1, "v", "VARCHAR"),
                               Column(2, "big", "VARCHAR", unchanged_possible=True)))
-            if dest is None:
-                conn = duckdb.connect()
-                conn.execute("SET TimeZone = 'UTC'")
-            else:
-                conn = dest.conn
+            conn = dest
             conn.execute("CREATE SCHEMA IF NOT EXISTS s")
             table = "t%d" % n
             conn.execute("CREATE OR REPLACE TABLE s.%s AS SELECT %s AS id, 'value ' || i AS v, 'big' AS big FROM range(%d) t(i)"
@@ -75,7 +69,7 @@ def main():
                                           % (r, lo, lo + args.batch * 3)).to_arrow_table()
                     settings = ApplySettings(local_temp_directory=spill_dir(), check_new_keys=check)
                     t0 = time.monotonic()
-                    with StandInTx(conn) as tx:
+                    with conn.transaction() as tx:
                         counts = apply_group(tx, Target("s", table), LocalChangeSet(rows, None, meta),
                                              settings=settings)
                     times.append(time.monotonic() - t0)
@@ -85,11 +79,8 @@ def main():
                                     "seconds_all": [round(x, 4) for x in times], "round_trips": max(sent),
                                     "shapes": counts.shapes})
             mk.close()
-            if dest is None:
-                conn.close()
     finally:
-        if dest is not None:
-            dest.drop()
+        dest.close()
     out["command"] = "apply_checkcost.py --target %s --rows %d --batch %d --reps %d" % (
         args.target, args.rows, args.batch, args.reps)
     for r in out["runs"]:

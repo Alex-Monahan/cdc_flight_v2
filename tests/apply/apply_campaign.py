@@ -22,7 +22,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parents[1] / "src"))
 
-from apply_harness import (catch_up_scenario, cut_scenario, local_conn, rounds_scenario,  # noqa: E402
+from apply_harness import (catch_up_scenario, cut_scenario, local_db, md_db, on_local, rounds_scenario,  # noqa: E402
                            stream_scenario, test_settings)
 from cdc_v2.testing.harness_evidence import write_evidence  # noqa: E402
 
@@ -33,7 +33,6 @@ def shapes_evidence():
     """The SQL of every statement shape for a sample table: a key, a column that can be unchanged of each kind
     that matters (text, interval, struct with a double, list), a double and an interval that cannot."""
     from apply_sim import KeyedSource, change_set_table, create_table, random_meta
-    from apply_standin import StandInTx
     from cdc_v2.apply import Column, LocalChangeSet, TableMeta, Target, apply_group
     from cdc_v2.apply.statements import Shapes
     meta = TableMeta((Column(0, "id", "BIGINT", key=True), Column(1, "big", "VARCHAR", unchanged_possible=True),
@@ -48,17 +47,18 @@ def shapes_evidence():
         rng = random.Random(seed)
         src = KeyedSource(meta, rng, kinds, toast_rate=0.7)
         src.seed_rows(8)
-        conn = local_conn()
-        create_table(conn, "s", "t", meta, src.snapshot())
-        for _ in range(3):
-            recs = src.ops_txn(rng.randint(1, 6))
-            with StandInTx(conn) as tx:
-                counts = apply_group(tx, Target("s", "t"), LocalChangeSet(change_set_table(meta, recs), None, meta),
-                                     settings=test_settings())
-            sets += 1
-            texts = [s for s in tx.sent if not s.startswith("SELECT")]
-            for shape, sql in zip([x for x in counts.shapes if x not in ("plan", "lookup")], texts):
-                seen.setdefault(shape, set()).add(sql)
+        with local_db() as conn:
+            create_table(conn, "s", "t", meta, src.snapshot())
+            for _ in range(3):
+                recs = src.ops_txn(rng.randint(1, 6))
+                with conn.transaction(check=True) as tx:
+                    counts = apply_group(tx, Target("s", "t"),
+                                         LocalChangeSet(change_set_table(meta, recs), None, meta),
+                                         settings=test_settings())
+                sets += 1
+                texts = [s for s in tx.sent if not s.startswith("SELECT")]
+                for shape, sql in zip([x for x in counts.shapes if x not in ("plan", "lookup")], texts):
+                    seen.setdefault(shape, set()).add(sql)
     sh = Shapes(meta, Target("s", "t"), list(meta.unchanged_columns))
     write_evidence(EVIDENCE / "shapes.json", {
         "table": [{"position": c.position, "name": c.name, "type": c.type, "key": c.key,
@@ -92,12 +92,12 @@ def controls(limit):
     """Item 12: how many examples each wrong-on-purpose planner survives before a property catches it."""
     from apply_controls import caught_after, everything_unresolved, last_record_decides, plain_values
     out = {"last_record_decides (keyed stream)": caught_after(
-        lambda s: stream_scenario(local_conn(), s, keyed=True, apply_fn=last_record_decides), 30_000_000, limit)}
+        on_local(lambda db, s: stream_scenario(db, s, keyed=True, apply_fn=last_record_decides)), 30_000_000, limit)}
     with plain_values():
         out["plain GROUP BY on values (keyless stream)"] = caught_after(
-            lambda s: stream_scenario(local_conn(), s, keyed=False), 30_000_000, limit)
+            on_local(lambda db, s: stream_scenario(db, s, keyed=False)), 30_000_000, limit)
     out["everything unresolved (catch-up rounds, bound 7c)"] = caught_after(
-        lambda s: rounds_scenario(local_conn(), s, apply_fn=everything_unresolved), 30_000_000, limit)
+        on_local(lambda db, s: rounds_scenario(db, s, apply_fn=everything_unresolved)), 30_000_000, limit)
     return out
 
 
@@ -121,12 +121,11 @@ def main():
     if not args.no_shapes and args.target == "local":
         shapes_evidence()
     if args.target == "md":
-        from cdc_v2.testing.md import TestDestination
-        dest = TestDestination()
-        conn_of = lambda: dest.conn
+        dest = md_db("cdc_v2_t_a_", shared=True)        # one database for the campaign, a table per seed
+        conn_of = lambda: dest
     else:
         dest = None
-        conn_of = local_conn
+        conn_of = None
     t_end = time.monotonic() + args.seconds
     counts = {k: 0 for k in KINDS}
     failed, seed, n, records, unresolved, rounds_records = [], args.start, 0, 0, 0, 0
@@ -136,7 +135,11 @@ def main():
             kind = KINDS[seed % len(KINDS)]
             form = "relation" if seed % 4 == 3 else "local"
             try:
-                e = run_one(kind, conn_of(), seed, form, "t%d" % n)
+                if conn_of is None:
+                    with local_db() as db:                  # a destination of its own per seed, on D's lane
+                        e = run_one(kind, db, seed, form, "t%d" % n)
+                else:
+                    e = run_one(kind, conn_of(), seed, form, "t%d" % n)
                 records += e.get("records", 0)
                 if kind == "rounds":
                     unresolved += e["unresolved"]
@@ -145,13 +148,13 @@ def main():
                 failed.append({"seed": seed, "form": form, "kind": kind,
                                "error": "%s: %s" % (type(ex).__name__, str(ex).split("\n")[0][:300]),
                                "where": traceback.format_exc().strip().split("\n")[-3:],
-                               "repeat": "apply_campaign.run_one(%r, local_conn(), %d, %r, 't')" % (kind, seed, form)})
+                               "repeat": "apply_campaign.run_one(%r, local_db(), %d, %r, 't')" % (kind, seed, form)})
             counts[kind] += 1
             seed += 1
             n += 1
     finally:
         if dest is not None:
-            dest.drop()
+            dest.close()
     summary = {
         "target": args.target, "code_version": code_version(), "seconds": round(time.monotonic() - t0, 1),
         "seeds": n, "seed_range": [args.start, seed - 1], "scenarios": counts, "records": records,

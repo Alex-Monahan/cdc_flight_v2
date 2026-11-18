@@ -3,7 +3,8 @@
 A lineitem-width table (16 columns, TPC-H names) with a key; change sets of n records: one third inserts of new
 keys, one third complete updates, one third deletes ("full"), or the updates leave the comment column unchanged
 ("unchanged"); and the same table without a key (deletes and updates carry the old image). Each change set is
-applied in one stand-in transaction; the time is from apply_group's call to COMMIT returning.
+applied in one transaction of package D's lane (`conn` is an apply_lane.LaneDB); the time is from apply_group's
+call to the lane's COMMIT returning (its fence statement included).
 """
 from __future__ import annotations
 
@@ -14,7 +15,6 @@ import duckdb
 import pyarrow as pa
 
 from apply_harness import spill_dir
-from apply_standin import StandInTx
 from cdc_v2.apply import ApplySettings, Column, LocalChangeSet, TableMeta, Target, apply_group
 
 COLS = [("l_orderkey", "BIGINT"), ("l_partkey", "BIGINT"), ("l_suppkey", "BIGINT"), ("l_linenumber", "INTEGER"),
@@ -109,7 +109,7 @@ def run_perf(conn, sizes=(1, 100, 100_000, 1_000_000), reps_small: int = 5):
                         prepare(conn, "perf", table, m, base)
                     rss0 = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
                     c0, w0 = time.process_time(), time.monotonic()
-                    with StandInTx(conn) as tx:
+                    with conn.transaction() as tx:
                         counts = apply_group(tx, Target("perf", table), LocalChangeSet(rows, None, m),
                                              settings=ApplySettings(local_temp_directory=spill_dir()))
                     times.append(time.monotonic() - w0)

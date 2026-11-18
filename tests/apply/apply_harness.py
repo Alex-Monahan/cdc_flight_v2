@@ -1,4 +1,5 @@
-"""Drive apply against a destination (local DuckDB or MotherDuck) and compare with the simulator."""
+"""Drive apply against a destination (local DuckDB or MotherDuck, through package D's real lane: apply_lane) and
+compare with the simulator."""
 from __future__ import annotations
 
 import random
@@ -8,7 +9,7 @@ import duckdb
 
 from apply_sim import (KeyedSource, KeylessSource, Rec, canon_rows, change_set_table, create_table,
                        literal_rows_canon, random_meta)
-from apply_standin import StandInTx
+from apply_lane import LaneDB, local_db, md_db  # noqa: F401 - the tests' destinations
 from cdc_v2.apply import (ApplySettings, LocalChangeSet, RelationChangeSet, Target, apply_group,
                           reduce_duplicates)
 from cdc_v2.oracle.canonical import quote_ident
@@ -32,11 +33,19 @@ def test_settings(**kw) -> ApplySettings:
 test_settings.__test__ = False
 
 
-def local_conn():
-    """A destination on local DuckDB (a database of its own: tests create the same schema names)."""
+def scratch():
+    """A plain local DuckDB connection to compute with in a test (not a destination)."""
     con = duckdb.connect()
     con.execute("SET TimeZone = 'UTC'")
     return con
+
+
+def on_local(fn):
+    """`fn(db, seed)` on a destination of its own, closed afterwards: `on_local(fn)(seed)`."""
+    def run(seed):
+        with local_db() as db:
+            return fn(db, seed)
+    return run
 
 
 def split_by_txn(recs: List[Rec], cuts: List[int]) -> List[List[Rec]]:
@@ -56,36 +65,39 @@ def split_by_txn(recs: List[Rec], cuts: List[int]) -> List[List[Rec]]:
     return out
 
 
-def apply_sets(conn, target, meta, sets: List[List[Rec]], mode="stream", form="local", one_tx=False,
-               settings: Optional[ApplySettings] = None, stage_conn=None):
-    """Apply each change set (one transaction each, or all in one). Returns the list of ApplyCounts."""
+def change_set(conn: LaneDB, meta, recs: List[Rec], form: str, i: int = 0):
+    """The change set of `recs` in the local form, or staged in the destination as a pending log would hold it
+    (commit_lsn instead of txn) and given in the relation form. Staging runs on the set-up connection, in its own
+    transaction, before the lane's block reads it."""
+    rows = change_set_table(meta, recs)
+    if form == "local":
+        return LocalChangeSet(rows, None, meta)
+    name = "_cdc_stage_test_%d" % i
+    conn.register("stage_src", rows)
+    conn.execute("CREATE SCHEMA IF NOT EXISTS _cdc_stage")
+    conn.execute("CREATE OR REPLACE TABLE _cdc_stage.%s AS SELECT * EXCLUDE (txn), "
+                 "CAST(txn * 16 + 1000 AS UBIGINT) AS commit_lsn, CAST(txn AS UBIGINT) AS xid, "
+                 "TIMESTAMPTZ '2026-01-01 00:00:00+00' AS commit_ts FROM stage_src" % name)
+    conn.unregister("stage_src")
+    return RelationChangeSet("SELECT * FROM _cdc_stage.%s WHERE commit_lsn >= ?" % name, (0,), meta)
+
+
+def apply_sets(conn: LaneDB, target, meta, sets: List[List[Rec]], mode="stream", form="local", one_tx=False,
+               settings: Optional[ApplySettings] = None, check: bool = False):
+    """Apply each change set on D's lane (one lane transaction each, or all in one). Returns the list of
+    ApplyCounts. The relation form's change sets are staged before the first block opens (a block does not see
+    a table that another connection creates after the block's first statement)."""
     out = []
     settings = settings or test_settings()
-
-    def one(tx, recs, i):
-        rows = change_set_table(meta, recs)
-        if form == "local":
-            cs = LocalChangeSet(rows, None, meta)
-        else:
-            name = "_cdc_stage_test_%d" % i
-            # stage the rows as a pending log would: commit_lsn instead of txn
-            conn.register("stage_src", rows)
-            conn.execute("CREATE SCHEMA IF NOT EXISTS _cdc_stage")
-            conn.execute("CREATE OR REPLACE TABLE _cdc_stage.%s AS SELECT * EXCLUDE (txn), "
-                         "CAST(txn * 16 + 1000 AS UBIGINT) AS commit_lsn, CAST(txn AS UBIGINT) AS xid, "
-                         "TIMESTAMPTZ '2026-01-01 00:00:00+00' AS commit_ts FROM stage_src" % name)
-            conn.unregister("stage_src")
-            cs = RelationChangeSet("SELECT * FROM _cdc_stage.%s WHERE commit_lsn >= ?" % name, (0,), meta)
-        return apply_group(tx, target, cs, mode=mode, settings=settings)
-
+    css = [change_set(conn, meta, recs, form, i) for i, recs in enumerate(sets)]
     if one_tx:
-        with StandInTx(conn) as tx:
-            for i, s in enumerate(sets):
-                out.append(one(tx, s, i))
+        with conn.transaction(check=check) as tx:
+            for cs in css:
+                out.append(apply_group(tx, target, cs, mode=mode, settings=settings))
     else:
-        for i, s in enumerate(sets):
-            with StandInTx(conn) as tx:
-                out.append(one(tx, s, i))
+        for cs in css:
+            with conn.transaction(check=check) as tx:
+                out.append(apply_group(tx, target, cs, mode=mode, settings=settings))
     return out
 
 
@@ -100,7 +112,7 @@ def key_canon(meta, table):
     if table is None or table.num_rows == 0:
         return set()
     from apply_sim import canon
-    con = local_conn()
+    con = scratch()
     con.register("u", table)
     out = {tuple(r) for r in con.execute("SELECT %s FROM u" % ", ".join(canon(c.a, c.type)
                                                                          for c in meta.key_columns)).fetchall()}
@@ -122,12 +134,12 @@ def run_case(case, conn, form="local", table="t"):
         exc = {"invariant": ApplyInvariantError, "changeset": ChangeSetError}[case.error]
         with pytest.raises(exc):
             apply_sets(conn, target, case.meta, case.sets, mode=case.mode, form=form, one_tx=case.one_tx,
-                       settings=settings)
-        assert dest_canon(conn, target, case.meta) == before, "the caller's roll-back leaves the table as it was"
+                       settings=settings, check=True)
+        assert dest_canon(conn, target, case.meta) == before, "the lane's roll-back leaves the table as it was"
         info["error"] = case.error
         return info
     counts = apply_sets(conn, target, case.meta, case.sets, mode=case.mode, form=form, one_tx=case.one_tx,
-                        settings=settings)
+                        settings=settings, check=True)
     got = dest_canon(conn, target, case.meta)
     want = literal_rows_canon(list(case.meta.columns), case.expect)
     assert got == want, "%s/%s: destination differs:\n extra %s\n missing %s" % (case.name, form, got - want,
@@ -143,7 +155,7 @@ def run_case(case, conn, form="local", table="t"):
         info["unresolved"] = len(got_u)
     if case.twice:
         apply_sets(conn, target, case.meta, case.sets, mode=case.mode, form=form, one_tx=case.one_tx,
-                   settings=settings)
+                   settings=settings, check=True)
         again = dest_canon(conn, target, case.meta)
         assert again == got, "%s/%s: a second catch-up changed the table" % (case.name, form)
         info["idempotent"] = True
@@ -219,7 +231,7 @@ def catch_up_scenario(conn, seed: int, form: str = "local", table: str = "t", n_
     after = [t for t in txns if t > max(times)] if not early_split else txns[1:]
     split = rng.choice(after) if after and rng.random() < 0.5 else None
     parts = split_by_txn(log, [split] if split else [])
-    with StandInTx(conn) as tx:
+    with conn.transaction() as tx:
         cs_all = LocalChangeSet(change_set_table(meta, log), None, meta)
         removed = reduce_duplicates(tx, target, cs_all, settings=test_settings())
     counts = apply_sets(conn, target, meta, parts, mode="catch_up", form=form, one_tx=rng.random() < 0.5)
@@ -302,15 +314,12 @@ def repair(conn, target, meta, rows, replace: bool = True) -> None:
         return
     data = values_table(list(meta.columns), rows)
     if replace:
-        with StandInTx(conn) as tx:
+        with conn.transaction() as tx:
             repair_keys(tx, target, meta, data)
         return
-    conn.register("cdc_v2_test_repair", data)
-    try:
-        with StandInTx(conn) as tx:
-            tx.execute("INSERT INTO %s SELECT * FROM cdc_v2_test_repair" % target.sql())
-    finally:
-        conn.unregister("cdc_v2_test_repair")
+    with conn.transaction() as tx:
+        tx.register("cdc_v2_test_repair", data)
+        tx.execute("INSERT INTO %s SELECT * FROM cdc_v2_test_repair" % target.sql())
 
 
 def rounds_scenario(conn, seed: int, form: str = "local", table: str = "t", n_txn: int = 8, max_ops: int = 4,
@@ -355,7 +364,7 @@ def rounds_scenario(conn, seed: int, form: str = "local", table: str = "t", n_tx
         if not part:
             lo = end
             continue
-        with StandInTx(conn) as tx:
+        with conn.transaction() as tx:
             reduce_duplicates(tx, target, LocalChangeSet(change_set_table(meta, part), None, meta),
                               settings=test_settings())
         calls = apply_fn(conn, target, meta, [part] + ([part] if repeat else []), mode="catch_up", form=form)
