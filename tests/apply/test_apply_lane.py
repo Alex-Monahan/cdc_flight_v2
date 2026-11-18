@@ -336,3 +336,59 @@ def test_the_lane_exports_hugeint_as_an_opaque_value(db):
         t = tx.fetch_arrow("SELECT sum(x) AS s, CAST(sum(x) AS BIGINT) AS b FROM range(3) t(x)")
     assert not pa.types.is_integer(t.schema.field("s").type) and t.schema.field("b").type == pa.int64()
     assert t.column("b").to_pylist() == [3]
+
+
+# ------------------------------------------------------------------ the hazard of apply.md 2.8
+
+
+TOASTED = "toasted-key-" + "k" * 40                 # stands for a long key value; it must not appear in a message
+KT = TableMeta((Column(0, "id", "VARCHAR", key=True, unchanged_possible=True), Column(1, "v", "VARCHAR")))
+KC = TableMeta((Column(0, "a", "BIGINT", key=True), Column(1, "b", "VARCHAR", key=True, unchanged_possible=True),
+                Column(2, "v", "VARCHAR")))
+
+
+def _key_unchanged(meta, recs, flag_key):
+    """The change set as the engine delivers an UPDATE whose key column pgoutput sent as unchanged TOAST (H-003):
+    the key's a<i> NULL and, when `flag_key`, its u<i> true (apply ignores u<i> on a key column)."""
+    rows = change_set_table(meta, recs)
+    if flag_key:
+        for c in meta.key_columns:
+            if c.unchanged_possible:
+                rows = rows.append_column(c.u, pa.array([r.op == "u" and r.a.get(c.position) is None for r in recs],
+                                                        pa.bool_()))
+    return rows
+
+
+@pytest.mark.parametrize("flag_key", [True, False])
+@pytest.mark.parametrize("form", ["local", "relation"])
+@pytest.mark.parametrize("composite", [False, True])
+def test_a_key_sent_as_unchanged_is_refused(db, composite, form, flag_key):
+    """docs/design/apply.md 2.8: an UPDATE whose (TOASTed) key column arrives as "unchanged" has no key value.
+    apply refuses the change set (ApplyInvariantError, from the plan), in both modes, writes nothing, and names no
+    value."""
+    from cdc_v2.apply import ApplyInvariantError, RelationChangeSet
+    meta = KC if composite else KT
+    nv = len(meta.key_columns)                      # position of the value column
+    key = {0: "1", 1: "'%s'" % TOASTED} if composite else {0: "'%s'" % TOASTED}
+    start = [{**key, nv: "'old'"}]
+    other = {0: "2", 1: "'other'"} if composite else {0: "'other'"}
+    upd = {**({0: "1", 1: None} if composite else {0: None}), nv: "'new'"}
+    recs = R().c(1, {**other, nv: "'x'"}).u(2, upd).out
+    create_table(db, SCHEMA, "t", meta, start)
+    rows = _key_unchanged(meta, recs, flag_key)
+    if form == "local":
+        cs = LocalChangeSet(rows, None, meta)
+    else:
+        db.register("stage_src", rows)
+        db.execute("CREATE SCHEMA IF NOT EXISTS _cdc_stage")
+        db.execute("CREATE OR REPLACE TABLE _cdc_stage.k AS SELECT * EXCLUDE (txn), CAST(txn * 16 + 1000 AS UBIGINT) "
+                   "AS commit_lsn, CAST(txn AS UBIGINT) AS xid, TIMESTAMPTZ '2026-01-01 00:00:00+00' AS commit_ts "
+                   "FROM stage_src")
+        db.unregister("stage_src")
+        cs = RelationChangeSet("SELECT * FROM _cdc_stage.k", (), meta)
+    for mode in ("stream", "catch_up"):
+        with pytest.raises(ApplyInvariantError, match="without a key value") as e:
+            with db.transaction() as tx:
+                apply_group(tx, Target(SCHEMA, "t"), cs, mode=mode, settings=test_settings())
+        assert TOASTED not in str(e.value) and "'new'" not in str(e.value) and "other" not in str(e.value)
+        assert dest_canon(db, Target(SCHEMA, "t"), meta) == literal_rows_canon(list(meta.columns), start)

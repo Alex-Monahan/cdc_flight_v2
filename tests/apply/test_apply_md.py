@@ -141,7 +141,7 @@ ROWID_STABLE = ("row ids stay the same within a transaction: a committed row and
 
 
 def _rowid_stable(c):
-    """What C0 to K7/K8 rely on (docs/design/apply.md 3.2 step 4, 10): a row id read inside a transaction still
+    """What C0 to K7/K8 rely on (docs/design/apply.md 3.2 step 4, 11): a row id read inside a transaction still
     names the same row after the statements that run between C0 and K7/K8 (K1 deletes other rows; K2/K3 update
     rows in place, the key included; no LIST/MAP/UNION column is set: those rewrite the row, section 5.4), also
     for a row the transaction inserted itself; and a DELETE by that row id removes exactly that row."""

@@ -7,9 +7,9 @@ transaction that someone else opened and will commit.
 | Part | Where |
 |---|---|
 | Code | `src/cdc_v2/apply/` (`types.py`, `meta.py`, `changeset.py`, `plan.py`, `backend.py`, `statements.py`, `core.py`) |
-| Tests, tier T0 (default run) | `tests/apply/test_apply_types.py`, `test_apply_cases.py`, `test_apply_property.py` |
+| Tests, tier T0 (default run) | `tests/apply/test_apply_types.py`, `test_apply_cases.py`, `test_apply_property.py`, `test_apply_limits.py`, `test_apply_spill.py`, `test_apply_lane.py` (D's lane, section 10) |
 | Tests on MotherDuck (marker `md`) | `tests/apply/test_apply_md.py` |
-| Test model | `tests/apply/apply_sim.py` (simulated source table, oracle canonical forms), `apply_cases.py` (named cases), `apply_harness.py`, `apply_standin.py` (stand-in for D's lane transaction) |
+| Test model | `tests/apply/apply_sim.py` (simulated source table, oracle canonical forms), `apply_cases.py` (named cases), `apply_harness.py`, `apply_lane.py` (the destination: D's real lane, section 10) |
 | Campaign, speed | `tests/apply/apply_campaign.py`, `tests/apply/apply_perf.py` |
 | Evidence | `evidence/p3/apply/` (section 9) |
 
@@ -21,9 +21,10 @@ truncate(tx, Target("public", "t"))
 reduce_duplicates(tx, target, change_set)        # catch-up, design 7.3 step 1
 ```
 
-`tx` is a lane transaction (C4). Apply calls `tx.execute`, `tx.fetch_arrow` and `tx.register` only, and never
-begins, commits, rolls back or fences. Until package D is merged the tests use `apply_standin.StandInTx`, which has
-D's call shapes over a plain DuckDB connection (local or MotherDuck).
+`tx` is a lane transaction of package D (C4: `md.Transaction`). Apply calls `tx.execute`, `tx.fetch_arrow` and
+`tx.register` only, and never begins, commits, rolls back or fences. Every test runs on D's real lane, on a local
+DuckDB in memory or on MotherDuck (`tests/apply/apply_lane.py`); the stand-in of the first rounds is deleted.
+Section 10 says what apply keeps to on that lane.
 
 ## 1. What a change set means
 
@@ -222,7 +223,7 @@ repair read through it.
 * A NULL `u<i>` means "not unchanged". A `u<i>` column is honoured whenever it is present, also if `meta` does not
   flag the column (otherwise its NULL `a<i>` would be written as a value). `u<i>` on a key column is ignored: a key
   value is always present; a record without its key value raises `ApplyInvariantError` (an unchanged TOASTed key
-  column, which pgoutput can send, is a hazard for the catalogue).
+  column, which pgoutput can send: section 2.8).
 * A key change is recognised only when the `c` with `k<i>` directly follows the `d` of that old key in the same
   transaction (the engine's order). Otherwise the link is broken: values that need it are unresolved.
 * `op = 't'` (or anything but `c`, `u`, `d`) raises `ChangeSetError`, as do two records with one
@@ -243,6 +244,37 @@ repair read through it.
   transaction and drops every table and the schema before returning (one `DROP TABLE` per table, section 5).
 * `TableMeta` refuses two names that differ only by case. Any other string is a destination name, including
   `rowid` (section 4.3), quotes, dots, spaces, keywords, non-ASCII and our own column names (`a1`, `x0`, `n`).
+
+### 2.8 Hazard: a TOASTed key column sent as "unchanged"
+
+**What.** An `UPDATE` that does not change a key column can arrive with no value for that key column. Then apply
+cannot find the row, and it refuses the change set.
+
+**Mechanism.** Postgres moves a value out of the row (TOAST, "external") when the row is larger than about 2 KB
+after compression. A key value can be external in the table even though the index holds it inline (a B-tree entry
+may be up to about 2.7 KB). pgoutput then sends the column as `u` ("unchanged toasted datum") in the new image of
+an `UPDATE` that did not change it (H-003, `docs/wal_hazards.md`). Under the default replica identity the old key
+is sent only when the key changed, so the record has no key value at all. Debezium replaces the `u` with its
+unavailable-value placeholder (default `__debezium_unavailable_value`); our engine turns the placeholder into
+`u<i>` = true and `a<i>` = NULL (`docs/design/engine.md` section 3, "Unchanged (H-003)"). With
+`REPLICA IDENTITY FULL` the old image is complete and Debezium fills the unchanged value from it (H-003), so the
+key is present.
+
+**What apply does.** A key value is never taken from "unchanged": `u<i>` on a key column is ignored (2.7), and a
+record whose key value is NULL (or whose old key `k<i>` is partly NULL) raises `ApplyInvariantError` from the
+plan, before any statement that changes the destination table, in both modes and both forms. The message gives
+the table and the number of such records, never a value. The caller rolls back. In the stream this is a failure
+of the table: after `apply.max_table_attempts` the table leaves the stream (state `quarantined`, alert; core
+design 3, plan C10), and the quarantine of SPEC 4.0 takes it from there. Apply never guesses the key, and never
+matches a row by its other columns.
+
+**Prevention** (not apply's; owner's question in `STATUS.md`, with F-7): a table whose key column can be TOASTed
+(a long `text`, `varchar` or `bytea` key) is replicated only with `REPLICA IDENTITY FULL`; until the owner rules,
+such a table without `FULL` is refused (STATUS, "From the apply package"). With `FULL` the record carries the key.
+
+**Test.** `test_apply_lane.py::test_a_key_sent_as_unchanged_is_refused` (a single key and a composite key with one
+part sent as unchanged, `u<i>` set or absent, both forms: `ApplyInvariantError`, nothing written, no value in the
+message).
 
 ## 3. Statements for a table with a key
 
@@ -404,7 +436,10 @@ unless another file is named).
    campaign, seeds 10002906, 10005444, 10005702; named cases `uuid_keys_in_one_transaction` and others). On
    MotherDuck a DELETE that joined a stored `-0` with an Arrow-side `0` by the plain DOUBLE column found no row
    (where `=` says equal); `repair_keys`, which compares by the source's equality, therefore compares FLOAT,
-   DOUBLE and INTERVAL through an expression (`types.source_wrap`). (A first fix cast DATE to
+   DOUBLE and INTERVAL through an expression (`types.source_wrap`). The probe of `test_apply_md.py`
+   (`duckdb_semantics.json`, key "a stored -0 (DOUBLE) against an Arrow-side 0") measures the join both ways,
+   for a committed row and for a row the same transaction wrote, locally and on MotherDuck
+   (`docs/spike/md_semantics.md`, "Facts apply relies on"). (A first fix cast DATE to
    TIMESTAMP; the review found that this overflows for dates past 294247 AD, which Postgres and DuckDB allow, and
    puts the value into the error text: named cases `*date*beyond_the_timestamp_range`.) The cost: DuckDB cannot
    prune the destination scan by the join's key range for DATE, TIMESTAMP, FLOAT, DOUBLE and INTERVAL keys; every
@@ -418,6 +453,10 @@ unless another file is named).
    JSON become VARCHAR; TIMETZ becomes TIME and loses the offset). The planning connection converts losslessly;
    key values that come back through the lane connection travel as text and are cast back (`RemoteBackend.
    fetch_arrow`), and lookups return candidate numbers, not keys. Found by the property test (seeds 0 and 260).
+   D's lane sets `arrow_lossless_conversion` on every connection (destination.md 2.1): there UUID and JSON
+   arrive as Arrow extension types, and TIME WITH TIME ZONE and **HUGEINT as an opaque 16-byte value**, not a
+   number. `sum` of a BIGINT is a HUGEINT; the relation form read the keyless plan's two sums through the lane
+   and failed (`int()` of the bytes) until they were cast to BIGINT (section 10).
 9. **A UNION whose member holds NULL arrives through Arrow as NULL** (local): the oracle's rule is met by the
    transport; a change set staged by SQL could still hold one, and apply would write it as given.
 10. **A column named `rowid` hides the row id** (both; 4.3).
@@ -447,11 +486,12 @@ the report for the comparison.
 ## 8. How to run
 
 ```sh
-uv run -q pytest -q tests/apply      # default run: every named case (local form; relation form for catch-up and
-                                     # error cases), the regression cases, 3 examples per property, one small case
-                                     # of each negative control; about 7 s on this laptop
+uv run -q pytest -q tests/apply      # default run, on D's lane over local DuckDB: every named case (local form;
+                                     # relation form for catch-up and error cases), the regression cases, the
+                                     # lane tests, 3 examples per property, one small case of each negative
+                                     # control; about 15 s on this laptop
 CDC_V2_APPLY_FULL=1 CDC_V2_APPLY_EXAMPLES=300 CDC_V2_APPLY_SHAPE_SEEDS=25 uv run -q pytest -q tests/apply   # full
-CDC_V2_MD_PREFIX=cdc_v2_t_a_ tools/with-env uv run pytest -m md tests/apply          # MotherDuck
+CDC_V2_MD_PREFIX=cdc_v2_t_a_ tools/with-env uv run pytest -m md tests/apply/test_apply_md.py   # MotherDuck
 CDC_V2_MD_PREFIX=cdc_v2_t_a_ CDC_V2_APPLY_PERF=1 tools/with-env uv run pytest -m md tests/apply -k speed
 uv run python tests/apply/apply_campaign.py --seconds 600 --controls 200            # campaign and controls, local
 uv run python tests/apply/apply_checkcost.py                                         # cost of check_new_keys
@@ -466,44 +506,96 @@ how many examples it took (`campaign_local.json`, `negative_controls_examples_to
 
 | File | What |
 |---|---|
-| `duckdb_semantics.json` | section 5, local and MotherDuck side by side |
-| `md_cases.json` | every named case on MotherDuck, both forms, with statements and seconds |
-| `md_property.json` | property examples on MotherDuck |
+| `duckdb_semantics.json` | section 5, local and MotherDuck side by side, with the row-id and `-0` probes |
+| `md_cases.json` | every named case on MotherDuck through D's lane, both forms, with statements and seconds; commit and command |
+| `md_property.json` | property examples on MotherDuck through D's lane; commit and command |
+| `after_d_lane.json` | section 10: the default run and the full matrix on D's lane, with this round's code and with the code before it |
 | `campaign_local.json` | the campaign: summary, seed range, every failing seed, the negative controls, the code version (second fix round: 10,249 seeds, 192,121 records, six kinds including `keyed_form`, 0 failures; the second reviewer's keyed stream program, unchanged, on seeds 1000-2835 and 200000-201686 plus its 15 refused seeds: 3,525 seeds, 0 bad) |
 | `check_new_keys_cost.json` | the cost of the stream start-state check (2.5) |
 | `shapes.json` | the SQL of every statement shape for a sample table |
 | `perf_md.json` | speed indications |
 
-## 10. Not done, limits
+## 10. On package D's lane
+
+Package D is merged; apply runs on its lane (`md.Transaction`, contract C4 as built: `docs/design/destination.md`
+sections 2.2, 13 to 15). Every test of this package does too (`tests/apply/apply_lane.py`): the default run on a
+local DuckDB in memory, `test_apply_md.py` on MotherDuck. The stand-in of the first rounds is deleted: no test
+needs a fault that D's lane cannot give (`test_apply_lane.py` injects D's own errors at every call through a thin
+wrapper over the real lane).
+
+What apply keeps to, and what holds it:
+
+1. **Apply catches nothing of D's.** `md.DestinationError` (`StatementError`, `ConnectionLost`, `Conflict`,
+   `FenceLost`), `DeadlineExceeded` and `md.LaneMisuse` reach apply's caller as the lane raised them: the same
+   object, from any call apply makes, and the lane's roll-back leaves the table as it was
+   (`test_d_errors_pass_through_unchanged_from_every_call`: every call of five named cases, both forms, one of
+   D's six statement errors at each). Apply's only `except` is for the planning database's own out-of-memory
+   error (`ApplySpillFull`); its clean-up touches no lane call after an error (`_rowid_free` does not rename back
+   after an error: the roll-back undoes the rename).
+2. **A statement that the destination refuses** (a value that does not fit a column, a constraint, a name that
+   does not exist) **reaches the caller as D's `md.StatementError`**, with `error_class` (the class of the client's
+   error) and `statement` (the kind of statement, from the client's parser), and never a value: the lane keeps
+   nothing of the client's text (destination.md section 5). A further call on that transaction is the lane's
+   `LaneMisuse`, and leaving the block raises the `StatementError` again
+   (`test_a_refused_value_is_d_s_statement_error_without_the_value`, both forms; on MotherDuck
+   `test_apply_md.py::test_lane_rules_on_motherduck`).
+3. **Counts only from INSERT, UPDATE and DELETE without RETURNING.** C4's `execute` returns a count for exactly
+   these, and `None` for `CREATE TABLE ... AS`, other DDL and any statement with `RETURNING`. Apply sends no
+   `RETURNING`. It reads a count only through `_Counting.count`, for K1, K3, K6, K7, K8, L1, L2, RK1, RK2, the
+   reduction (`RD`) and `truncate` (`T`); `_Counting.execute` returns nothing, so the plan's `CREATE TABLE ... AS`
+   and DDL cannot be read. A missing count is an error (`RuntimeError`), never 0: the old `... or 0` let an
+   insert-only change set without a check of its count (L2, or K6 with `check_new_keys` off) report 0 rows and go
+   on. Every apply test runs with a check that each counted statement is of one of the three kinds by the client's
+   parser, as the lane decides (`conftest.py`, `apply_lane.counted_statements`;
+   `test_counts_are_read_from_insert_update_and_delete_only`, `test_a_missing_count_is_never_read_as_zero`,
+   `test_counting_hands_back_no_result_but_a_count`).
+4. **Registered names** are `cdc_v2_apply_<step>` (`del`, `ins`, `upd`, `copy`, `copy_roots`, `neg`, `plus`,
+   `cand`, `keys`, `repair_rows`, `repair_keys`), within D's rule `^[a-z_][a-z0-9_]{0,62}$`. A name registered
+   again in the same block gets the new data (slices of one change set; several change sets in one block);
+   apply does not unregister, the lane releases every name when the block ends. Checked at every call of every
+   named case (`apply_lane.Checked`) and by `test_registered_names_are_replaced_and_gone_after_the_block` (local
+   and on MotherDuck).
+5. **Deadlines.** Apply passes no deadline of its own (None: the lane's statement and block deadlines hold); a
+   caller that wants one gives the block its `Deadline`. Checked at every call of every named case; a block
+   deadline that passes while apply plans is the lane's `DeadlineExceeded`
+   (`test_a_deadline_of_the_block_passes_through`).
+6. **What the stand-in hid**, and what changed for it:
+   * the lossless Arrow export (5.8): the keyless plan's two sums are cast to BIGINT. On the code before this
+     round, with the real lane: 17 keyless named cases in the relation form, the keyless property and the new
+     tests failed (`after_d_lane.json`); with the stand-in they had passed, because its connection exported a
+     HUGEINT as a decimal;
+   * `execute` returns `None` for `CREATE TABLE ... AS` (and `RETURNING`): nothing in apply reads it (point 3);
+   * errors are D's (`StatementError`, `LaneMisuse`), not DuckDB's (points 1, 2);
+   * calls after a failure are refused (`LaneMisuse`): apply makes none (point 1);
+   * one thread only: apply starts no thread and uses the transaction from the caller's thread; a call from
+     another thread is the lane's `LaneMisuse` (`test_a_call_from_another_thread_is_the_lane_s_lane_misuse`).
+     The planning database is per thread (3.1).
+7. **The planning database** is shared by the calls of a thread; its cursors set `TimeZone` and
+   `arrow_lossless_conversion` with `SET SESSION`, never a plain `SET`, which reaches every connection of that
+   database (D's finding 21; `test_planning_settings_stay_with_the_cursor`). Already so on main before this
+   round; the test now also checks that another cursor keeps the database's own time zone.
+
+What a block costs on the lane: D's fence statement and `COMMIT` (and, on a lane's first block, its
+registration) come on top of apply's statements; `ApplyCounts.statements` counts apply's only.
+
+## 11. Not done, limits
 
 * History tables and soft deletes (SPEC 8.1, 8.2) are P4. The plan computes, per record, its arrival and the
   final row of each key; a history table needs exactly that, from the same pass over the change set.
 * A table with a deferrable key reaches apply as a table without a key (rule K, not this package).
-* A key column sent as "unchanged" (a TOASTed key) cannot be applied: `ApplyInvariantError`.
+* A key column sent as "unchanged" (a TOASTed key) cannot be applied: `ApplyInvariantError` (2.8).
 * Speed is measured from this laptop only; Flight numbers are P9.
 * The relation form sends about 40 statements per change set (one CREATE TABLE and one DROP TABLE per plan step;
   `md_cases.json`: median 41 against 2 for the local form). It serves oversized transactions and pending logs,
   where the rows dominate; merging steps would lower it.
 * `join_wrap` covers DATE, TIMESTAMP and TIMESTAMP WITH TIME ZONE; the other timestamp precisions are not produced
   by C3 today.
-* Towards package D's lane (D is reviewed, not merged; the stand-in `tests/apply/apply_standin.py` stays until
-  then, and replacing it by D's lane is a separate small step after D's merge):
-  * a statement that the destination refuses (a value that does not fit a column, a constraint) reaches the
-    caller as D's `md.StatementError`, with the class of the error and the kind of statement, never a value. Apply
-    catches nothing of D's: `DestinationError`, `DeadlineExceeded` and `LaneMisuse` pass through unchanged (with
-    the stand-in, DuckDB's own exception passes through, and its text can name a value);
-  * apply relies on the count of `execute` only for INSERT, UPDATE and DELETE without `RETURNING` (it sends no
-    `RETURNING`);
-  * the names apply passes to `tx.register` match `^[a-z_][a-z0-9_]{0,62}$` (`cdc_v2_apply_<relation>`; the
-    stand-in asserts it);
-  * a deadline is a `Deadline` object or None; apply passes none of its own;
-  * the cursors of the shared planning database set their options with `SET SESSION`, never a plain `SET`
-    (a plain `SET arrow_lossless_conversion` is global and would reach the other calls of the thread;
-    `test_planning_settings_stay_with_the_cursor`).
 * `reduce_duplicates` plans a local change set in the same planning database as `apply_group`, under the same
   `ApplySettings` (spill directory required; `ApplySpillFull` beyond the limits).
 * C0 to K7/K8 relies on `rowid` staying the same within one transaction, also for a row that an earlier change
   set of the transaction inserted and that is not committed yet (named case
-  `round3_copy_root_inserted_earlier_in_the_transaction`, both forms, local and on MotherDuck).
+  `round3_copy_root_inserted_earlier_in_the_transaction`, both forms, local and on MotherDuck; the probe of
+  `duckdb_semantics.json`, key "row ids stay the same within a transaction ...", and
+  `docs/spike/md_semantics.md`, "Facts apply relies on"). No DuckDB document promises it.
 * Catch-up rule 1 with two creates at the root key (`d(K) c(K, k=K)` twice, each taking a value from the start
   row) stays unresolved, although it could be resolved (2.3).
